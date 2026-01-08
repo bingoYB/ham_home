@@ -1,0 +1,28 @@
+{
+  "name": "@hamhome/api",
+  "version": "1.0.0",
+  "private": true,
+  "description": "HamHome 后端 API (Cloudflare Workers + Hono)",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "build": "wrangler deploy --dry-run",
+    "deploy": "wrangler deploy",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "hono": "^4.0.0",
+    "@hono/zod-validator": "^0.2.0",
+    "zod": "^3.22.0",
+    "nanoid": "^5.0.0",
+    "drizzle-orm": "^0.30.0",
+    "@hamhome/db": "workspace:*",
+    "@hamhome/types": "workspace:*"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20240101.0",
+    "wrangler": "^3.0.0",
+    "typescript": "^5.3.0"
+  }
+}
+

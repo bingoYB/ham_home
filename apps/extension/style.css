@@ -1,0 +1,4 @@
+@import "tailwindcss";
+@import "@hamhome/ui/globals.css";
+@source "../../packages/ui/src/**/*.{js,ts,jsx,tsx}";
+

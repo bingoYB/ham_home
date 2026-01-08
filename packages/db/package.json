@@ -1,0 +1,37 @@
+{
+  "name": "@hamhome/db",
+  "version": "1.0.0",
+  "private": true,
+  "description": "HamHome 数据库 Schema (Drizzle ORM)",
+  "type": "module",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./schema": {
+      "types": "./src/schema.ts",
+      "default": "./src/schema.ts"
+    }
+  },
+  "files": ["src"],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist",
+    "generate": "drizzle-kit generate:sqlite",
+    "migrate": "drizzle-kit migrate"
+  },
+  "dependencies": {
+    "drizzle-orm": "^0.30.0"
+  },
+  "devDependencies": {
+    "drizzle-kit": "^0.20.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.3.0"
+  }
+}
+

@@ -1,0 +1,35 @@
+{
+  "name": "extension",
+  "version": "1.0.0",
+  "private": true,
+  "description": "HamHome 浏览器插件",
+  "scripts": {
+    "dev": "wxt",
+    "dev:firefox": "wxt -b firefox",
+    "build": "wxt build",
+    "build:firefox": "wxt build -b firefox",
+    "zip": "wxt zip",
+    "clean": "rm -rf .wxt .output dist"
+  },
+  "dependencies": {
+    "@hamhome/ai": "workspace:*",
+    "@hamhome/types": "workspace:*",
+    "@hamhome/ui": "workspace:*",
+    "@hamhome/utils": "workspace:*",
+    "@mozilla/readability": "^0.5.0",
+    "lucide-react": "^0.469.0",
+    "nanoid": "^5.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "turndown": "^7.2.0"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.0.260",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@types/turndown": "^5.0.5",
+    "@wxt-dev/module-react": "^1.1.5",
+    "typescript": "^5.7.0",
+    "wxt": "^0.20.13"
+  }
+}
