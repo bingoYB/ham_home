@@ -1,7 +1,7 @@
 /**
  * 编辑书签弹窗组件
+ * UI 层：负责 JSX 渲染、样式布局、事件绑定
  */
-import { useState, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -20,8 +20,8 @@ import {
 } from '@hamhome/ui';
 import { Loader2, Trash2 } from 'lucide-react';
 import { TagInput } from '@/components/common/TagInput';
-import { bookmarkStorage } from '@/lib/storage';
-import type { LocalBookmark, LocalCategory } from '@/types';
+import { useEditBookmark } from '@/hooks/useEditBookmark';
+import type { LocalBookmark } from '@/types';
 
 interface EditBookmarkDialogProps {
   bookmark: LocalBookmark | null;
@@ -38,76 +38,28 @@ export function EditBookmarkDialog({
   onSaved,
   onDeleted,
 }: EditBookmarkDialogProps) {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [categoryId, setCategoryId] = useState<string | null>(null);
-  const [tags, setTags] = useState<string[]>([]);
-  const [categories, setCategories] = useState<LocalCategory[]>([]);
-  const [allTags, setAllTags] = useState<string[]>([]);
-  const [saving, setSaving] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-
-  // 加载分类和标签
-  useEffect(() => {
-    if (open) {
-      Promise.all([
-        bookmarkStorage.getCategories(),
-        bookmarkStorage.getAllTags(),
-      ]).then(([cats, existingTags]) => {
-        setCategories(cats);
-        setAllTags(existingTags);
-      });
-    }
-  }, [open]);
-
-  // 填充表单数据
-  useEffect(() => {
-    if (bookmark) {
-      setTitle(bookmark.title);
-      setDescription(bookmark.description);
-      setCategoryId(bookmark.categoryId);
-      setTags(bookmark.tags);
-    }
-  }, [bookmark]);
-
-  const handleSave = async () => {
-    if (!bookmark || !title.trim()) return;
-
-    setSaving(true);
-    try {
-      await bookmarkStorage.updateBookmark(bookmark.id, {
-        title: title.trim(),
-        description: description.trim(),
-        categoryId,
-        tags,
-      });
-      onSaved();
-      onOpenChange(false);
-    } catch (err) {
-      console.error('[EditBookmarkDialog] Save error:', err);
-      alert('保存失败');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!bookmark) return;
-
-    if (!confirm('确定要删除这个书签吗？')) return;
-
-    setDeleting(true);
-    try {
-      await bookmarkStorage.deleteBookmark(bookmark.id);
-      onDeleted();
-      onOpenChange(false);
-    } catch (err) {
-      console.error('[EditBookmarkDialog] Delete error:', err);
-      alert('删除失败');
-    } finally {
-      setDeleting(false);
-    }
-  };
+  const {
+    title,
+    description,
+    categoryId,
+    tags,
+    categories,
+    allTags,
+    saving,
+    deleting,
+    setTitle,
+    setDescription,
+    setCategoryId,
+    setTags,
+    save,
+    deleteBookmark,
+  } = useEditBookmark({
+    bookmark,
+    open,
+    onSaved,
+    onDeleted,
+    onClose: () => onOpenChange(false),
+  });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -116,66 +68,23 @@ export function EditBookmarkDialog({
           <DialogTitle>编辑书签</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-4 py-4">
-          <div className="space-y-2">
-            <Label htmlFor="edit-title">标题</Label>
-            <Input
-              id="edit-title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="输入标题"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="edit-description">摘要</Label>
-            <Textarea
-              id="edit-description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="输入摘要"
-              rows={3}
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label>分类</Label>
-            <Select
-              value={categoryId || 'uncategorized'}
-              onValueChange={(v) =>
-                setCategoryId(v === 'uncategorized' ? null : v)
-              }
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="选择分类" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="uncategorized">未分类</SelectItem>
-                {categories.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="space-y-2">
-            <Label>标签</Label>
-            <TagInput
-              value={tags}
-              onChange={setTags}
-              placeholder="输入标签后回车"
-              maxTags={10}
-              suggestions={allTags}
-            />
-          </div>
-        </div>
+        <EditBookmarkForm
+          title={title}
+          description={description}
+          categoryId={categoryId}
+          tags={tags}
+          categories={categories}
+          allTags={allTags}
+          onTitleChange={setTitle}
+          onDescriptionChange={setDescription}
+          onCategoryChange={setCategoryId}
+          onTagsChange={setTags}
+        />
 
         <DialogFooter className="flex justify-between sm:justify-between">
           <Button
             variant="destructive"
-            onClick={handleDelete}
+            onClick={deleteBookmark}
             disabled={deleting || saving}
           >
             {deleting ? (
@@ -195,7 +104,7 @@ export function EditBookmarkDialog({
               取消
             </Button>
             <Button
-              onClick={handleSave}
+              onClick={save}
               disabled={saving || deleting || !title.trim()}
             >
               {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
@@ -208,3 +117,88 @@ export function EditBookmarkDialog({
   );
 }
 
+// ========== 子组件 ==========
+
+interface EditBookmarkFormProps {
+  title: string;
+  description: string;
+  categoryId: string | null;
+  tags: string[];
+  categories: { id: string; name: string }[];
+  allTags: string[];
+  onTitleChange: (value: string) => void;
+  onDescriptionChange: (value: string) => void;
+  onCategoryChange: (value: string | null) => void;
+  onTagsChange: (value: string[]) => void;
+}
+
+function EditBookmarkForm({
+  title,
+  description,
+  categoryId,
+  tags,
+  categories,
+  allTags,
+  onTitleChange,
+  onDescriptionChange,
+  onCategoryChange,
+  onTagsChange,
+}: EditBookmarkFormProps) {
+  return (
+    <div className="space-y-4 py-4">
+      <div className="space-y-2">
+        <Label htmlFor="edit-title">标题</Label>
+        <Input
+          id="edit-title"
+          value={title}
+          onChange={(e) => onTitleChange(e.target.value)}
+          placeholder="输入标题"
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label htmlFor="edit-description">摘要</Label>
+        <Textarea
+          id="edit-description"
+          value={description}
+          onChange={(e) => onDescriptionChange(e.target.value)}
+          placeholder="输入摘要"
+          rows={3}
+        />
+      </div>
+
+      <div className="space-y-2">
+        <Label>分类</Label>
+        <Select
+          value={categoryId || 'uncategorized'}
+          onValueChange={(v) =>
+            onCategoryChange(v === 'uncategorized' ? null : v)
+          }
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="选择分类" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="uncategorized">未分类</SelectItem>
+            {categories.map((c) => (
+              <SelectItem key={c.id} value={c.id}>
+                {c.name}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="space-y-2">
+        <Label>标签</Label>
+        <TagInput
+          value={tags}
+          onChange={onTagsChange}
+          placeholder="输入标签后回车"
+          maxTags={10}
+          suggestions={allTags}
+        />
+      </div>
+    </div>
+  );
+}

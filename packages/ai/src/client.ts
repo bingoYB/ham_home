@@ -1,192 +1,408 @@
+import { generateObject, generateText } from 'ai';
+import { createOpenAI } from '@ai-sdk/openai';
+import { createAnthropic } from '@ai-sdk/anthropic';
+import type { LanguageModelV1 } from 'ai';
 import type {
   AIClientConfig,
   AnalyzeBookmarkInput,
   BookmarkAnalysisResult,
   AIClient,
+  AIProvider,
+  TagSuggestionResult,
+  CategorySuggestionResult,
+} from './types';
+import {
+  BookmarkAnalysisSchema,
+  TagSuggestionsSchema,
+  CategorySuggestionsSchema,
 } from './types';
 
 /**
  * 系统提示词 - 用于书签分析
+ * 参考 SmartBookmark 的提示词设计，强调结构化输出和约束
  */
-const SYSTEM_PROMPT = `你是一个专业的书签管理助手。你的任务是分析网页内容并生成结构化的元数据。
+const BOOKMARK_ANALYSIS_SYSTEM_PROMPT = `你是一个专业的网页内容分析专家，擅长提取文章的核心主题并生成准确的元数据。
 
-请根据提供的网页内容，生成以下信息：
-1. title: 优化后的标题，简洁明了，不超过50字
-2. summary: 一句话摘要，概括文章核心内容，使用中文，不超过200字
-3. category: 推荐一个最合适的分类名称（如：技术、设计、生活、新闻、教程、工具、娱乐等）
-4. tags: 3-5个相关标签，用于检索
+你的任务是分析网页内容，一次性生成以下所有信息：
+1. title: 优化后的标题
+2. summary: 一句话摘要
+3. category: 推荐分类
+4. tags: 相关标签
 
-请以 JSON 格式返回，格式如下：
-{"title": "...", "summary": "...", "category": "...", "tags": ["tag1", "tag2", ...]}
+请严格按照输出格式要求返回结果。`;
 
-重要：只返回 JSON，不要包含其他文字说明。`;
+/**
+ * 智能截断文本（用于 Prompt 构建）
+ */
+function smartTruncate(text: string, maxLength: number): string {
+  if (!text || text.length <= maxLength) return text;
+  
+  // 检测是否以中文为主
+  const sample = text.slice(0, 100);
+  const cjkMatch = sample.match(/[\u4e00-\u9fa5]/g);
+  const isCJK = cjkMatch && cjkMatch.length > 30;
+  
+  if (isCJK) {
+    // 中文：在标点处截断
+    const truncated = text.slice(0, maxLength);
+    const punctuation = /[，。！？；,!?;]/;
+    for (let i = truncated.length - 1; i >= maxLength - 50; i--) {
+      if (punctuation.test(truncated[i])) {
+        return truncated.slice(0, i + 1);
+      }
+    }
+    return truncated;
+  } else {
+    // 英文：在空格处截断
+    const truncated = text.slice(0, maxLength);
+    const lastSpace = truncated.lastIndexOf(' ');
+    if (lastSpace > maxLength * 0.7) {
+      return truncated.slice(0, lastSpace);
+    }
+    return truncated;
+  }
+}
+
+/**
+ * 构建结构化的用户提示词
+ * 参考 SmartBookmark 的 makeChatPrompt 实现
+ */
+function buildUserPrompt(input: AnalyzeBookmarkInput): string {
+  // 清理 URL（去除查询参数和 hash）
+  const cleanUrl = input.url
+    .replace(/\?.+$/, '')
+    .replace(/[#&].*$/, '')
+    .replace(/\/+$/, '');
+
+  // 构建结构化的网页信息
+  let pageInfo = `title: ${input.title}\nurl: ${cleanUrl}`;
+  
+  // 添加摘要（优先级高）
+  if (input.excerpt) {
+    pageInfo += `\nexcerpt: ${smartTruncate(input.excerpt, 300)}`;
+  }
+  
+  // 添加 metadata 中的 keywords（对标签生成很有帮助）
+  if (input.metadata?.keywords) {
+    pageInfo += `\nkeywords: ${input.metadata.keywords.slice(0, 300)}`;
+  }
+  
+  // 添加正文内容（仅当可读时）
+  if (input.content && input.isReaderable !== false) {
+    pageInfo += `\ncontent: ${smartTruncate(input.content, 500)}`;
+  }
+  
+  // 添加网站名称
+  if (input.metadata?.siteName) {
+    pageInfo += `\nsite: ${input.metadata.siteName}`;
+  }
+
+  // 构建分类上下文
+  let categoryContext = '';
+  if (input.existingCategories && input.existingCategories.length > 0) {
+    categoryContext = `\n用户已有分类: ${input.existingCategories.join(', ')}`;
+  }
+  if (input.presetCategories && input.presetCategories.length > 0) {
+    categoryContext += `\n预设分类选项: ${input.presetCategories.join(', ')}`;
+  }
+
+  // 构建标签上下文
+  let tagContext = '';
+  if (input.existingTags && input.existingTags.length > 0) {
+    tagContext = `\n用户已有标签: ${input.existingTags.slice(0, 20).join(', ')}`;
+  }
+
+  return `请分析以下网页内容，生成书签元数据：
+
+网页信息：
+${pageInfo}
+${categoryContext}
+${tagContext}
+
+要求：
+1. title: 优化标题，简洁明了，保留核心信息，不超过50字
+2. summary: 一句话摘要，客观描述核心内容，使用中文，不超过200字
+3. category: 推荐一个最合适的分类
+   - 优先从用户已有分类中选择
+   - 如果不合适，可以推荐预设分类或新分类名称
+4. tags: 生成3-5个关键词标签
+   - 简洁：中文2-5字，英文不超过2个单词
+   - 准确：反映网页核心主题
+   - 多样：涵盖网站/领域/具体内容
+   - 避免与已有标签重复`;
+}
+
+/**
+ * 创建语言模型实例
+ */
+function createLanguageModel(config: AIClientConfig): LanguageModelV1 {
+  const { provider, apiKey, baseUrl, model } = config;
+
+  switch (provider) {
+    case 'openai':
+    case 'custom': {
+      const openai = createOpenAI({
+        apiKey: apiKey || '',
+        baseURL: baseUrl || 'https://api.openai.com/v1',
+      });
+      return openai(model || 'gpt-3.5-turbo');
+    }
+
+    case 'anthropic': {
+      const anthropic = createAnthropic({
+        apiKey: apiKey || '',
+        baseURL: baseUrl,
+      });
+      return anthropic(model || 'claude-3-haiku-20240307');
+    }
+
+    case 'ollama': {
+      // Ollama 兼容 OpenAI API
+      const ollama = createOpenAI({
+        baseURL: baseUrl || 'http://localhost:11434/v1',
+        apiKey: 'ollama', // Ollama 不需要真实的 API key
+      });
+      return ollama(model || 'llama3');
+    }
+
+    default:
+      throw new Error(`Unsupported provider: ${provider}`);
+  }
+}
 
 /**
  * 创建 AI 客户端
  */
 export function createAIClient(config: AIClientConfig): AIClient {
+  const model = createLanguageModel(config);
+  const { temperature = 0.3, maxTokens = 1000 } = config;
+
   return {
-    async analyzeBookmark(
-      input: AnalyzeBookmarkInput
-    ): Promise<BookmarkAnalysisResult> {
-      // 构建用户消息
-      const userMessage = `请分析以下网页内容：
-
-URL: ${input.url}
-原始标题: ${input.title}
-
-正文内容:
-${input.content.slice(0, 4000)}`;
+    async analyzeBookmark(input: AnalyzeBookmarkInput): Promise<BookmarkAnalysisResult> {
+      // 使用新的结构化提示词构建器
+      const userMessage = buildUserPrompt(input);
 
       try {
-        const result = await callAI(config, userMessage);
-        return result;
+        const { object } = await generateObject({
+          model,
+          schema: BookmarkAnalysisSchema,
+          system: BOOKMARK_ANALYSIS_SYSTEM_PROMPT,
+          prompt: userMessage,
+          temperature,
+          maxTokens,
+        });
+
+        return {
+          title: object.title || input.title || '未命名书签',
+          summary: object.summary || '',
+          category: object.category || '未分类',
+          tags: cleanTags(object.tags || []),
+        };
       } catch (error) {
         console.error('[@hamhome/ai] AI analysis failed:', error);
-        // 返回默认值而非抛出异常
-        return {
-          title: input.title || '未命名书签',
-          summary: '',
-          category: '未分类',
-          tags: [],
-        };
+        // 返回默认值而非抛出异常，使用降级策略
+        return getFallbackResult(input);
       }
     },
   };
 }
 
 /**
- * 调用 AI API
+ * 清理标签（参考 SmartBookmark）
  */
-async function callAI(
-  config: AIClientConfig,
-  userMessage: string
-): Promise<BookmarkAnalysisResult> {
-  const { provider, apiKey, baseUrl, model, temperature = 0.3, maxTokens = 1000 } = config;
+function cleanTags(tags: string[]): string[] {
+  return tags
+    .map(tag => tag.trim())
+    .filter(tag => {
+      if (!tag) return false;
+      // 计算视觉长度（中文算2个单位）
+      let length = 0;
+      for (const char of tag) {
+        if (/[\u4e00-\u9fa5]/.test(char)) {
+          length += 2;
+        } else {
+          length += 1;
+        }
+      }
+      // 长度在 2-20 之间
+      return length >= 2 && length <= 20;
+    })
+    .filter((tag, index, self) => self.indexOf(tag) === index) // 去重
+    .slice(0, 5);
+}
 
-  let endpoint: string;
-  let headers: Record<string, string>;
-  let body: unknown;
-
-  switch (provider) {
-    case 'openai':
-    case 'custom': {
-      endpoint = baseUrl
-        ? `${baseUrl.replace(/\/$/, '')}/chat/completions`
-        : 'https://api.openai.com/v1/chat/completions';
-      headers = {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      };
-      body = {
-        model: model || 'gpt-3.5-turbo',
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: userMessage },
-        ],
-        temperature,
-        max_tokens: maxTokens,
-        response_format: { type: 'json_object' },
-      };
-      break;
-    }
-
-    case 'anthropic': {
-      endpoint = baseUrl
-        ? `${baseUrl.replace(/\/$/, '')}/messages`
-        : 'https://api.anthropic.com/v1/messages';
-      headers = {
-        'Content-Type': 'application/json',
-        'x-api-key': apiKey || '',
-        'anthropic-version': '2023-06-01',
-      };
-      body = {
-        model: model || 'claude-3-haiku-20240307',
-        max_tokens: maxTokens,
-        messages: [
-          {
-            role: 'user',
-            content: `${SYSTEM_PROMPT}\n\n${userMessage}`,
-          },
-        ],
-      };
-      break;
-    }
-
-    case 'ollama': {
-      endpoint = baseUrl
-        ? `${baseUrl.replace(/\/$/, '')}/chat/completions`
-        : 'http://localhost:11434/v1/chat/completions';
-      headers = {
-        'Content-Type': 'application/json',
-      };
-      body = {
-        model: model || 'llama3',
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: userMessage },
-        ],
-        temperature,
-        stream: false,
-      };
-      break;
-    }
-
-    default:
-      throw new Error(`Unsupported provider: ${provider}`);
+/**
+ * AI 失败时的降级策略（参考 SmartBookmark 的 getFallbackTags）
+ */
+function getFallbackResult(input: AnalyzeBookmarkInput): BookmarkAnalysisResult {
+  const tags: string[] = [];
+  
+  // 1. 尝试从 keywords 提取
+  if (input.metadata?.keywords) {
+    const keywordTags = input.metadata.keywords
+      .split(/[,，;；]/)
+      .map(t => t.trim())
+      .filter(t => t.length >= 1 && t.length <= 20)
+      .slice(0, 3);
+    tags.push(...keywordTags);
   }
-
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify(body),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`API request failed: ${response.status} - ${errorText}`);
+  
+  // 2. 从标题提取关键词
+  if (tags.length < 3 && input.title) {
+    const stopWords = new Set(['的', '了', '和', '与', 'the', 'a', 'an', 'and', 'or', 'in', 'on', 'at', 'to', 'for']);
+    const titleWords = input.title
+      .split(/[\s\-\_\,\.\。\，\|]+/)
+      .map(w => w.trim())
+      .filter(w => w.length >= 2 && w.length <= 20 && !stopWords.has(w.toLowerCase()));
+    tags.push(...titleWords.slice(0, 3 - tags.length));
   }
-
-  const data = await response.json();
-
-  // 解析响应
-  let content: string;
-  if (provider === 'anthropic') {
-    content = data.content?.[0]?.text || '';
-  } else {
-    content = data.choices?.[0]?.message?.content || '';
-  }
-
-  // 解析 JSON 响应
-  try {
-    // 尝试从响应中提取 JSON
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-    if (jsonMatch) {
-      const parsed = JSON.parse(jsonMatch[0]);
-      return {
-        title: parsed.title || '',
-        summary: parsed.summary || '',
-        category: parsed.category || '未分类',
-        tags: Array.isArray(parsed.tags) ? parsed.tags.slice(0, 5) : [],
-      };
-    }
-  } catch {
-    console.warn('[@hamhome/ai] Failed to parse AI response as JSON');
-  }
-
-  // 解析失败时返回默认值
+  
   return {
-    title: '',
-    summary: content.slice(0, 200),
+    title: input.title || '未命名书签',
+    summary: input.excerpt || input.metadata?.description || '',
     category: '未分类',
-    tags: [],
+    tags: [...new Set(tags)].slice(0, 5),
+  };
+}
+
+/**
+ * 扩展 AI 客户端 - 提供更多功能
+ */
+export function createExtendedAIClient(config: AIClientConfig) {
+  const model = createLanguageModel(config);
+  const { temperature = 0.3, maxTokens = 1000 } = config;
+  const baseClient = createAIClient(config);
+
+  return {
+    ...baseClient,
+
+    /**
+     * 推荐标签
+     */
+    async suggestTags(input: {
+      url: string;
+      title: string;
+      content: string;
+      existingTags: string[];
+    }): Promise<TagSuggestionResult[]> {
+      const prompt = `请为以下网页推荐 3-5 个相关标签。
+
+URL: ${input.url}
+标题: ${input.title}
+内容摘要: ${input.content.slice(0, 500)}
+
+用户已有标签: ${input.existingTags.join(', ')}
+
+要求:
+1. 标签应简洁、准确、有辨识度
+2. 优先推荐与用户已有标签相关但不重复的标签
+3. 标签应该是中文，除非是专有名词（如 React, GitHub）`;
+
+      try {
+        const { object } = await generateObject({
+          model,
+          schema: TagSuggestionsSchema,
+          prompt,
+          temperature,
+          maxTokens: 500,
+        });
+
+        return object;
+      } catch (error) {
+        console.error('[@hamhome/ai] Tag suggestion failed:', error);
+        return [];
+      }
+    },
+
+    /**
+     * 推荐分类
+     */
+    async suggestCategory(input: {
+      url: string;
+      title: string;
+      content: string;
+      userCategories: string[];
+      presetCategories: string[];
+    }): Promise<CategorySuggestionResult[]> {
+      const prompt = `请为以下网页推荐最合适的分类。
+
+URL: ${input.url}
+标题: ${input.title}
+内容摘要: ${input.content.slice(0, 500)}
+
+用户已有分类: ${input.userCategories.join(', ') || '无'}
+预设分类选项: ${input.presetCategories.join(', ')}
+
+要求:
+1. 优先从用户已有分类中选择
+2. 如果用户分类不合适，可以推荐预设分类
+3. 返回 1-2 个最合适的分类`;
+
+      try {
+        const { object } = await generateObject({
+          model,
+          schema: CategorySuggestionsSchema,
+          prompt,
+          temperature,
+          maxTokens: 500,
+        });
+
+        return object;
+      } catch (error) {
+        console.error('[@hamhome/ai] Category suggestion failed:', error);
+        return [];
+      }
+    },
+
+    /**
+     * 翻译文本
+     */
+    async translate(text: string, targetLang: 'zh' | 'en' = 'zh'): Promise<string> {
+      const langName = targetLang === 'zh' ? '中文' : 'English';
+      const prompt = `请将以下文本翻译成${langName}，只返回翻译结果，不要包含其他内容：
+
+${text}`;
+
+      try {
+        const { text: result } = await generateText({
+          model,
+          prompt,
+          temperature: 0.3,
+          maxTokens: 500,
+        });
+
+        return result.trim();
+      } catch (error) {
+        console.error('[@hamhome/ai] Translation failed:', error);
+        return text;
+      }
+    },
+
+    /**
+     * 原始文本生成（用于自定义 prompt）
+     */
+    async generateRaw(prompt: string): Promise<string> {
+      try {
+        const { text } = await generateText({
+          model,
+          prompt,
+          temperature,
+          maxTokens,
+        });
+
+        return text;
+      } catch (error) {
+        console.error('[@hamhome/ai] Raw generation failed:', error);
+        throw error;
+      }
+    },
   };
 }
 
 /**
  * 获取默认模型名称
  */
-export function getDefaultModel(provider: AIClientConfig['provider']): string {
+export function getDefaultModel(provider: AIProvider): string {
   switch (provider) {
     case 'openai':
       return 'gpt-3.5-turbo';
@@ -194,10 +410,9 @@ export function getDefaultModel(provider: AIClientConfig['provider']): string {
       return 'claude-3-haiku-20240307';
     case 'ollama':
       return 'llama3';
-    case 'workers-ai':
-      return '@cf/meta/llama-3-8b-instruct';
+    case 'custom':
+      return 'gpt-3.5-turbo';
     default:
       return 'gpt-3.5-turbo';
   }
 }
-

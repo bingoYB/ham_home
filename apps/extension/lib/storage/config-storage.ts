@@ -18,6 +18,9 @@ const DEFAULT_AI_CONFIG: AIConfig = {
   temperature: 0.3,
   maxTokens: 1000,
   enabled: false, // 默认关闭，需要用户配置后开启
+  enableTranslation: false, // 默认关闭翻译
+  enableSmartCategory: true, // 默认开启智能分类
+  enableTagSuggestion: true, // 默认开启标签推荐
 };
 
 // 默认设置

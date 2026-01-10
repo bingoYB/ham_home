@@ -54,6 +54,8 @@ async function handleGetPageHTML(): Promise<string | null> {
       func: () => document.documentElement.outerHTML,
     });
 
+    console.log('[HamHome Background] Get page HTML results:', results);
+
     return results[0]?.result || null;
   } catch (error) {
     console.error('[HamHome Background] Get page HTML error:', error);

@@ -64,6 +64,9 @@ export interface AIConfig {
   temperature?: number;
   maxTokens?: number;
   enabled: boolean;           // 是否启用 AI 分析
+  enableTranslation: boolean; // 是否启用翻译
+  enableSmartCategory: boolean; // 是否启用智能分类
+  enableTagSuggestion: boolean; // 是否启用标签推荐
 }
 
 // ============ 用户设置相关 ============
@@ -105,6 +108,20 @@ export interface Snapshot {
 // ============ 页面内容提取 ============
 
 /**
+ * 页面元数据
+ */
+export interface PageMetadata {
+  description?: string;       // meta description
+  keywords?: string;          // meta keywords
+  author?: string;            // 作者
+  siteName?: string;          // 网站名称
+  publishDate?: string;       // 发布日期
+  ogTitle?: string;           // Open Graph 标题
+  ogDescription?: string;     // Open Graph 描述
+  ogImage?: string;           // Open Graph 图片
+}
+
+/**
  * 提取的页面内容
  */
 export interface PageContent {
@@ -114,6 +131,8 @@ export interface PageContent {
   textContent: string;        // 纯文本
   excerpt: string;            // 摘要
   favicon: string;
+  metadata?: PageMetadata;    // 页面元数据
+  isReaderable?: boolean;     // 是否可读（Readability 判断）
 }
 
 // ============ 查询相关 ============
@@ -166,7 +185,51 @@ export interface AnalysisResult {
   tags: string[];
 }
 
+/**
+ * 标签推荐结果
+ */
+export interface TagSuggestion {
+  tag: string;
+  confidence: number; // 0-1 置信度
+  reason?: string;    // 推荐原因
+}
+
+/**
+ * 智能分类结果
+ */
+export interface CategorySuggestion {
+  categoryId: string;
+  categoryName: string;
+  confidence: number; // 0-1 置信度
+  reason?: string;    // 推荐原因
+}
+
 // ============ 消息通信 ============
+
+/**
+ * 批量操作类型
+ */
+export type BatchOperationType = 'delete' | 'addTags' | 'removeTags' | 'changeCategory' | 'restore';
+
+/**
+ * 批量操作参数
+ */
+export interface BatchOperationParams {
+  operation: BatchOperationType;
+  bookmarkIds: string[];
+  tags?: string[];        // 用于 addTags/removeTags
+  categoryId?: string | null;  // 用于 changeCategory
+  permanent?: boolean;    // 用于 delete
+}
+
+/**
+ * 批量操作结果
+ */
+export interface BatchOperationResult {
+  success: number;
+  failed: number;
+  errors?: string[];
+}
 
 /**
  * 消息类型
@@ -183,5 +246,18 @@ export type MessageType =
 export interface ExtensionMessage<T = unknown> {
   type: MessageType;
   payload?: T;
+}
+
+// ============ 预设分类系统 ============
+
+/**
+ * 预设分类
+ */
+export interface PresetCategory {
+  id: string;
+  name: string;
+  icon: string;
+  description?: string;
+  keywords: string[]; // 用于智能匹配的关键词
 }
 

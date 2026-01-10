@@ -292,6 +292,154 @@ class BookmarkStorage {
     return Array.from(tagSet).sort();
   }
 
+  // ============ 批量操作 ============
+
+  /**
+   * 批量删除书签
+   */
+  async batchDeleteBookmarks(ids: string[], permanent = false): Promise<void> {
+    const result = await chrome.storage.local.get(STORAGE_KEYS.BOOKMARKS);
+    let bookmarks: LocalBookmark[] = result[STORAGE_KEYS.BOOKMARKS] || [];
+
+    if (permanent) {
+      // 永久删除
+      bookmarks = bookmarks.filter((b) => !ids.includes(b.id));
+    } else {
+      // 软删除
+      const now = Date.now();
+      bookmarks = bookmarks.map((b) =>
+        ids.includes(b.id) ? { ...b, isDeleted: true, updatedAt: now } : b
+      );
+    }
+
+    await chrome.storage.local.set({ [STORAGE_KEYS.BOOKMARKS]: bookmarks });
+  }
+
+  /**
+   * 批量恢复书签
+   */
+  async batchRestoreBookmarks(ids: string[]): Promise<void> {
+    const result = await chrome.storage.local.get(STORAGE_KEYS.BOOKMARKS);
+    const bookmarks: LocalBookmark[] = result[STORAGE_KEYS.BOOKMARKS] || [];
+
+    const now = Date.now();
+    const updated = bookmarks.map((b) =>
+      ids.includes(b.id) ? { ...b, isDeleted: false, updatedAt: now } : b
+    );
+
+    await chrome.storage.local.set({ [STORAGE_KEYS.BOOKMARKS]: updated });
+  }
+
+  /**
+   * 批量添加标签
+   */
+  async batchAddTags(ids: string[], tags: string[]): Promise<void> {
+    const result = await chrome.storage.local.get(STORAGE_KEYS.BOOKMARKS);
+    const bookmarks: LocalBookmark[] = result[STORAGE_KEYS.BOOKMARKS] || [];
+
+    const now = Date.now();
+    const updated = bookmarks.map((b) =>
+      ids.includes(b.id)
+        ? {
+            ...b,
+            tags: [...new Set([...b.tags, ...tags])],
+            updatedAt: now,
+          }
+        : b
+    );
+
+    await chrome.storage.local.set({ [STORAGE_KEYS.BOOKMARKS]: updated });
+  }
+
+  /**
+   * 批量移除标签
+   */
+  async batchRemoveTags(ids: string[], tags: string[]): Promise<void> {
+    const result = await chrome.storage.local.get(STORAGE_KEYS.BOOKMARKS);
+    const bookmarks: LocalBookmark[] = result[STORAGE_KEYS.BOOKMARKS] || [];
+
+    const now = Date.now();
+    const updated = bookmarks.map((b) =>
+      ids.includes(b.id)
+        ? {
+            ...b,
+            tags: b.tags.filter((t) => !tags.includes(t)),
+            updatedAt: now,
+          }
+        : b
+    );
+
+    await chrome.storage.local.set({ [STORAGE_KEYS.BOOKMARKS]: updated });
+  }
+
+  /**
+   * 批量更改分类
+   */
+  async batchChangeCategory(ids: string[], categoryId: string | null): Promise<void> {
+    const result = await chrome.storage.local.get(STORAGE_KEYS.BOOKMARKS);
+    const bookmarks: LocalBookmark[] = result[STORAGE_KEYS.BOOKMARKS] || [];
+
+    const now = Date.now();
+    const updated = bookmarks.map((b) =>
+      ids.includes(b.id) ? { ...b, categoryId, updatedAt: now } : b
+    );
+
+    await chrome.storage.local.set({ [STORAGE_KEYS.BOOKMARKS]: updated });
+  }
+
+  /**
+   * 统一的批量操作接口
+   */
+  async batchOperate(params: {
+    operation: 'delete' | 'addTags' | 'removeTags' | 'changeCategory' | 'restore';
+    bookmarkIds: string[];
+    tags?: string[];
+    categoryId?: string | null;
+    permanent?: boolean;
+  }): Promise<{ success: number; failed: number; errors?: string[] }> {
+    const { operation, bookmarkIds, tags, categoryId, permanent } = params;
+
+    try {
+      switch (operation) {
+        case 'delete':
+          await this.batchDeleteBookmarks(bookmarkIds, permanent);
+          break;
+        case 'restore':
+          await this.batchRestoreBookmarks(bookmarkIds);
+          break;
+        case 'addTags':
+          if (!tags || tags.length === 0) {
+            throw new Error('添加标签需要提供标签列表');
+          }
+          await this.batchAddTags(bookmarkIds, tags);
+          break;
+        case 'removeTags':
+          if (!tags || tags.length === 0) {
+            throw new Error('移除标签需要提供标签列表');
+          }
+          await this.batchRemoveTags(bookmarkIds, tags);
+          break;
+        case 'changeCategory':
+          await this.batchChangeCategory(bookmarkIds, categoryId ?? null);
+          break;
+        default:
+          throw new Error(`未知的操作类型: ${operation}`);
+      }
+
+      return {
+        success: bookmarkIds.length,
+        failed: 0,
+      };
+    } catch (error) {
+      console.error('[BookmarkStorage] Batch operation failed:', error);
+      return {
+        success: 0,
+        failed: bookmarkIds.length,
+        errors: [error instanceof Error ? error.message : '批量操作失败'],
+      };
+    }
+  }
+
   // ============ 工具方法 ============
 
   /**
