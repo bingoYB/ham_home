@@ -1,0 +1,299 @@
+{
+  "settings": {
+    "title": "Settings",
+    "description": "Manage your bookmark tool preferences",
+    "tabs": {
+      "ai": "AI Config",
+      "general": "General",
+      "storage": "Storage"
+    },
+    "language": "Language",
+    "theme": "Theme",
+    "themeOptions": {
+      "light": "Light",
+      "dark": "Dark",
+      "system": "System"
+    },
+    "aiSettings": "AI Settings",
+    "aiProvider": "AI Provider",
+    "apiKey": "API Key",
+    "modelName": "Model Name",
+    "temperature": "Temperature (Creativity)",
+    "maxTokens": "Max Tokens",
+    "importBookmarks": "Import Bookmarks",
+    "exportBookmarks": "Export Bookmarks",
+    "about": "About",
+    "sections": {
+      "general": "General",
+      "ai": "AI",
+      "privacy": "Privacy",
+      "about": "About"
+    },
+    "descriptions": {
+      "language": "Choose the application language",
+      "theme": "Select theme mode",
+      "autoSaveSnapshot": "Automatically save web snapshots"
+    },
+    "buttons": {
+      "import": "Choose File to Import",
+      "export": "Export All Bookmarks",
+      "reset": "Reset to Default",
+      "clear": "Clear All Data"
+    },
+    "general": {
+      "title": "General Settings",
+      "description": "Customize your experience",
+      "autoSaveSnapshot": "Auto Save Snapshots",
+      "autoSaveSnapshotDesc": "Automatically save page snapshots when saving bookmarks",
+      "shortcut": "Shortcut Key",
+      "shortcutDesc": "Customize the shortcut key for saving bookmarks",
+      "shortcutPlaceholder": "Ctrl+Shift+E"
+    },
+    "ai": {
+      "title": "AI Service Configuration",
+      "description": "Configure AI analysis service to automatically extract bookmark summaries and tags",
+      "enableAI": "Enable AI Analysis",
+      "enableAIDesc": "Automatically use AI to generate summaries and tags when saving bookmarks",
+      "provider": "AI Provider",
+      "apiKeyPlaceholder": "sk-...",
+      "apiKeyDesc": "Your API Key will be securely stored locally and never uploaded to the server",
+      "baseUrl": "Base URL",
+      "baseUrlPlaceholder": "https://api.example.com/v1",
+      "model": "Model Name",
+      "modelPlaceholder": "gpt-3.5-turbo",
+      "advancedOptions": "Advanced Options",
+      "smartCategory": "Smart Category Recommendation",
+      "smartCategoryDesc": "Automatically recommend bookmark categories",
+      "tagSuggestion": "Tag Suggestion",
+      "tagSuggestionDesc": "Automatically recommend relevant tags",
+      "translation": "Translation Feature",
+      "translationDesc": "Translate foreign language content to English",
+      "presetTags": "Preset Tags",
+      "presetTagsDesc": "Configure preset tags, AI will prioritize matching relevant tags for bookmarks",
+      "addTag": "Add Tag",
+      "addTagPlaceholder": "Enter tag name, press Enter to add",
+      "configuredTags": "Configured Tags",
+      "noTags": "No preset tags added yet. After adding preset tags, AI will recommend tags more accurately.",
+      "testConnection": "Test Connection",
+      "testing": "Testing...",
+      "removeTag": "Delete Tag"
+    },
+    "storage": {
+      "title": "Storage Management",
+      "description": "Manage your bookmark data and snapshots",
+      "bookmarkCount": "Bookmark Count",
+      "categoryCount": "Category Count",
+      "storageUsed": "Storage Used",
+      "dataExport": "Data Export",
+      "exportJSON": "Export as JSON",
+      "exportHTML": "Export as HTML",
+      "dangerZone": "Danger Zone",
+      "clearAllData": "Clear All Data"
+    },
+    "about": {
+      "title": "About",
+      "description": "About HamHome",
+      "version": "HamHome v1.0.0",
+      "subtitle": "Intelligent Bookmark Management Tool",
+      "intro": "HamHome is a powerful browser extension that helps you manage and organize bookmarks, using AI technology to automatically categorize and tag bookmarks.",
+      "copyright": "© 2024-2025 HamHome. All rights reserved."
+    },
+    "dialogs": {
+      "confirmClear": "Confirm Clear All Data",
+      "clearWarning": "This action will delete all bookmarks, categories, and settings data. This action cannot be undone, please proceed with caution.",
+      "cancel": "Cancel",
+      "confirm": "Confirm Clear"
+    },
+    "providers": {
+      "openai": "OpenAI",
+      "anthropic": "Anthropic",
+      "ollama": "Ollama (Local)",
+      "custom": "Custom"
+    },
+    "messages": {
+      "temperatureDesc": "Control the randomness of generated content (0-2, recommended 0.3)",
+      "maxTokensDesc": "Maximum length of generated content (recommended 1000)",
+      "apiKeySecure": "Your API Key will be securely stored locally and never uploaded to the server"
+    },
+    "importExport": {
+      "title": "Import/Export",
+      "description": "Backup or migrate your bookmark data",
+      "importSuccess": "Import completed",
+      "importFailed": "Import failed",
+      "importDetails": "Successfully imported {{imported}} bookmarks, skipped {{skipped}} duplicates",
+      "export": {
+        "title": "Export Bookmarks",
+        "description": "Export your bookmark data as a backup file",
+        "jsonFormat": "JSON Format",
+        "jsonSubtitle": "Full data backup",
+        "jsonDesc": "Contains all bookmarks and category information, can be used for complete data recovery",
+        "htmlFormat": "HTML Format",
+        "htmlSubtitle": "Browsable webpage",
+        "htmlDesc": "Generate a beautiful HTML page that can be viewed directly in the browser",
+        "currentStats": "Currently have {{bookmarkCount}} bookmarks, {{categoryCount}} categories"
+      },
+      "import": {
+        "title": "Import Bookmarks",
+        "description": "Import bookmark data from a file",
+        "selectFile": "Click to select file",
+        "supportedFormats": "Supports JSON and HTML formats",
+        "importing": "Importing...",
+        "formatLabel": "Supported formats:",
+        "formatJSON": "HamHome JSON export file",
+        "formatHTML": "Browser bookmark HTML file (exported from Chrome/Firefox/Edge)"
+      },
+      "errors": {
+        "unsupportedFormat": "Unsupported file format, please select a JSON or HTML file",
+        "unknown": "Unknown error"
+      }
+    },
+    "privacy": {
+      "title": "Privacy Settings",
+      "description": "Manage your data privacy and security settings",
+      "dataStorage": {
+        "title": "Data Storage",
+        "description": "Learn how your data is stored",
+        "localStorage": "Local Storage",
+        "localStorageDesc": "All your bookmark data is stored locally in the browser and never uploaded to any server. Data is securely stored using Chrome Storage API.",
+        "apiKeySecurity": "API Key Security",
+        "apiKeySecurityDesc": "Your AI API Key is only stored locally and communicates directly with AI service providers without going through any intermediate servers."
+      },
+      "aiPrivacy": {
+        "title": "AI Service Privacy",
+        "description": "Control data sent during AI analysis",
+        "enableAI": "Enable AI Analysis",
+        "enableAIDesc": "When enabled, page titles and content summaries will be sent to AI services for analysis",
+        "dataNotice": "AI Analysis Data Notice",
+        "dataNoticeDesc": "When you use AI analysis features, the following data is sent to AI service providers:",
+        "dataItems": {
+          "url": "Page URL",
+          "title": "Page Title",
+          "content": "Page content summary (for generating descriptions and tags)"
+        }
+      },
+      "snapshot": {
+        "title": "Snapshot Settings",
+        "description": "Control web page snapshot saving",
+        "autoSave": "Auto Save Snapshots",
+        "autoSaveDesc": "Automatically save page snapshots when saving bookmarks for offline viewing",
+        "tip": "Tip",
+        "tipContent": "The snapshot feature saves page HTML locally, which may take up significant storage space. You can turn off this feature if you're concerned about storage."
+      }
+    },
+    "categories": {
+      "title": "Category Management",
+      "description": "Create and manage your bookmark categories",
+      "newCategory": "New Category",
+      "usePreset": "Use Preset",
+      "batchDelete": "Batch Delete",
+      "selectAll": "Select All",
+      "deselectAll": "Deselect All",
+      "selectedCount": "{{count}} selected",
+      "deleteSelected": "Delete Selected",
+      "categoryName": "Category Name",
+      "categoryNamePlaceholder": "Enter category name",
+      "bookmarkCount": "{{count}} bookmarks",
+      "noCategories": "No categories yet, click \"New Category\" or \"Use Preset\" to start",
+      "edit": "Edit",
+      "delete": "Delete",
+      "expand": "Expand",
+      "collapse": "Collapse",
+      "addSubcategory": "Add Subcategory",
+      "dialogs": {
+        "createTitle": "New Category",
+        "editTitle": "Edit Category",
+        "deleteTitle": "Confirm Delete Category",
+        "deleteDescription": "After deleting the category \"{{name}}\", bookmarks in this category will be moved to \"Uncategorized\". This action cannot be undone.",
+        "batchDeleteTitle": "Confirm Batch Delete",
+        "batchDeleteDescription": "Are you sure you want to delete {{count}} selected categories? Bookmarks in these categories will be moved to \"Uncategorized\". This action cannot be undone.",
+        "cancel": "Cancel",
+        "create": "Create",
+        "save": "Save",
+        "confirm": "Confirm Delete"
+      },
+      "preset": {
+        "title": "Select Category Scheme",
+        "description": "Choose a preset category scheme or use AI to generate personalized categories",
+        "presetTab": "Preset Categories",
+        "aiTab": "AI Generate",
+        "general": "Scheme 1: General",
+        "generalDesc": "Suitable for daily information gathering and work-life balance",
+        "professional": "Scheme 2: Professional/Tech-oriented",
+        "professionalDesc": "Suitable for developers, designers, content creators and other professionals",
+        "aiInputLabel": "Describe your category requirements",
+        "aiInputPlaceholder": "For example: I'm a frontend developer, I usually bookmark technical docs, design inspiration, learning resources, and also follow tech news and investment content...",
+        "aiGenerate": "AI Generate Categories",
+        "aiGenerating": "AI Generating...",
+        "aiRecommended": "AI Recommended Categories",
+        "retry": "Retry",
+        "apply": "Apply",
+        "schemes": {
+          "general": {
+            "learning": "Learning & Knowledge",
+            "learning-tech-docs": "Technical Docs",
+            "learning-tutorials": "Tutorials / Courses",
+            "learning-research": "Research / Articles",
+            "learning-notes": "Notes / Summaries",
+            "learning-ebooks": "E-books / Libraries",
+            "work": "Work & Productivity",
+            "work-projects": "Projects",
+            "work-tools": "Tools / SaaS",
+            "work-design": "Design Resources",
+            "work-writing": "Writing / Copywriting",
+            "work-collab": "Collaboration / Management",
+            "reading": "News & Reading",
+            "reading-news": "News",
+            "reading-blogs": "Blogs",
+            "reading-industry": "Industry Updates",
+            "reading-later": "Read Later",
+            "reading-rss": "RSS Feeds",
+            "tech": "Tech & Development",
+            "tech-frontend": "Frontend",
+            "tech-backend": "Backend",
+            "tech-ai": "AI / Data",
+            "tech-system": "System / Architecture",
+            "tech-opensource": "Open Source",
+            "life": "Life & Interests",
+            "life-entertainment": "Entertainment",
+            "life-art": "Photography / Art",
+            "life-health": "Health",
+            "life-travel": "Travel",
+            "life-hobbies": "Hobbies"
+          },
+          "professional": {
+            "tech": "Technology",
+            "tech-langs": "Programming Languages",
+            "tech-langs-js": "JavaScript",
+            "tech-langs-python": "Python",
+            "tech-langs-other": "Others",
+            "tech-frameworks": "Frameworks / Libraries",
+            "tech-ai": "AI / LLM",
+            "tech-system": "System Design",
+            "tech-opensource": "Open Source Ecosystem",
+            "product": "Product & Design",
+            "product-analysis": "Product Analysis",
+            "product-ux": "User Experience",
+            "product-design-system": "Design System",
+            "product-competitor": "Competitor Research",
+            "product-prototype": "Prototype / Demo",
+            "content": "Content Creation",
+            "content-material": "Writing Materials",
+            "content-skills": "Expression Skills",
+            "content-cases": "Case Studies",
+            "content-channels": "Publishing Channels",
+            "business": "Business & Trends",
+            "business-reports": "Industry Reports",
+            "business-startup": "Startup / Business Model",
+            "business-investment": "Investment / Market",
+            "business-trends": "Trend Analysis",
+            "resources": "Tools & Resources",
+            "resources-online": "Online Tools",
+            "resources-data": "Data Resources",
+            "resources-templates": "Templates / Assets",
+            "resources-automation": "Automation"
+          }
+        }
+      }
+    }
+  }
+}

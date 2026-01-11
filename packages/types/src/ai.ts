@@ -9,6 +9,7 @@ export interface AIConfig {
   temperature?: number;
   maxTokens?: number;
   enabled: boolean;
+  presetTags?: string[];     // 预设标签列表（用于自动匹配书签）
 }
 
 /**

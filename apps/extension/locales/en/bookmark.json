@@ -1,0 +1,76 @@
+{
+  "bookmark": {
+    "title": "Bookmarks",
+    "newBookmark": "New Bookmark",
+    "addBookmark": "Add Bookmark",
+    "editBookmark": "Edit Bookmark",
+    "deleteBookmark": "Delete Bookmark",
+    "deleteConfirm": "Are you sure you want to delete \"{{title}}\"?",
+    "deleteSuccess": "Bookmark deleted successfully",
+    "saveSuccess": "Bookmark saved successfully",
+    "saveFailed": "Failed to save bookmark",
+    "placeholders": {
+      "title": "Page title",
+      "description": "Briefly describe this page...",
+      "url": "Enter URL"
+    },
+    "categories": "Categories",
+    "uncategorized": "Uncategorized",
+    "tags": "Tags",
+    "createdAt": "Created",
+    "recent": "Recent Bookmarks",
+    "all": "All Bookmarks",
+    "search": "Search bookmarks...",
+    "count": "You have {{count}} bookmark",
+    "count_plural": "You have {{count}} bookmarks",
+    "stats": {
+      "total": "Total",
+      "category": "categories",
+      "tags": "tags"
+    }
+  },
+  "modal": {
+    "title": "Add New Bookmark",
+    "subtitle": "Save your favorite pages, access them anytime",
+    "url": "URL",
+    "titleLabel": "Title",
+    "description": "Summary",
+    "selectCategory": "Select category",
+    "tagPlaceholder": "Enter tag and press Enter to add",
+    "useAI": "Use AI Smart Analysis",
+    "aiAnalyzing": "AI analyzing...",
+    "saving": "Saving...",
+    "saveBookmark": "Save Bookmark",
+    "errors": {
+      "urlTitleRequired": "Please enter URL and title first",
+      "configureAI": "Please configure AI service in settings first",
+      "aiFailed": "AI analysis failed"
+    }
+  },
+  "tags": {
+    "title": "Tag Management",
+    "description": "View and manage your bookmark tags",
+    "empty": "No tags yet, add tags when saving bookmarks",
+    "stats": {
+      "title": "Tag Statistics",
+      "totalTags": "{{count}} tags in total",
+      "totalCount": "Total Tags",
+      "avgPerBookmark": "Avg Tags/Bookmark",
+      "mostUsed": "Most Used Tag",
+      "maxUsage": "Highest Usage"
+    },
+    "cloud": {
+      "title": "Tag Cloud",
+      "description": "Darker color indicates more frequent usage"
+    }
+  },
+  "popup": {
+    "save": "Save",
+    "bookmarkList": "Bookmarks",
+    "shortcut": "Shortcut",
+    "loadingPage": "Loading page content",
+    "pleaseWait": "Please wait...",
+    "cannotGetPage": "Cannot get page content",
+    "viewBookmarkList": "View Bookmark List"
+  }
+}

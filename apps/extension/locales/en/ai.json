@@ -1,0 +1,45 @@
+{
+  "ai": {
+    "analyzing": "AI is analyzing...",
+    "generatingTitle": "Generating title...",
+    "generatingDescription": "Generating description...",
+    "extractingContent": "Extracting content...",
+    "suggestedCategory": "Suggested Category",
+    "suggestedTags": "Suggested Tags",
+    "aiNotEnabled": "AI features are not enabled. Please configure AI in settings.",
+    "settings": {
+      "provider": "Provider",
+      "providers": {
+        "openai": "OpenAI",
+        "anthropic": "Anthropic Claude",
+        "deepseek": "DeepSeek",
+        "ollama": "Ollama (Local)",
+        "custom": "Custom"
+      },
+      "apiKeyPlaceholder": "Enter your API key",
+      "baseUrlPlaceholder": "Enter custom endpoint (optional)",
+      "modelPlaceholder": "Enter model name, e.g.: gpt-4-turbo",
+      "testConnection": "Test Connection",
+      "features": {
+        "enableSmartCategory": "Enable Smart Categorization",
+        "enableTagSuggestion": "Enable Tag Suggestion",
+        "enableTranslation": "Enable Translation"
+      }
+    },
+    "error": {
+      "configNotFound": "AI configuration not found",
+      "apiKeyInvalid": "Invalid API key",
+      "requestFailed": "AI request failed: {{error}}",
+      "networkError": "Network error, please check your connection",
+      "modelNotFound": "Model not found",
+      "rateLimited": "Too many requests, please try again later",
+      "timeout": "Request timeout"
+    },
+    "success": {
+      "configSaved": "Configuration saved",
+      "testPassed": "Connection test successful",
+      "categorySuggested": "Category suggestion generated",
+      "tagsSuggested": "Tag suggestions generated"
+    }
+  }
+}

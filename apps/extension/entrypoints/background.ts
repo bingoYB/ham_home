@@ -31,7 +31,7 @@ export default defineBackground(() => {
     console.log('[HamHome Background] 安装/更新事件:', details.reason);
     if (details.reason === 'install') {
       // 首次安装，打开设置页面
-      chrome.runtime.openOptionsPage();
+      chrome.tabs.create({ url: chrome.runtime.getURL('app.html#settings') });
     }
   });
 });

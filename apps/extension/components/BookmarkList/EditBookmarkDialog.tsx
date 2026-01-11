@@ -20,7 +20,7 @@ import {
 } from '@hamhome/ui';
 import { Loader2, Trash2 } from 'lucide-react';
 import { TagInput } from '@/components/common/TagInput';
-import { useEditBookmark } from '@/hooks/useEditBookmark';
+import { useEditBookmark } from './useEditBookmark';
 import type { LocalBookmark } from '@/types';
 
 interface EditBookmarkDialogProps {

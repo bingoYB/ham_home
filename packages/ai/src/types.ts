@@ -38,9 +38,8 @@ export interface AnalyzeBookmarkInput {
   metadata?: PageMetadataInput; // 页面元数据
   isReaderable?: boolean;     // 是否可读
   // 上下文信息
-  existingTags?: string[];    // 用户已有的标签（用于推荐）
+  presetTags?: string[];      // 预设标签（由用户配置，用于自动匹配书签）
   existingCategories?: string[]; // 用户已有的分类
-  presetCategories?: string[]; // 预设分类列表
 }
 
 /**
@@ -85,3 +84,18 @@ export const CategorySuggestionSchema = z.object({
 export const CategorySuggestionsSchema = z.array(CategorySuggestionSchema).max(3);
 
 export type CategorySuggestionResult = z.infer<typeof CategorySuggestionSchema>;
+
+/**
+ * AI 生成分类方案 Schema
+ */
+export const GeneratedCategorySchema: z.ZodType<any> = z.object({
+  name: z.string().describe('分类名称'),
+  children: z.lazy(() => z.array(GeneratedCategorySchema)).optional().describe('子分类'),
+});
+
+export const GeneratedCategoriesSchema = z.array(GeneratedCategorySchema).max(10);
+
+export interface GeneratedCategory {
+  name: string;
+  children?: GeneratedCategory[];
+}

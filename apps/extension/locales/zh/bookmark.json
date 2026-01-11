@@ -1,0 +1,76 @@
+{
+  "bookmark": {
+    "title": "书签",
+    "newBookmark": "新建书签",
+    "addBookmark": "添加书签",
+    "editBookmark": "编辑书签",
+    "deleteBookmark": "删除书签",
+    "deleteConfirm": "确定删除书签 \"{{title}}\" 吗？",
+    "deleteSuccess": "书签已删除",
+    "saveSuccess": "书签已保存",
+    "saveFailed": "保存书签失败",
+    "placeholders": {
+      "title": "页面标题",
+      "description": "简要描述这个页面的内容...",
+      "url": "输入网址"
+    },
+    "categories": "分类",
+    "uncategorized": "未分类",
+    "tags": "标签",
+    "createdAt": "创建时间",
+    "recent": "最近的书签",
+    "all": "所有书签",
+    "search": "搜索书签...",
+    "count": "你有 {{count}} 个书签",
+    "count_plural": "你有 {{count}} 个书签",
+    "stats": {
+      "total": "总计",
+      "category": "个分类",
+      "tags": "个标签"
+    }
+  },
+  "modal": {
+    "title": "添加新书签",
+    "subtitle": "保存你喜欢的网页，随时随地访问",
+    "url": "网址",
+    "titleLabel": "标题",
+    "description": "摘要",
+    "selectCategory": "选择分类",
+    "tagPlaceholder": "输入标签后按回车添加",
+    "useAI": "使用 AI 智能分析",
+    "aiAnalyzing": "AI 分析中...",
+    "saving": "保存中...",
+    "saveBookmark": "保存书签",
+    "errors": {
+      "urlTitleRequired": "请先输入 URL 和标题",
+      "configureAI": "请先在设置中配置 AI 服务",
+      "aiFailed": "AI 分析失败"
+    }
+  },
+  "tags": {
+    "title": "标签管理",
+    "description": "查看和管理你的书签标签",
+    "empty": "还没有标签，在保存书签时添加标签",
+    "stats": {
+      "title": "标签统计",
+      "totalTags": "共有 {{count}} 个标签",
+      "totalCount": "总标签数",
+      "avgPerBookmark": "平均标签/书签",
+      "mostUsed": "最常用标签",
+      "maxUsage": "最高使用次数"
+    },
+    "cloud": {
+      "title": "标签云",
+      "description": "颜色越深表示使用越频繁"
+    }
+  },
+  "popup": {
+    "save": "收藏",
+    "bookmarkList": "书签列表",
+    "shortcut": "快捷键",
+    "loadingPage": "正在获取页面内容",
+    "pleaseWait": "请稍候...",
+    "cannotGetPage": "无法获取页面内容",
+    "viewBookmarkList": "查看书签列表"
+  }
+}

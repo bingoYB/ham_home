@@ -67,6 +67,7 @@ export interface AIConfig {
   enableTranslation: boolean; // 是否启用翻译
   enableSmartCategory: boolean; // 是否启用智能分类
   enableTagSuggestion: boolean; // 是否启用标签推荐
+  presetTags?: string[];      // 预设标签列表（用于自动匹配书签）
 }
 
 // ============ 用户设置相关 ============
@@ -261,3 +262,20 @@ export interface PresetCategory {
   keywords: string[]; // 用于智能匹配的关键词
 }
 
+/**
+ * 层级分类结构（用于预设分类方案）
+ */
+export interface HierarchicalCategory {
+  id: string;
+  name: string;
+  icon?: string;
+  children?: HierarchicalCategory[];
+}
+
+/**
+ * AI 生成分类结果
+ */
+export interface AIGeneratedCategory {
+  name: string;
+  children?: AIGeneratedCategory[];
+}

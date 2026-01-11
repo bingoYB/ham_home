@@ -1,0 +1,45 @@
+{
+  "ai": {
+    "analyzing": "AI 正在分析...",
+    "generatingTitle": "正在生成标题...",
+    "generatingDescription": "正在生成描述...",
+    "extractingContent": "正在提取内容...",
+    "suggestedCategory": "推荐分类",
+    "suggestedTags": "推荐标签",
+    "aiNotEnabled": "AI 功能未启用，请先在设置中配置 AI",
+    "settings": {
+      "provider": "服务商",
+      "providers": {
+        "openai": "OpenAI",
+        "anthropic": "Anthropic Claude",
+        "deepseek": "DeepSeek",
+        "ollama": "Ollama（本地）",
+        "custom": "自定义"
+      },
+      "apiKeyPlaceholder": "输入您的 API 密钥",
+      "baseUrlPlaceholder": "输入自定义端点（可选）",
+      "modelPlaceholder": "输入模型名称，如：gpt-4-turbo",
+      "testConnection": "测试连接",
+      "features": {
+        "enableSmartCategory": "启用智能分类",
+        "enableTagSuggestion": "启用标签推荐",
+        "enableTranslation": "启用翻译"
+      }
+    },
+    "error": {
+      "configNotFound": "未找到 AI 配置",
+      "apiKeyInvalid": "API 密钥无效",
+      "requestFailed": "AI 请求失败：{{error}}",
+      "networkError": "网络错误，请检查连接",
+      "modelNotFound": "模型不存在",
+      "rateLimited": "请求过于频繁，请稍后再试",
+      "timeout": "请求超时"
+    },
+    "success": {
+      "configSaved": "配置已保存",
+      "testPassed": "连接测试成功",
+      "categorySuggested": "分类推荐已生成",
+      "tagsSuggested": "标签推荐已生成"
+    }
+  }
+}

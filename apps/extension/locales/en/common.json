@@ -1,0 +1,26 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "close": "Close",
+    "confirm": "Confirm",
+    "error": "Error",
+    "success": "Success",
+    "warning": "Warning",
+    "search": "Search",
+    "empty": "No data",
+    "noResults": "No results found",
+    "back": "Back",
+    "next": "Next",
+    "openSettings": "Open Full Settings",
+    "languages": {
+      "en": "English",
+      "zh": "中文",
+      "ja": "日本語",
+      "ko": "한국어"
+    }
+  }
+}

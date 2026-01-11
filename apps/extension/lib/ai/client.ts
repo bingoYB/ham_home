@@ -9,10 +9,10 @@
  * - 提供上下文（已有标签和分类）提高推荐准确性
  */
 import { createExtendedAIClient, getDefaultModel } from '@hamhome/ai';
-import type { AIClient, AnalyzeBookmarkInput } from '@hamhome/ai';
+import type { AIClient, AnalyzeBookmarkInput, GeneratedCategory } from '@hamhome/ai';
 import { configStorage } from '@/lib/storage';
-import type { AIConfig, AnalysisResult, TagSuggestion, CategorySuggestion, LocalCategory, PageContent, PageMetadata } from '@/types';
-import { matchCategories, PRESET_CATEGORIES } from '@/lib/preset-categories';
+import type { AIConfig, AnalysisResult, TagSuggestion, CategorySuggestion, LocalCategory, PageContent, PageMetadata, HierarchicalCategory } from '@/types';
+import { matchCategories, PRESET_CATEGORIES, formatCategoryHierarchy, buildCategoryTree } from '@/lib/preset-categories';
 import { bookmarkStorage } from '@/lib/storage';
 
 type ExtendedAIClient = ReturnType<typeof createExtendedAIClient>;
@@ -23,7 +23,6 @@ type ExtendedAIClient = ReturnType<typeof createExtendedAIClient>;
 export interface EnhancedAnalyzeInput {
   pageContent: PageContent;
   userCategories?: LocalCategory[];
-  existingTags?: string[];
 }
 
 class ExtensionAIClient {
@@ -86,7 +85,16 @@ class ExtensionAIClient {
 
     try {
       const client = this.getOrCreateClient();
+
+      console.log('this.config?.presetTags', this.config?.presetTags);
       
+      // 构建带层级关系的分类信息
+      let categoryContext: string[] = [];
+      if (input.userCategories && input.userCategories.length > 0) {
+        const categoryTree = buildCategoryTree(input.userCategories);
+        categoryContext = formatCategoryHierarchy(categoryTree);
+      }
+
       // 构建增强的输入，包含完整的页面信息和上下文
       const enhancedInput: AnalyzeBookmarkInput = {
         url: input.pageContent.url,
@@ -101,9 +109,9 @@ class ExtensionAIClient {
         } : undefined,
         isReaderable: input.pageContent.isReaderable,
         // 上下文信息，帮助 AI 更好地推荐
-        existingTags: input.existingTags,
-        existingCategories: input.userCategories?.map(c => c.name),
-        presetCategories: PRESET_CATEGORIES.map(c => c.name),
+        presetTags: this.config?.presetTags,
+        // 传递带层级关系的分类信息
+        existingCategories: categoryContext.length > 0 ? categoryContext : input.userCategories?.map(c => c.name),
       };
 
       const result = await client.analyzeBookmark(enhancedInput);
@@ -273,7 +281,6 @@ class ExtensionAIClient {
         title: input.title,
         content: input.content,
         userCategories: input.userCategories.map(c => c.name),
-        presetCategories: PRESET_CATEGORIES.map(c => c.name),
       });
 
       return result.map(item => {
@@ -418,6 +425,27 @@ class ExtensionAIClient {
   reset(): void {
     this.config = null;
     this.client = null;
+  }
+
+  /**
+   * 根据用户描述生成分类方案
+   */
+  async generateCategories(description: string): Promise<GeneratedCategory[]> {
+    if (!this.config) {
+      await this.loadConfig();
+    }
+
+    if (!this.isConfigured()) {
+      throw new Error('请先配置 AI 服务');
+    }
+
+    try {
+      const client = this.getOrCreateClient();
+      return await client.generateCategories(description);
+    } catch (error) {
+      console.error('[ExtensionAIClient] Category generation failed:', error);
+      throw error;
+    }
   }
 }
 

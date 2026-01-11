@@ -32,6 +32,12 @@ export function AIStatus({ status, error, onRetry, className }: AIStatusProps) {
         <div className="flex items-center gap-2 p-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
           <Sparkles className="h-4 w-4" />
           <span>AI 分析完成</span>
+          <button
+              onClick={onRetry}
+              className="underline hover:no-underline whitespace-nowrap ml-2"
+            >
+              重试
+            </button>
         </div>
       )}
 
@@ -59,7 +65,9 @@ export function AIStatus({ status, error, onRetry, className }: AIStatusProps) {
             <span>AI 未配置，使用手动填写</span>
           </div>
           <button
-            onClick={() => chrome.runtime.openOptionsPage()}
+            onClick={() => {
+              chrome.tabs.create({ url: chrome.runtime.getURL('app.html#settings') });
+            }}
             className="underline hover:no-underline whitespace-nowrap ml-2"
           >
             去配置

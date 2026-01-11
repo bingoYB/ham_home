@@ -15,6 +15,14 @@ export * from "./components/textarea";
 export * from "./components/dialog";
 export * from "./components/toast";
 export * from "./components/toaster";
+export * from "./components/progress";
+export * from "./components/avatar";
+export * from "./components/dropdown-menu";
+export * from "./components/tabs";
+export * from "./components/collapsible";
+export * from "./components/alert-dialog";
+export * from "./components/scroll-area";
+export * from "./components/checkbox";
 
 // Hooks 导出
 export { useDebounce } from "./hooks/useDebounce";

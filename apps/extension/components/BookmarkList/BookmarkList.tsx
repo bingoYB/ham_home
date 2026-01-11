@@ -26,7 +26,7 @@ import {
 } from '@hamhome/ui';
 import { BookmarkCard } from './BookmarkCard';
 import { EditBookmarkDialog } from './EditBookmarkDialog';
-import { useBookmarkList } from '@/hooks/useBookmarkList';
+import { useBookmarkList } from './useBookmarkList';
 import type { LocalBookmark } from '@/types';
 
 interface BookmarkListProps {

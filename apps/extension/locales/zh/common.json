@@ -1,0 +1,26 @@
+{
+  "common": {
+    "loading": "加载中...",
+    "save": "保存",
+    "cancel": "取消",
+    "delete": "删除",
+    "edit": "编辑",
+    "close": "关闭",
+    "confirm": "确认",
+    "error": "错误",
+    "success": "成功",
+    "warning": "警告",
+    "search": "搜索",
+    "empty": "无数据",
+    "noResults": "未找到匹配结果",
+    "back": "返回",
+    "next": "下一步",
+    "openSettings": "打开完整设置",
+    "languages": {
+      "en": "English",
+      "zh": "中文",
+      "ja": "日本語",
+      "ko": "한국어"
+    }
+  }
+}

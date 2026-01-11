@@ -10,11 +10,13 @@ import type {
   AIProvider,
   TagSuggestionResult,
   CategorySuggestionResult,
+  GeneratedCategory,
 } from './types';
 import {
   BookmarkAnalysisSchema,
   TagSuggestionsSchema,
   CategorySuggestionsSchema,
+  GeneratedCategoriesSchema,
 } from './types';
 
 /**
@@ -102,14 +104,11 @@ function buildUserPrompt(input: AnalyzeBookmarkInput): string {
   if (input.existingCategories && input.existingCategories.length > 0) {
     categoryContext = `\n用户已有分类: ${input.existingCategories.join(', ')}`;
   }
-  if (input.presetCategories && input.presetCategories.length > 0) {
-    categoryContext += `\n预设分类选项: ${input.presetCategories.join(', ')}`;
-  }
 
   // 构建标签上下文
   let tagContext = '';
-  if (input.existingTags && input.existingTags.length > 0) {
-    tagContext = `\n用户已有标签: ${input.existingTags.slice(0, 20).join(', ')}`;
+  if (input.presetTags && input.presetTags.length > 0) {
+    tagContext = `\n预设标签: ${input.presetTags.slice(0, 20).join(', ')}`;
   }
 
   return `请分析以下网页内容，生成书签元数据：
@@ -129,7 +128,7 @@ ${tagContext}
    - 简洁：中文2-5字，英文不超过2个单词
    - 准确：反映网页核心主题
    - 多样：涵盖网站/领域/具体内容
-   - 避免与已有标签重复`;
+   - 优先从预设标签中选择，避免重复`;
 }
 
 /**
@@ -291,12 +290,9 @@ URL: ${input.url}
 标题: ${input.title}
 内容摘要: ${input.content.slice(0, 500)}
 
-用户已有标签: ${input.existingTags.join(', ')}
-
 要求:
 1. 标签应简洁、准确、有辨识度
-2. 优先推荐与用户已有标签相关但不重复的标签
-3. 标签应该是中文，除非是专有名词（如 React, GitHub）`;
+2. 标签应该是中文，除非是专有名词（如 React, GitHub）`;
 
       try {
         const { object } = await generateObject({
@@ -322,7 +318,6 @@ URL: ${input.url}
       title: string;
       content: string;
       userCategories: string[];
-      presetCategories: string[];
     }): Promise<CategorySuggestionResult[]> {
       const prompt = `请为以下网页推荐最合适的分类。
 
@@ -331,12 +326,10 @@ URL: ${input.url}
 内容摘要: ${input.content.slice(0, 500)}
 
 用户已有分类: ${input.userCategories.join(', ') || '无'}
-预设分类选项: ${input.presetCategories.join(', ')}
 
 要求:
 1. 优先从用户已有分类中选择
-2. 如果用户分类不合适，可以推荐预设分类
-3. 返回 1-2 个最合适的分类`;
+2. 返回 1-2 个最合适的分类`;
 
       try {
         const { object } = await generateObject({
@@ -393,6 +386,42 @@ ${text}`;
         return text;
       } catch (error) {
         console.error('[@hamhome/ai] Raw generation failed:', error);
+        throw error;
+      }
+    },
+
+    /**
+     * 根据用户描述生成分类方案
+     */
+    async generateCategories(description: string): Promise<GeneratedCategory[]> {
+      const prompt = `你是一个专业的信息架构师，擅长为用户设计个性化的书签分类系统。
+
+用户需求描述：
+${description}
+
+请根据用户的描述，生成一套个性化的书签分类系统。
+
+要求：
+1. 分类数量适中（3-8个一级分类）
+2. 支持层级结构（最多3层）
+3. 分类名称简洁明了（2-8个字）
+4. 分类之间不重叠
+5. 覆盖用户描述的所有需求场景
+
+请直接返回分类结构，格式为 JSON 数组。`;
+
+      try {
+        const { object } = await generateObject({
+          model,
+          schema: GeneratedCategoriesSchema,
+          prompt,
+          temperature: 0.5,
+          maxTokens: 1500,
+        });
+
+        return object as GeneratedCategory[];
+      } catch (error) {
+        console.error('[@hamhome/ai] Category generation failed:', error);
         throw error;
       }
     },

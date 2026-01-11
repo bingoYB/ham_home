@@ -1,0 +1,299 @@
+{
+  "settings": {
+    "title": "设置",
+    "description": "管理你的书签工具偏好设置",
+    "tabs": {
+      "ai": "AI 配置",
+      "general": "通用设置",
+      "storage": "存储管理"
+    },
+    "language": "语言",
+    "theme": "主题",
+    "themeOptions": {
+      "light": "浅色",
+      "dark": "深色",
+      "system": "跟随系统"
+    },
+    "aiSettings": "AI 设置",
+    "aiProvider": "AI 服务商",
+    "apiKey": "API 密钥",
+    "modelName": "模型名称",
+    "temperature": "温度（创意度）",
+    "maxTokens": "最大 Token 数",
+    "importBookmarks": "导入书签",
+    "exportBookmarks": "导出书签",
+    "about": "关于",
+    "sections": {
+      "general": "通用",
+      "ai": "AI",
+      "privacy": "隐私",
+      "about": "关于"
+    },
+    "descriptions": {
+      "language": "选择应用语言",
+      "theme": "选择主题模式",
+      "autoSaveSnapshot": "自动保存网页快照"
+    },
+    "buttons": {
+      "import": "选择文件导入",
+      "export": "导出所有书签",
+      "reset": "重置为默认",
+      "clear": "清空所有数据"
+    },
+    "general": {
+      "title": "通用设置",
+      "description": "自定义你的使用体验",
+      "autoSaveSnapshot": "自动保存快照",
+      "autoSaveSnapshotDesc": "保存书签时自动保存页面快照",
+      "shortcut": "快捷键",
+      "shortcutDesc": "自定义保存书签的快捷键",
+      "shortcutPlaceholder": "Ctrl+Shift+E"
+    },
+    "ai": {
+      "title": "AI 服务配置",
+      "description": "配置 AI 分析服务以自动提取书签摘要和标签",
+      "enableAI": "启用 AI 分析",
+      "enableAIDesc": "保存书签时自动使用 AI 生成摘要和标签",
+      "provider": "AI 服务商",
+      "apiKeyPlaceholder": "sk-...",
+      "apiKeyDesc": "你的 API Key 将安全存储在本地，不会上传到服务器",
+      "baseUrl": "Base URL",
+      "baseUrlPlaceholder": "https://api.example.com/v1",
+      "model": "模型名称",
+      "modelPlaceholder": "gpt-3.5-turbo",
+      "advancedOptions": "高级参数",
+      "smartCategory": "智能分类推荐",
+      "smartCategoryDesc": "自动推荐书签分类",
+      "tagSuggestion": "标签推荐",
+      "tagSuggestionDesc": "自动推荐相关标签",
+      "translation": "翻译功能",
+      "translationDesc": "将外语内容翻译为中文",
+      "presetTags": "预设标签",
+      "presetTagsDesc": "配置预设标签，AI 将优先从中匹配相关标签应用到书签",
+      "addTag": "添加标签",
+      "addTagPlaceholder": "输入标签名称，按 Enter 添加",
+      "configuredTags": "已配置标签",
+      "noTags": "还未添加任何预设标签。添加预设标签后，AI 将更准确地推荐相关标签。",
+      "testConnection": "测试连接",
+      "testing": "测试中...",
+      "removeTag": "删除标签"
+    },
+    "storage": {
+      "title": "存储管理",
+      "description": "管理你的书签数据和快照",
+      "bookmarkCount": "书签数量",
+      "categoryCount": "分类数量",
+      "storageUsed": "占用空间",
+      "dataExport": "数据导出",
+      "exportJSON": "导出为 JSON",
+      "exportHTML": "导出为 HTML",
+      "dangerZone": "危险操作",
+      "clearAllData": "清除所有数据"
+    },
+    "about": {
+      "title": "关于",
+      "description": "关于 HamHome",
+      "version": "HamHome v1.0.0",
+      "subtitle": "智能书签管理工具",
+      "intro": "HamHome 是一个强大的浏览器扩展，帮助你管理和组织书签，使用 AI 技术自动分类和标记书签。",
+      "copyright": "© 2024-2025 HamHome. 保留所有权利。"
+    },
+    "dialogs": {
+      "confirmClear": "确认清除所有数据",
+      "clearWarning": "此操作将删除所有书签、分类和设置数据。此操作无法撤销，请谨慎操作。",
+      "cancel": "取消",
+      "confirm": "确认清除"
+    },
+    "providers": {
+      "openai": "OpenAI",
+      "anthropic": "Anthropic",
+      "ollama": "Ollama (本地)",
+      "custom": "自定义"
+    },
+    "messages": {
+      "temperatureDesc": "控制生成内容的随机性（0-2，推荐 0.3）",
+      "maxTokensDesc": "生成内容的最大长度（推荐 1000）",
+      "apiKeySecure": "你的 API Key 将安全存储在本地，不会上传到服务器"
+    },
+    "importExport": {
+      "title": "导入/导出",
+      "description": "备份或迁移你的书签数据",
+      "importSuccess": "导入完成",
+      "importFailed": "导入失败",
+      "importDetails": "成功导入 {{imported}} 个书签，跳过 {{skipped}} 个重复项",
+      "export": {
+        "title": "导出书签",
+        "description": "将你的书签数据导出为文件备份",
+        "jsonFormat": "JSON 格式",
+        "jsonSubtitle": "完整数据备份",
+        "jsonDesc": "包含所有书签、分类信息，可用于完整恢复数据",
+        "htmlFormat": "HTML 格式",
+        "htmlSubtitle": "可浏览的网页",
+        "htmlDesc": "生成美观的 HTML 页面，可直接在浏览器中查看",
+        "currentStats": "当前共有 {{bookmarkCount}} 个书签，{{categoryCount}} 个分类"
+      },
+      "import": {
+        "title": "导入书签",
+        "description": "从文件导入书签数据",
+        "selectFile": "点击选择文件",
+        "supportedFormats": "支持 JSON 和 HTML 格式",
+        "importing": "正在导入...",
+        "formatLabel": "支持的格式：",
+        "formatJSON": "HamHome JSON 导出文件",
+        "formatHTML": "浏览器书签 HTML 文件（从 Chrome/Firefox/Edge 导出）"
+      },
+      "errors": {
+        "unsupportedFormat": "不支持的文件格式，请选择 JSON 或 HTML 文件",
+        "unknown": "未知错误"
+      }
+    },
+    "privacy": {
+      "title": "隐私设置",
+      "description": "管理你的数据隐私和安全设置",
+      "dataStorage": {
+        "title": "数据存储",
+        "description": "了解你的数据如何被存储",
+        "localStorage": "本地存储",
+        "localStorageDesc": "你的所有书签数据都存储在浏览器本地，不会上传到任何服务器。数据使用 Chrome Storage API 安全存储。",
+        "apiKeySecurity": "API Key 安全",
+        "apiKeySecurityDesc": "你的 AI API Key 仅存储在本地，直接与 AI 服务提供商通信，不经过任何中间服务器。"
+      },
+      "aiPrivacy": {
+        "title": "AI 服务隐私",
+        "description": "控制 AI 分析时发送的数据",
+        "enableAI": "启用 AI 分析",
+        "enableAIDesc": "开启后，网页标题和内容摘要将发送给 AI 服务进行分析",
+        "dataNotice": "AI 分析数据说明",
+        "dataNoticeDesc": "当你使用 AI 分析功能时，以下数据会发送给 AI 服务提供商：",
+        "dataItems": {
+          "url": "网页 URL",
+          "title": "网页标题",
+          "content": "网页内容摘要（用于生成描述和标签）"
+        }
+      },
+      "snapshot": {
+        "title": "快照设置",
+        "description": "控制网页快照的保存",
+        "autoSave": "自动保存快照",
+        "autoSaveDesc": "保存书签时自动保存网页快照，以便离线查看",
+        "tip": "提示",
+        "tipContent": "快照功能会将网页 HTML 保存在本地，可能占用较多存储空间。如果你关心存储空间，可以关闭此功能。"
+      }
+    },
+    "categories": {
+      "title": "分类管理",
+      "description": "创建和管理你的书签分类",
+      "newCategory": "新建分类",
+      "usePreset": "使用预设分类",
+      "batchDelete": "批量删除",
+      "selectAll": "全选",
+      "deselectAll": "取消全选",
+      "selectedCount": "已选择 {{count}} 项",
+      "deleteSelected": "删除选中项",
+      "categoryName": "分类名称",
+      "categoryNamePlaceholder": "输入分类名称",
+      "bookmarkCount": "{{count}} 个书签",
+      "noCategories": "还没有分类，点击「新建分类」或「使用预设分类」开始",
+      "edit": "编辑",
+      "delete": "删除",
+      "expand": "展开",
+      "collapse": "折叠",
+      "addSubcategory": "添加子分类",
+      "dialogs": {
+        "createTitle": "新建分类",
+        "editTitle": "编辑分类",
+        "deleteTitle": "确认删除分类",
+        "deleteDescription": "删除分类「{{name}}」后，该分类下的书签将被移至「未分类」。此操作无法撤销。",
+        "batchDeleteTitle": "确认批量删除",
+        "batchDeleteDescription": "确定要删除选中的 {{count}} 个分类吗？这些分类下的书签将被移至「未分类」。此操作无法撤销。",
+        "cancel": "取消",
+        "create": "创建",
+        "save": "保存",
+        "confirm": "确认删除"
+      },
+      "preset": {
+        "title": "选择分类方案",
+        "description": "选择预设分类方案或使用 AI 生成个性化分类",
+        "presetTab": "预设分类",
+        "aiTab": "AI 生成",
+        "general": "方案一：通用型",
+        "generalDesc": "适合日常信息获取和工作生活平衡的用户",
+        "professional": "方案二：专业创作者 / 技术向",
+        "professionalDesc": "适合开发者、设计师、内容创作者等专业人士",
+        "aiInputLabel": "描述你的分类需求",
+        "aiInputPlaceholder": "例如：我是一名前端开发者，平时会收藏技术文档、设计灵感、学习资源，也会关注一些科技新闻和投资理财内容...",
+        "aiGenerate": "AI 生成分类",
+        "aiGenerating": "AI 生成中...",
+        "aiRecommended": "AI 推荐分类",
+        "retry": "重试",
+        "apply": "应用",
+        "schemes": {
+          "general": {
+            "learning": "学习与知识",
+            "learning-tech-docs": "技术文档",
+            "learning-tutorials": "教程 / 课程",
+            "learning-research": "研究 / 深度文章",
+            "learning-notes": "笔记 / 摘要",
+            "learning-ebooks": "电子书 / 资料库",
+            "work": "工作与效率",
+            "work-projects": "项目相关",
+            "work-tools": "工具 / SaaS",
+            "work-design": "设计资源",
+            "work-writing": "写作 / 文案",
+            "work-collab": "协作 / 管理",
+            "reading": "资讯与阅读",
+            "reading-news": "新闻",
+            "reading-blogs": "博客",
+            "reading-industry": "行业动态",
+            "reading-later": "长文待读",
+            "reading-rss": "订阅源",
+            "tech": "技术与开发",
+            "tech-frontend": "前端",
+            "tech-backend": "后端",
+            "tech-ai": "AI / 数据",
+            "tech-system": "系统 / 架构",
+            "tech-opensource": "开源项目",
+            "life": "生活与兴趣",
+            "life-entertainment": "娱乐",
+            "life-art": "摄影 / 艺术",
+            "life-health": "健康",
+            "life-travel": "旅行",
+            "life-hobbies": "兴趣爱好"
+          },
+          "professional": {
+            "tech": "技术",
+            "tech-langs": "编程语言",
+            "tech-langs-js": "JavaScript",
+            "tech-langs-python": "Python",
+            "tech-langs-other": "其他",
+            "tech-frameworks": "框架 / 库",
+            "tech-ai": "AI / LLM",
+            "tech-system": "系统设计",
+            "tech-opensource": "开源生态",
+            "product": "产品与设计",
+            "product-analysis": "产品分析",
+            "product-ux": "用户体验",
+            "product-design-system": "设计系统",
+            "product-competitor": "竞品研究",
+            "product-prototype": "原型 / Demo",
+            "content": "内容创作",
+            "content-material": "写作素材",
+            "content-skills": "表达技巧",
+            "content-cases": "案例拆解",
+            "content-channels": "发布渠道",
+            "business": "商业与趋势",
+            "business-reports": "行业报告",
+            "business-startup": "创业 / 商业模式",
+            "business-investment": "投资 / 市场",
+            "business-trends": "趋势判断",
+            "resources": "工具与资源",
+            "resources-online": "在线工具",
+            "resources-data": "数据资源",
+            "resources-templates": "模板 / 素材",
+            "resources-automation": "自动化"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,36 @@
+{
+  "name": "@hamhome/i18n",
+  "version": "1.0.0",
+  "description": "HamHome 国际化配置和工具",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist",
+    "src"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "dev": "tsup src/index.ts --format cjs,esm --dts --watch"
+  },
+  "dependencies": {
+    "i18next": "^24.0.0",
+    "react-i18next": "^15.0.0",
+    "i18next-browser-languagedetector": "^7.0.0"
+  },
+  "peerDependencies": {
+    "react": "^18.0.0 || ^19.0.0",
+    "react-dom": "^18.0.0 || ^19.0.0"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "typescript": "^5.7.0",
+    "tsup": "^8.0.0"
+  },
+  "keywords": [
+    "i18n",
+    "internationalization",
+    "hamhome",
+    "i18next"
+  ],
+  "license": "MIT"
+}
