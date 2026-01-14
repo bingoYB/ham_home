@@ -4,11 +4,16 @@
  */
 import { useState, useEffect } from 'react';
 import type { PageContent } from '@/types';
+import { containsPrivateContent, isNonBookmarkableUrl } from '../lib/privacy';
 
 interface UseCurrentPageResult {
   pageContent: PageContent | null;
   loading: boolean;
   error: string | null;
+  /** 是否为隐私页面 */
+  isPrivate: boolean;
+  /** 隐私原因 */
+  privacyReason: string | null;
   refresh: () => Promise<void>;
 }
 
@@ -16,10 +21,14 @@ export function useCurrentPage(): UseCurrentPageResult {
   const [pageContent, setPageContent] = useState<PageContent | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isPrivate, setIsPrivate] = useState(false);
+  const [privacyReason, setPrivacyReason] = useState<string | null>(null);
 
   const fetchContent = async () => {
     setLoading(true);
     setError(null);
+    setIsPrivate(false);
+    setPrivacyReason(null);
 
     try {
       // 获取当前活动标签页
@@ -34,14 +43,32 @@ export function useCurrentPage(): UseCurrentPageResult {
         return;
       }
 
-      // 检查是否是特殊页面（chrome://、edge:// 等）
-      if (
-        tab.url.startsWith('chrome://') ||
-        tab.url.startsWith('chrome-extension://') ||
-        tab.url.startsWith('edge://') ||
-        tab.url.startsWith('about:')
-      ) {
+      // 检查是否是特殊页面（使用 privacy 模块统一检测）
+      if (isNonBookmarkableUrl(tab.url)) {
         setError('无法收藏浏览器内部页面');
+        setIsPrivate(true);
+        setPrivacyReason('浏览器内部页面');
+        setLoading(false);
+        return;
+      }
+
+      // 检测隐私内容
+      const privacyCheck = await containsPrivateContent(tab.url);
+      setIsPrivate(privacyCheck.isPrivate);
+      setPrivacyReason(privacyCheck.reason || null);
+
+      // 如果是隐私页面，只返回基本信息，不提取页面内容
+      if (privacyCheck.isPrivate) {
+        setPageContent({
+          url: tab.url,
+          title: tab.title || '',
+          content: '',
+          textContent: '',
+          excerpt: '',
+          favicon: tab.favIconUrl || '',
+          isPrivate: true,
+          privacyReason: privacyCheck.reason,
+        });
         setLoading(false);
         return;
       }
@@ -52,7 +79,10 @@ export function useCurrentPage(): UseCurrentPageResult {
       });
 
       if (content) {
-        setPageContent(content);
+        setPageContent({
+          ...content,
+          isPrivate: false,
+        });
       } else {
         // 如果 content script 未返回内容，使用基本信息
         setPageContent({
@@ -62,6 +92,7 @@ export function useCurrentPage(): UseCurrentPageResult {
           textContent: '',
           excerpt: '',
           favicon: tab.favIconUrl || '',
+          isPrivate: false,
         });
       }
     } catch (err) {
@@ -75,6 +106,11 @@ export function useCurrentPage(): UseCurrentPageResult {
         });
         
         if (tab?.url) {
+          // 即使出错也检测隐私状态
+          const privacyCheck = await containsPrivateContent(tab.url);
+          setIsPrivate(privacyCheck.isPrivate);
+          setPrivacyReason(privacyCheck.reason || null);
+
           setPageContent({
             url: tab.url,
             title: tab.title || '',
@@ -82,6 +118,8 @@ export function useCurrentPage(): UseCurrentPageResult {
             textContent: '',
             excerpt: '',
             favicon: tab.favIconUrl || '',
+            isPrivate: privacyCheck.isPrivate,
+            privacyReason: privacyCheck.reason,
           });
         } else {
           setError('获取页面内容失败');
@@ -102,6 +140,8 @@ export function useCurrentPage(): UseCurrentPageResult {
     pageContent,
     loading,
     error,
+    isPrivate,
+    privacyReason,
     refresh: fetchContent,
   };
 }

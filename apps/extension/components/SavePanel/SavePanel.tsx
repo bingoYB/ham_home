@@ -2,23 +2,19 @@
  * 保存面板组件
  * 参考 NewBookmarkModal 设计风格优化 UI
  */
-import { Loader2, Check, Bookmark, Lightbulb, Sparkles, Link as LinkIcon, FileText, FolderOpen, Tag as TagIcon, X } from 'lucide-react';
+import { Loader2, Bookmark, FileText, FolderOpen, Tag as TagIcon, AlignLeft } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import {
   Button,
   Input,
   Textarea,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
   Label,
-  Badge,
 } from '@hamhome/ui';
 import { TagInput } from '@/components/common/TagInput';
+import { CategorySelect } from '@/components/common/CategorySelect';
 import { AIStatus } from './AIStatus';
 import { useSavePanel } from './useSavePanel';
-import type { PageContent, LocalBookmark, CategorySuggestion } from '@/types';
+import type { PageContent, LocalBookmark, LocalCategory } from '@/types';
 
 interface SavePanelProps {
   pageContent: PageContent;
@@ -35,6 +31,7 @@ export function SavePanel({
   onClose,
   onDelete,
 }: SavePanelProps) {
+  const { t } = useTranslation();
   const {
     title,
     description,
@@ -44,10 +41,6 @@ export function SavePanel({
     allTags,
     aiStatus,
     aiError,
-    tagSuggestions,
-    categorySuggestions,
-    showSuggestions,
-    loadingSuggestions,
     aiRecommendedCategory,
     saving,
     setTitle,
@@ -56,8 +49,6 @@ export function SavePanel({
     setTags,
     runAIAnalysis,
     retryAnalysis,
-    applyTagSuggestion,
-    applyCategorySuggestion,
     applyAIRecommendedCategory,
     save,
     deleteBookmark,
@@ -69,23 +60,6 @@ export function SavePanel({
 
   return (
     <div className="p-4 space-y-4">
-      {/* AI 状态提示 */}
-      <AIStatus status={aiStatus} error={aiError} onRetry={retryAnalysis} />
-
-      {/* 已收藏提示 */}
-      {existingBookmark && <ExistingBookmarkBanner />}
-
-      {/* 智能推荐区域 */}
-      {showSuggestions && !existingBookmark && (
-        <SmartSuggestions
-          tagSuggestions={tagSuggestions}
-          categorySuggestions={categorySuggestions}
-          loading={loadingSuggestions}
-          onApplyTag={applyTagSuggestion}
-          onApplyCategory={applyCategorySuggestion}
-        />
-      )}
-
       {/* 表单 */}
       <BookmarkForm
         title={title}
@@ -95,16 +69,17 @@ export function SavePanel({
         categories={categories}
         allTags={allTags}
         existingBookmark={existingBookmark}
-        tagSuggestionsCount={tagSuggestions.length}
-        categorySuggestionsCount={categorySuggestions.length}
-        loadingSuggestions={loadingSuggestions}
+        isLoading={aiStatus === 'loading'}
         aiRecommendedCategory={aiRecommendedCategory}
+        aiStatus={aiStatus}
+        aiError={aiError}
         onTitleChange={setTitle}
         onDescriptionChange={setDescription}
         onCategoryChange={setCategoryId}
         onTagsChange={setTags}
         onLoadSuggestions={runAIAnalysis}
         onApplyAICategory={applyAIRecommendedCategory}
+        onRetry={retryAnalysis}
       />
 
       {/* 操作按钮 */}
@@ -112,14 +87,16 @@ export function SavePanel({
         {/* 取消按钮 */}
         <Button
           variant="outline"
+          size="sm"
           className="flex-1"
           onClick={onClose}
         >
-          取消
+          {t('bookmark:savePanel.cancel')}
         </Button>
 
         {/* 保存按钮 */}
         <Button
+          size="sm"
           className="flex-1 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-600 hover:to-primary-700 text-primary-foreground shadow-sm"
           onClick={save}
           disabled={saving || !title.trim()}
@@ -127,12 +104,12 @@ export function SavePanel({
           {saving ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              保存中...
+              {t('bookmark:savePanel.saving')}
             </>
           ) : (
             <>
               <Bookmark className="h-4 w-4 mr-2" />
-              {existingBookmark ? '更新书签' : '保存书签'}
+              {existingBookmark ? t('bookmark:savePanel.updateBookmark') : t('bookmark:savePanel.saveBookmark')}
             </>
           )}
         </Button>
@@ -141,6 +118,7 @@ export function SavePanel({
         {existingBookmark && (
           <Button
             variant="destructive"
+            size="sm"
             className="flex-1"
             onClick={() => {
               deleteBookmark().then(() => {
@@ -149,7 +127,7 @@ export function SavePanel({
             }}
             disabled={saving}
           >
-            删除
+            {t('common:common.delete')}
           </Button>
         )}
       </div>
@@ -159,112 +137,25 @@ export function SavePanel({
 
 // ========== 子组件 ==========
 
-function ExistingBookmarkBanner() {
-  return (
-    <div className="flex items-center gap-2 p-3 bg-emerald-50 dark:bg-emerald-950/30 rounded-xl text-sm border border-emerald-200 dark:border-emerald-800">
-      <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-900 flex items-center justify-center">
-        <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-      </div>
-      <span className="text-emerald-700 dark:text-emerald-300 font-medium">此页面已收藏，可更新信息</span>
-    </div>
-  );
-}
-
-interface SmartSuggestionsProps {
-  tagSuggestions: { tag: string; reason?: string }[];
-  categorySuggestions: CategorySuggestion[];
-  loading: boolean;
-  onApplyTag: (tag: string) => void;
-  onApplyCategory: (suggestion: CategorySuggestion) => void;
-}
-
-function SmartSuggestions({
-  tagSuggestions,
-  categorySuggestions,
-  loading,
-  onApplyTag,
-  onApplyCategory,
-}: SmartSuggestionsProps) {
-  return (
-    <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-950/30 dark:to-indigo-950/30 rounded-xl space-y-3 border border-blue-200 dark:border-blue-800">
-      <div className="flex items-center gap-2 text-sm font-medium text-blue-700 dark:text-blue-300">
-        <div className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-          <Sparkles className="h-3.5 w-3.5 text-blue-600 dark:text-blue-400" />
-        </div>
-        <span>智能推荐</span>
-        {loading && <Loader2 className="h-3 w-3 animate-spin" />}
-      </div>
-
-      {/* 分类推荐 */}
-      {categorySuggestions.length > 0 && (
-        <div className="space-y-2">
-          <div className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-            推荐分类
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {categorySuggestions.map((suggestion, index) => (
-              <button
-                key={index}
-                onClick={() => onApplyCategory(suggestion)}
-                className="group flex items-center gap-1.5 px-3 py-1.5 bg-white dark:bg-blue-900/50 rounded-lg border border-blue-200 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900 hover:border-blue-300 transition-all shadow-sm"
-                title={suggestion.reason}
-              >
-                <Lightbulb className="h-3.5 w-3.5 text-blue-500" />
-                <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
-                  {suggestion.categoryName}
-                </span>
-                <span className="text-xs text-blue-500/70 dark:text-blue-400/70">
-                  {Math.round(suggestion.confidence * 100)}%
-                </span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* 标签推荐 */}
-      {tagSuggestions.length > 0 && (
-        <div className="space-y-2">
-          <div className="text-xs text-blue-600 dark:text-blue-400 font-medium">
-            推荐标签
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {tagSuggestions.map((suggestion, index) => (
-              <button
-                key={index}
-                onClick={() => onApplyTag(suggestion.tag)}
-                className="group flex items-center gap-1 px-3 py-1.5 bg-white dark:bg-blue-900/50 rounded-lg border border-blue-200 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900 hover:border-blue-300 transition-all shadow-sm"
-                title={suggestion.reason}
-              >
-                <span className="text-sm font-medium text-blue-700 dark:text-blue-300">{suggestion.tag}</span>
-                <span className="text-xs text-blue-500/70">+</span>
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
 interface BookmarkFormProps {
   title: string;
   description: string;
   categoryId: string | null;
   tags: string[];
-  categories: { id: string; name: string }[];
+  categories: LocalCategory[];
   allTags: string[];
   existingBookmark: LocalBookmark | null;
-  tagSuggestionsCount: number;
-  categorySuggestionsCount: number;
-  loadingSuggestions: boolean;
+  isLoading: boolean;
   aiRecommendedCategory: string | null;
+  aiStatus: 'idle' | 'loading' | 'success' | 'error' | 'disabled';
+  aiError: string | null;
   onTitleChange: (value: string) => void;
   onDescriptionChange: (value: string) => void;
   onCategoryChange: (value: string | null) => void;
   onTagsChange: (value: string[]) => void;
   onLoadSuggestions: () => void;
   onApplyAICategory: () => void;
+  onRetry: () => void;
 }
 
 function BookmarkForm({
@@ -275,127 +166,102 @@ function BookmarkForm({
   categories,
   allTags,
   existingBookmark,
-  tagSuggestionsCount,
-  categorySuggestionsCount,
-  loadingSuggestions,
+  isLoading,
   aiRecommendedCategory,
+  aiStatus,
+  aiError,
   onTitleChange,
   onDescriptionChange,
   onCategoryChange,
   onTagsChange,
   onLoadSuggestions,
   onApplyAICategory,
+  onRetry,
 }: BookmarkFormProps) {
+  const { t } = useTranslation();
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {/* 标题 */}
-      <div className="space-y-2">
-        <Label htmlFor="title" className="flex items-center gap-2 text-sm font-medium">
-          <FileText className="h-4 w-4 text-blue-500" />
-          标题
-        </Label>
+      <div className="space-y-1.5">
+        <div className="flex items-center justify-between">
+          <Label htmlFor="title" className="flex items-center gap-2 text-sm font-medium">
+            <FileText className="h-4 w-4 text-blue-500" />
+            {t('bookmark:savePanel.titleLabel')}
+          </Label>
+          {!existingBookmark && <AIStatus status={aiStatus} error={aiError} onRetry={onRetry} />}
+        </div>
         <Input
           id="title"
           value={title}
           onChange={(e) => onTitleChange(e.target.value)}
-          placeholder="输入标题"
-          className="h-10"
+          placeholder={t('bookmark:savePanel.titlePlaceholder')}
+          className="h-9 text-sm"
         />
       </div>
 
       {/* 摘要 */}
-      <div className="space-y-2">
-        <Label htmlFor="description" className="text-sm font-medium">
-          摘要
+      <div className="space-y-1.5">
+        <Label htmlFor="description" className="flex items-center gap-2 text-sm font-medium">
+          <AlignLeft className="h-4 w-4 text-orange-500" />
+          {t('bookmark:savePanel.descriptionLabel')}
         </Label>
         <Textarea
           id="description"
           value={description}
           onChange={(e) => onDescriptionChange(e.target.value)}
-          placeholder="输入摘要或等待 AI 生成"
-          rows={3}
+          placeholder={t('bookmark:savePanel.descriptionPlaceholder')}
+          rows={2}
           className="text-sm resize-none"
         />
       </div>
 
       {/* 分类 */}
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         <div className="flex items-center justify-between">
           <Label className="flex items-center gap-2 text-sm font-medium">
             <FolderOpen className="h-4 w-4 text-emerald-500" />
-            分类
+            {t('bookmark:savePanel.categoryLabel')}
           </Label>
-          {!existingBookmark && categorySuggestionsCount === 0 && !aiRecommendedCategory && (
+          {!existingBookmark && !aiRecommendedCategory && !categoryId && (
             <button
               onClick={onLoadSuggestions}
               className="text-xs text-primary hover:text-primary/80 font-medium"
-              disabled={loadingSuggestions}
+              disabled={isLoading}
             >
-              {loadingSuggestions ? '加载中...' : '获取推荐'}
+              {isLoading ? t('bookmark:savePanel.loading') : t('bookmark:savePanel.getSuggestions')}
             </button>
           )}
         </div>
-        <Select
-          value={categoryId || 'uncategorized'}
-          onValueChange={(v) =>
-            onCategoryChange(v === 'uncategorized' ? null : v)
-          }
-        >
-          <SelectTrigger className="h-10">
-            <SelectValue placeholder="选择分类" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="uncategorized">未分类</SelectItem>
-            {categories.map((c) => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-        
-        {/* AI 推荐分类（不在已有分类中时显示） */}
-        {aiRecommendedCategory && !categoryId && (
-          <div className="flex items-center justify-between p-2 bg-amber-50 dark:bg-amber-950/30 rounded-lg border border-amber-200 dark:border-amber-800">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-3.5 w-3.5 text-amber-600 dark:text-amber-400" />
-              <span className="text-sm text-amber-700 dark:text-amber-300">
-                AI 推荐分类：<span className="font-medium">{aiRecommendedCategory}</span>
-              </span>
-            </div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 px-2 text-amber-700 dark:text-amber-300 hover:bg-amber-100 dark:hover:bg-amber-900/50"
-              onClick={onApplyAICategory}
-            >
-              应用
-            </Button>
-          </div>
-        )}
+        <CategorySelect
+          value={categoryId}
+          onChange={onCategoryChange}
+          categories={categories}
+          aiRecommendedCategory={aiRecommendedCategory}
+          onApplyAICategory={onApplyAICategory}
+        />
       </div>
 
       {/* 标签 */}
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         <div className="flex items-center justify-between">
           <Label className="flex items-center gap-2 text-sm font-medium">
             <TagIcon className="h-4 w-4 text-purple-500" />
-            标签
+            {t('bookmark:savePanel.tagsLabel')}
           </Label>
-          {!existingBookmark && tagSuggestionsCount === 0 && (
+          {!existingBookmark && tags.length === 0 && (
             <button
               onClick={onLoadSuggestions}
               className="text-xs text-primary hover:text-primary/80 font-medium"
-              disabled={loadingSuggestions}
+              disabled={isLoading}
             >
-              {loadingSuggestions ? '加载中...' : '获取推荐'}
+              {isLoading ? t('bookmark:savePanel.loading') : t('bookmark:savePanel.getSuggestions')}
             </button>
           )}
         </div>
         <TagInput
           value={tags}
           onChange={onTagsChange}
-          placeholder="输入标签后回车"
+          placeholder={t('bookmark:savePanel.tagPlaceholder')}
           maxTags={10}
           suggestions={allTags}
         />

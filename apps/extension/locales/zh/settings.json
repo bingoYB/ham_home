@@ -18,7 +18,7 @@
     "aiProvider": "AI 服务商",
     "apiKey": "API 密钥",
     "modelName": "模型名称",
-    "temperature": "温度（创意度）",
+    "temperature": "temperature",
     "maxTokens": "最大 Token 数",
     "importBookmarks": "导入书签",
     "exportBookmarks": "导出书签",
@@ -161,8 +161,11 @@
       "aiPrivacy": {
         "title": "AI 服务隐私",
         "description": "控制 AI 分析时发送的数据",
-        "enableAI": "启用 AI 分析",
-        "enableAIDesc": "开启后，网页标题和内容摘要将发送给 AI 服务进行分析",
+        "customDomains": "自定义隐私域名",
+        "customDomainsDesc": "除了系统默认保护的页面外，您还可以添加需要额外保护的域名",
+        "domainPlaceholder": "输入域名，如 example.com",
+        "addDomain": "添加域名",
+        "removeDomain": "删除域名",
         "dataNotice": "AI 分析数据说明",
         "dataNoticeDesc": "当你使用 AI 分析功能时，以下数据会发送给 AI 服务提供商：",
         "dataItems": {

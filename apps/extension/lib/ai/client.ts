@@ -42,7 +42,6 @@ class ExtensionAIClient {
    */
   isConfigured(): boolean {
     if (!this.config) return false;
-    if (!this.config.enabled) return false;
 
     // Ollama 不需要 API Key
     if (this.config.provider === 'ollama') {

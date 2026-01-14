@@ -2,7 +2,7 @@
  * OptionsPage 设置页面
  * 迁移自 design-example，整合现有设置功能
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Settings,
@@ -68,6 +68,18 @@ export function OptionsPage() {
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [testResult, setTestResult] = useState<{ status: 'success' | 'error' | 'warning'; message: string } | null>(null);
   const [newTag, setNewTag] = useState('');
+  
+  // 本地状态用于输入框，避免光标跳动
+  const [localApiKey, setLocalApiKey] = useState('');
+  const [localBaseUrl, setLocalBaseUrl] = useState('');
+  const [localModel, setLocalModel] = useState('');
+  
+  // 同步 aiConfig 到本地状态
+  useEffect(() => {
+    setLocalApiKey(aiConfig.apiKey || '');
+    setLocalBaseUrl(aiConfig.baseUrl || '');
+    setLocalModel(aiConfig.model || '');
+  }, [aiConfig.apiKey, aiConfig.baseUrl, aiConfig.model]);
 
   const handleTestConnection = async () => {
     setIsTesting(true);
@@ -153,19 +165,6 @@ export function OptionsPage() {
               <CardDescription>{t('settings:settings.ai.description')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>{t('settings:settings.ai.enableAI')}</Label>
-                  <p className="text-sm text-muted-foreground">
-                    {t('settings:settings.ai.enableAIDesc')}
-                  </p>
-                </div>
-                <Switch
-                  checked={aiConfig.enabled}
-                  onCheckedChange={(checked) => updateAIConfig({ enabled: checked })}
-                />
-              </div>
-
               <div className="space-y-2">
                 <Label htmlFor="provider">{t('settings:settings.ai.provider')}</Label>
                 <Select
@@ -192,8 +191,9 @@ export function OptionsPage() {
                   id="apiKey"
                   type="password"
                   placeholder={t('settings:settings.ai.apiKeyPlaceholder')}
-                  value={aiConfig.apiKey || ''}
-                  onChange={(e) => updateAIConfig({ apiKey: e.target.value })}
+                  value={localApiKey}
+                  onChange={(e) => setLocalApiKey(e.target.value)}
+                  onBlur={(e) => updateAIConfig({ apiKey: e.target.value })}
                 />
                 <p className="text-xs text-muted-foreground">
                   {t('settings:settings.ai.apiKeyDesc')}
@@ -207,8 +207,9 @@ export function OptionsPage() {
                     id="baseUrl"
                     type="url"
                     placeholder={t('settings:settings.ai.baseUrlPlaceholder')}
-                    value={aiConfig.baseUrl || ''}
-                    onChange={(e) => updateAIConfig({ baseUrl: e.target.value })}
+                    value={localBaseUrl}
+                    onChange={(e) => setLocalBaseUrl(e.target.value)}
+                    onBlur={(e) => updateAIConfig({ baseUrl: e.target.value })}
                   />
                 </div>
               )}
@@ -218,8 +219,9 @@ export function OptionsPage() {
                 <Input
                   id="model"
                   placeholder={t('settings:settings.ai.modelPlaceholder')}
-                  value={aiConfig.model || ''}
-                  onChange={(e) => updateAIConfig({ model: e.target.value })}
+                  value={localModel}
+                  onChange={(e) => setLocalModel(e.target.value)}
+                  onBlur={(e) => updateAIConfig({ model: e.target.value })}
                 />
               </div>
 

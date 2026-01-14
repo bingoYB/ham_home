@@ -161,8 +161,11 @@
       "aiPrivacy": {
         "title": "AI Service Privacy",
         "description": "Control data sent during AI analysis",
-        "enableAI": "Enable AI Analysis",
-        "enableAIDesc": "When enabled, page titles and content summaries will be sent to AI services for analysis",
+        "customDomains": "Custom Privacy Domains",
+        "customDomainsDesc": "In addition to system-protected pages, you can add domains that need extra protection",
+        "domainPlaceholder": "Enter domain, e.g. example.com",
+        "addDomain": "Add Domain",
+        "removeDomain": "Remove Domain",
         "dataNotice": "AI Analysis Data Notice",
         "dataNoticeDesc": "When you use AI analysis features, the following data is sent to AI service providers:",
         "dataItems": {

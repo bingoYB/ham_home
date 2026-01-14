@@ -59,7 +59,7 @@ export function ImportExportPage() {
       } else if (file.name.endsWith('.html') || file.name.endsWith('.htm')) {
         await importFromHTML(content);
       } else {
-        throw new Error(t('settings:importExport.errors.unsupportedFormat'));
+        throw new Error(t('settings.importExport.errors.unsupportedFormat', { ns: 'settings' }));
       }
 
       await refreshBookmarks();
@@ -68,8 +68,8 @@ export function ImportExportPage() {
     } catch (error) {
       setImportResult({
         success: false,
-        message: t('settings:importExport.importFailed'),
-        details: error instanceof Error ? error.message : t('settings:importExport.errors.unknown'),
+        message: t('settings.importExport.importFailed', { ns: 'settings' }),
+        details: error instanceof Error ? error.message : t('settings.importExport.errors.unknown', { ns: 'settings' }),
       });
     } finally {
       setImporting(false);
@@ -120,8 +120,8 @@ export function ImportExportPage() {
 
     setImportResult({
       success: true,
-      message: t('settings:importExport.importSuccess'),
-      details: t('settings:importExport.importDetails', { imported, skipped }),
+      message: t('settings.importExport.importSuccess', { ns: 'settings' }),
+      details: t('settings.importExport.importDetails', { imported, skipped, ns: 'settings' }),
     });
   };
 
@@ -158,16 +158,16 @@ export function ImportExportPage() {
 
     setImportResult({
       success: true,
-      message: t('settings:importExport.importSuccess'),
-      details: t('settings:importExport.importDetails', { imported, skipped }),
+      message: t('settings.importExport.importSuccess', { ns: 'settings' }),
+      details: t('settings.importExport.importDetails', { imported, skipped, ns: 'settings' }),
     });
   };
 
   return (
     <div className="w-full max-w-4xl mx-auto p-6">
       <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-foreground mb-2">{t('settings:importExport.title')}</h1>
-        <p className="text-muted-foreground">{t('settings:importExport.description')}</p>
+        <h1 className="text-2xl font-semibold text-foreground mb-2">{t('settings.importExport.title', { ns: 'settings' })}</h1>
+        <p className="text-muted-foreground">{t('settings.importExport.description', { ns: 'settings' })}</p>
       </div>
 
       {/* 导出 */}
@@ -175,10 +175,10 @@ export function ImportExportPage() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <Download className="h-5 w-5 text-primary" />
-            <CardTitle className="text-lg">{t('settings:importExport.export.title')}</CardTitle>
+            <CardTitle className="text-lg">{t('settings.importExport.export.title', { ns: 'settings' })}</CardTitle>
           </div>
           <CardDescription>
-            {t('settings:importExport.export.description')}
+            {t('settings.importExport.export.description', { ns: 'settings' })}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -193,15 +193,15 @@ export function ImportExportPage() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-foreground group-hover:text-primary">
-                    {t('settings:importExport.export.jsonFormat')}
+                    {t('settings.importExport.export.jsonFormat', { ns: 'settings' })}
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    {t('settings:importExport.export.jsonSubtitle')}
+                    {t('settings.importExport.export.jsonSubtitle', { ns: 'settings' })}
                   </p>
                 </div>
               </div>
               <p className="text-sm text-muted-foreground">
-                {t('settings:importExport.export.jsonDesc')}
+                {t('settings.importExport.export.jsonDesc', { ns: 'settings' })}
               </p>
             </button>
 
@@ -215,23 +215,24 @@ export function ImportExportPage() {
                 </div>
                 <div>
                   <h3 className="font-semibold text-foreground group-hover:text-primary">
-                    {t('settings:importExport.export.htmlFormat')}
+                    {t('settings.importExport.export.htmlFormat', { ns: 'settings' })}
                   </h3>
                   <p className="text-sm text-muted-foreground">
-                    {t('settings:importExport.export.htmlSubtitle')}
+                    {t('settings.importExport.export.htmlSubtitle', { ns: 'settings' })}
                   </p>
                 </div>
               </div>
               <p className="text-sm text-muted-foreground">
-                {t('settings:importExport.export.htmlDesc')}
+                {t('settings.importExport.export.htmlDesc', { ns: 'settings' })}
               </p>
             </button>
           </div>
 
           <div className="mt-4 p-3 rounded-lg bg-muted text-sm text-muted-foreground">
-            {t('settings:importExport.export.currentStats', { 
+            {t('settings.importExport.export.currentStats', { 
               bookmarkCount: bookmarks.length, 
-              categoryCount: categories.length 
+              categoryCount: categories.length,
+              ns: 'settings'
             })}
           </div>
         </CardContent>
@@ -242,10 +243,10 @@ export function ImportExportPage() {
         <CardHeader>
           <div className="flex items-center gap-2">
             <Upload className="h-5 w-5 text-primary" />
-            <CardTitle className="text-lg">{t('settings:importExport.import.title')}</CardTitle>
+            <CardTitle className="text-lg">{t('settings.importExport.import.title', { ns: 'settings' })}</CardTitle>
           </div>
           <CardDescription>
-            {t('settings:importExport.import.description')}
+            {t('settings.importExport.import.description', { ns: 'settings' })}
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -265,15 +266,15 @@ export function ImportExportPage() {
             {importing ? (
               <div className="flex flex-col items-center gap-3">
                 <Loader2 className="h-12 w-12 text-primary animate-spin" />
-                <span className="text-muted-foreground">{t('settings:importExport.import.importing')}</span>
+                <span className="text-muted-foreground">{t('settings.importExport.import.importing', { ns: 'settings' })}</span>
               </div>
             ) : (
               <div className="flex flex-col items-center gap-3">
                 <Upload className="h-12 w-12 text-muted-foreground" />
                 <div className="text-center">
-                  <p className="font-medium text-foreground">{t('settings:importExport.import.selectFile')}</p>
+                  <p className="font-medium text-foreground">{t('settings.importExport.import.selectFile', { ns: 'settings' })}</p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    {t('settings:importExport.import.supportedFormats')}
+                    {t('settings.importExport.import.supportedFormats', { ns: 'settings' })}
                   </p>
                 </div>
               </div>
@@ -302,10 +303,10 @@ export function ImportExportPage() {
           )}
 
           <div className="mt-4 p-3 rounded-lg bg-muted text-sm text-muted-foreground">
-            <strong className="text-foreground">{t('settings:importExport.import.formatLabel')}</strong>
+            <strong className="text-foreground">{t('settings.importExport.import.formatLabel', { ns: 'settings' })}</strong>
             <ul className="mt-2 space-y-1 list-disc list-inside">
-              <li>{t('settings:importExport.import.formatJSON')}</li>
-              <li>{t('settings:importExport.import.formatHTML')}</li>
+              <li>{t('settings.importExport.import.formatJSON', { ns: 'settings' })}</li>
+              <li>{t('settings.importExport.import.formatHTML', { ns: 'settings' })}</li>
             </ul>
           </div>
         </CardContent>

@@ -47,8 +47,8 @@ export function Sidebar({ currentView, onViewChange, onThemeToggle, theme }: Sid
     { id: 'all', label: t('bookmark:bookmark.all'), icon: Bookmark, count: bookmarks.length },
     { id: 'categories', label: t('bookmark:bookmark.categories'), icon: Folder, count: categories.length },
     { id: 'tags', label: t('bookmark:bookmark.tags'), icon: Tag, count: allTags.length },
-    { id: 'privacy', label: t('common:common.warning'), icon: Shield },
-    { id: 'import-export', label: t('settings:settings.importBookmarks'), icon: Download },
+    { id: 'privacy', label: t('bookmark:bookmark.privacy'), icon: Shield },
+    { id: 'import-export', label: t('settings:settings.importExport.title'), icon: Download },
     { id: 'settings', label: t('settings:settings.title'), icon: Settings },
   ];
 
@@ -169,7 +169,7 @@ export function Sidebar({ currentView, onViewChange, onThemeToggle, theme }: Sid
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => onViewChange('import-export')}>
               <Download className="h-4 w-4 mr-2" />
-              {t('settings:settings.importBookmarks')}
+              {t('settings:importExport.title')}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>

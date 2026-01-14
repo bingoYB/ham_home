@@ -72,13 +72,13 @@ export function TagInput({
             <Badge
               key={tag}
               variant="secondary"
-              className="pl-2 pr-1 py-0.5 flex items-center gap-1 cursor-default"
+              className="pl-2 pr-1 py-0.5 flex items-center gap-1 cursor-default bg-gradient-to-r from-violet-500/90 to-indigo-500/90 dark:from-violet-600/80 dark:to-indigo-600/80 text-white border-0 shadow-sm"
             >
-              <span className="text-xs">{tag}</span>
+              <span className="text-xs font-medium">{tag}</span>
               <button
                 type="button"
                 onClick={() => removeTag(index)}
-                className="hover:bg-muted rounded-full p-0.5"
+                className="hover:bg-white/20 rounded-full p-0.5 transition-colors"
                 aria-label={`删除标签 ${tag}`}
               >
                 <X className="h-3 w-3" />

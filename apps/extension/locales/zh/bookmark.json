@@ -20,6 +20,7 @@
     "createdAt": "创建时间",
     "recent": "最近的书签",
     "all": "所有书签",
+    "privacy": "隐私",
     "search": "搜索书签...",
     "count": "你有 {{count}} 个书签",
     "count_plural": "你有 {{count}} 个书签",
@@ -72,5 +73,29 @@
     "pleaseWait": "请稍候...",
     "cannotGetPage": "无法获取页面内容",
     "viewBookmarkList": "查看书签列表"
+  },
+  "savePanel": {
+    "alreadyBookmarked": "此页面已收藏，可更新信息",
+    "smartSuggestions": "智能推荐",
+    "recommendedCategory": "推荐分类",
+    "recommendedTags": "推荐标签",
+    "titleLabel": "标题",
+    "titlePlaceholder": "输入标题",
+    "descriptionLabel": "摘要",
+    "descriptionPlaceholder": "输入摘要或等待 AI 生成",
+    "categoryLabel": "分类",
+    "selectCategory": "选择分类",
+    "searchCategory": "搜索分类...",
+    "noCategoryFound": "未找到分类",
+    "getSuggestions": "获取推荐",
+    "loading": "加载中...",
+    "tagsLabel": "标签",
+    "tagPlaceholder": "输入标签后回车",
+    "aiRecommendedCategory": "AI 推荐分类：",
+    "apply": "应用",
+    "cancel": "取消",
+    "updateBookmark": "更新书签",
+    "saveBookmark": "保存书签",
+    "saving": "保存中..."
   }
 }

@@ -7,6 +7,14 @@
     "suggestedCategory": "推荐分类",
     "suggestedTags": "推荐标签",
     "aiNotEnabled": "AI 功能未启用，请先在设置中配置 AI",
+    "status": {
+      "analyzing": "AI 正在分析...",
+      "completed": "AI 分析完成",
+      "failed": "AI 分析失败",
+      "notConfigured": "AI 未配置，使用手动填写",
+      "retry": "重试",
+      "configure": "去配置"
+    },
     "settings": {
       "provider": "服务商",
       "providers": {

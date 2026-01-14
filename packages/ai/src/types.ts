@@ -89,11 +89,14 @@ export type CategorySuggestionResult = z.infer<typeof CategorySuggestionSchema>;
  * AI 生成分类方案 Schema
  */
 export const GeneratedCategorySchema: z.ZodType<any> = z.object({
-  name: z.string().describe('分类名称'),
-  children: z.lazy(() => z.array(GeneratedCategorySchema)).optional().describe('子分类'),
+  name: z.string().min(2).max(20).describe('分类名称，2-8个字'),
+  children: z.lazy(() => z.array(GeneratedCategorySchema)).optional().describe('子分类数组（可选）'),
 });
 
-export const GeneratedCategoriesSchema = z.array(GeneratedCategorySchema).max(10);
+// 包装在对象中，因为有些模型不支持顶层数组
+export const GeneratedCategoriesSchema = z.object({
+  categories: z.array(GeneratedCategorySchema).min(3).max(10).describe('书签分类数组，包含3-10个一级分类'),
+});
 
 export interface GeneratedCategory {
   name: string;

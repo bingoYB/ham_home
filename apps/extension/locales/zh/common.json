@@ -16,11 +16,19 @@
     "back": "返回",
     "next": "下一步",
     "openSettings": "打开完整设置",
+    "settings": "设置",
+    "bookmarkList": "书签列表",
     "languages": {
       "en": "English",
       "zh": "中文",
       "ja": "日本語",
       "ko": "한국어"
+    },
+    "theme": {
+      "toggle": "切换主题",
+      "light": "浅色模式",
+      "dark": "深色模式",
+      "system": "跟随系统"
     }
   }
 }

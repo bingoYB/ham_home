@@ -63,11 +63,12 @@ export interface AIConfig {
   model?: string;
   temperature?: number;
   maxTokens?: number;
-  enabled: boolean;           // 是否启用 AI 分析
   enableTranslation: boolean; // 是否启用翻译
   enableSmartCategory: boolean; // 是否启用智能分类
   enableTagSuggestion: boolean; // 是否启用标签推荐
   presetTags?: string[];      // 预设标签列表（用于自动匹配书签）
+  privacyDomains?: string[];  // 隐私域名列表（不分析这些域名的页面内容）
+  autoDetectPrivacy?: boolean; // 是否自动检测隐私页面（默认开启）
 }
 
 // ============ 用户设置相关 ============
@@ -134,6 +135,8 @@ export interface PageContent {
   favicon: string;
   metadata?: PageMetadata;    // 页面元数据
   isReaderable?: boolean;     // 是否可读（Readability 判断）
+  isPrivate?: boolean;        // 是否为隐私页面
+  privacyReason?: string;     // 隐私原因
 }
 
 // ============ 查询相关 ============

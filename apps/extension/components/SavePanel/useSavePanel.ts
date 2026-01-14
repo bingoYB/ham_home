@@ -5,13 +5,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { aiClient } from '@/lib/ai/client';
 import { bookmarkStorage, snapshotStorage, configStorage, aiCacheStorage } from '@/lib/storage';
-import { PRESET_CATEGORIES } from '@/lib/preset-categories';
 import type {
   PageContent,
   LocalBookmark,
   LocalCategory,
-  TagSuggestion,
-  CategorySuggestion,
 } from '@/types';
 import type { AIStatusType } from './AIStatus';
 
@@ -34,12 +31,6 @@ interface UseSavePanelResult {
   aiStatus: AIStatusType;
   aiError: string | null;
 
-  // 智能推荐
-  tagSuggestions: TagSuggestion[];
-  categorySuggestions: CategorySuggestion[];
-  showSuggestions: boolean;
-  loadingSuggestions: boolean;
-
   // AI 推荐的新分类（不在用户已有分类中）
   aiRecommendedCategory: string | null;
 
@@ -55,8 +46,6 @@ interface UseSavePanelResult {
   // 业务操作
   runAIAnalysis: () => Promise<void>;
   retryAnalysis: () => Promise<void>;
-  applyTagSuggestion: (tag: string) => void;
-  applyCategorySuggestion: (suggestion: CategorySuggestion) => void;
   applyAIRecommendedCategory: () => Promise<void>;
   save: () => Promise<void>;
   deleteBookmark: () => Promise<void>;
@@ -80,14 +69,6 @@ export function useSavePanel({
   // AI 状态
   const [aiStatus, setAIStatus] = useState<AIStatusType>('idle');
   const [aiError, setAIError] = useState<string | null>(null);
-
-  // 智能推荐
-  const [tagSuggestions, setTagSuggestions] = useState<TagSuggestion[]>([]);
-  const [categorySuggestions, setCategorySuggestions] = useState<
-    CategorySuggestion[]
-  >([]);
-  const [showSuggestions, setShowSuggestions] = useState(false);
-  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
 
   // AI 推荐的新分类（不在用户已有分类中）
   const [aiRecommendedCategory, setAiRecommendedCategory] = useState<string | null>(null);
@@ -135,7 +116,12 @@ export function useSavePanel({
   const runAIAnalysis = useCallback(async () => {
     const config = await configStorage.getAIConfig();
 
-    if (!config.enabled) {
+    // 检查 AI 是否已配置
+    const isAIConfigured = config.provider === 'ollama' 
+      ? !!config.baseUrl 
+      : !!config.apiKey;
+    
+    if (!isAIConfigured) {
       setAIStatus('disabled');
       return;
     }
@@ -156,16 +142,11 @@ export function useSavePanel({
           setTitle,
           setDescription,
           setTags,
-          setCategories,
           setCategoryId,
           setAiRecommendedCategory,
           existingBookmark
         );
         setAIStatus('success');
-        // 清除智能推荐
-        setTagSuggestions([]);
-        setCategorySuggestions([]);
-        setShowSuggestions(false);
         return;
       }
 
@@ -193,23 +174,17 @@ export function useSavePanel({
         setTitle,
         setDescription,
         setTags,
-        setCategories,
         setCategoryId,
         setAiRecommendedCategory,
         existingBookmark
       );
 
       setAIStatus('success');
-
-      // 清除智能推荐（因为已经在一次调用中完成）
-      setTagSuggestions([]);
-      setCategorySuggestions([]);
-      setShowSuggestions(false);
     } catch (err: unknown) {
       setAIStatus('error');
       setAIError(err instanceof Error ? err.message : '分析失败');
     }
-  }, [pageContent, categories, allTags, existingBookmark]);
+  }, [pageContent, categories, existingBookmark]);
 
   /**
    * 重试 AI 分析 - 强制重新分析，不使用缓存
@@ -218,7 +193,12 @@ export function useSavePanel({
   const retryAnalysis = useCallback(async () => {
     const config = await configStorage.getAIConfig();
 
-    if (!config.enabled) {
+    // 检查 AI 是否已配置
+    const isAIConfigured = config.provider === 'ollama' 
+      ? !!config.baseUrl 
+      : !!config.apiKey;
+    
+    if (!isAIConfigured) {
       setAIStatus('disabled');
       return;
     }
@@ -252,18 +232,12 @@ export function useSavePanel({
         setTitle,
         setDescription,
         setTags,
-        setCategories,
         setCategoryId,
         setAiRecommendedCategory,
         existingBookmark
       );
 
       setAIStatus('success');
-
-      // 清除智能推荐
-      setTagSuggestions([]);
-      setCategorySuggestions([]);
-      setShowSuggestions(false);
     } catch (err: unknown) {
       setAIStatus('error');
       setAIError(err instanceof Error ? err.message : '分析失败');
@@ -271,79 +245,55 @@ export function useSavePanel({
   }, [pageContent, categories, existingBookmark]);
 
   /**
-   * 应用推荐的标签
-   */
-  const applyTagSuggestion = useCallback(
-    (tag: string) => {
-      if (!tags.includes(tag)) {
-        setTags([...tags, tag]);
-      }
-      // 从推荐列表中移除已应用的标签
-      setTagSuggestions((prev) => prev.filter((s) => s.tag !== tag));
-    },
-    [tags]
-  );
-
-  /**
-   * 应用推荐的分类
-   */
-  const applyCategorySuggestion = useCallback(
-    (suggestion: CategorySuggestion) => {
-      // 查找分类
-      const category = categories.find((c) => c.id === suggestion.categoryId);
-      if (category) {
-        setCategoryId(category.id);
-      } else {
-        // 如果是预设分类，需要先创建
-        const presetCat = PRESET_CATEGORIES.find(
-          (c) => c.id === suggestion.categoryId
-        );
-        if (presetCat) {
-          bookmarkStorage.createCategory(presetCat.name).then((newCat) => {
-            setCategoryId(newCat.id);
-            setCategories((prev) => [...prev, newCat]);
-          }).catch(async () => {
-            // 如果分类已存在，从最新的分类列表中查找
-            const allCategories = await bookmarkStorage.getCategories();
-            const existingCat = allCategories.find((c) => c.id === suggestion.categoryId);
-            if (existingCat) {
-              setCategoryId(existingCat.id);
-              setCategories(allCategories);
-            }
-          });
-        }
-      }
-      // 清除分类推荐
-      setCategorySuggestions([]);
-    },
-    [categories]
-  );
-
-  /**
    * 应用 AI 推荐的新分类（创建并设置）
+   * 支持多层级格式：如 "设计 > 灵感素材 > 图片资源" 或 "设计/灵感素材/图片资源"
    */
   const applyAIRecommendedCategory = useCallback(async () => {
     if (!aiRecommendedCategory) return;
     
     try {
-      // 创建新分类
-      const newCat = await bookmarkStorage.createCategory(aiRecommendedCategory);
-      setCategoryId(newCat.id);
-      setCategories((prev) => [...prev, newCat]);
-      setAiRecommendedCategory(null);
-    } catch (err) {
-      // 分类可能已存在，尝试从列表中查找
-      const allCategories = await bookmarkStorage.getCategories();
-      const existingCat = allCategories.find(
-        (c) => c.name.toLowerCase() === aiRecommendedCategory.toLowerCase()
-      );
-      if (existingCat) {
-        setCategoryId(existingCat.id);
-        setCategories(allCategories);
-        setAiRecommendedCategory(null);
-      } else {
-        console.error('[useSavePanel] Failed to apply AI recommended category:', err);
+      // 解析层级路径（支持 " > " 和 "/" 分隔符）
+      const parts = parseCategoryPath(aiRecommendedCategory);
+      
+      // 获取最新分类列表
+      let allCategories = await bookmarkStorage.getCategories();
+      let parentId: string | null = null;
+      let finalCategory: LocalCategory | null = null;
+      const newCategories: LocalCategory[] = [];
+
+      // 逐层查找或创建分类
+      for (const partName of parts) {
+        const trimmedName = partName.trim();
+        if (!trimmedName) continue;
+
+        // 在当前层级查找是否已存在
+        const existing = allCategories.find(
+          (c) => c.name.toLowerCase() === trimmedName.toLowerCase() && c.parentId === parentId
+        );
+
+        if (existing) {
+          parentId = existing.id;
+          finalCategory = existing;
+        } else {
+          // 创建新分类
+          const newCat = await bookmarkStorage.createCategory(trimmedName, parentId);
+          newCategories.push(newCat);
+          parentId = newCat.id;
+          finalCategory = newCat;
+          // 更新分类列表
+          allCategories = [...allCategories, newCat];
+        }
       }
+
+      if (finalCategory) {
+        setCategoryId(finalCategory.id);
+        if (newCategories.length > 0) {
+          setCategories((prev) => [...prev, ...newCategories]);
+        }
+        setAiRecommendedCategory(null);
+      }
+    } catch (err) {
+      console.error('[useSavePanel] Failed to apply AI recommended category:', err);
     }
   }, [aiRecommendedCategory]);
 
@@ -453,10 +403,6 @@ export function useSavePanel({
     allTags,
     aiStatus,
     aiError,
-    tagSuggestions,
-    categorySuggestions,
-    showSuggestions,
-    loadingSuggestions,
     saving,
     setTitle,
     setDescription,
@@ -464,8 +410,6 @@ export function useSavePanel({
     setTags,
     runAIAnalysis,
     retryAnalysis,
-    applyTagSuggestion,
-    applyCategorySuggestion,
     applyAIRecommendedCategory,
     aiRecommendedCategory,
     save,
@@ -486,7 +430,6 @@ async function applyAnalysisResultWithSetters(
   setTitle: (v: string) => void,
   setDescription: (v: string) => void,
   setTags: (v: string[]) => void,
-  setCategories: React.Dispatch<React.SetStateAction<LocalCategory[]>>,
   setCategoryId: React.Dispatch<React.SetStateAction<string | null>>,
   setAiRecommendedCategory: React.Dispatch<React.SetStateAction<string | null>>,
   existingBookmark: any
@@ -530,6 +473,24 @@ async function applyAnalysisResultWithSetters(
       setAiRecommendedCategory(result.category);
     }
   }
+}
+
+/**
+ * 解析分类路径
+ * 支持 " > " 和 "/" 分隔符
+ * 如 "设计 > 灵感素材 > 图片资源" 或 "设计/灵感素材/图片资源"
+ */
+function parseCategoryPath(path: string): string[] {
+  // 优先使用 " > " 分隔符
+  if (path.includes(' > ')) {
+    return path.split(' > ').map((s) => s.trim()).filter(Boolean);
+  }
+  // 其次使用 "/" 分隔符
+  if (path.includes('/')) {
+    return path.split('/').map((s) => s.trim()).filter(Boolean);
+  }
+  // 无分隔符，返回单个元素
+  return [path.trim()].filter(Boolean);
 }
 
 /**

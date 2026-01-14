@@ -23,6 +23,9 @@ export * from "./components/collapsible";
 export * from "./components/alert-dialog";
 export * from "./components/scroll-area";
 export * from "./components/checkbox";
+export * from "./components/command";
+export * from "./components/popover";
+export * from "./components/tooltip";
 
 // Hooks 导出
 export { useDebounce } from "./hooks/useDebounce";

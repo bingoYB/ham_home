@@ -17,10 +17,11 @@ const DEFAULT_AI_CONFIG: AIConfig = {
   model: 'gpt-3.5-turbo',
   temperature: 0.3,
   maxTokens: 1000,
-  enabled: false, // 默认关闭，需要用户配置后开启
   enableTranslation: false, // 默认关闭翻译
   enableSmartCategory: true, // 默认开启智能分类
   enableTagSuggestion: true, // 默认开启标签推荐
+  privacyDomains: [], // 隐私域名列表
+  autoDetectPrivacy: true, // 默认开启自动隐私检测
 };
 
 // 默认设置

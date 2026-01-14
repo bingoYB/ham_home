@@ -7,6 +7,14 @@
     "suggestedCategory": "Suggested Category",
     "suggestedTags": "Suggested Tags",
     "aiNotEnabled": "AI features are not enabled. Please configure AI in settings.",
+    "status": {
+      "analyzing": "AI is analyzing...",
+      "completed": "AI analysis completed",
+      "failed": "AI analysis failed",
+      "notConfigured": "AI not configured, using manual input",
+      "retry": "Retry",
+      "configure": "Configure"
+    },
     "settings": {
       "provider": "Provider",
       "providers": {

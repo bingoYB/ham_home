@@ -48,7 +48,7 @@ export function NewBookmarkModal({ open, onOpenChange }: NewBookmarkModalProps) 
       return;
     }
 
-    if (!aiConfig.enabled || !aiConfig.apiKey) {
+    if (!aiConfig.apiKey) {
       setError(t('bookmark:modal.errors.configureAI'));
       return;
     }

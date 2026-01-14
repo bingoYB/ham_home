@@ -20,6 +20,7 @@
     "createdAt": "Created",
     "recent": "Recent Bookmarks",
     "all": "All Bookmarks",
+    "privacy": "Privacy",
     "search": "Search bookmarks...",
     "count": "You have {{count}} bookmark",
     "count_plural": "You have {{count}} bookmarks",
@@ -72,5 +73,29 @@
     "pleaseWait": "Please wait...",
     "cannotGetPage": "Cannot get page content",
     "viewBookmarkList": "View Bookmark List"
+  },
+  "savePanel": {
+    "alreadyBookmarked": "This page is already bookmarked, you can update the information",
+    "smartSuggestions": "Smart Suggestions",
+    "recommendedCategory": "Recommended Category",
+    "recommendedTags": "Recommended Tags",
+    "titleLabel": "Title",
+    "titlePlaceholder": "Enter title",
+    "descriptionLabel": "Summary",
+    "descriptionPlaceholder": "Enter summary or wait for AI to generate",
+    "categoryLabel": "Category",
+    "selectCategory": "Select category",
+    "searchCategory": "Search categories...",
+    "noCategoryFound": "No category found",
+    "getSuggestions": "Get Suggestions",
+    "loading": "Loading...",
+    "tagsLabel": "Tags",
+    "tagPlaceholder": "Enter tag and press Enter",
+    "aiRecommendedCategory": "AI Recommended Category:",
+    "apply": "Apply",
+    "cancel": "Cancel",
+    "updateBookmark": "Update Bookmark",
+    "saveBookmark": "Save Bookmark",
+    "saving": "Saving..."
   }
 }

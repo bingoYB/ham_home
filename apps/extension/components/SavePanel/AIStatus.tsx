@@ -3,6 +3,7 @@
  * 显示 AI 分析的各种状态
  */
 import { Sparkles, Loader2, AlertCircle, Settings } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@hamhome/ui';
 
 export type AIStatusType = 'idle' | 'loading' | 'success' | 'error' | 'disabled';
@@ -15,54 +16,56 @@ interface AIStatusProps {
 }
 
 export function AIStatus({ status, error, onRetry, className }: AIStatusProps) {
+  const { t } = useTranslation();
+  
   if (status === 'idle') {
     return null;
   }
 
   return (
-    <div className={cn('rounded-md text-sm', className)}>
+    <div className={cn('rounded-lg text-xs', className)}>
       {status === 'loading' && (
-        <div className="flex items-center gap-2 p-2 bg-primary/10 text-primary">
-          <Loader2 className="h-4 w-4 animate-spin" />
-          <span>AI 正在分析...</span>
+        <div className="rounded-lg flex items-center gap-1.5 py-1.5 px-2 bg-primary/10 text-primary">
+          <Loader2 className="h-3.5 w-3.5 animate-spin" />
+          <span>{t('ai:ai.status.analyzing')}</span>
         </div>
       )}
 
       {status === 'success' && (
-        <div className="flex items-center gap-2 p-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
-          <Sparkles className="h-4 w-4" />
-          <span>AI 分析完成</span>
+        <div className="rounded-lg flex items-center gap-1.5 py-1.5 px-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">
+          <Sparkles className="h-3.5 w-3.5" />
+          <span>{t('ai:ai.status.completed')}</span>
           <button
               onClick={onRetry}
               className="underline hover:no-underline whitespace-nowrap ml-2"
             >
-              重试
+              {t('ai:ai.status.retry')}
             </button>
         </div>
       )}
 
       {status === 'error' && (
-        <div className="flex items-center justify-between p-2 bg-destructive/10 text-destructive">
-          <div className="flex items-center gap-2">
-            <AlertCircle className="h-4 w-4" />
-            <span className="truncate">AI 分析失败{error ? `: ${error}` : ''}</span>
+        <div className="rounded-lg flex items-center justify-between py-1.5 px-2 bg-destructive/10 text-destructive">
+          <div className="flex items-center gap-1.5">
+            <AlertCircle className="h-3.5 w-3.5" />
+            <span className="truncate">{t('ai:ai.status.failed')}{error ? `: ${error}` : ''}</span>
           </div>
           {onRetry && (
             <button
               onClick={onRetry}
               className="underline hover:no-underline whitespace-nowrap ml-2"
             >
-              重试
+              {t('ai:ai.status.retry')}
             </button>
           )}
         </div>
       )}
 
       {status === 'disabled' && (
-        <div className="flex items-center justify-between p-2 bg-muted text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <Settings className="h-4 w-4" />
-            <span>AI 未配置，使用手动填写</span>
+        <div className="rounded-lg flex items-center justify-between py-1.5 px-2 bg-muted text-muted-foreground">
+          <div className="flex items-center gap-1.5">
+            <Settings className="h-3.5 w-3.5" />
+            <span>{t('ai:ai.status.notConfigured')}</span>
           </div>
           <button
             onClick={() => {
@@ -70,7 +73,7 @@ export function AIStatus({ status, error, onRetry, className }: AIStatusProps) {
             }}
             className="underline hover:no-underline whitespace-nowrap ml-2"
           >
-            去配置
+            {t('ai:ai.status.configure')}
           </button>
         </div>
       )}
