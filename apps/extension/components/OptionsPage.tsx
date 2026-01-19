@@ -136,11 +136,6 @@ export function OptionsPage() {
 
   return (
     <div className="w-full max-w-4xl mx-auto p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-foreground mb-2">{t('settings:settings.title')}</h1>
-        <p className="text-muted-foreground">{t('settings:settings.description')}</p>
-      </div>
-
       <Tabs defaultValue="ai" className="w-full">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="ai" className="gap-2">

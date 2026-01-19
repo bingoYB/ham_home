@@ -3,18 +3,22 @@
  */
 import { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Download, Upload, FileJson, FileText, Check, AlertCircle, Loader2 } from 'lucide-react';
+import { Download, Upload, FileJson, FileText, Check, AlertCircle, Loader2, FolderTree, Sparkles, Globe } from 'lucide-react';
 import {
-  Button,
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
+  Checkbox,
+  Label,
+  Progress,
 } from '@hamhome/ui';
 import { useBookmarks } from '@/contexts/BookmarkContext';
 import { bookmarkStorage } from '@/lib/storage/bookmark-storage';
-import type { LocalBookmark, LocalCategory } from '@/types';
+import { aiClient } from '@/lib/ai/client';
+import { parseCategoryPath } from './common/CategoryTree';
+import type { LocalCategory } from '@/types';
 
 export function ImportExportPage() {
   const { t } = useTranslation(['common', 'settings']);
@@ -22,11 +26,33 @@ export function ImportExportPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const [importing, setImporting] = useState(false);
+  const [preserveFolders, setPreserveFolders] = useState(true);
+  const [enableAIAnalysis, setEnableAIAnalysis] = useState(false);
+  const [fetchPageContent, setFetchPageContent] = useState(false);
+  const [importProgress, setImportProgress] = useState<{ current: number; total: number } | null>(null);
   const [importResult, setImportResult] = useState<{
     success: boolean;
     message: string;
     details?: string;
   } | null>(null);
+
+  // 互斥处理：保留目录 vs AI 分析
+  const handlePreserveFoldersChange = (checked: boolean) => {
+    setPreserveFolders(checked);
+    if (checked) {
+      setEnableAIAnalysis(false);
+      setFetchPageContent(false);
+    }
+  };
+
+  const handleEnableAIAnalysisChange = (checked: boolean) => {
+    setEnableAIAnalysis(checked);
+    if (checked) {
+      setPreserveFolders(false);
+    } else {
+      setFetchPageContent(false);
+    }
+  };
 
   // 导出 JSON
   const handleExportJSON = () => {
@@ -125,51 +151,350 @@ export function ImportExportPage() {
     });
   };
 
+  // 获取页面内容用于 AI 分析
+  const fetchPageContentForAI = async (url: string): Promise<string> => {
+    try {
+      const response = await fetch(url, {
+        headers: { 'Accept': 'text/html' },
+        signal: AbortSignal.timeout(10000), // 10秒超时
+      });
+      if (!response.ok) return '';
+      const html = await response.text();
+      // 简单提取文本内容
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      // 移除 script 和 style
+      doc.querySelectorAll('script, style, nav, footer, header').forEach(el => el.remove());
+      const text = doc.body?.textContent?.replace(/\s+/g, ' ').trim() || '';
+      return text.slice(0, 5000); // 限制长度
+    } catch {
+      return '';
+    }
+  };
+
+  // 匹配分类（精确 + 模糊，优先叶子节点）
+  const matchCategoryByName = (
+    categoryName: string,
+    categories: LocalCategory[]
+  ): { matched: boolean; categoryId: string | null } => {
+    const searchName = categoryName.toLowerCase();
+    
+    // 判断是否为叶子节点（没有子分类）
+    const parentIds = new Set(categories.map(c => c.parentId).filter(Boolean));
+    const isLeaf = (c: LocalCategory) => !parentIds.has(c.id);
+    
+    // 精确匹配 - 优先叶子节点
+    const exactMatches = categories.filter(c => c.name.toLowerCase() === searchName);
+    if (exactMatches.length > 0) {
+      const leafMatch = exactMatches.find(isLeaf);
+      return { matched: true, categoryId: (leafMatch || exactMatches[0]).id };
+    }
+
+    // 模糊匹配 - 优先叶子节点
+    const fuzzyMatches = categories.filter(
+      c => c.name.toLowerCase().includes(searchName) || searchName.includes(c.name.toLowerCase())
+    );
+    if (fuzzyMatches.length > 0) {
+      const leafMatch = fuzzyMatches.find(isLeaf);
+      return { matched: true, categoryId: (leafMatch || fuzzyMatches[0]).id };
+    }
+
+    return { matched: false, categoryId: null };
+  };
+
+  // 创建 AI 推荐的分类（支持层级路径如 "技术 > 前端"）
+  const createAIRecommendedCategory = async (
+    categoryPath: string,
+    currentCategories: LocalCategory[]
+  ): Promise<{ categoryId: string | null; newCategories: LocalCategory[] }> => {
+    try {
+      const parts = parseCategoryPath(categoryPath);
+      if (parts.length === 0) {
+        return { categoryId: null, newCategories: [] };
+      }
+
+      let allCategories = [...currentCategories];
+      let parentId: string | null = null;
+      let finalCategory: LocalCategory | null = null;
+      const newCategories: LocalCategory[] = [];
+
+      // 逐层查找或创建分类
+      for (const partName of parts) {
+        const trimmedName = partName.trim();
+        if (!trimmedName) continue;
+
+        // 在当前层级查找是否已存在
+        const existing = allCategories.find(
+          c => c.name.toLowerCase() === trimmedName.toLowerCase() && c.parentId === parentId
+        );
+
+        if (existing) {
+          parentId = existing.id;
+          finalCategory = existing;
+        } else {
+          // 创建新分类
+          const newCat = await bookmarkStorage.createCategory(trimmedName, parentId);
+          newCategories.push(newCat);
+          parentId = newCat.id;
+          finalCategory = newCat;
+          allCategories = [...allCategories, newCat];
+        }
+      }
+
+      return {
+        categoryId: finalCategory?.id || null,
+        newCategories,
+      };
+    } catch (err) {
+      console.error('[ImportExport] Failed to create category:', err);
+      return { categoryId: null, newCategories: [] };
+    }
+  };
+
+  // AI 分析书签
+  const analyzeBookmarkWithAI = async (
+    url: string,
+    title: string,
+    currentCategories: LocalCategory[]
+  ): Promise<{ 
+    description: string; 
+    categoryId: string | null; 
+    tags: string[]; 
+    newCategories: LocalCategory[];
+  }> => {
+    try {
+      await aiClient.loadConfig();
+      if (!aiClient.isConfigured()) {
+        return { description: '', categoryId: null, tags: [], newCategories: [] };
+      }
+
+      // 构建页面内容
+      let content = '';
+      if (fetchPageContent) {
+        content = await fetchPageContentForAI(url);
+      }
+
+      const result = await aiClient.analyzeComplete({
+        pageContent: {
+          url,
+          title,
+          content,
+          textContent: content,
+          excerpt: '',
+          metadata: {},
+          isReaderable: !!content,
+          favicon: `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=32`,
+        },
+        userCategories: currentCategories,
+      });
+
+      // 匹配或创建分类
+      let categoryId: string | null = null;
+      let newCategories: LocalCategory[] = [];
+      
+      if (result.category) {
+        // 先尝试匹配现有分类
+        const matchResult = matchCategoryByName(result.category, currentCategories);
+        if (matchResult.matched) {
+          categoryId = matchResult.categoryId;
+        } else {
+          // 如果没有匹配到，创建新分类
+          const createResult = await createAIRecommendedCategory(result.category, currentCategories);
+          categoryId = createResult.categoryId;
+          newCategories = createResult.newCategories;
+        }
+      }
+
+      return {
+        description: result.summary || '',
+        categoryId,
+        tags: result.tags || [],
+        newCategories,
+      };
+    } catch (err) {
+      console.error('[ImportExport] AI analysis failed:', err);
+      return { description: '', categoryId: null, tags: [], newCategories: [] };
+    }
+  };
+
   // 从 HTML 导入（浏览器书签格式）
   const importFromHTML = async (content: string) => {
     const parser = new DOMParser();
     const doc = parser.parseFromString(content, 'text/html');
-    const links = doc.querySelectorAll('a');
     
     let imported = 0;
     let skipped = 0;
+    let categoriesCreated = 0;
+    let aiProcessed = 0;
+    
+    // 分类名称到 ID 的映射（用于处理重复名称）
+    const categoryMap = new Map<string, string>();
+    
+    // 获取现有分类
+    let allCategories = await bookmarkStorage.getCategories();
+    for (const cat of allCategories) {
+      const key = `${cat.parentId || 'root'}|${cat.name}`;
+      categoryMap.set(key, cat.id);
+    }
 
-    for (const link of links) {
-      const url = link.getAttribute('href');
-      const title = link.textContent?.trim();
+    // 收集所有书签（用于进度显示和 AI 批量处理）
+    interface BookmarkToImport {
+      url: string;
+      title: string;
+      parentCategoryId: string | null;
+    }
+    const bookmarksToImport: BookmarkToImport[] = [];
+
+    // 递归解析 DL 结构，收集书签
+    const collectBookmarks = async (
+      dl: Element,
+      parentCategoryId: string | null
+    ): Promise<void> => {
+      const children = dl.children;
       
-      if (url && title && url.startsWith('http')) {
-        try {
-          await bookmarkStorage.createBookmark({
-            url,
-            title,
-            description: '',
-            categoryId: null,
-            tags: [],
-            favicon: `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=32`,
-            hasSnapshot: false,
-          });
-          imported++;
-        } catch {
-          skipped++;
+      for (let i = 0; i < children.length; i++) {
+        const child = children[i];
+        
+        if (child.tagName === 'DT') {
+          const h3 = child.querySelector(':scope > H3');
+          const nestedDl = child.querySelector(':scope > DL');
+          
+          if (h3 && nestedDl && preserveFolders) {
+            // 文件夹处理
+            const folderName = h3.textContent?.trim() || '未命名文件夹';
+            const mapKey = `${parentCategoryId || 'root'}|${folderName}`;
+            
+            let categoryId = categoryMap.get(mapKey);
+            
+            if (!categoryId) {
+              try {
+                const newCategory = await bookmarkStorage.createCategory(folderName, parentCategoryId);
+                categoryId = newCategory.id;
+                categoryMap.set(mapKey, categoryId);
+                categoriesCreated++;
+                allCategories = [...allCategories, newCategory];
+              } catch {
+                const existing = allCategories.find(c => c.name === folderName && c.parentId === parentCategoryId);
+                if (existing) {
+                  categoryId = existing.id;
+                  categoryMap.set(mapKey, categoryId);
+                }
+              }
+            }
+            
+            await collectBookmarks(nestedDl, categoryId || null);
+          } else {
+            const link = child.querySelector(':scope > A');
+            if (link) {
+              const url = link.getAttribute('href');
+              const title = link.textContent?.trim();
+              
+              if (url && title && url.startsWith('http')) {
+                bookmarksToImport.push({
+                  url,
+                  title,
+                  parentCategoryId: preserveFolders ? parentCategoryId : null,
+                });
+              }
+            }
+            
+            if (!preserveFolders && nestedDl) {
+              await collectBookmarks(nestedDl, null);
+            }
+          }
         }
       }
+    };
+
+    // 收集书签
+    const rootDl = doc.querySelector('DL');
+    if (rootDl) {
+      await collectBookmarks(rootDl, null);
+    }
+
+    // 设置进度
+    const total = bookmarksToImport.length;
+    setImportProgress({ current: 0, total });
+
+    // 导入书签
+    for (let i = 0; i < bookmarksToImport.length; i++) {
+      const bm = bookmarksToImport[i];
+      setImportProgress({ current: i + 1, total });
+
+      try {
+        // 检查 URL 是否已存在，避免重复导入和不必要的 AI 分析
+        const existingBookmark = await bookmarkStorage.getBookmarkByUrl(bm.url);
+        if (existingBookmark) {
+          skipped++;
+          continue;
+        }
+
+        let description = '';
+        let categoryId = bm.parentCategoryId;
+        let tags: string[] = [];
+
+        // AI 分析（如果启用且不保留目录）
+        if (enableAIAnalysis && !preserveFolders) {
+          const aiResult = await analyzeBookmarkWithAI(bm.url, bm.title, allCategories);
+          description = aiResult.description;
+          categoryId = aiResult.categoryId;
+          tags = aiResult.tags;
+          
+          // 如果 AI 创建了新分类，更新分类列表和计数
+          if (aiResult.newCategories.length > 0) {
+            allCategories = [...allCategories, ...aiResult.newCategories];
+            categoriesCreated += aiResult.newCategories.length;
+          }
+          
+          aiProcessed++;
+
+          // 限速：每个请求间隔 500ms，避免 API 限流
+          if (i < bookmarksToImport.length - 1) {
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        }
+
+        await bookmarkStorage.createBookmark({
+          url: bm.url,
+          title: bm.title,
+          description,
+          categoryId,
+          tags,
+          favicon: `https://www.google.com/s2/favicons?domain=${new URL(bm.url).hostname}&sz=32`,
+          hasSnapshot: false,
+        });
+        imported++;
+      } catch {
+        skipped++;
+      }
+    }
+
+    setImportProgress(null);
+
+    // 构建结果详情
+    let details: string;
+    if (preserveFolders && categoriesCreated > 0) {
+      details = t('settings.importExport.importDetailsWithCategories', { imported, skipped, categoriesCreated, ns: 'settings' });
+    } else if (enableAIAnalysis && aiProcessed > 0) {
+      // AI 分析模式，显示处理数量和创建的分类数量
+      if (categoriesCreated > 0) {
+        details = t('settings.importExport.importDetailsWithAIAndCategories', { imported, skipped, aiProcessed, categoriesCreated, ns: 'settings' });
+      } else {
+        details = t('settings.importExport.importDetailsWithAI', { imported, skipped, aiProcessed, ns: 'settings' });
+      }
+    } else {
+      details = t('settings.importExport.importDetails', { imported, skipped, ns: 'settings' });
     }
 
     setImportResult({
       success: true,
       message: t('settings.importExport.importSuccess', { ns: 'settings' }),
-      details: t('settings.importExport.importDetails', { imported, skipped, ns: 'settings' }),
+      details,
     });
   };
 
   return (
     <div className="w-full max-w-4xl mx-auto p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-foreground mb-2">{t('settings.importExport.title', { ns: 'settings' })}</h1>
-        <p className="text-muted-foreground">{t('settings.importExport.description', { ns: 'settings' })}</p>
-      </div>
-
       {/* 导出 */}
       <Card className="mb-6">
         <CardHeader>
@@ -258,15 +583,101 @@ export function ImportExportPage() {
             className="hidden"
           />
 
+          {/* 导入选项 */}
+          <div className="mb-4 space-y-3">
+            {/* 保留目录结构选项 */}
+            <div className="p-4 rounded-lg border border-border bg-card">
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  id="preserve-folders"
+                  checked={preserveFolders}
+                  onCheckedChange={(checked) => handlePreserveFoldersChange(checked === true)}
+                />
+                <div className="flex-1">
+                  <Label 
+                    htmlFor="preserve-folders" 
+                    className="text-sm font-medium cursor-pointer flex items-center gap-2"
+                  >
+                    <FolderTree className="h-4 w-4 text-muted-foreground" />
+                    {t('settings.importExport.import.preserveFolders', { ns: 'settings' })}
+                  </Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {t('settings.importExport.import.preserveFoldersDesc', { ns: 'settings' })}
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* AI 分类打标选项 */}
+            <div className="p-4 rounded-lg border border-border bg-card">
+              <div className="flex items-start gap-3">
+                <Checkbox
+                  id="enable-ai-analysis"
+                  checked={enableAIAnalysis}
+                  onCheckedChange={(checked) => handleEnableAIAnalysisChange(checked === true)}
+                />
+                <div className="flex-1">
+                  <Label 
+                    htmlFor="enable-ai-analysis" 
+                    className="text-sm font-medium cursor-pointer flex items-center gap-2"
+                  >
+                    <Sparkles className="h-4 w-4 text-amber-500" />
+                    {t('settings.importExport.import.enableAIAnalysis', { ns: 'settings' })}
+                  </Label>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {t('settings.importExport.import.enableAIAnalysisDesc', { ns: 'settings' })}
+                  </p>
+                  
+                  {/* 子配置：获取页面内容 */}
+                  {enableAIAnalysis && (
+                    <div className="mt-3 pt-3 border-t border-border">
+                      <div className="flex items-start gap-3">
+                        <Checkbox
+                          id="fetch-page-content"
+                          checked={fetchPageContent}
+                          onCheckedChange={(checked) => setFetchPageContent(checked === true)}
+                        />
+                        <div>
+                          <Label 
+                            htmlFor="fetch-page-content" 
+                            className="text-sm cursor-pointer flex items-center gap-2"
+                          >
+                            <Globe className="h-3.5 w-3.5 text-muted-foreground" />
+                            {t('settings.importExport.import.fetchPageContent', { ns: 'settings' })}
+                          </Label>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            {t('settings.importExport.import.fetchPageContentDesc', { ns: 'settings' })}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
           <button
             onClick={triggerFileInput}
             disabled={importing}
             className="w-full p-8 rounded-xl border-2 border-dashed border-border hover:border-primary hover:bg-primary/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {importing ? (
-              <div className="flex flex-col items-center gap-3">
+              <div className="flex flex-col items-center gap-3 w-full">
                 <Loader2 className="h-12 w-12 text-primary animate-spin" />
                 <span className="text-muted-foreground">{t('settings.importExport.import.importing', { ns: 'settings' })}</span>
+                {importProgress && (
+                  <div className="w-full max-w-xs space-y-2">
+                    <Progress value={(importProgress.current / importProgress.total) * 100} className="h-2" />
+                    <p className="text-xs text-center text-muted-foreground">
+                      {t('settings.importExport.import.progress', { 
+                        current: importProgress.current, 
+                        total: importProgress.total,
+                        ns: 'settings' 
+                      })}
+                    </p>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="flex flex-col items-center gap-3">

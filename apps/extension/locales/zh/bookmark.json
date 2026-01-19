@@ -1,11 +1,14 @@
 {
   "bookmark": {
     "title": "书签",
+    "pageTitle": "书签列表",
+    "pageDescription": "管理和浏览你的所有书签",
     "newBookmark": "新建书签",
     "addBookmark": "添加书签",
     "editBookmark": "编辑书签",
     "deleteBookmark": "删除书签",
-    "deleteConfirm": "确定删除书签 \"{{title}}\" 吗？",
+    "deleteTitle": "删除确认",
+    "deleteConfirm": "确定删除书签 \"{{title}}\" 吗？此操作无法撤销。",
     "deleteSuccess": "书签已删除",
     "saveSuccess": "书签已保存",
     "saveFailed": "保存书签失败",
@@ -21,14 +24,43 @@
     "recent": "最近的书签",
     "all": "所有书签",
     "privacy": "隐私",
-    "search": "搜索书签...",
+    "search": "搜索书签、标签、网址...",
     "count": "你有 {{count}} 个书签",
     "count_plural": "你有 {{count}} 个书签",
     "stats": {
       "total": "总计",
       "category": "个分类",
       "tags": "个标签"
-    }
+    },
+    "filter": {
+      "tags": "标签筛选",
+      "category": "分类筛选",
+      "allCategories": "全部分类",
+      "allTags": "全部标签",
+      "selectedTags": "已选 {{count}} 个标签",
+      "clearFilter": "清除筛选"
+    },
+    "view": {
+      "grid": "卡片视图",
+      "list": "列表视图"
+    },
+    "batch": {
+      "selected": "已选择 {{count}} 项",
+      "selectAll": "全选",
+      "deselectAll": "取消全选",
+      "delete": "批量删除",
+      "deleteTitle": "批量删除确认",
+      "deleteConfirm": "确定删除选中的 {{count}} 个书签吗？此操作无法撤销。"
+    },
+    "empty": "暂无书签",
+    "emptyFilter": "没有符合筛选条件的书签",
+    "noTags": "无标签",
+    "open": "打开",
+    "edit": "编辑",
+    "delete": "删除",
+    "copyLink": "复制链接",
+    "share": "分享",
+    "aiTag": "AI"
   },
   "modal": {
     "title": "添加新书签",
@@ -79,6 +111,8 @@
     "smartSuggestions": "智能推荐",
     "recommendedCategory": "推荐分类",
     "recommendedTags": "推荐标签",
+    "urlLabel": "链接",
+    "urlPlaceholder": "输入网址",
     "titleLabel": "标题",
     "titlePlaceholder": "输入标题",
     "descriptionLabel": "摘要",

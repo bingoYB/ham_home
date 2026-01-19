@@ -121,6 +121,9 @@
       "importSuccess": "Import completed",
       "importFailed": "Import failed",
       "importDetails": "Successfully imported {{imported}} bookmarks, skipped {{skipped}} duplicates",
+      "importDetailsWithCategories": "Successfully imported {{imported}} bookmarks, created {{categoriesCreated}} categories, skipped {{skipped}} duplicates",
+      "importDetailsWithAI": "Successfully imported {{imported}} bookmarks, AI processed {{aiProcessed}}, skipped {{skipped}} duplicates",
+      "importDetailsWithAIAndCategories": "Successfully imported {{imported}} bookmarks, AI processed {{aiProcessed}}, created {{categoriesCreated}} categories, skipped {{skipped}} duplicates",
       "export": {
         "title": "Export Bookmarks",
         "description": "Export your bookmark data as a backup file",
@@ -138,9 +141,16 @@
         "selectFile": "Click to select file",
         "supportedFormats": "Supports JSON and HTML formats",
         "importing": "Importing...",
+        "progress": "{{current}} / {{total}}",
         "formatLabel": "Supported formats:",
         "formatJSON": "HamHome JSON export file",
-        "formatHTML": "Browser bookmark HTML file (exported from Chrome/Firefox/Edge)"
+        "formatHTML": "Browser bookmark HTML file (exported from Chrome/Firefox/Edge)",
+        "preserveFolders": "Preserve folder structure",
+        "preserveFoldersDesc": "When importing HTML bookmarks, automatically convert folders to categories to maintain hierarchy",
+        "enableAIAnalysis": "Use AI for auto categorization",
+        "enableAIAnalysisDesc": "Use AI to analyze bookmark content during import, automatically generating summaries, categories and tags (mutually exclusive with preserve folders)",
+        "fetchPageContent": "Fetch page content for analysis",
+        "fetchPageContentDesc": "Access bookmark URLs to get page content for more accurate AI analysis (slower)"
       },
       "errors": {
         "unsupportedFormat": "Unsupported file format, please select a JSON or HTML file",

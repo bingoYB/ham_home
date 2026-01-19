@@ -18,6 +18,10 @@
     "openSettings": "Open Full Settings",
     "settings": "Settings",
     "bookmarkList": "Bookmark List",
+    "today": "Today",
+    "yesterday": "Yesterday",
+    "daysAgo": "{{days}} days ago",
+    "storage": "Storage",
     "languages": {
       "en": "English",
       "zh": "中文",

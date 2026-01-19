@@ -11,6 +11,11 @@ export default defineConfig({
       },
     },
   }),
+  dev: {
+    server: {
+      port: 3123
+    }
+  },
   manifest: {
     name: 'HamHome - 智能书签助手',
     description: '🐹 让收藏不再积灰，AI 驱动的智能书签管理工具',

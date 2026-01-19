@@ -63,6 +63,7 @@ class ExtensionAIClient {
         model: this.config.model || getDefaultModel(this.config.provider),
         temperature: this.config.temperature,
         maxTokens: this.config.maxTokens,
+        debug: true,
       });
     }
     return this.client!;
@@ -123,28 +124,7 @@ class ExtensionAIClient {
   }
 
   /**
-   * 兼容旧的 analyze 方法（简化输入）
-   */
-  async analyze(input: {
-    url: string;
-    title: string;
-    content: string;
-  }): Promise<AnalysisResult> {
-    // 转换为增强输入格式
-    const pageContent: PageContent = {
-      url: input.url,
-      title: input.title,
-      content: input.content,
-      textContent: input.content,
-      excerpt: '',
-      favicon: '',
-    };
-    
-    return this.analyzeComplete({ pageContent });
-  }
-
-  /**
-   * AI 失败时的降级策略（参考 SmartBookmark 的 getFallbackTags）
+   * AI 失败时的降级策略
    */
   private getFallbackResult(pageContent: PageContent): AnalysisResult {
     const tags: string[] = [];
@@ -217,90 +197,6 @@ class ExtensionAIClient {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : '连接失败';
       return { success: false, message };
-    }
-  }
-
-  /**
-   * 推荐标签
-   * 基于已有标签和内容，推荐相关标签
-   */
-  async suggestTags(input: {
-    url: string;
-    title: string;
-    content: string;
-    existingTags: string[];
-  }): Promise<TagSuggestion[]> {
-    if (!this.config) {
-      await this.loadConfig();
-    }
-
-    // 如果未启用标签推荐，返回基于规则的推荐
-    if (!this.config?.enableTagSuggestion || !this.isConfigured()) {
-      return this.getRuleBasedTagSuggestions(input);
-    }
-
-    try {
-      const client = this.getOrCreateClient();
-      const result = await client.suggestTags(input);
-      return result.map(item => ({
-        tag: item.tag,
-        confidence: 0.8,
-        reason: item.reason,
-      }));
-    } catch (error) {
-      console.error('[ExtensionAIClient] Tag suggestion failed:', error);
-      return this.getRuleBasedTagSuggestions(input);
-    }
-  }
-
-  /**
-   * 智能分类推荐
-   */
-  async suggestCategory(input: {
-    url: string;
-    title: string;
-    content: string;
-    userCategories: LocalCategory[];
-  }): Promise<CategorySuggestion[]> {
-    if (!this.config) {
-      await this.loadConfig();
-    }
-
-    const text = `${input.url} ${input.title} ${input.content}`.toLowerCase();
-
-    // 如果未启用智能分类或 AI 未配置，使用规则匹配
-    if (!this.config?.enableSmartCategory || !this.isConfigured()) {
-      return this.getRuleBasedCategorySuggestions(text, input.userCategories);
-    }
-
-    try {
-      const client = this.getOrCreateClient();
-      const result = await client.suggestCategory({
-        url: input.url,
-        title: input.title,
-        content: input.content,
-        userCategories: input.userCategories.map(c => c.name),
-      });
-
-      return result.map(item => {
-        // 查找匹配的分类
-        const userCategory = input.userCategories.find(
-          (c) => c.name.toLowerCase() === item.name.toLowerCase()
-        );
-        const presetCategory = PRESET_CATEGORIES.find(
-          (c) => c.name.toLowerCase() === item.name.toLowerCase()
-        );
-
-        return {
-          categoryId: userCategory?.id || presetCategory?.id || '',
-          categoryName: item.name,
-          confidence: 0.8,
-          reason: item.reason,
-        };
-      });
-    } catch (error) {
-      console.error('[ExtensionAIClient] Category suggestion failed:', error);
-      return this.getRuleBasedCategorySuggestions(text, input.userCategories);
     }
   }
 

@@ -18,6 +18,10 @@
     "openSettings": "打开完整设置",
     "settings": "设置",
     "bookmarkList": "书签列表",
+    "today": "今天",
+    "yesterday": "昨天",
+    "daysAgo": "{{days}} 天前",
+    "storage": "存储",
     "languages": {
       "en": "English",
       "zh": "中文",

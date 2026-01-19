@@ -97,7 +97,7 @@ export function SavePanel({
         {/* 保存按钮 */}
         <Button
           size="sm"
-          className="flex-1 bg-gradient-to-r from-primary to-primary-600 hover:from-primary-600 hover:to-primary-700 text-primary-foreground shadow-sm"
+          className="flex-1"
           onClick={save}
           disabled={saving || !title.trim()}
         >
@@ -195,7 +195,7 @@ function BookmarkForm({
           value={title}
           onChange={(e) => onTitleChange(e.target.value)}
           placeholder={t('bookmark:savePanel.titlePlaceholder')}
-          className="h-9 text-sm"
+          className="h-9 text-sm shadow-none"
         />
       </div>
 
@@ -211,7 +211,7 @@ function BookmarkForm({
           onChange={(e) => onDescriptionChange(e.target.value)}
           placeholder={t('bookmark:savePanel.descriptionPlaceholder')}
           rows={2}
-          className="text-sm resize-none"
+          className="text-sm resize-none shadow-none"
         />
       </div>
 
@@ -238,6 +238,7 @@ function BookmarkForm({
           categories={categories}
           aiRecommendedCategory={aiRecommendedCategory}
           onApplyAICategory={onApplyAICategory}
+          className="[&_button]:shadow-none"
         />
       </div>
 
@@ -264,6 +265,7 @@ function BookmarkForm({
           placeholder={t('bookmark:savePanel.tagPlaceholder')}
           maxTags={10}
           suggestions={allTags}
+          className="[&_input]:shadow-none"
         />
       </div>
     </div>

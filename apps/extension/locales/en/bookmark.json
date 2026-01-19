@@ -1,11 +1,14 @@
 {
   "bookmark": {
     "title": "Bookmarks",
+    "pageTitle": "Bookmark List",
+    "pageDescription": "Manage and browse all your bookmarks",
     "newBookmark": "New Bookmark",
     "addBookmark": "Add Bookmark",
     "editBookmark": "Edit Bookmark",
     "deleteBookmark": "Delete Bookmark",
-    "deleteConfirm": "Are you sure you want to delete \"{{title}}\"?",
+    "deleteTitle": "Confirm Delete",
+    "deleteConfirm": "Are you sure you want to delete \"{{title}}\"? This action cannot be undone.",
     "deleteSuccess": "Bookmark deleted successfully",
     "saveSuccess": "Bookmark saved successfully",
     "saveFailed": "Failed to save bookmark",
@@ -21,14 +24,43 @@
     "recent": "Recent Bookmarks",
     "all": "All Bookmarks",
     "privacy": "Privacy",
-    "search": "Search bookmarks...",
+    "search": "Search bookmarks, tags, or URLs...",
     "count": "You have {{count}} bookmark",
     "count_plural": "You have {{count}} bookmarks",
     "stats": {
       "total": "Total",
       "category": "categories",
       "tags": "tags"
-    }
+    },
+    "filter": {
+      "tags": "Filter by Tags",
+      "category": "Filter by Category",
+      "allCategories": "All Categories",
+      "allTags": "All Tags",
+      "selectedTags": "{{count}} tags selected",
+      "clearFilter": "Clear Filters"
+    },
+    "view": {
+      "grid": "Grid View",
+      "list": "List View"
+    },
+    "batch": {
+      "selected": "{{count}} selected",
+      "selectAll": "Select All",
+      "deselectAll": "Deselect All",
+      "delete": "Delete Selected",
+      "deleteTitle": "Confirm Batch Delete",
+      "deleteConfirm": "Are you sure you want to delete {{count}} bookmarks? This action cannot be undone."
+    },
+    "empty": "No bookmarks yet",
+    "emptyFilter": "No bookmarks match your filters",
+    "noTags": "No tags",
+    "open": "Open",
+    "edit": "Edit",
+    "delete": "Delete",
+    "copyLink": "Copy Link",
+    "share": "Share",
+    "aiTag": "AI"
   },
   "modal": {
     "title": "Add New Bookmark",
@@ -79,6 +111,8 @@
     "smartSuggestions": "Smart Suggestions",
     "recommendedCategory": "Recommended Category",
     "recommendedTags": "Recommended Tags",
+    "urlLabel": "URL",
+    "urlPlaceholder": "Enter URL",
     "titleLabel": "Title",
     "titlePlaceholder": "Enter title",
     "descriptionLabel": "Summary",

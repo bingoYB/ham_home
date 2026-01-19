@@ -13,7 +13,6 @@ import {
   Moon,
   Sun,
   Monitor,
-  Plus,
   ChevronDown,
   Database,
 } from 'lucide-react';
@@ -80,17 +79,6 @@ export function Sidebar({ currentView, onViewChange, onThemeToggle, theme }: Sid
           </div>
           <span className="font-semibold text-lg text-foreground">HamHome</span>
         </div>
-      </div>
-
-      {/* New Button */}
-      <div className="px-4 mb-4">
-        <Button
-          onClick={() => onViewChange('new')}
-          className="w-full bg-primary hover:bg-primary-600 text-primary-foreground font-medium"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          {t('bookmark:bookmark.newBookmark')}
-        </Button>
       </div>
 
       {/* Navigation Menu */}

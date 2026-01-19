@@ -305,16 +305,8 @@ export function CategoriesPage() {
 
   return (
     <div className="w-full max-w-4xl mx-auto p-6">
-      {/* 页面头部 */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-semibold text-foreground mb-2">
-            {t('settings:settings.categories.title')}
-          </h1>
-          <p className="text-muted-foreground">
-            {t('settings:settings.categories.description')}
-          </p>
-        </div>
+      {/* 页面头部操作 */}
+      <div className="flex items-center justify-end mb-6">
         <div className="flex gap-2">
           {isBatchMode ? (
             <>
@@ -502,7 +494,7 @@ export function CategoriesPage() {
           setAiError(null);
         }
       }}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
+        <DialogContent className="sm:max-w-4xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{t('settings:settings.categories.preset.title')}</DialogTitle>
             <DialogDescription>

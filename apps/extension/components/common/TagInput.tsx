@@ -72,7 +72,7 @@ export function TagInput({
             <Badge
               key={tag}
               variant="secondary"
-              className="pl-2 pr-1 py-0.5 flex items-center gap-1 cursor-default bg-gradient-to-r from-violet-500/90 to-indigo-500/90 dark:from-violet-600/80 dark:to-indigo-600/80 text-white border-0 shadow-sm"
+              className="pl-2 pr-1 py-0.5 flex items-center gap-1 cursor-default bg-linear-to-r from-violet-500/90 to-indigo-500/90 dark:from-violet-600/80 dark:to-indigo-600/80 text-white border-0 shadow-sm"
             >
               <span className="text-xs font-medium">{tag}</span>
               <button
@@ -96,7 +96,7 @@ export function TagInput({
           onKeyDown={handleKeyDown}
           placeholder={value.length >= maxTags ? `最多 ${maxTags} 个标签` : placeholder}
           disabled={value.length >= maxTags}
-          className="h-8 text-sm"
+          className="text-sm"
         />
 
         {/* 建议列表 */}

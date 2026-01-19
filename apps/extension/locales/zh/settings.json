@@ -121,6 +121,9 @@
       "importSuccess": "导入完成",
       "importFailed": "导入失败",
       "importDetails": "成功导入 {{imported}} 个书签，跳过 {{skipped}} 个重复项",
+      "importDetailsWithCategories": "成功导入 {{imported}} 个书签，创建 {{categoriesCreated}} 个分类，跳过 {{skipped}} 个重复项",
+      "importDetailsWithAI": "成功导入 {{imported}} 个书签，AI 处理 {{aiProcessed}} 个，跳过 {{skipped}} 个重复项",
+      "importDetailsWithAIAndCategories": "成功导入 {{imported}} 个书签，AI 处理 {{aiProcessed}} 个，创建 {{categoriesCreated}} 个分类，跳过 {{skipped}} 个重复项",
       "export": {
         "title": "导出书签",
         "description": "将你的书签数据导出为文件备份",
@@ -138,9 +141,16 @@
         "selectFile": "点击选择文件",
         "supportedFormats": "支持 JSON 和 HTML 格式",
         "importing": "正在导入...",
+        "progress": "{{current}} / {{total}}",
         "formatLabel": "支持的格式：",
         "formatJSON": "HamHome JSON 导出文件",
-        "formatHTML": "浏览器书签 HTML 文件（从 Chrome/Firefox/Edge 导出）"
+        "formatHTML": "浏览器书签 HTML 文件（从 Chrome/Firefox/Edge 导出）",
+        "preserveFolders": "保留书签目录结构",
+        "preserveFoldersDesc": "导入 HTML 书签时，自动将文件夹转换为分类，保持书签的层级结构",
+        "enableAIAnalysis": "使用 AI 自动分类打标",
+        "enableAIAnalysisDesc": "导入时使用 AI 分析书签内容，自动生成摘要、分类和标签（与保留目录结构互斥）",
+        "fetchPageContent": "获取页面内容进行分析",
+        "fetchPageContentDesc": "访问书签 URL 获取页面内容以获得更准确的 AI 分析结果（较慢）"
       },
       "errors": {
         "unsupportedFormat": "不支持的文件格式，请选择 JSON 或 HTML 文件",

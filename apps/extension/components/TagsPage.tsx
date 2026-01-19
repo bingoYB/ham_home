@@ -47,11 +47,6 @@ export function TagsPage() {
 
   return (
     <div className="w-full max-w-4xl mx-auto p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-foreground mb-2">{t('bookmark:tags.title')}</h1>
-        <p className="text-muted-foreground">{t('bookmark:tags.description')}</p>
-      </div>
-
       {/* 标签统计 */}
       <Card className="mb-6">
         <CardHeader>

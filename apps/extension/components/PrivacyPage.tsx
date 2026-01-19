@@ -53,11 +53,6 @@ export function PrivacyPage() {
 
   return (
     <div className="w-full max-w-4xl mx-auto p-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-semibold text-foreground mb-2">{t('settings.privacy.title', { ns: 'settings' })}</h1>
-        <p className="text-muted-foreground">{t('settings.privacy.description', { ns: 'settings' })}</p>
-      </div>
-
       {/* 数据存储 */}
       <Card className="mb-6">
         <CardHeader>

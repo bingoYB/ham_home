@@ -8,6 +8,11 @@ export type AIProvider = 'openai' | 'anthropic' | 'ollama' | 'custom';
 /**
  * AI 配置接口
  */
+/**
+ * AI 输出语言类型
+ */
+export type AILanguage = 'zh' | 'en' | 'auto';
+
 export interface AIClientConfig {
   provider: AIProvider;
   apiKey?: string;
@@ -15,6 +20,10 @@ export interface AIClientConfig {
   model?: string;
   temperature?: number;
   maxTokens?: number;
+  /** 是否启用调试日志，打印 AI 请求参数和响应 */
+  debug?: boolean;
+  /** AI 输出语言，默认 'auto' 自动检测 */
+  language?: AILanguage;
 }
 
 /**

@@ -1,16 +1,13 @@
 /**
  * 预设分类系统
  * 提供两套常用的书签分类，供用户快速选择
- * 支持中英文双语
  */
 import type { PresetCategory, HierarchicalCategory } from '@/types';
 
-// ========== 中文版预设分类 ==========
-
 /**
- * 方案一：通用型（信息获取 + 工作生活平衡）- 中文
+ * 方案一：通用型（信息获取 + 工作生活平衡）- 中文版
  */
-const PRESET_CATEGORIES_GENERAL_ZH: HierarchicalCategory[] = [
+export const PRESET_CATEGORIES_GENERAL: HierarchicalCategory[] = [
   {
     id: 'general-learning',
     name: '学习与知识',
@@ -74,9 +71,75 @@ const PRESET_CATEGORIES_GENERAL_ZH: HierarchicalCategory[] = [
 ];
 
 /**
- * 方案二：专业创作者 / 技术向（高颗粒度）- 中文
+ * 方案一：通用型 - 英文版
  */
-const PRESET_CATEGORIES_PROFESSIONAL_ZH: HierarchicalCategory[] = [
+export const PRESET_CATEGORIES_GENERAL_EN: HierarchicalCategory[] = [
+  {
+    id: 'general-learning',
+    name: 'Learning & Knowledge',
+    icon: '📚',
+    children: [
+      { id: 'general-learning-tech-docs', name: 'Tech Docs', icon: '📄' },
+      { id: 'general-learning-tutorials', name: 'Tutorials / Courses', icon: '🎓' },
+      { id: 'general-learning-research', name: 'Research / In-depth Articles', icon: '🔬' },
+      { id: 'general-learning-notes', name: 'Notes / Summaries', icon: '📝' },
+      { id: 'general-learning-ebooks', name: 'E-books / Resources', icon: '📖' },
+    ],
+  },
+  {
+    id: 'general-work',
+    name: 'Work & Productivity',
+    icon: '💼',
+    children: [
+      { id: 'general-work-projects', name: 'Projects', icon: '📋' },
+      { id: 'general-work-tools', name: 'Tools / SaaS', icon: '🛠️' },
+      { id: 'general-work-design', name: 'Design Resources', icon: '🎨' },
+      { id: 'general-work-writing', name: 'Writing / Copywriting', icon: '✍️' },
+      { id: 'general-work-collab', name: 'Collaboration / Management', icon: '👥' },
+    ],
+  },
+  {
+    id: 'general-reading',
+    name: 'News & Reading',
+    icon: '📰',
+    children: [
+      { id: 'general-reading-news', name: 'News', icon: '📢' },
+      { id: 'general-reading-blogs', name: 'Blogs', icon: '✏️' },
+      { id: 'general-reading-industry', name: 'Industry Updates', icon: '📊' },
+      { id: 'general-reading-later', name: 'Read Later', icon: '📑' },
+      { id: 'general-reading-rss', name: 'RSS Feeds', icon: '📡' },
+    ],
+  },
+  {
+    id: 'general-tech',
+    name: 'Tech & Development',
+    icon: '💻',
+    children: [
+      { id: 'general-tech-frontend', name: 'Frontend', icon: '🌐' },
+      { id: 'general-tech-backend', name: 'Backend', icon: '⚙️' },
+      { id: 'general-tech-ai', name: 'AI / Data', icon: '🤖' },
+      { id: 'general-tech-system', name: 'System / Architecture', icon: '🏗️' },
+      { id: 'general-tech-opensource', name: 'Open Source', icon: '🔓' },
+    ],
+  },
+  {
+    id: 'general-life',
+    name: 'Life & Interests',
+    icon: '🎉',
+    children: [
+      { id: 'general-life-entertainment', name: 'Entertainment', icon: '🎬' },
+      { id: 'general-life-art', name: 'Photography / Art', icon: '📷' },
+      { id: 'general-life-health', name: 'Health', icon: '🏃' },
+      { id: 'general-life-travel', name: 'Travel', icon: '✈️' },
+      { id: 'general-life-hobbies', name: 'Hobbies', icon: '🎮' },
+    ],
+  },
+];
+
+/**
+ * 方案二：专业创作者 / 技术向（高颗粒度）- 中文版
+ */
+export const PRESET_CATEGORIES_PROFESSIONAL: HierarchicalCategory[] = [
   {
     id: 'pro-tech',
     name: '技术',
@@ -145,78 +208,10 @@ const PRESET_CATEGORIES_PROFESSIONAL_ZH: HierarchicalCategory[] = [
   },
 ];
 
-// ========== 英文版预设分类 ==========
-
 /**
- * 方案一：通用型 - 英文
+ * 方案二：专业创作者 / 技术向 - 英文版
  */
-const PRESET_CATEGORIES_GENERAL_EN: HierarchicalCategory[] = [
-  {
-    id: 'general-learning',
-    name: 'Learning & Knowledge',
-    icon: '📚',
-    children: [
-      { id: 'general-learning-tech-docs', name: 'Technical Docs', icon: '📄' },
-      { id: 'general-learning-tutorials', name: 'Tutorials / Courses', icon: '🎓' },
-      { id: 'general-learning-research', name: 'Research / Articles', icon: '🔬' },
-      { id: 'general-learning-notes', name: 'Notes / Summaries', icon: '📝' },
-      { id: 'general-learning-ebooks', name: 'E-books / Libraries', icon: '📖' },
-    ],
-  },
-  {
-    id: 'general-work',
-    name: 'Work & Productivity',
-    icon: '💼',
-    children: [
-      { id: 'general-work-projects', name: 'Projects', icon: '📋' },
-      { id: 'general-work-tools', name: 'Tools / SaaS', icon: '🛠️' },
-      { id: 'general-work-design', name: 'Design Resources', icon: '🎨' },
-      { id: 'general-work-writing', name: 'Writing / Copywriting', icon: '✍️' },
-      { id: 'general-work-collab', name: 'Collaboration / Management', icon: '👥' },
-    ],
-  },
-  {
-    id: 'general-reading',
-    name: 'News & Reading',
-    icon: '📰',
-    children: [
-      { id: 'general-reading-news', name: 'News', icon: '📢' },
-      { id: 'general-reading-blogs', name: 'Blogs', icon: '✏️' },
-      { id: 'general-reading-industry', name: 'Industry Updates', icon: '📊' },
-      { id: 'general-reading-later', name: 'Read Later', icon: '📑' },
-      { id: 'general-reading-rss', name: 'RSS Feeds', icon: '📡' },
-    ],
-  },
-  {
-    id: 'general-tech',
-    name: 'Tech & Development',
-    icon: '💻',
-    children: [
-      { id: 'general-tech-frontend', name: 'Frontend', icon: '🌐' },
-      { id: 'general-tech-backend', name: 'Backend', icon: '⚙️' },
-      { id: 'general-tech-ai', name: 'AI / Data', icon: '🤖' },
-      { id: 'general-tech-system', name: 'System / Architecture', icon: '🏗️' },
-      { id: 'general-tech-opensource', name: 'Open Source', icon: '🔓' },
-    ],
-  },
-  {
-    id: 'general-life',
-    name: 'Life & Interests',
-    icon: '🎉',
-    children: [
-      { id: 'general-life-entertainment', name: 'Entertainment', icon: '🎬' },
-      { id: 'general-life-art', name: 'Photography / Art', icon: '📷' },
-      { id: 'general-life-health', name: 'Health', icon: '🏃' },
-      { id: 'general-life-travel', name: 'Travel', icon: '✈️' },
-      { id: 'general-life-hobbies', name: 'Hobbies', icon: '🎮' },
-    ],
-  },
-];
-
-/**
- * 方案二：专业创作者 / 技术向 - 英文
- */
-const PRESET_CATEGORIES_PROFESSIONAL_EN: HierarchicalCategory[] = [
+export const PRESET_CATEGORIES_PROFESSIONAL_EN: HierarchicalCategory[] = [
   {
     id: 'pro-tech',
     name: 'Technology',
@@ -235,7 +230,7 @@ const PRESET_CATEGORIES_PROFESSIONAL_EN: HierarchicalCategory[] = [
       { id: 'pro-tech-frameworks', name: 'Frameworks / Libraries', icon: '📦' },
       { id: 'pro-tech-ai', name: 'AI / LLM', icon: '🤖' },
       { id: 'pro-tech-system', name: 'System Design', icon: '🏗️' },
-      { id: 'pro-tech-opensource', name: 'Open Source Ecosystem', icon: '🔓' },
+      { id: 'pro-tech-opensource', name: 'Open Source', icon: '🔓' },
     ],
   },
   {
@@ -247,7 +242,7 @@ const PRESET_CATEGORIES_PROFESSIONAL_EN: HierarchicalCategory[] = [
       { id: 'pro-product-ux', name: 'User Experience', icon: '👤' },
       { id: 'pro-product-design-system', name: 'Design System', icon: '🎯' },
       { id: 'pro-product-competitor', name: 'Competitor Research', icon: '🔍' },
-      { id: 'pro-product-prototype', name: 'Prototype / Demo', icon: '🖼️' },
+      { id: 'pro-product-prototype', name: 'Prototypes / Demos', icon: '🖼️' },
     ],
   },
   {
@@ -267,8 +262,8 @@ const PRESET_CATEGORIES_PROFESSIONAL_EN: HierarchicalCategory[] = [
     icon: '📈',
     children: [
       { id: 'pro-business-reports', name: 'Industry Reports', icon: '📋' },
-      { id: 'pro-business-startup', name: 'Startup / Business Model', icon: '🚀' },
-      { id: 'pro-business-investment', name: 'Investment / Market', icon: '💰' },
+      { id: 'pro-business-startup', name: 'Startups / Business Models', icon: '🚀' },
+      { id: 'pro-business-investment', name: 'Investment / Markets', icon: '💰' },
       { id: 'pro-business-trends', name: 'Trend Analysis', icon: '📊' },
     ],
   },
@@ -285,26 +280,6 @@ const PRESET_CATEGORIES_PROFESSIONAL_EN: HierarchicalCategory[] = [
   },
 ];
 
-// ========== 根据语言获取预设分类 ==========
-
-/**
- * 根据语言获取通用型预设分类
- */
-export function getPresetCategoriesGeneral(lang: string = 'zh'): HierarchicalCategory[] {
-  return lang.startsWith('en') ? PRESET_CATEGORIES_GENERAL_EN : PRESET_CATEGORIES_GENERAL_ZH;
-}
-
-/**
- * 根据语言获取专业型预设分类
- */
-export function getPresetCategoriesProfessional(lang: string = 'zh'): HierarchicalCategory[] {
-  return lang.startsWith('en') ? PRESET_CATEGORIES_PROFESSIONAL_EN : PRESET_CATEGORIES_PROFESSIONAL_ZH;
-}
-
-// 导出默认版本（中文）以保持兼容
-export const PRESET_CATEGORIES_GENERAL = PRESET_CATEGORIES_GENERAL_ZH;
-export const PRESET_CATEGORIES_PROFESSIONAL = PRESET_CATEGORIES_PROFESSIONAL_ZH;
-
 /**
  * 预设分类方案类型
  */
@@ -315,6 +290,20 @@ export type PresetCategoryScheme = 'general' | 'professional';
  */
 export function getPresetCategoryScheme(scheme: PresetCategoryScheme): HierarchicalCategory[] {
   return scheme === 'general' ? PRESET_CATEGORIES_GENERAL : PRESET_CATEGORIES_PROFESSIONAL;
+}
+
+/**
+ * 根据语言获取通用型预设分类
+ */
+export function getPresetCategoriesGeneral(lang: string): HierarchicalCategory[] {
+  return lang.startsWith('zh') ? PRESET_CATEGORIES_GENERAL : PRESET_CATEGORIES_GENERAL_EN;
+}
+
+/**
+ * 根据语言获取专业型预设分类
+ */
+export function getPresetCategoriesProfessional(lang: string): HierarchicalCategory[] {
+  return lang.startsWith('zh') ? PRESET_CATEGORIES_PROFESSIONAL : PRESET_CATEGORIES_PROFESSIONAL_EN;
 }
 
 /**
