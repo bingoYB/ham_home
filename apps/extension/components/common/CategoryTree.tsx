@@ -245,10 +245,10 @@ export function CategoryFilterDropdown({
         <Button
           variant="outline"
           size="sm"
-          className={cn('w-[180px] h-9 justify-between hover:text-card-foreground', triggerClassName)}
+          className={cn('w-[180px] h-9 justify-between', triggerClassName)}
         >
           <div className="flex items-center gap-2 truncate">
-            <FolderOpen className="h-4 w-4 text-muted-foreground shrink-0" />
+            <FolderOpen className="h-4 w-4 shrink-0" />
             <span className="truncate">{displayValue}</span>
           </div>
           <ChevronDown className="h-3 w-3 opacity-50 shrink-0" />

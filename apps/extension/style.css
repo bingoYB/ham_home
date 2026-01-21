@@ -2,3 +2,19 @@
 @import "@hamhome/ui/globals.css";
 @source "../../packages/ui/src/**/*.{js,ts,jsx,tsx}";
 
+/* fix scroll area viewport display issue */
+/* https://github.com/radix-ui/primitives/issues/2964 */
+.bookmark-list-view [data-slot="scroll-area-viewport"] > div {
+  display: block !important;
+}
+
+/* content ui root init style */
+#hamhome-root{
+  @apply bg-background text-foreground;
+}
+
+#hamhome-root{
+  position: fixed;
+  height: 100%;
+  z-index: 999999
+}

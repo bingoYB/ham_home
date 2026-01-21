@@ -1,10 +1,13 @@
 /**
- * Content Script - 网页内容提取
+ * Content Script - 网页内容提取 + UI 注入
  * 使用 Readability 提取正文，Turndown 转换为 Markdown
+ * 使用 createShadowRootUi 注入书签面板
  */
+/// <reference path="../.wxt/wxt.d.ts" />
 import { Readability, isProbablyReaderable } from '@mozilla/readability';
 import TurndownService from 'turndown';
 import type { PageContent, PageMetadata } from '@/types';
+import "../style.css";
 
 /**
  * 提取页面元数据
@@ -193,8 +196,36 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 // 导出 WXT content script 配置
 export default defineContentScript({
   matches: ['<all_urls>'],
-  main() {
+  cssInjectionMode: 'ui',
+  async main(ctx) {
     console.log('[HamHome] Content script loaded');
+
+    // 动态导入 React 组件
+    const { mountContentUI } = await import('@/lib/contentUi/index');
+
+    // 创建 Shadow Root UI
+    const ui = await createShadowRootUi(ctx, {
+      name: 'hamhome-bookmark-panel',
+      position: 'overlay',
+      zIndex: 99999,
+      anchor: 'body',
+      onMount(container) {
+        // 创建 React 挂载点
+        const appRoot = document.createElement('div');
+        appRoot.id = 'hamhome-root';
+        container.append(appRoot);
+
+        // 挂载 React 应用
+        const unmount = mountContentUI(appRoot);
+
+        return { unmount };
+      },
+      onRemove(mounted) {
+        mounted?.unmount();
+      },
+    });
+
+    // 挂载 UI
+    ui.mount();
   },
 });
-

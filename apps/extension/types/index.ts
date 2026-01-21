@@ -84,6 +84,11 @@ export type ThemeMode = 'light' | 'dark' | 'system';
 export type Language = 'zh' | 'en';
 
 /**
+ * 书签面板位置
+ */
+export type PanelPosition = 'left' | 'right';
+
+/**
  * 用户设置
  */
 export interface LocalSettings {
@@ -92,6 +97,8 @@ export interface LocalSettings {
   theme: ThemeMode;
   language: Language;
   shortcut: string;           // 快捷键配置
+  panelPosition: PanelPosition; // 书签面板位置
+  panelShortcut: string;      // 面板快捷键
 }
 
 // ============ 快照相关 ============
@@ -242,7 +249,11 @@ export type MessageType =
   | 'EXTRACT_CONTENT'
   | 'GET_PAGE_HTML'
   | 'SAVE_BOOKMARK'
-  | 'AI_ANALYZE';
+  | 'AI_ANALYZE'
+  | 'GET_BOOKMARKS'
+  | 'GET_CATEGORIES'
+  | 'GET_ALL_TAGS'
+  | 'GET_SETTINGS';
 
 /**
  * 消息结构
@@ -281,4 +292,36 @@ export interface HierarchicalCategory {
 export interface AIGeneratedCategory {
   name: string;
   children?: AIGeneratedCategory[];
+}
+
+// ============ 自定义筛选器相关 ============
+
+/**
+ * 筛选字段类型
+ */
+export type FilterField = 'title' | 'url' | 'description' | 'tags' | 'createdAt';
+
+/**
+ * 筛选操作符类型
+ */
+export type FilterOperator = 'equals' | 'contains' | 'notEquals' | 'notContains' | 'startsWith' | 'endsWith' | 'greaterThan' | 'lessThan';
+
+/**
+ * 筛选条件
+ */
+export interface FilterCondition {
+  field: FilterField;
+  operator: FilterOperator;
+  value: string;
+}
+
+/**
+ * 自定义筛选器
+ */
+export interface CustomFilter {
+  id: string;
+  name: string;
+  conditions: FilterCondition[];
+  createdAt: number;
+  updatedAt: number;
 }
