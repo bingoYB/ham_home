@@ -1,14 +1,8 @@
 /**
  * 配置存储模块
- * 存储 AI 配置和用户设置
+ * 基于 WXT Storage 存储 AI 配置和用户设置
  */
 import type { AIConfig, LocalSettings, CustomFilter } from '@/types';
-
-const STORAGE_KEYS = {
-  AI_CONFIG: 'aiConfig',
-  SETTINGS: 'settings',
-  CUSTOM_FILTERS: 'customFilters',
-};
 
 // 默认 AI 配置
 const DEFAULT_AI_CONFIG: AIConfig = {
@@ -36,22 +30,34 @@ const DEFAULT_SETTINGS: LocalSettings = {
   panelShortcut: 'Ctrl+Shift+B',
 };
 
+// 定义存储项（使用 sync 实现跨设备同步）
+const aiConfigItem = storage.defineItem<AIConfig>('sync:aiConfig', {
+  fallback: DEFAULT_AI_CONFIG,
+});
+
+const settingsItem = storage.defineItem<LocalSettings>('sync:settings', {
+  fallback: DEFAULT_SETTINGS,
+});
+
+const customFiltersItem = storage.defineItem<CustomFilter[]>('sync:customFilters', {
+  fallback: [],
+});
+
 class ConfigStorage {
   /**
    * 获取 AI 配置
    */
   async getAIConfig(): Promise<AIConfig> {
-    const result = await chrome.storage.local.get(STORAGE_KEYS.AI_CONFIG);
-    return { ...DEFAULT_AI_CONFIG, ...result[STORAGE_KEYS.AI_CONFIG] };
+    return aiConfigItem.getValue();
   }
 
   /**
    * 设置 AI 配置
    */
   async setAIConfig(config: Partial<AIConfig>): Promise<AIConfig> {
-    const current = await this.getAIConfig();
+    const current = await aiConfigItem.getValue();
     const updated = { ...current, ...config };
-    await chrome.storage.local.set({ [STORAGE_KEYS.AI_CONFIG]: updated });
+    await aiConfigItem.setValue(updated);
     return updated;
   }
 
@@ -59,17 +65,16 @@ class ConfigStorage {
    * 获取用户设置
    */
   async getSettings(): Promise<LocalSettings> {
-    const result = await chrome.storage.local.get(STORAGE_KEYS.SETTINGS);
-    return { ...DEFAULT_SETTINGS, ...result[STORAGE_KEYS.SETTINGS] };
+    return settingsItem.getValue();
   }
 
   /**
    * 设置用户设置
    */
   async setSettings(settings: Partial<LocalSettings>): Promise<LocalSettings> {
-    const current = await this.getSettings();
+    const current = await settingsItem.getValue();
     const updated = { ...current, ...settings };
-    await chrome.storage.local.set({ [STORAGE_KEYS.SETTINGS]: updated });
+    await settingsItem.setValue(updated);
     return updated;
   }
 
@@ -77,9 +82,7 @@ class ConfigStorage {
    * 重置 AI 配置为默认值
    */
   async resetAIConfig(): Promise<AIConfig> {
-    await chrome.storage.local.set({
-      [STORAGE_KEYS.AI_CONFIG]: DEFAULT_AI_CONFIG,
-    });
+    await aiConfigItem.setValue(DEFAULT_AI_CONFIG);
     return DEFAULT_AI_CONFIG;
   }
 
@@ -87,9 +90,7 @@ class ConfigStorage {
    * 重置用户设置为默认值
    */
   async resetSettings(): Promise<LocalSettings> {
-    await chrome.storage.local.set({
-      [STORAGE_KEYS.SETTINGS]: DEFAULT_SETTINGS,
-    });
+    await settingsItem.setValue(DEFAULT_SETTINGS);
     return DEFAULT_SETTINGS;
   }
 
@@ -97,35 +98,34 @@ class ConfigStorage {
    * 获取自定义筛选器列表
    */
   async getCustomFilters(): Promise<CustomFilter[]> {
-    const result = await chrome.storage.local.get(STORAGE_KEYS.CUSTOM_FILTERS);
-    return result[STORAGE_KEYS.CUSTOM_FILTERS] || [];
+    return customFiltersItem.getValue();
   }
 
   /**
    * 保存自定义筛选器列表
    */
   async setCustomFilters(filters: CustomFilter[]): Promise<void> {
-    await chrome.storage.local.set({ [STORAGE_KEYS.CUSTOM_FILTERS]: filters });
+    await customFiltersItem.setValue(filters);
   }
 
   /**
    * 添加自定义筛选器
    */
   async addCustomFilter(filter: CustomFilter): Promise<void> {
-    const filters = await this.getCustomFilters();
+    const filters = await customFiltersItem.getValue();
     filters.push(filter);
-    await this.setCustomFilters(filters);
+    await customFiltersItem.setValue(filters);
   }
 
   /**
    * 更新自定义筛选器
    */
   async updateCustomFilter(filterId: string, updates: Partial<CustomFilter>): Promise<void> {
-    const filters = await this.getCustomFilters();
-    const index = filters.findIndex((f) => f.id === filterId);
+    const filters: CustomFilter[] = await customFiltersItem.getValue();
+    const index = filters.findIndex((f: CustomFilter) => f.id === filterId);
     if (index !== -1) {
       filters[index] = { ...filters[index], ...updates, updatedAt: Date.now() };
-      await this.setCustomFilters(filters);
+      await customFiltersItem.setValue(filters);
     }
   }
 
@@ -133,12 +133,40 @@ class ConfigStorage {
    * 删除自定义筛选器
    */
   async deleteCustomFilter(filterId: string): Promise<void> {
-    const filters = await this.getCustomFilters();
-    const filtered = filters.filter((f) => f.id !== filterId);
-    await this.setCustomFilters(filtered);
+    const filters: CustomFilter[] = await customFiltersItem.getValue();
+    const filtered = filters.filter((f: CustomFilter) => f.id !== filterId);
+    await customFiltersItem.setValue(filtered);
+  }
+
+  // ============ 监听变化 ============
+
+  /**
+   * 监听 AI 配置变化
+   */
+  watchAIConfig(callback: (config: AIConfig) => void): () => void {
+    return aiConfigItem.watch((newValue: AIConfig | null) => {
+      callback(newValue ?? DEFAULT_AI_CONFIG);
+    });
+  }
+
+  /**
+   * 监听用户设置变化
+   */
+  watchSettings(callback: (settings: LocalSettings) => void): () => void {
+    return settingsItem.watch((newValue: LocalSettings | null) => {
+      callback(newValue ?? DEFAULT_SETTINGS);
+    });
+  }
+
+  /**
+   * 监听自定义筛选器变化
+   */
+  watchCustomFilters(callback: (filters: CustomFilter[]) => void): () => void {
+    return customFiltersItem.watch((newValue: CustomFilter[] | null) => {
+      callback(newValue ?? []);
+    });
   }
 }
 
 export const configStorage = new ConfigStorage();
 export { DEFAULT_AI_CONFIG, DEFAULT_SETTINGS };
-
