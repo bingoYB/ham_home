@@ -10,6 +10,8 @@
     "clean": "turbo clean && rm -rf node_modules",
     "dev:web": "pnpm --filter web dev",
     "dev:extension": "pnpm --filter extension dev",
+    "dev:ext-edge": "pnpm --filter extension dev:edge",
+    "dev:ext-firefox": "pnpm --filter extension dev:firefox",
     "dev:api": "pnpm --filter @hamhome/api dev",
     "build:web": "pnpm --filter web build",
     "build:extension": "pnpm --filter extension build",

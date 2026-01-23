@@ -16,7 +16,7 @@ export default defineConfig({
       port: 3123
     }
   },
-  manifest: {
+  manifest: ({ browser }) => ({
     name: 'HamHome - 智能书签助手',
     description: '🐹 让收藏不再积灰，AI 驱动的智能书签管理工具',
     version: '1.0.0',
@@ -37,6 +37,13 @@ export default defineConfig({
         },
         description: '快速收藏当前页面',
       },
+      'toggle-bookmark-panel': {
+        suggested_key: {
+          default: 'Ctrl+Shift+L',
+          mac: 'Command+Shift+L',
+        },
+        description: '切换书签面板',
+      },
     },
     icons: {
       16: 'icon/16.png',
@@ -44,6 +51,15 @@ export default defineConfig({
       48: 'icon/48.png',
       128: 'icon/128.png',
     },
-  },
+    // Firefox 特定配置
+    ...(browser === 'firefox' && {
+      browser_specific_settings: {
+        gecko: {
+          id: 'hamhome@example.com',
+          strict_min_version: '109.0',
+        },
+      },
+    }),
+  }),
 });
 

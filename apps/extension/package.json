@@ -6,9 +6,15 @@
   "scripts": {
     "dev": "wxt",
     "dev:firefox": "wxt -b firefox",
+    "dev:edge": "wxt -b edge",
     "build": "wxt build",
     "build:firefox": "wxt build -b firefox",
+    "build:edge": "wxt build -b edge",
+    "build:all": "pnpm build && pnpm build:firefox && pnpm build:edge",
     "zip": "wxt zip",
+    "zip:firefox": "wxt zip -b firefox",
+    "zip:edge": "wxt zip -b edge",
+    "zip:all": "pnpm zip && pnpm zip:firefox && pnpm zip:edge",
     "clean": "rm -rf .wxt .output dist"
   },
   "dependencies": {
@@ -17,6 +23,7 @@
     "@hamhome/ui": "workspace:*",
     "@hamhome/utils": "workspace:*",
     "@mozilla/readability": "^0.5.0",
+    "@webext-core/proxy-service": "^2.0.0",
     "i18next": "^24.0.0",
     "i18next-browser-languagedetector": "^7.0.0",
     "lucide-react": "^0.469.0",
@@ -33,6 +40,7 @@
     "@types/turndown": "^5.0.5",
     "@wxt-dev/module-react": "^1.1.5",
     "postcss-rem-to-pixel": "^4.1.2",
+    "sharp": "^0.34.5",
     "typescript": "^5.7.0",
     "wxt": "^0.20.13"
   }

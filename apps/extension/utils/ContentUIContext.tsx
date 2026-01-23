@@ -10,7 +10,7 @@ interface ContentUIContextValue {
   container: HTMLElement;
 }
 
-const ContentUIContext = createContext<ContentUIContextValue | null>(null);
+export const ContentUIContext = createContext<ContentUIContextValue | null>(null);
 
 interface ContentUIProviderProps {
   root: Root;
