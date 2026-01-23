@@ -83,22 +83,21 @@ i18n
     saveMissing: false,
   });
 
-// 初始化时从 chrome.storage 同步语言设置
+// 初始化时从 storage 同步语言设置（使用 WXT Storage）
 async function syncLanguageFromStorage() {
   try {
-    if (typeof chrome !== 'undefined' && chrome.storage?.local) {
-      const result = await chrome.storage.local.get('settings');
-      const settings = result.settings;
-      if (settings?.language && ['en', 'zh'].includes(settings.language)) {
-        const currentLng = i18n.language;
-        if (currentLng !== settings.language) {
-          await i18n.changeLanguage(settings.language);
-          localStorage.setItem(I18N_STORAGE_KEY, settings.language);
-        }
+    // 动态导入避免循环依赖
+    const { configStorage } = await import('@/lib/storage');
+    const settings = await configStorage.getSettings();
+    if (settings?.language && ['en', 'zh'].includes(settings.language)) {
+      const currentLng = i18n.language;
+      if (currentLng !== settings.language) {
+        await i18n.changeLanguage(settings.language);
+        localStorage.setItem(I18N_STORAGE_KEY, settings.language);
       }
     }
   } catch (error) {
-    console.warn('[i18n] Failed to sync language from chrome.storage:', error);
+    console.warn('[i18n] Failed to sync language from storage:', error);
   }
 }
 

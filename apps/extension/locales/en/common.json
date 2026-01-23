@@ -22,6 +22,9 @@
     "yesterday": "Yesterday",
     "daysAgo": "{{days}} days ago",
     "storage": "Storage",
+    "more": "More",
+    "manageBookmarks": "Manage Bookmarks",
+    "viewShortcuts": "View Shortcuts",
     "languages": {
       "en": "English",
       "zh": "中文",

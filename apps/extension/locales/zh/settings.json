@@ -46,8 +46,29 @@
       "autoSaveSnapshot": "自动保存快照",
       "autoSaveSnapshotDesc": "保存书签时自动保存页面快照",
       "shortcut": "快捷键",
-      "shortcutDesc": "自定义保存书签的快捷键",
-      "shortcutPlaceholder": "Ctrl+Shift+E"
+      "shortcutButton": "打开浏览器快捷键设置",
+      "shortcutDesc": "在浏览器设置中配置扩展快捷键",
+      "shortcutDescFirefox": "点击齿轮图标 → 管理扩展快捷键",
+      "currentShortcuts": "当前快捷键配置",
+      "shortcutNotSet": "未设置",
+      "panelPosition": "侧边栏位置",
+      "panelPositionDesc": "设置内容页面中侧边栏显示在左侧还是右侧",
+      "panelPositionOptions": {
+        "left": "左侧",
+        "right": "右侧"
+      },
+      "customFilters": {
+        "title": "自定义筛选器",
+        "description": "创建和管理自定义筛选器，快速筛选书签",
+        "noFilters": "还没有自定义筛选器",
+        "noFiltersDesc": "点击「添加筛选器」创建你的第一个自定义筛选器",
+        "addFilter": "添加筛选器",
+        "edit": "编辑",
+        "delete": "删除",
+        "deleteConfirm": "确认删除筛选器",
+        "deleteWarning": "确定要删除筛选器「{{name}}」吗？此操作无法撤销。",
+        "conditionsCount": "{{count}} 个条件"
+      }
     },
     "ai": {
       "title": "AI 服务配置",
@@ -124,6 +145,7 @@
       "importDetailsWithCategories": "成功导入 {{imported}} 个书签，创建 {{categoriesCreated}} 个分类，跳过 {{skipped}} 个重复项",
       "importDetailsWithAI": "成功导入 {{imported}} 个书签，AI 处理 {{aiProcessed}} 个，跳过 {{skipped}} 个重复项",
       "importDetailsWithAIAndCategories": "成功导入 {{imported}} 个书签，AI 处理 {{aiProcessed}} 个，创建 {{categoriesCreated}} 个分类，跳过 {{skipped}} 个重复项",
+      "importErrorSkipped": "{{count}} 个因错误跳过",
       "export": {
         "title": "导出书签",
         "description": "将你的书签数据导出为文件备份",

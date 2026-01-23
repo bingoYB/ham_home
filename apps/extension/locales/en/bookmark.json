@@ -60,7 +60,20 @@
     "delete": "Delete",
     "copyLink": "Copy Link",
     "share": "Share",
-    "aiTag": "AI"
+    "aiTag": "AI",
+    "viewSnapshot": "View Snapshot",
+    "snapshot": {
+      "title": "Web Snapshot",
+      "loading": "Loading snapshot...",
+      "notFound": "Snapshot not found",
+      "openInNewTab": "Open in new tab",
+      "download": "Download snapshot",
+      "delete": "Delete snapshot",
+      "deleteConfirm": "Are you sure you want to delete this snapshot? This action cannot be undone.",
+      "saveSuccess": "Snapshot saved successfully",
+      "saveFailed": "Failed to save snapshot",
+      "noSnapshot": "No snapshot available"
+    }
   },
   "modal": {
     "title": "Add New Bookmark",
@@ -131,5 +144,59 @@
     "updateBookmark": "Update Bookmark",
     "saveBookmark": "Save Bookmark",
     "saving": "Saving..."
+  },
+  "contentPanel": {
+    "openPanel": "Open Bookmark Panel",
+    "searchPlaceholder": "Search bookmarks...",
+    "clearSearch": "Clear Search",
+    "tagFilter": "Tag Filter",
+    "filter": "Filter",
+    "openSettings": "Open Settings",
+    "switchToLightMode": "Switch to Light Mode",
+    "switchToDarkMode": "Switch to Dark Mode",
+    "switchToEnglish": "Switch to English",
+    "switchToChinese": "Switch to Chinese",
+    "emptyBookmarks": "No bookmarks yet",
+    "noMatchingBookmarks": "No matching bookmarks found",
+    "tryAdjustFilters": "Try adjusting your filters",
+    "searchTags": "Search tags...",
+    "selectedTags": "Selected Tags",
+    "noMatchingTags": "No matching tags found",
+    "noTags": "No tags yet",
+    "clearAllTags": "Clear All Tags",
+    "quickTimeFilter": "Quick Time Filter",
+    "today": "Today",
+    "lastWeek": "Last Week",
+    "lastMonth": "Last Month",
+    "lastYear": "Last Year",
+    "customFilters": "Custom Filters",
+    "clearFilter": "Clear Filter",
+    "addCustomFilter": "Add Custom Filter",
+    "addCustomFilterTitle": "Add Custom Filter",
+    "editCustomFilterTitle": "Edit Custom Filter",
+    "filterName": "Filter Name",
+    "filterNamePlaceholder": "Give this filter a name",
+    "filterConditions": "Filter Conditions (all conditions must be met)",
+    "addCondition": "Add Condition",
+    "conditionValuePlaceholder": "Enter condition value",
+    "loadCustomFiltersFailed": "Failed to load custom filters",
+    "saveCustomFilterFailed": "Failed to save custom filter",
+    "fields": {
+      "title": "Title",
+      "url": "URL",
+      "description": "Description",
+      "tags": "Tags",
+      "createdAt": "Created At"
+    },
+    "operators": {
+      "equals": "Equals",
+      "contains": "Contains",
+      "notEquals": "Not Equals",
+      "notContains": "Not Contains",
+      "startsWith": "Starts With",
+      "endsWith": "Ends With",
+      "greaterThan": "Greater Than",
+      "lessThan": "Less Than"
+    }
   }
 }

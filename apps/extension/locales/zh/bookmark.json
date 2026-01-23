@@ -60,7 +60,20 @@
     "delete": "删除",
     "copyLink": "复制链接",
     "share": "分享",
-    "aiTag": "AI"
+    "aiTag": "AI",
+    "viewSnapshot": "查看快照",
+    "snapshot": {
+      "title": "网页快照",
+      "loading": "正在加载快照...",
+      "notFound": "未找到快照",
+      "openInNewTab": "在新标签页中打开",
+      "download": "下载快照",
+      "delete": "删除快照",
+      "deleteConfirm": "确定要删除此快照吗？此操作无法撤销。",
+      "saveSuccess": "快照保存成功",
+      "saveFailed": "快照保存失败",
+      "noSnapshot": "暂无快照"
+    }
   },
   "modal": {
     "title": "添加新书签",
@@ -131,5 +144,59 @@
     "updateBookmark": "更新书签",
     "saveBookmark": "保存书签",
     "saving": "保存中..."
+  },
+  "contentPanel": {
+    "openPanel": "打开书签面板",
+    "searchPlaceholder": "搜索书签...",
+    "clearSearch": "清除搜索",
+    "tagFilter": "标签筛选",
+    "filter": "筛选器",
+    "openSettings": "打开设置",
+    "switchToLightMode": "切换到浅色模式",
+    "switchToDarkMode": "切换到深色模式",
+    "switchToEnglish": "Switch to English",
+    "switchToChinese": "切换到中文",
+    "emptyBookmarks": "暂无书签",
+    "noMatchingBookmarks": "未找到匹配的书签",
+    "tryAdjustFilters": "尝试调整筛选条件",
+    "searchTags": "搜索标签...",
+    "selectedTags": "已选标签",
+    "noMatchingTags": "未找到匹配的标签",
+    "noTags": "暂无标签",
+    "clearAllTags": "清除所有标签",
+    "quickTimeFilter": "快捷时间筛选",
+    "today": "今天",
+    "lastWeek": "最近一周",
+    "lastMonth": "最近一月",
+    "lastYear": "最近一年",
+    "customFilters": "自定义筛选器",
+    "clearFilter": "清除筛选器",
+    "addCustomFilter": "添加自定义筛选器",
+    "addCustomFilterTitle": "添加自定义筛选器",
+    "editCustomFilterTitle": "编辑自定义筛选器",
+    "filterName": "筛选器名称",
+    "filterNamePlaceholder": "给这个筛选器起个名字",
+    "filterConditions": "筛选条件 (多个条件时需要同时满足)",
+    "addCondition": "添加条件",
+    "conditionValuePlaceholder": "输入条件值",
+    "loadCustomFiltersFailed": "加载自定义筛选器失败",
+    "saveCustomFilterFailed": "保存自定义筛选器失败",
+    "fields": {
+      "title": "标题",
+      "url": "URL",
+      "description": "描述",
+      "tags": "标签",
+      "createdAt": "创建时间"
+    },
+    "operators": {
+      "equals": "等于",
+      "contains": "包含",
+      "notEquals": "不等于",
+      "notContains": "不包含",
+      "startsWith": "开头是",
+      "endsWith": "结尾是",
+      "greaterThan": "大于",
+      "lessThan": "小于"
+    }
   }
 }

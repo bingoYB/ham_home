@@ -22,6 +22,9 @@
     "yesterday": "昨天",
     "daysAgo": "{{days}} 天前",
     "storage": "存储",
+    "more": "更多",
+    "manageBookmarks": "管理书签",
+    "viewShortcuts": "查看快捷键",
     "languages": {
       "en": "English",
       "zh": "中文",

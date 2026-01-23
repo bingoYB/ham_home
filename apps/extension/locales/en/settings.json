@@ -46,8 +46,29 @@
       "autoSaveSnapshot": "Auto Save Snapshots",
       "autoSaveSnapshotDesc": "Automatically save page snapshots when saving bookmarks",
       "shortcut": "Shortcut Key",
-      "shortcutDesc": "Customize the shortcut key for saving bookmarks",
-      "shortcutPlaceholder": "Ctrl+Shift+E"
+      "shortcutButton": "Open Browser Shortcut Settings",
+      "shortcutDesc": "Configure extension shortcuts in browser settings",
+      "shortcutDescFirefox": "Click gear icon → Manage Extension Shortcuts",
+      "currentShortcuts": "Current Shortcuts",
+      "shortcutNotSet": "Not Set",
+      "panelPosition": "Sidebar Position",
+      "panelPositionDesc": "Set whether the sidebar appears on the left or right side in content pages",
+      "panelPositionOptions": {
+        "left": "Left",
+        "right": "Right"
+      },
+      "customFilters": {
+        "title": "Custom Filters",
+        "description": "Create and manage custom filters to quickly filter bookmarks",
+        "noFilters": "No custom filters yet",
+        "noFiltersDesc": "Click \"Add Filter\" to create your first custom filter",
+        "addFilter": "Add Filter",
+        "edit": "Edit",
+        "delete": "Delete",
+        "deleteConfirm": "Confirm Delete Filter",
+        "deleteWarning": "Are you sure you want to delete the filter \"{{name}}\"? This action cannot be undone.",
+        "conditionsCount": "{{count}} conditions"
+      }
     },
     "ai": {
       "title": "AI Service Configuration",
@@ -124,6 +145,7 @@
       "importDetailsWithCategories": "Successfully imported {{imported}} bookmarks, created {{categoriesCreated}} categories, skipped {{skipped}} duplicates",
       "importDetailsWithAI": "Successfully imported {{imported}} bookmarks, AI processed {{aiProcessed}}, skipped {{skipped}} duplicates",
       "importDetailsWithAIAndCategories": "Successfully imported {{imported}} bookmarks, AI processed {{aiProcessed}}, created {{categoriesCreated}} categories, skipped {{skipped}} duplicates",
+      "importErrorSkipped": "{{count}} skipped due to errors",
       "export": {
         "title": "Export Bookmarks",
         "description": "Export your bookmark data as a backup file",
