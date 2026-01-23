@@ -131,7 +131,7 @@ function CategoryTreeNode({
       <Button
         variant="outline"
         onClick={() => onToggleExpand(nodeId)}
-        className="border-0 w-full justify-start"
+        className="border-0 w-full justify-start shadow-none"
         style={{ paddingLeft: `${level * 16 + 8}px` }}
       >
         {/* 展开/折叠图标 */}

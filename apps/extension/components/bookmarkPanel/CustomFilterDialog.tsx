@@ -2,8 +2,9 @@
  * CustomFilterDialog - 自定义筛选器弹窗组件
  * 支持创建和编辑自定义筛选器，包含多个条件（AND 关系）
  */
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useMemo, useEffect } from 'react';
 import { Trash2, Plus, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import {
   Dialog,
   DialogContent,
@@ -19,60 +20,80 @@ import {
   SelectValue,
   cn,
 } from '@hamhome/ui';
-import { useContentUI } from '@/utils/ContentUIContext';
+import { useContext } from 'react';
+import { ContentUIContext } from '@/utils/ContentUIContext';
 import type { FilterCondition, FilterField, FilterOperator } from '@/types';
 
 export interface CustomFilterDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onSave: (name: string, conditions: FilterCondition[]) => void;
-}
-
-// 字段选项
-const FIELD_OPTIONS: { value: FilterField; label: string }[] = [
-  { value: 'title', label: '标题' },
-  { value: 'url', label: 'URL' },
-  { value: 'description', label: '描述' },
-  { value: 'tags', label: '标签' },
-  { value: 'createdAt', label: '创建时间' },
-];
-
-// 操作符选项（根据字段类型动态显示）
-const OPERATOR_OPTIONS: { value: FilterOperator; label: string; fields: FilterField[] }[] = [
-  { value: 'equals', label: '等于', fields: ['title', 'url', 'description', 'tags', 'createdAt'] },
-  { value: 'contains', label: '包含', fields: ['title', 'url', 'description', 'tags'] },
-  { value: 'notEquals', label: '不等于', fields: ['title', 'url', 'description', 'tags', 'createdAt'] },
-  { value: 'notContains', label: '不包含', fields: ['title', 'url', 'description', 'tags'] },
-  { value: 'startsWith', label: '开头是', fields: ['title', 'url', 'description'] },
-  { value: 'endsWith', label: '结尾是', fields: ['title', 'url', 'description'] },
-  { value: 'greaterThan', label: '大于', fields: ['createdAt'] },
-  { value: 'lessThan', label: '小于', fields: ['createdAt'] },
-];
-
-/**
- * 获取字段可用的操作符
- */
-function getOperatorsForField(field: FilterField): FilterOperator[] {
-  return OPERATOR_OPTIONS.filter((op) => op.fields.includes(field)).map((op) => op.value);
-}
-
-/**
- * 获取操作符的标签
- */
-function getOperatorLabel(operator: FilterOperator): string {
-  return OPERATOR_OPTIONS.find((op) => op.value === operator)?.label || operator;
+  editingFilter?: { id: string; name: string; conditions: FilterCondition[] } | null;
 }
 
 export function CustomFilterDialog({
   open,
   onOpenChange,
   onSave,
+  editingFilter = null,
 }: CustomFilterDialogProps) {
-  const { container: portalContainer } = useContentUI();
+  const { t } = useTranslation('bookmark');
+  // 安全获取 container，如果不在 ContentUIProvider 中则使用 undefined（会回退到 document.body）
+  const contentUIContext = useContext(ContentUIContext);
+  const portalContainer = contentUIContext?.container;
   const [filterName, setFilterName] = useState('');
   const [conditions, setConditions] = useState<FilterCondition[]>([
     { field: 'title', operator: 'contains', value: '' },
   ]);
+
+  // 当编辑的筛选器变化时，更新表单
+  useEffect(() => {
+    if (editingFilter) {
+      setFilterName(editingFilter.name);
+      setConditions(editingFilter.conditions.length > 0 ? editingFilter.conditions : [
+        { field: 'title', operator: 'contains', value: '' },
+      ]);
+    } else {
+      setFilterName('');
+      setConditions([{ field: 'title', operator: 'contains', value: '' }]);
+    }
+  }, [editingFilter, open]);
+
+  // 字段选项
+  const FIELD_OPTIONS: { value: FilterField; labelKey: string }[] = useMemo(() => [
+    { value: 'title', labelKey: 'title' },
+    { value: 'url', labelKey: 'url' },
+    { value: 'description', labelKey: 'description' },
+    { value: 'tags', labelKey: 'tags' },
+    { value: 'createdAt', labelKey: 'createdAt' },
+  ], []);
+
+  // 操作符选项（根据字段类型动态显示）
+  const OPERATOR_OPTIONS: { value: FilterOperator; labelKey: string; fields: FilterField[] }[] = useMemo(() => [
+    { value: 'equals', labelKey: 'equals', fields: ['title', 'url', 'description', 'tags', 'createdAt'] },
+    { value: 'contains', labelKey: 'contains', fields: ['title', 'url', 'description', 'tags'] },
+    { value: 'notEquals', labelKey: 'notEquals', fields: ['title', 'url', 'description', 'tags', 'createdAt'] },
+    { value: 'notContains', labelKey: 'notContains', fields: ['title', 'url', 'description', 'tags'] },
+    { value: 'startsWith', labelKey: 'startsWith', fields: ['title', 'url', 'description'] },
+    { value: 'endsWith', labelKey: 'endsWith', fields: ['title', 'url', 'description'] },
+    { value: 'greaterThan', labelKey: 'greaterThan', fields: ['createdAt'] },
+    { value: 'lessThan', labelKey: 'lessThan', fields: ['createdAt'] },
+  ], []);
+
+  /**
+   * 获取字段可用的操作符
+   */
+  const getOperatorsForField = useCallback((field: FilterField): FilterOperator[] => {
+    return OPERATOR_OPTIONS.filter((op) => op.fields.includes(field)).map((op) => op.value);
+  }, [OPERATOR_OPTIONS]);
+
+  /**
+   * 获取操作符的标签
+   */
+  const getOperatorLabel = useCallback((operator: FilterOperator): string => {
+    const option = OPERATOR_OPTIONS.find((op) => op.value === operator);
+    return option ? t(`bookmark:contentPanel.operators.${option.labelKey}`) : operator;
+  }, [OPERATOR_OPTIONS, t]);
 
   // 添加条件
   const handleAddCondition = useCallback(() => {
@@ -133,15 +154,17 @@ export function CustomFilterDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent container={portalContainer} className="sm:max-w-[480px] p-0">
         <DialogHeader className="px-4 pt-4 pb-2">
-          <DialogTitle className="text-base">添加自定义筛选器</DialogTitle>
+          <DialogTitle className="text-base">
+            {editingFilter ? t('bookmark:contentPanel.editCustomFilterTitle') : t('bookmark:contentPanel.addCustomFilterTitle')}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="px-4 pb-4 space-y-4">
           {/* 筛选器名称 */}
           <div className="space-y-2">
-            <Label className="text-sm">筛选器名称</Label>
+            <Label className="text-sm">{t('bookmark:contentPanel.filterName')}</Label>
             <Input
-              placeholder="给这个筛选器起个名字"
+              placeholder={t('bookmark:contentPanel.filterNamePlaceholder')}
               value={filterName}
               onChange={(e) => setFilterName(e.target.value)}
               className="h-9"
@@ -151,7 +174,7 @@ export function CustomFilterDialog({
           {/* 筛选条件 */}
           <div className="space-y-2">
             <div className="flex items-center justify-between">
-              <Label className="text-sm">筛选条件 (多个条件时需要同时满足)</Label>
+              <Label className="text-sm">{t('bookmark:contentPanel.filterConditions')}</Label>
               <Button
                 type="button"
                 variant="ghost"
@@ -160,7 +183,7 @@ export function CustomFilterDialog({
                 className="h-7 px-2 text-xs"
               >
                 <Plus className="h-3 w-3 mr-1" />
-                添加条件
+                {t('bookmark:contentPanel.addCondition')}
               </Button>
             </div>
 
@@ -187,7 +210,7 @@ export function CustomFilterDialog({
                       <SelectContent container={portalContainer}>
                         {FIELD_OPTIONS.map((field) => (
                           <SelectItem key={field.value} value={field.value}>
-                            {field.label}
+                            {t(`bookmark:contentPanel.fields.${field.labelKey}`)}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -215,7 +238,7 @@ export function CustomFilterDialog({
                     {/* 值输入 */}
                     <Input
                       type={isDateField ? 'date' : 'text'}
-                      placeholder="输入条件值"
+                      placeholder={t('bookmark:contentPanel.conditionValuePlaceholder')}
                       value={condition.value}
                       onChange={(e) =>
                         handleUpdateCondition(index, { value: e.target.value })
@@ -245,10 +268,10 @@ export function CustomFilterDialog({
         {/* 底部操作按钮 */}
         <div className="flex items-center justify-end gap-2 px-4 py-3 border-t">
           <Button variant="ghost" size="sm" onClick={handleCancel}>
-            取消
+            {t('common:common.cancel')}
           </Button>
           <Button size="sm" onClick={handleSave} disabled={!canSave}>
-            保存
+            {t('common:common.save')}
           </Button>
         </div>
       </DialogContent>

@@ -3,6 +3,7 @@
  * 整合 Header + List，管理面板展开/收起
  */
 import { useEffect, useCallback, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@hamhome/ui';
 import { BookmarkHeader } from './BookmarkHeader';
 import { BookmarkListView } from './BookmarkListView';
@@ -30,6 +31,31 @@ export function BookmarkPanel({
   onOpenBookmark,
   onOpenSettings,
 }: BookmarkPanelProps) {
+  // 自定义筛选器管理
+  const [customFilters, setCustomFilters] = useState<CustomFilter[]>([]);
+  const [selectedCustomFilterId, setSelectedCustomFilterId] = useState<string | undefined>();
+
+  const { t } = useTranslation('bookmark');
+
+  // 加载自定义筛选器
+  useEffect(() => {
+    const loadCustomFilters = async () => {
+      try {
+        const filters = await configStorage.getCustomFilters();
+        setCustomFilters(filters);
+      } catch (error) {
+        console.error(t('bookmark:contentPanel.loadCustomFiltersFailed'), error);
+      }
+    };
+    loadCustomFilters();
+  }, [t]);
+
+  // 获取当前选中的自定义筛选器
+  const selectedCustomFilter = useMemo(() => {
+    if (!selectedCustomFilterId) return null;
+    return customFilters.find((f) => f.id === selectedCustomFilterId) || null;
+  }, [selectedCustomFilterId, customFilters]);
+
   // 搜索筛选
   const {
     searchQuery,
@@ -42,7 +68,11 @@ export function BookmarkPanel({
     clearTimeFilter,
     filteredBookmarks,
     hasFilters,
-  } = useBookmarkSearch({ bookmarks, categories });
+  } = useBookmarkSearch({ 
+    bookmarks, 
+    categories,
+    customFilter: selectedCustomFilter,
+  });
 
   // 提取所有唯一标签
   const allTags = useMemo(() => {
@@ -85,23 +115,6 @@ export function BookmarkPanel({
     e.stopPropagation();
   }, []);
 
-  // 自定义筛选器管理
-  const [customFilters, setCustomFilters] = useState<CustomFilter[]>([]);
-  const [selectedCustomFilterId, setSelectedCustomFilterId] = useState<string | undefined>();
-
-  // 加载自定义筛选器
-  useEffect(() => {
-    const loadCustomFilters = async () => {
-      try {
-        const filters = await configStorage.getCustomFilters();
-        setCustomFilters(filters);
-      } catch (error) {
-        console.error('加载自定义筛选器失败:', error);
-      }
-    };
-    loadCustomFilters();
-  }, []);
-
   // 保存自定义筛选器
   const handleSaveCustomFilter = useCallback(async (name: string, conditions: FilterCondition[]) => {
     const newFilter: CustomFilter = {
@@ -117,9 +130,9 @@ export function BookmarkPanel({
       // 自动应用新创建的筛选器
       setSelectedCustomFilterId(newFilter.id);
     } catch (error) {
-      console.error('保存自定义筛选器失败:', error);
+      console.error(t('bookmark:contentPanel.saveCustomFilterFailed'), error);
     }
-  }, []);
+  }, [t]);
 
   // 选择自定义筛选器
   const handleSelectCustomFilter = useCallback((filterId: string | null) => {
@@ -154,8 +167,8 @@ export function BookmarkPanel({
           isOpen
             ? 'translate-x-0'
             : position === 'left'
-              ? '-translate-x-full'
-              : 'translate-x-full'
+              ? '-translate-x-full -left-2'
+              : 'translate-x-full -right-2'
         )}
       >
         {/* 头部 */}
@@ -175,7 +188,6 @@ export function BookmarkPanel({
           selectedCustomFilterId={selectedCustomFilterId}
           onSelectCustomFilter={handleSelectCustomFilter}
           onSaveCustomFilter={handleSaveCustomFilter}
-          onOpenSettings={onOpenSettings}
         />
 
         {/* 列表 - 确保有明确高度限制以启用滚动 */}

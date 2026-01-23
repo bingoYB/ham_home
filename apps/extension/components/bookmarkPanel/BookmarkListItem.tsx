@@ -23,7 +23,7 @@ export function BookmarkListItem({ bookmark }: BookmarkListItemProps) {
           rel="noopener noreferrer"
           className={cn(
             buttonVariants({ variant: 'outline', size: 'default' }),
-            'group flex items-center gap-3 px-3 py-2.5 w-full justify-start border-0'
+            'group flex items-center gap-3 px-3 py-2.5 w-full justify-start border-0 shadow-none'
           )}
         >
           {/* Favicon */}

@@ -3,6 +3,7 @@
  * 展示书签列表，支持滚动、空状态和分类树视图
  */
 import { Bookmark, SearchX } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@hamhome/ui';
 import { CategoryTreeView } from './CategoryTreeView';
 import type { LocalBookmark, LocalCategory } from '@/types';
@@ -20,12 +21,15 @@ export interface BookmarkListViewProps {
 export function BookmarkListView({
   bookmarks,
   categories = [],
-  emptyText = '暂无书签',
+  emptyText,
   searchQuery,
   hasFilters,
   onOpenBookmark,
   className,
 }: BookmarkListViewProps) {
+  const { t } = useTranslation('bookmark');
+  const defaultEmptyText = emptyText || t('bookmark:contentPanel.emptyBookmarks');
+  
   // 空状态
   if (bookmarks.length === 0) {
     return (
@@ -33,15 +37,15 @@ export function BookmarkListView({
         {searchQuery || hasFilters ? (
           <>
             <SearchX className="h-12 w-12 text-muted-foreground/50 mb-3" />
-            <p className="text-sm text-muted-foreground">未找到匹配的书签</p>
+            <p className="text-sm text-muted-foreground">{t('bookmark:contentPanel.noMatchingBookmarks')}</p>
             <p className="text-xs text-muted-foreground/70 mt-1">
-              尝试调整筛选条件
+              {t('bookmark:contentPanel.tryAdjustFilters')}
             </p>
           </>
         ) : (
           <>
             <Bookmark className="h-12 w-12 text-muted-foreground/50 mb-3" />
-            <p className="text-sm text-muted-foreground">{emptyText}</p>
+            <p className="text-sm text-muted-foreground">{defaultEmptyText}</p>
           </>
         )}
       </div>

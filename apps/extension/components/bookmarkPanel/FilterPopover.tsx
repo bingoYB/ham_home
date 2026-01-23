@@ -2,7 +2,8 @@
  * FilterDropdownMenu - 筛选器下拉菜单组件
  * 提供快捷时间筛选和自定义筛选器选择
  */
-import { Calendar, Plus, Check } from 'lucide-react';
+import { Calendar, Plus, Check, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,7 +13,8 @@ import {
   DropdownMenuTrigger,
   cn,
 } from '@hamhome/ui';
-import { useContentUI } from '@/utils/ContentUIContext';
+import { useContext } from 'react';
+import { ContentUIContext } from '@/utils/ContentUIContext';
 import type { TimeRange, TimeRangeType } from '@/hooks/useBookmarkSearch';
 import type { CustomFilter } from '@/types';
 
@@ -23,20 +25,9 @@ export interface FilterDropdownMenuProps {
   selectedCustomFilterId?: string;
   onSelectCustomFilter?: (filterId: string | null) => void;
   onOpenCustomFilterDialog: () => void;
+  onClearFilter?: () => void;
   children: React.ReactNode;
 }
-
-interface PresetOption {
-  type: TimeRangeType;
-  label: string;
-}
-
-const PRESET_OPTIONS: PresetOption[] = [
-  { type: 'today', label: '今天' },
-  { type: 'week', label: '最近一周' },
-  { type: 'month', label: '最近一月' },
-  { type: 'year', label: '最近一年' },
-];
 
 export function FilterDropdownMenu({
   timeRange,
@@ -45,9 +36,20 @@ export function FilterDropdownMenu({
   selectedCustomFilterId,
   onSelectCustomFilter,
   onOpenCustomFilterDialog,
+  onClearFilter,
   children,
 }: FilterDropdownMenuProps) {
-  const { container: portalContainer } = useContentUI();
+  const { t } = useTranslation('bookmark');
+  // 安全获取 container，如果不在 ContentUIProvider 中则使用 undefined（会回退到 document.body）
+  const contentUIContext = useContext(ContentUIContext);
+  const portalContainer = contentUIContext?.container;
+
+  const PRESET_OPTIONS: { type: TimeRangeType; labelKey: string }[] = [
+    { type: 'today', labelKey: 'today' },
+    { type: 'week', labelKey: 'lastWeek' },
+    { type: 'month', labelKey: 'lastMonth' },
+    { type: 'year', labelKey: 'lastYear' },
+  ];
 
   const handleSelectPreset = (type: TimeRangeType) => {
     onTimeRangeChange({ type });
@@ -61,6 +63,10 @@ export function FilterDropdownMenu({
     onTimeRangeChange({ type: 'all' });
   };
 
+  const handleClearFilter = () => {
+    onClearFilter?.();
+  };
+
   const isPresetSelected = timeRange.type !== 'all' && !selectedCustomFilterId;
   const hasActiveFilter = isPresetSelected || !!selectedCustomFilterId;
 
@@ -72,7 +78,7 @@ export function FilterDropdownMenu({
       <DropdownMenuContent container={portalContainer} align="end" className="w-56">
         {/* 快捷时间筛选 */}
         <DropdownMenuLabel className="text-xs text-muted-foreground">
-          快捷时间筛选
+          {t('bookmark:contentPanel.quickTimeFilter')}
         </DropdownMenuLabel>
         {PRESET_OPTIONS.map((option) => {
           const isSelected = timeRange.type === option.type && !selectedCustomFilterId;
@@ -83,7 +89,7 @@ export function FilterDropdownMenu({
               className="gap-2"
             >
               <Calendar className="h-4 w-4" />
-              <span className="flex-1">{option.label}</span>
+              <span className="flex-1">{t(`bookmark:contentPanel.${option.labelKey}`)}</span>
               {isSelected && <Check className="h-4 w-4" />}
             </DropdownMenuItem>
           );
@@ -94,7 +100,7 @@ export function FilterDropdownMenu({
           <>
             <DropdownMenuSeparator />
             <DropdownMenuLabel className="text-xs text-muted-foreground">
-              自定义筛选器
+              {t('bookmark:contentPanel.customFilters')}
             </DropdownMenuLabel>
             {customFilters.map((filter) => {
               const isSelected = selectedCustomFilterId === filter.id;
@@ -112,11 +118,25 @@ export function FilterDropdownMenu({
           </>
         )}
 
+        {/* 清除筛选器 */}
+        {hasActiveFilter && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem 
+              onClick={handleClearFilter} 
+              className="gap-2 text-muted-foreground"
+            >
+              <X className="h-4 w-4" />
+              <span>{t('bookmark:contentPanel.clearFilter')}</span>
+            </DropdownMenuItem>
+          </>
+        )}
+
         {/* 添加自定义筛选器 */}
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={onOpenCustomFilterDialog} className="gap-2">
           <Plus className="h-4 w-4" />
-          <span>添加自定义筛选器</span>
+          <span>{t('bookmark:contentPanel.addCustomFilter')}</span>
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

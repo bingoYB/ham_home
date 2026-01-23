@@ -4,6 +4,7 @@
  */
 import { useState, useMemo } from 'react';
 import { Tag, Check, Search, X } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -31,6 +32,7 @@ export function TagFilterDropdown({
   onClearTags,
   children,
 }: TagFilterDropdownProps) {
+  const { t } = useTranslation('bookmark');
   const { container: portalContainer } = useContentUI();
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -57,7 +59,7 @@ export function TagFilterDropdown({
             <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
             <Input
               type="text"
-              placeholder="搜索标签..."
+              placeholder={t('bookmark:contentPanel.searchTags')}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => e.stopPropagation()}
@@ -82,7 +84,7 @@ export function TagFilterDropdown({
           <>
             <DropdownMenuSeparator />
             <DropdownMenuLabel className="text-xs text-muted-foreground">
-              已选标签
+              {t('bookmark:contentPanel.selectedTags')}
             </DropdownMenuLabel>
             <div className="px-2 pb-1">
               <div className="flex flex-wrap gap-1">
@@ -139,7 +141,7 @@ export function TagFilterDropdown({
             <div className="flex flex-col items-center justify-center py-8 text-muted-foreground">
               <Tag className="h-8 w-8 mb-2 opacity-50" />
               <p className="text-xs">
-                {searchQuery ? '未找到匹配的标签' : '暂无标签'}
+                {searchQuery ? t('bookmark:contentPanel.noMatchingTags') : t('bookmark:contentPanel.noTags')}
               </p>
             </div>
           </>
@@ -157,7 +159,7 @@ export function TagFilterDropdown({
               className="text-destructive focus:text-destructive"
             >
               <X className="h-4 w-4" />
-              <span>清除所有标签</span>
+              <span>{t('bookmark:contentPanel.clearAllTags')}</span>
             </DropdownMenuItem>
           </>
         )}
