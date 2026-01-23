@@ -5,6 +5,7 @@
 import { Sparkles, Loader2, AlertCircle, Settings } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@hamhome/ui';
+import { getExtensionURL, safeCreateTab } from '@/utils/browser-api';
 
 export type AIStatusType = 'idle' | 'loading' | 'success' | 'error' | 'disabled';
 
@@ -69,7 +70,7 @@ export function AIStatus({ status, error, onRetry, className }: AIStatusProps) {
           </div>
           <button
             onClick={() => {
-              chrome.tabs.create({ url: chrome.runtime.getURL('app.html#settings') });
+              safeCreateTab(getExtensionURL('app.html#settings'));
             }}
             className="underline hover:no-underline whitespace-nowrap ml-2"
           >

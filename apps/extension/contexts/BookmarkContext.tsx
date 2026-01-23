@@ -146,15 +146,19 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
     loadData();
   }, []);
 
-  // 监听 storage 变化
+  // 监听 storage 变化（使用 WXT Storage watch）
   useEffect(() => {
-    const handleStorageChange = () => {
+    const unwatchBookmarks = bookmarkStorage.watchBookmarks(() => {
       refreshBookmarks();
+    });
+    const unwatchCategories = bookmarkStorage.watchCategories(() => {
       refreshCategories();
+    });
+    
+    return () => {
+      unwatchBookmarks();
+      unwatchCategories();
     };
-
-    chrome.storage.onChanged.addListener(handleStorageChange);
-    return () => chrome.storage.onChanged.removeListener(handleStorageChange);
   }, [refreshBookmarks, refreshCategories]);
 
   // 书签操作
@@ -256,9 +260,17 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
     setAppSettings(updated);
   };
 
-  // 清除所有数据
+  // 清除所有数据（使用 WXT Storage）
   const clearAllData = async () => {
-    await chrome.storage.local.clear();
+    // 清除 sync 和 local 存储
+    await Promise.all([
+      storage.removeItem('sync:bookmarks'),
+      storage.removeItem('sync:categories'),
+      storage.removeItem('sync:aiConfig'),
+      storage.removeItem('sync:settings'),
+      storage.removeItem('sync:customFilters'),
+      storage.removeItem('local:bookmarkContents'),
+    ]);
     setBookmarks([]);
     setCategories([]);
     setAllTags([]);

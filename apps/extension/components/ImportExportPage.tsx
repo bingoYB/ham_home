@@ -317,6 +317,15 @@ export function ImportExportPage() {
     }
   };
 
+  // 安全获取 hostname
+  const safeGetHostname = (url: string): string => {
+    try {
+      return new URL(url).hostname;
+    } catch {
+      return '';
+    }
+  };
+
   // 从 HTML 导入（浏览器书签格式）
   const importFromHTML = async (content: string) => {
     const parser = new DOMParser();
@@ -324,11 +333,15 @@ export function ImportExportPage() {
     
     let imported = 0;
     let skipped = 0;
+    let duplicateSkipped = 0; // 区分重复跳过
     let categoriesCreated = 0;
     let aiProcessed = 0;
     
     // 分类名称到 ID 的映射（用于处理重复名称）
     const categoryMap = new Map<string, string>();
+    
+    // 跟踪本次导入中已处理的 URL（规范化后）
+    const importedUrls = new Set<string>();
     
     // 获取现有分类
     let allCategories = await bookmarkStorage.getCategories();
@@ -422,10 +435,20 @@ export function ImportExportPage() {
       setImportProgress({ current: i + 1, total });
 
       try {
-        // 检查 URL 是否已存在，避免重复导入和不必要的 AI 分析
+        // 规范化 URL 用于去重检查
+        const normalizedUrl = bm.url.replace(/\/$/, '').toLowerCase();
+        
+        // 检查是否在本次导入中已处理过
+        if (importedUrls.has(normalizedUrl)) {
+          duplicateSkipped++;
+          continue;
+        }
+
+        // 检查 URL 是否已存在于存储中
         const existingBookmark = await bookmarkStorage.getBookmarkByUrl(bm.url);
         if (existingBookmark) {
-          skipped++;
+          duplicateSkipped++;
+          importedUrls.add(normalizedUrl); // 标记为已处理
           continue;
         }
 
@@ -454,36 +477,57 @@ export function ImportExportPage() {
           }
         }
 
+        // 安全获取 hostname，避免无效 URL 导致异常
+        const hostname = safeGetHostname(bm.url);
+        const favicon = hostname 
+          ? `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`
+          : '';
+
         await bookmarkStorage.createBookmark({
           url: bm.url,
           title: bm.title,
           description,
           categoryId,
           tags,
-          favicon: `https://www.google.com/s2/favicons?domain=${new URL(bm.url).hostname}&sz=32`,
+          favicon,
           hasSnapshot: false,
         });
         imported++;
-      } catch {
-        skipped++;
+        importedUrls.add(normalizedUrl); // 标记为已导入
+      } catch (err) {
+        // 区分重复错误和其他错误
+        if (err instanceof Error && err.message.includes('已收藏')) {
+          duplicateSkipped++;
+        } else {
+          console.error('[ImportExport] Failed to import bookmark:', bm.url, err);
+          skipped++;
+        }
       }
     }
 
     setImportProgress(null);
 
+    // 合并跳过计数用于显示
+    const totalSkipped = skipped + duplicateSkipped;
+    
     // 构建结果详情
     let details: string;
     if (preserveFolders && categoriesCreated > 0) {
-      details = t('settings.importExport.importDetailsWithCategories', { imported, skipped, categoriesCreated, ns: 'settings' });
+      details = t('settings.importExport.importDetailsWithCategories', { imported, skipped: totalSkipped, categoriesCreated, ns: 'settings' });
     } else if (enableAIAnalysis && aiProcessed > 0) {
       // AI 分析模式，显示处理数量和创建的分类数量
       if (categoriesCreated > 0) {
-        details = t('settings.importExport.importDetailsWithAIAndCategories', { imported, skipped, aiProcessed, categoriesCreated, ns: 'settings' });
+        details = t('settings.importExport.importDetailsWithAIAndCategories', { imported, skipped: totalSkipped, aiProcessed, categoriesCreated, ns: 'settings' });
       } else {
-        details = t('settings.importExport.importDetailsWithAI', { imported, skipped, aiProcessed, ns: 'settings' });
+        details = t('settings.importExport.importDetailsWithAI', { imported, skipped: totalSkipped, aiProcessed, ns: 'settings' });
       }
     } else {
-      details = t('settings.importExport.importDetails', { imported, skipped, ns: 'settings' });
+      details = t('settings.importExport.importDetails', { imported, skipped: totalSkipped, ns: 'settings' });
+    }
+    
+    // 如果有错误跳过，添加提示
+    if (skipped > 0) {
+      details += ` (${t('settings.importExport.importErrorSkipped', { count: skipped, ns: 'settings' })})`;
     }
 
     setImportResult({

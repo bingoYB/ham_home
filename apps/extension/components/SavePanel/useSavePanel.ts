@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { aiClient } from '@/lib/ai/client';
 import { bookmarkStorage, snapshotStorage, configStorage, aiCacheStorage } from '@/lib/storage';
+import { getBackgroundService } from '@/lib/services';
 import type {
   PageContent,
   LocalBookmark,
@@ -305,10 +306,9 @@ export function useSavePanel({
       // 自动保存快照
       if (settings.autoSaveSnapshot && pageContent.content) {
         try {
-          // 获取页面 HTML (通过 background script)
-          const html = await chrome.runtime.sendMessage({
-            type: 'GET_PAGE_HTML',
-          });
+          // 获取页面 HTML (通过 proxy-service)
+          const backgroundService = getBackgroundService();
+          const html = await backgroundService.getPageHtml();
           if (html) {
             await snapshotStorage.saveSnapshot(bookmark.id, html);
             await bookmarkStorage.updateBookmark(bookmark.id, {

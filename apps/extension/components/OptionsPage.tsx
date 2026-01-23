@@ -15,6 +15,7 @@ import {
   Download,
   Trash2,
   Plus,
+  ExternalLink,
 } from 'lucide-react';
 import {
   Button,
@@ -49,10 +50,16 @@ import {
 } from '@hamhome/ui';
 import { useBookmarks } from '@/contexts/BookmarkContext';
 import { useLanguage } from '@/hooks/useLanguage';
+import { useShortcuts } from '@/hooks/useShortcuts';
+import { configStorage } from '@/lib/storage/config-storage';
+import { CustomFilterDialog } from '@/components/bookmarkPanel/CustomFilterDialog';
+import { getBrowserSpecificURL, isFirefox, safeCreateTab } from '@/utils/browser-api';
+import type { CustomFilter, FilterCondition } from '@/types';
 
 export function OptionsPage() {
   const { t } = useTranslation(['common', 'settings']);
   const { language, switchLanguage, availableLanguages } = useLanguage();
+  const { shortcuts, refresh: refreshShortcuts } = useShortcuts();
   const {
     aiConfig,
     appSettings,
@@ -69,6 +76,12 @@ export function OptionsPage() {
   const [testResult, setTestResult] = useState<{ status: 'success' | 'error' | 'warning'; message: string } | null>(null);
   const [newTag, setNewTag] = useState('');
   
+  // 自定义筛选器管理状态
+  const [customFilters, setCustomFilters] = useState<CustomFilter[]>([]);
+  const [filterDialogOpen, setFilterDialogOpen] = useState(false);
+  const [editingFilter, setEditingFilter] = useState<CustomFilter | null>(null);
+  const [deleteFilterTarget, setDeleteFilterTarget] = useState<CustomFilter | null>(null);
+  
   // 本地状态用于输入框，避免光标跳动
   const [localApiKey, setLocalApiKey] = useState('');
   const [localBaseUrl, setLocalBaseUrl] = useState('');
@@ -80,6 +93,19 @@ export function OptionsPage() {
     setLocalBaseUrl(aiConfig.baseUrl || '');
     setLocalModel(aiConfig.model || '');
   }, [aiConfig.apiKey, aiConfig.baseUrl, aiConfig.model]);
+
+  // 加载自定义筛选器
+  useEffect(() => {
+    const loadCustomFilters = async () => {
+      try {
+        const filters = await configStorage.getCustomFilters();
+        setCustomFilters(filters);
+      } catch (error) {
+        console.error('[OptionsPage] Failed to load custom filters:', error);
+      }
+    };
+    loadCustomFilters();
+  }, []);
 
   const handleTestConnection = async () => {
     setIsTesting(true);
@@ -131,6 +157,62 @@ export function OptionsPage() {
     if (e.key === 'Enter') {
       e.preventDefault();
       handleAddTag();
+    }
+  };
+
+  // 筛选器管理函数
+  const handleAddFilter = () => {
+    setEditingFilter(null);
+    setFilterDialogOpen(true);
+  };
+
+  const handleEditFilter = (filter: CustomFilter) => {
+    setEditingFilter(filter);
+    setFilterDialogOpen(true);
+  };
+
+  const handleSaveFilter = async (name: string, conditions: FilterCondition[]) => {
+    try {
+      if (editingFilter) {
+        // 更新现有筛选器
+        await configStorage.updateCustomFilter(editingFilter.id, {
+          name,
+          conditions,
+        });
+        setCustomFilters((prev) =>
+          prev.map((f) =>
+            f.id === editingFilter.id
+              ? { ...f, name, conditions, updatedAt: Date.now() }
+              : f
+          )
+        );
+      } else {
+        // 创建新筛选器
+        const newFilter: CustomFilter = {
+          id: `filter_${Date.now()}`,
+          name,
+          conditions,
+          createdAt: Date.now(),
+          updatedAt: Date.now(),
+        };
+        await configStorage.addCustomFilter(newFilter);
+        setCustomFilters((prev) => [...prev, newFilter]);
+      }
+      setFilterDialogOpen(false);
+      setEditingFilter(null);
+    } catch (error) {
+      console.error('[OptionsPage] Failed to save custom filter:', error);
+    }
+  };
+
+  const handleDeleteFilter = async () => {
+    if (!deleteFilterTarget) return;
+    try {
+      await configStorage.deleteCustomFilter(deleteFilterTarget.id);
+      setCustomFilters((prev) => prev.filter((f) => f.id !== deleteFilterTarget.id));
+      setDeleteFilterTarget(null);
+    } catch (error) {
+      console.error('[OptionsPage] Failed to delete custom filter:', error);
     }
   };
 
@@ -449,15 +531,20 @@ export function OptionsPage() {
                 />
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="theme">{t('settings:settings.theme')}</Label>
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="theme">{t('settings:settings.theme')}</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {t('settings:settings.descriptions.theme')}
+                  </p>
+                </div>
                 <Select
                   value={appSettings.theme}
                   onValueChange={(value: 'system' | 'light' | 'dark') => 
                     updateAppSettings({ theme: value })
                   }
                 >
-                  <SelectTrigger id="theme">
+                  <SelectTrigger id="theme" className="w-32">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -468,17 +555,161 @@ export function OptionsPage() {
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="shortcut">{t('settings:settings.general.shortcut')}</Label>
-                <Input
-                  id="shortcut"
-                  value={appSettings.shortcut}
-                  onChange={(e) => updateAppSettings({ shortcut: e.target.value })}
-                  placeholder={t('settings:settings.general.shortcutPlaceholder')}
-                />
-                <p className="text-xs text-muted-foreground">
-                  {t('settings:settings.general.shortcutDesc')}
-                </p>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label>{t('settings:settings.general.shortcut')}</Label>
+                    <p className="text-sm text-muted-foreground">
+                      {isFirefox()
+                        ? t('settings:settings.general.shortcutDescFirefox')
+                        : t('settings:settings.general.shortcutDesc')}
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={async () => {
+                      const url = getBrowserSpecificURL('shortcuts');
+                      await safeCreateTab(url);
+                      // 延迟刷新，等待用户从设置页返回
+                      setTimeout(refreshShortcuts, 500);
+                    }}
+                  >
+                    <span>{t('settings:settings.general.shortcutButton')}</span>
+                    <ExternalLink className="h-4 w-4 ml-2" />
+                  </Button>
+                </div>
+
+                {/* 当前快捷键配置显示 */}
+                {shortcuts.length > 0 && (
+                  <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      {t('settings:settings.general.currentShortcuts')}
+                    </p>
+                    <div className="space-y-3">
+                      {shortcuts.map((shortcut) => (
+                        <div
+                          key={shortcut.name}
+                          className="flex items-center justify-between gap-4"
+                        >
+                          <span className="text-sm text-foreground">{shortcut.description}</span>
+                          {shortcut.shortcut ? (
+                            <div className="flex items-center gap-1">
+                              {shortcut.formattedShortcut.split(' + ').map((key, idx) => (
+                                <kbd
+                                  key={idx}
+                                  className="inline-flex items-center justify-center min-w-[28px] h-7 px-2 text-xs font-medium font-mono bg-background border border-border rounded-md shadow-sm"
+                                >
+                                  {key}
+                                </kbd>
+                              ))}
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground italic">
+                              {t('settings:settings.general.shortcutNotSet')}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label htmlFor="panelPosition">{t('settings:settings.general.panelPosition')}</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {t('settings:settings.general.panelPositionDesc')}
+                  </p>
+                </div>
+                <Select
+                  value={appSettings.panelPosition}
+                  onValueChange={(value: 'left' | 'right') => 
+                    updateAppSettings({ panelPosition: value })
+                  }
+                >
+                  <SelectTrigger id="panelPosition" className="w-32">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="left">{t('settings:settings.general.panelPositionOptions.left')}</SelectItem>
+                    <SelectItem value="right">{t('settings:settings.general.panelPositionOptions.right')}</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* 自定义筛选器管理 */}
+              <div className="space-y-4 pt-4 border-t">
+                <div>
+                  <Label className="text-base font-semibold mb-1 block">
+                    {t('settings:settings.general.customFilters.title')}
+                  </Label>
+                  <p className="text-sm text-muted-foreground mb-4">
+                    {t('settings:settings.general.customFilters.description')}
+                  </p>
+                </div>
+
+                {customFilters.length === 0 ? (
+                  <div className="p-6 border border-dashed rounded-lg text-center bg-muted/30">
+                    <p className="text-sm text-muted-foreground mb-2">
+                      {t('settings:settings.general.customFilters.noFilters')}
+                    </p>
+                    <p className="text-xs text-muted-foreground mb-4">
+                      {t('settings:settings.general.customFilters.noFiltersDesc')}
+                    </p>
+                    <Button onClick={handleAddFilter} variant="outline" size="sm">
+                      <Plus className="h-4 w-4 mr-2" />
+                      {t('settings:settings.general.customFilters.addFilter')}
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm text-muted-foreground">
+                        {customFilters.length} {t('settings:settings.general.customFilters.title')}
+                      </span>
+                      <Button onClick={handleAddFilter} variant="outline" size="sm">
+                        <Plus className="h-4 w-4 mr-2" />
+                        {t('settings:settings.general.customFilters.addFilter')}
+                      </Button>
+                    </div>
+                    <div className="space-y-2">
+                      {customFilters.map((filter) => (
+                        <div
+                          key={filter.id}
+                          className="flex items-center justify-between p-3 border rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
+                        >
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{filter.name}</p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {t('settings:settings.general.customFilters.conditionsCount', {
+                                count: filter.conditions.length,
+                              })}
+                            </p>
+                          </div>
+                          <div className="flex items-center gap-2 ml-4">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleEditFilter(filter)}
+                              className="h-8 px-2"
+                            >
+                              {t('settings:settings.general.customFilters.edit')}
+                            </Button>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setDeleteFilterTarget(filter)}
+                              className="h-8 px-2 text-destructive hover:text-destructive"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
@@ -570,6 +801,44 @@ export function OptionsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* 删除筛选器确认对话框 */}
+      <AlertDialog open={!!deleteFilterTarget} onOpenChange={(open) => !open && setDeleteFilterTarget(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t('settings:settings.general.customFilters.deleteConfirm')}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('settings:settings.general.customFilters.deleteWarning', {
+                name: deleteFilterTarget?.name,
+              })}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('settings:settings.dialogs.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteFilter}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {t('settings:settings.dialogs.confirm')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 自定义筛选器弹窗 */}
+      <CustomFilterDialog
+        open={filterDialogOpen}
+        onOpenChange={(open) => {
+          setFilterDialogOpen(open);
+          if (!open) {
+            setEditingFilter(null);
+          }
+        }}
+        onSave={handleSaveFilter}
+        editingFilter={editingFilter}
+      />
     </div>
   );
 }

@@ -2,7 +2,7 @@
  * MainContent 主内容区组件
  * 展示书签列表，支持筛选、视图切换和批量操作
  */
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Search,
@@ -14,6 +14,7 @@ import {
   ChevronDown,
   Folder,
   FolderX,
+  Filter,
 } from 'lucide-react';
 import {
   Input,
@@ -37,12 +38,16 @@ import {
 } from '@hamhome/ui';
 import { useBookmarks } from '@/contexts/BookmarkContext';
 import { CategoryFilterDropdown } from '@/components/common/CategoryTree';
-import { BookmarkCard, BookmarkListItem, EditBookmarkDialog } from '@/components/bookmarkListMng';
-import { useBookmarkFilter } from '@/hooks/useBookmarkFilter';
+import { BookmarkCard, BookmarkListItem, EditBookmarkDialog, SnapshotViewer } from '@/components/bookmarkListMng';
+import { useSnapshot } from '@/hooks/useSnapshot';
+import { FilterDropdownMenu } from '@/components/bookmarkPanel/FilterPopover';
+import { CustomFilterDialog } from '@/components/bookmarkPanel/CustomFilterDialog';
+import { useBookmarkSearch } from '@/hooks/useBookmarkSearch';
 import { useBookmarkSelection } from '@/hooks/useBookmarkSelection';
 import { useMasonryLayout } from '@/hooks/useMasonryLayout';
 import { getCategoryPath, formatDate } from '@/utils/bookmark-utils';
-import type { LocalBookmark } from '@/types';
+import { configStorage } from '@/lib/storage/config-storage';
+import type { LocalBookmark, CustomFilter, FilterCondition } from '@/types';
 
 type ViewMode = 'grid' | 'list';
 
@@ -55,19 +60,50 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
   const { t, i18n } = useTranslation(['common', 'bookmark']);
   const { bookmarks, categories, allTags, deleteBookmark, refreshBookmarks } = useBookmarks();
 
-  // 筛选逻辑
+  // 自定义筛选器状态
+  const [customFilters, setCustomFilters] = useState<CustomFilter[]>([]);
+  const [selectedCustomFilterId, setSelectedCustomFilterId] = useState<string | undefined>();
+  const [customFilterDialogOpen, setCustomFilterDialogOpen] = useState(false);
+
+  // 加载自定义筛选器
+  useEffect(() => {
+    const loadCustomFilters = async () => {
+      try {
+        const filters = await configStorage.getCustomFilters();
+        setCustomFilters(filters);
+      } catch (error) {
+        console.error('[MainContent] Failed to load custom filters:', error);
+      }
+    };
+    loadCustomFilters();
+  }, []);
+
+  // 选中的自定义筛选器
+  const selectedCustomFilter = useMemo(() => {
+    if (!selectedCustomFilterId) return null;
+    return customFilters.find((f) => f.id === selectedCustomFilterId) || null;
+  }, [selectedCustomFilterId, customFilters]);
+
+  // 筛选逻辑（使用 useBookmarkSearch 支持时间范围和自定义筛选器）
   const {
     searchQuery,
     selectedTags,
     selectedCategory,
+    timeRange,
     hasFilters,
     filteredBookmarks,
     setSearchQuery,
     setSelectedCategory,
+    setTimeRange,
     toggleTagSelection,
     clearFilters,
-    clearSelectedTags,
-  } = useBookmarkFilter(bookmarks);
+    clearTagFilters,
+    clearTimeFilter,
+  } = useBookmarkSearch({
+    bookmarks,
+    categories,
+    customFilter: selectedCustomFilter,
+  });
 
   // 批量选择逻辑
   const {
@@ -90,6 +126,49 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
 
   // 编辑弹窗状态
   const [editingBookmark, setEditingBookmark] = useState<LocalBookmark | null>(null);
+
+  // 快照查看状态
+  const [snapshotBookmark, setSnapshotBookmark] = useState<LocalBookmark | null>(null);
+  const {
+    snapshotUrl,
+    loading: snapshotLoading,
+    error: snapshotError,
+    openSnapshot,
+    closeSnapshot,
+    deleteSnapshot,
+  } = useSnapshot();
+
+  // 保存自定义筛选器
+  const handleSaveCustomFilter = useCallback(async (name: string, conditions: FilterCondition[]) => {
+    const newFilter: CustomFilter = {
+      id: `filter_${Date.now()}`,
+      name,
+      conditions,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    try {
+      await configStorage.addCustomFilter(newFilter);
+      setCustomFilters((prev) => [...prev, newFilter]);
+      setSelectedCustomFilterId(newFilter.id);
+    } catch (error) {
+      console.error('[MainContent] Failed to save custom filter:', error);
+    }
+  }, []);
+
+  // 选择自定义筛选器
+  const handleSelectCustomFilter = useCallback((filterId: string | null) => {
+    setSelectedCustomFilterId(filterId || undefined);
+  }, []);
+
+  // 清除筛选器（包括时间筛选和自定义筛选器）
+  const handleClearFilter = useCallback(() => {
+    clearTimeFilter();
+    handleSelectCustomFilter(null);
+  }, [clearTimeFilter, handleSelectCustomFilter]);
+
+  // 判断是否有筛选器（时间筛选或自定义筛选器）
+  const hasTimeOrCustomFilter = timeRange.type !== 'all' || !!selectedCustomFilterId;
 
   // 获取分类路径的包装函数
   const getBookmarkCategoryPath = useCallback(
@@ -119,6 +198,32 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
   const handleEditSaved = () => {
     refreshBookmarks();
     setEditingBookmark(null);
+  };
+
+  // 查看快照
+  const handleViewSnapshot = (bookmark: LocalBookmark) => {
+    setSnapshotBookmark(bookmark);
+    openSnapshot(bookmark.id);
+  };
+
+  // 关闭快照查看器
+  const handleCloseSnapshot = () => {
+    setSnapshotBookmark(null);
+    closeSnapshot();
+  };
+
+  // 删除快照
+  const handleDeleteSnapshot = async () => {
+    if (!snapshotBookmark) return;
+    if (!confirm(t('bookmark:bookmark.snapshot.deleteConfirm'))) return;
+    
+    try {
+      await deleteSnapshot(snapshotBookmark.id);
+      refreshBookmarks();
+      handleCloseSnapshot();
+    } catch (err) {
+      console.error('[MainContent] Failed to delete snapshot:', err);
+    }
   };
 
   // 删除书签 - 打开确认弹窗
@@ -220,7 +325,7 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
                       variant="ghost"
                       size="sm"
                       className="w-full"
-                      onClick={clearSelectedTags}
+                      onClick={clearTagFilters}
                     >
                       {t('bookmark:bookmark.filter.clearFilter')}
                     </Button>
@@ -235,6 +340,29 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
               value={selectedCategory}
               onChange={setSelectedCategory}
             />
+
+            {/* 筛选器下拉菜单（时间范围和自定义筛选器） */}
+            <FilterDropdownMenu
+              timeRange={timeRange}
+              onTimeRangeChange={setTimeRange}
+              customFilters={customFilters}
+              selectedCustomFilterId={selectedCustomFilterId}
+              onSelectCustomFilter={handleSelectCustomFilter}
+              onOpenCustomFilterDialog={() => setCustomFilterDialogOpen(true)}
+              onClearFilter={handleClearFilter}
+            >
+              <Button
+                variant="ghost"
+                size="icon"
+                className={cn(
+                  'h-9 w-9 border border-border',
+                  hasTimeOrCustomFilter && 'text-primary bg-primary/10'
+                )}
+                title={t('bookmark:contentPanel.filter')}
+              >
+                <Filter className="h-4 w-4" />
+              </Button>
+            </FilterDropdownMenu>
 
             {/* 视图切换 */}
             <div className="flex items-center border border-border rounded-lg p-0.5 bg-muted/30">
@@ -383,8 +511,10 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
                 formattedDate={formatBookmarkDate(bookmark.createdAt)}
                 isSelected={selectedIds.has(bookmark.id)}
                 onToggleSelect={() => toggleSelect(bookmark.id)}
+                onOpen={() => openBookmark(bookmark.url)}
                 onEdit={() => setEditingBookmark(bookmark)}
                 onDelete={() => handleDelete(bookmark)}
+                onViewSnapshot={bookmark.hasSnapshot ? () => handleViewSnapshot(bookmark) : undefined}
                 columnSize={masonryConfig.columnSize}
                 t={t}
               />
@@ -403,6 +533,7 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
                 onOpen={() => openBookmark(bookmark.url)}
                 onEdit={() => setEditingBookmark(bookmark)}
                 onDelete={() => handleDelete(bookmark)}
+                onViewSnapshot={bookmark.hasSnapshot ? () => handleViewSnapshot(bookmark) : undefined}
                 t={t}
               />
             ))}
@@ -460,6 +591,25 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* 自定义筛选器弹窗 */}
+      <CustomFilterDialog
+        open={customFilterDialogOpen}
+        onOpenChange={setCustomFilterDialogOpen}
+        onSave={handleSaveCustomFilter}
+      />
+
+      {/* 快照查看器 */}
+      <SnapshotViewer
+        open={!!snapshotBookmark}
+        snapshotUrl={snapshotUrl}
+        title={snapshotBookmark?.title || ''}
+        loading={snapshotLoading}
+        error={snapshotError}
+        onClose={handleCloseSnapshot}
+        onDelete={handleDeleteSnapshot}
+        t={t}
+      />
     </div>
   );
 }

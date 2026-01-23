@@ -3,6 +3,7 @@
  * 在屏幕边缘显示一个触发区域，点击后展开书签面板
  */
 import { Bookmark } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { cn } from '@hamhome/ui';
 import type { PanelPosition } from '@/types';
 
@@ -13,10 +14,12 @@ export interface EdgeTriggerProps {
 }
 
 export function EdgeTrigger({ position, visible, onClick }: EdgeTriggerProps) {
+  const { t } = useTranslation('bookmark');
+  
   return (
     <div
       className={cn(
-        'fixed top-1/2 -translate-y-1/2 z-[99998]',
+        'fixed top-1/2 -translate-y-1/2 z-99998',
         'transition-all duration-300 ease-out',
         position === 'left' ? 'left-0' : 'right-0',
         visible
@@ -39,7 +42,7 @@ export function EdgeTrigger({ position, visible, onClick }: EdgeTriggerProps) {
             ? 'rounded-r-lg border-l-0'
             : 'rounded-l-lg border-r-0'
         )}
-        title="打开书签面板"
+        title={t('bookmark:contentPanel.openPanel')}
       >
         <Bookmark className="h-5 w-5 text-foreground" />
       </button>
