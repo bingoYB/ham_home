@@ -10,6 +10,8 @@ import {
   Copy,
   Share2,
   Trash2,
+  Camera,
+  ExternalLink,
 } from 'lucide-react';
 import {
   Badge,
@@ -18,6 +20,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@hamhome/ui';
 import { CATEGORY_COLOR } from '@/utils/bookmark-utils';
@@ -30,8 +33,10 @@ export interface BookmarkCardProps {
   isSelected: boolean;
   columnSize?: number;
   onToggleSelect: () => void;
+  onOpen: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onViewSnapshot?: () => void;
   t: (key: string, options?: Record<string, unknown>) => string;
 }
 
@@ -42,8 +47,10 @@ export function BookmarkCard({
   isSelected,
   columnSize = 356,
   onToggleSelect,
+  onOpen,
   onEdit,
   onDelete,
+  onViewSnapshot,
   t,
 }: BookmarkCardProps) {
   const hostname = new URL(bookmark.url).hostname;
@@ -116,6 +123,10 @@ export function BookmarkCard({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-40">
+                <DropdownMenuItem onClick={onOpen}>
+                  <ExternalLink className="h-4 w-4 mr-2" />
+                  {t('bookmark:bookmark.open')}
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={onEdit}>
                   <Edit className="h-4 w-4 mr-2" />
                   {t('bookmark:bookmark.edit')}
@@ -128,6 +139,16 @@ export function BookmarkCard({
                   <Share2 className="h-4 w-4 mr-2" />
                   {t('bookmark:bookmark.share')}
                 </DropdownMenuItem>
+                {bookmark.hasSnapshot && onViewSnapshot && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem onClick={onViewSnapshot}>
+                      <Camera className="h-4 w-4 mr-2" />
+                      {t('bookmark:bookmark.viewSnapshot')}
+                    </DropdownMenuItem>
+                  </>
+                )}
+                <DropdownMenuSeparator />
                 <DropdownMenuItem
                   onClick={onDelete}
                   className="text-destructive focus:text-destructive"

@@ -9,6 +9,7 @@ import {
   Copy,
   Share2,
   Trash2,
+  Camera,
 } from 'lucide-react';
 import {
   Badge,
@@ -17,6 +18,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@hamhome/ui';
 import type { LocalBookmark } from '@/types';
@@ -30,6 +32,7 @@ export interface BookmarkListItemProps {
   onOpen: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  onViewSnapshot?: () => void;
   t: (key: string, options?: Record<string, unknown>) => string;
 }
 
@@ -42,6 +45,7 @@ export function BookmarkListItem({
   onOpen,
   onEdit,
   onDelete,
+  onViewSnapshot,
   t,
 }: BookmarkListItemProps) {
   const hostname = new URL(bookmark.url).hostname;
@@ -153,6 +157,16 @@ export function BookmarkListItem({
               <Share2 className="h-4 w-4 mr-2" />
               {t('bookmark:bookmark.share')}
             </DropdownMenuItem>
+            {bookmark.hasSnapshot && onViewSnapshot && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={onViewSnapshot}>
+                  <Camera className="h-4 w-4 mr-2" />
+                  {t('bookmark:bookmark.viewSnapshot')}
+                </DropdownMenuItem>
+              </>
+            )}
+            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
               <Trash2 className="h-4 w-4 mr-2" />
               {t('bookmark:bookmark.delete')}
