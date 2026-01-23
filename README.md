@@ -1,78 +1,169 @@
-# 🐹 HamHome - 智能书签管理工具
 
-让收藏不再积灰，AI 驱动的智能书签管理工具。
+<p>
+  <img src="logo.png" alt="HamHome" width="280" />
+</p>
 
-## 项目结构
+# HamHome
+
+**AI-Powered Bookmark Manager for Modern Browsers**
+
+<p>
+  <img src="https://img.shields.io/github/v/release/user/ham_home?style=flat-square" alt="Release" />
+  <img src="https://img.shields.io/github/stars/user/ham_home?style=flat-square" alt="Stars" />
+  <img src="https://img.shields.io/github/forks/user/ham_home?style=flat-square" alt="Forks" />
+  <img src="https://img.shields.io/github/issues/user/ham_home?style=flat-square" alt="Issues" />
+  <img src="https://img.shields.io/github/license/user/ham_home?style=flat-square" alt="License" />
+</p>
+
+<p>
+  <a href="./docs/README_zh.md">中文文档</a> •
+  <a href="#features">Features</a> •
+  <a href="#installation">Installation</a> •
+  <a href="#development">Development</a> •
+  <a href="#contributing">Contributing</a>
+</p>
+
+## What is HamHome?
+
+HamHome is a browser extension that helps you collect, organize, and retrieve web content intelligently. It uses AI to automatically categorize pages, generate summaries, and suggest tags—while keeping your data local and private.
+
+## Features
+
+### 🤖 AI-Assisted Organization
+- Auto-categorization based on page content
+- Smart tag suggestions with configurable presets
+- AI-generated summaries for quick reference
+- BYOK (Bring Your Own Key) support for OpenAI, Anthropic, Ollama, and custom endpoints
+
+### 🗂️ Category Management
+- **Preset Schemes**: Two built-in category templates—"General" and "Professional Creator"—with one-click import
+- **AI-Generated Categories**: Describe your use case and let AI create a tailored category structure
+- Unlimited hierarchical category tree
+
+### 📸 Page Snapshots
+- Save complete HTML snapshots locally
+- Access content even when the original page goes offline
+- Powered by [Mozilla Readability](https://github.com/mozilla/readability) for clean extraction
+
+### 🔍 Powerful Search & Filtering
+- Full-text search across titles, descriptions, and content
+- Filter by category, tags, and time range
+- Create custom filter presets for complex queries
+
+### 🎯 Privacy-First Design
+- All data stored locally in Chrome Storage + IndexedDB
+- Configure privacy domains to exclude sensitive sites from AI analysis
+- Export/import your data anytime (JSON format)
+
+### 🖥️ Modern UI
+- Grid (masonry) and list view modes
+- Light/dark theme with system preference detection
+- Full i18n support (English & Chinese)
+- Keyboard shortcuts and edge-trigger panel
+
+## Browser Support
+
+| Browser | Status |
+|---------|--------|
+| Chrome / Chromium | ✅ Manifest V3 |
+| Microsoft Edge | ✅ Manifest V3 |
+| Firefox | ✅ Manifest V2/V3 |
+
+## Downloads
+
+- [**Chrome Web Store**](): Pending upload
+- [**Firefox Add-ons**](): Pending upload
+- [**Microsoft Edge Addons**](https://microsoftedge.microsoft.com/addons/detail/hamhome/xxx)
+- See [releases](https://github.com/user/ham_home/releases) to download and install manually.
+
+## Installation
+
+
+### From Source
+
+```bash
+# Clone the repository
+git clone https://github.com/user/ham_home.git
+cd ham_home
+
+# Install dependencies (requires pnpm)
+pnpm install
+
+# Build for Chrome/Edge
+pnpm --filter extension build
+
+# Build for Firefox
+pnpm --filter extension build:firefox
+```
+
+### Load the Extension
+
+- **Chrome/Edge**: Navigate to `chrome://extensions/`, enable "Developer mode", click "Load unpacked", and select `apps/extension/.output/chrome-mv3`
+- **Firefox**: Go to `about:debugging`, click "This Firefox", click "Load Temporary Add-on", and select `apps/extension/.output/firefox-mv2/manifest.json`
+
+## Development
+
+```bash
+# Start dev server (Chrome)
+pnpm --filter extension dev
+
+# Start dev server (Firefox)
+pnpm --filter extension dev:firefox
+
+# Build all browser variants
+pnpm --filter extension build:all
+```
+
+## Tech Stack
+<p>
+  <img src="https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen?style=flat-square&logo=node.js" alt="Node" />
+  <img src="https://img.shields.io/badge/pnpm-9.0.0-orange?style=flat-square&logo=pnpm" alt="pnpm" />
+  <img src="https://img.shields.io/badge/TypeScript-5.7-blue?style=flat-square&logo=typescript" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/React-19-blue?style=flat-square&logo=react" alt="React" />
+</p>
+
+
+- **Framework**: [WXT](https://wxt.dev/) (Vite-based extension framework)
+- **UI**: React 19 + TypeScript + Tailwind CSS
+- **Components**: [shadcn/ui](https://ui.shadcn.com/)
+- **Content Extraction**: Mozilla Readability + Turndown
+- **i18n**: i18next + react-i18next
+- **Storage**: Chrome Storage API + IndexedDB
+
+## Project Structure
 
 ```
 ham_home/
 ├── apps/
-│   ├── web/           # Next.js Web 管理端
-│   └── extension/     # WXT 浏览器插件
+│   └── extension/          # Browser extension
+│       ├── components/     # React components
+│       ├── hooks/          # Custom hooks
+│       ├── lib/            # Core libraries (AI, storage, i18n)
+│       ├── entrypoints/    # Extension entry points
+│       └── locales/        # i18n resources
 ├── packages/
-│   ├── api/           # Cloudflare Workers API
-│   ├── db/            # 数据库 Schema (Drizzle ORM)
-│   ├── ui/            # 共享 UI 组件库
-│   ├── types/         # 共享类型定义
-│   ├── utils/         # 通用工具函数
-│   ├── ai/            # AI 客户端 SDK
-│   ├── parser/        # 网页内容解析器
-│   └── storage/       # 存储抽象层
-├── package.json
-├── pnpm-workspace.yaml
-└── turbo.json
+│   ├── ui/                 # Shared UI components
+│   ├── types/              # Shared TypeScript types
+│   └── ...                 # Other shared packages
+└── docs/                   # Documentation
 ```
 
-## 快速开始
+## Contributing
 
-### 安装依赖
+Contributions are welcome! Please:
 
-```bash
-pnpm install
-```
-
-### 构建公共模块
-
-```bash
-pnpm build:packages
-```
-
-### 启动开发
-
-```bash
-# 启动 Web 端
-pnpm dev:web
-
-# 启动浏览器插件
-pnpm dev:extension
-
-# 启动 API (Cloudflare Workers)
-pnpm dev:api
-```
-
-## 技术栈
-
-- **前端**: Next.js 14, React 18, Tailwind CSS
-- **插件**: WXT (基于 Vite)
-- **后端**: Cloudflare Workers, Hono
-- **数据库**: Cloudflare D1 (SQLite)
-- **ORM**: Drizzle ORM
-- **包管理**: pnpm + Turborepo
-
-## 模块说明
-
-| 模块 | 说明 |
-|------|------|
-| `@hamhome/ui` | 共享 UI 组件库 (Button, Input 等) |
-| `@hamhome/types` | 共享类型定义 (Bookmark, Category 等) |
-| `@hamhome/utils` | 通用工具函数 (URL 处理, 日期格式化等) |
-| `@hamhome/ai` | AI 客户端 SDK |
-| `@hamhome/parser` | 网页内容解析器 |
-| `@hamhome/storage` | 存储抽象层接口 |
-| `@hamhome/db` | 数据库 Schema |
-| `@hamhome/api` | 后端 API 服务 |
+1. Fork this repository
+2. Create a feature branch (`git checkout -b feature/your-feature`)
+3. Commit your changes (`git commit -m 'Add your feature'`)
+4. Push to the branch (`git push origin feature/your-feature`)
+5. Open a Pull Request
 
 ## License
 
-MIT
+[MIT](./LICENSE)
 
+---
+
+<p align="center">
+  If you find HamHome useful, consider giving it a ⭐
+</p>
