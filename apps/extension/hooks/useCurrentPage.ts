@@ -5,6 +5,7 @@
 import { useState, useEffect } from 'react';
 import type { PageContent } from '@/types';
 import { containsPrivateContent, isNonBookmarkableUrl } from '../lib/privacy';
+import { safeSendMessageToTab } from '@/utils/browser-api';
 
 interface UseCurrentPageResult {
   pageContent: PageContent | null;
@@ -73,8 +74,8 @@ export function useCurrentPage(): UseCurrentPageResult {
         return;
       }
 
-      // 向 content script 发送消息提取内容
-      const content = await chrome.tabs.sendMessage(tab.id, {
+      // 向 content script 发送消息提取内容（使用安全的跨浏览器 API）
+      const content = await safeSendMessageToTab<PageContent>(tab.id, {
         type: 'EXTRACT_CONTENT',
       });
 

@@ -14,7 +14,8 @@ import {
   Moon,
   Sun,
   Database,
-  SunMoon
+  SunMoon,
+  Languages
 } from 'lucide-react';
 import {
   Toaster,
@@ -38,16 +39,20 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   Switch,
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
 } from '@hamhome/ui';
 import type { AppSidebarNavItem, AppSidebarBrand } from '@hamhome/ui';
 import { BookmarkProvider, useBookmarks } from '@/contexts/BookmarkContext';
+import { useLanguage } from '@/hooks/useLanguage';
 import { MainContent } from '@/components/MainContent';
 import { OptionsPage } from '@/components/OptionsPage';
 import { CategoriesPage } from '@/components/CategoriesPage';
 import { TagsPage } from '@/components/TagsPage';
 import { PrivacyPage } from '@/components/PrivacyPage';
 import { ImportExportPage } from '@/components/ImportExportPage';
-import type { LocalSettings } from '@/types';
+import logoImage from '@/assets/logo.png';
 
 // 页面标题映射
 const PAGE_TITLES: Record<string, { title: string; description?: string }> = {
@@ -61,6 +66,7 @@ const PAGE_TITLES: Record<string, { title: string; description?: string }> = {
 
 function AppContent() {
   const { t } = useTranslation(['common', 'bookmark', 'settings']);
+  const { language, switchLanguage, availableLanguages } = useLanguage();
   
   // 从 URL hash 获取初始页面
   const getInitialView = () => {
@@ -193,7 +199,7 @@ function AppContent() {
   const brand: AppSidebarBrand = {
     name: 'HamHome',
     subtitle: t('bookmark:bookmark.count', { count: bookmarks.length }),
-    logo: <span className="text-lg">🐹</span>,
+    logo: <img src={logoImage} alt="HamHome" className="h-8 w-8 object-contain" />,
   };
 
   // 获取当前 Switch 状态（基于实际主题）
@@ -301,25 +307,70 @@ function AppContent() {
             </Breadcrumb>
           </div>
           <div className="ml-auto px-4 flex items-center gap-3">
+            {/* 语言切换 */}
+            <DropdownMenu>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-2"
+                    >
+                      <Languages className="h-4 w-4" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {t('settings:settings.language')}
+                </TooltipContent>
+              </Tooltip>
+              <DropdownMenuContent align="end">
+                {availableLanguages.map((lng) => (
+                  <DropdownMenuItem
+                    key={lng}
+                    onClick={() => switchLanguage(lng)}
+                    className={language === lng ? 'bg-accent' : ''}
+                  >
+                    {t(`common:common.languages.${lng}`)}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
             {/* Switch 控制明暗主题 */}
-            <div className="flex items-center gap-2">
-              <Sun className="h-4 w-4 text-muted-foreground" />
-              <Switch
-                checked={isDarkTheme}
-                onCheckedChange={handleThemeSwitch}
-              />
-              <Moon className="h-4 w-4 text-muted-foreground" />
-            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="flex items-center gap-2">
+                  <Sun className="h-4 w-4 text-muted-foreground" />
+                  <Switch
+                    checked={isDarkTheme}
+                    onCheckedChange={handleThemeSwitch}
+                  />
+                  <Moon className="h-4 w-4 text-muted-foreground" />
+                </div>
+              </TooltipTrigger>
+              <TooltipContent>
+                {isDarkTheme ? t('common:common.theme.dark') : t('common:common.theme.light')}
+              </TooltipContent>
+            </Tooltip>
             {/* 跟随系统按钮 */}
-            <Button
-              onClick={handleSystemTheme}
-              variant={isSystemTheme ? "default" : "ghost"}
-              size="sm"
-              className="gap-2"
-            >
-              <SunMoon className="h-4 w-4" />
-              <span className="text-sm">Auto</span>
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  onClick={handleSystemTheme}
+                  variant={isSystemTheme ? "default" : "ghost"}
+                  size="sm"
+                  className="gap-2"
+                >
+                  <SunMoon className="h-4 w-4" />
+                  <span className="text-sm">Auto</span>
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>
+                {t('common:common.theme.system')}
+              </TooltipContent>
+            </Tooltip>
+            
           </div>
         </header>
         <main className="flex-1 overflow-auto">

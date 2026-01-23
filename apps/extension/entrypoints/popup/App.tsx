@@ -4,47 +4,26 @@
  */
 import { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Settings, Loader2, Sun, Moon, Monitor, List } from "lucide-react";
-import {
-  Button,
-  Toaster,
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@hamhome/ui";
+import { Loader2 } from "lucide-react";
+import { Toaster } from "@hamhome/ui";
 import { SavePanel } from "@/components/SavePanel";
+import { QuickActions } from "@/components/common/QuickActions";
 import { useCurrentPage } from "@/hooks/useCurrentPage";
-import { useTheme } from "@/hooks/useTheme";
+import { useShortcuts } from "@/hooks/useShortcuts";
 import { bookmarkStorage } from "@/lib/storage/bookmark-storage";
 import type { LocalBookmark } from "@/types";
 import "../../style.css";
 
 export function App() {
   const { t } = useTranslation(["common", "bookmark"]);
-  const { theme, setTheme } = useTheme();
+  const { shortcuts } = useShortcuts();
   const [existingBookmark, setExistingBookmark] =
     useState<LocalBookmark | null>(null);
   const { pageContent, loading, error } = useCurrentPage();
 
-  // 切换主题：light -> dark -> system -> light
-  const toggleTheme = () => {
-    const nextTheme =
-      theme === "light" ? "dark" : theme === "dark" ? "system" : "light";
-    setTheme(nextTheme);
-  };
-
-  // 获取主题图标
-  const ThemeIcon =
-    theme === "system" ? Monitor : theme === "dark" ? Moon : Sun;
-
-  // 获取主题提示文本
-  const themeTooltip =
-    theme === "system"
-      ? t("common:common.theme.system")
-      : theme === "dark"
-      ? t("common:common.theme.dark")
-      : t("common:common.theme.light");
+  // 获取保存书签的快捷键（使用格式化后的显示）
+  const saveShortcutInfo = shortcuts.find((s) => s.name === "save-bookmark");
+  const saveShortcut = saveShortcutInfo?.formattedShortcut || saveShortcutInfo?.shortcut || "⌘/Ctrl + Shift + E";
 
   // 检查当前页面是否已收藏
   useEffect(() => {
@@ -89,64 +68,8 @@ export function App() {
       {/* 底部状态栏 */}
       <footer className="px-4 py-2 border-t bg-muted/30 text-xs text-muted-foreground shrink-0">
         <div className="flex items-center justify-between">
-          <span>{t("bookmark:popup.shortcut")}: ⌘/Ctrl + Shift + E</span>
-          <TooltipProvider delayDuration={300}>
-            <div className="flex items-center gap-1">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={toggleTheme}
-                    className="h-6 px-2 text-muted-foreground hover:text-foreground"
-                  >
-                    <ThemeIcon className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  <p>{themeTooltip}</p>
-                </TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() =>
-                      chrome.tabs.create({
-                        url: chrome.runtime.getURL("app.html#settings"),
-                      })
-                    }
-                    className="h-6 px-2 text-muted-foreground hover:text-foreground"
-                  >
-                    <Settings className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  <p>{t("common:common.settings")}</p>
-                </TooltipContent>
-              </Tooltip>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() =>
-                      chrome.tabs.create({
-                        url: chrome.runtime.getURL("app.html"),
-                      })
-                    }
-                    className="h-6 px-2 text-muted-foreground hover:text-foreground"
-                  >
-                    <List className="h-3.5 w-3.5" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent side="top">
-                  <p>{t("common:common.bookmarkList")}</p>
-                </TooltipContent>
-              </Tooltip>
-            </div>
-          </TooltipProvider>
+          <span>{t("bookmark:popup.shortcut")}: {saveShortcut}</span>
+          <QuickActions size="sm" showTooltip />
         </div>
       </footer>
 

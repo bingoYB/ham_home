@@ -3,7 +3,7 @@
  * 从 MainContent.tsx 抽象的公共搜索能力
  */
 import { useState, useMemo, useCallback } from 'react';
-import type { LocalBookmark, LocalCategory } from '@/types';
+import type { LocalBookmark, LocalCategory, CustomFilter, FilterCondition } from '@/types';
 
 /**
  * 时间范围筛选类型
@@ -50,6 +50,7 @@ export interface UseBookmarkSearchOptions {
   bookmarks: LocalBookmark[];
   categories?: LocalCategory[];
   initialState?: Partial<BookmarkSearchState>;
+  customFilter?: CustomFilter | null; // 自定义筛选器
 }
 
 /**
@@ -98,11 +99,75 @@ function getTimeRangeBounds(range: TimeRange): { start: number; end: number } | 
 }
 
 /**
+ * 应用单个筛选条件
+ */
+function applyFilterCondition(bookmark: LocalBookmark, condition: FilterCondition): boolean {
+  const { field, operator, value } = condition;
+
+  // 获取字段值
+  let fieldValue: string | number;
+  switch (field) {
+    case 'title':
+      fieldValue = bookmark.title;
+      break;
+    case 'url':
+      fieldValue = bookmark.url;
+      break;
+    case 'description':
+      fieldValue = bookmark.description;
+      break;
+    case 'tags':
+      fieldValue = bookmark.tags.join(' ');
+      break;
+    case 'createdAt':
+      fieldValue = bookmark.createdAt;
+      break;
+    default:
+      return true;
+  }
+
+  // 对于字符串字段，转换为小写进行比较
+  const isStringField = field !== 'createdAt';
+  const compareValue = isStringField ? String(fieldValue).toLowerCase() : fieldValue;
+  const compareTarget = isStringField ? value.toLowerCase() : Number(value);
+
+  // 应用操作符
+  switch (operator) {
+    case 'equals':
+      return compareValue === compareTarget;
+    case 'notEquals':
+      return compareValue !== compareTarget;
+    case 'contains':
+      return isStringField && String(compareValue).includes(String(compareTarget));
+    case 'notContains':
+      return isStringField && !String(compareValue).includes(String(compareTarget));
+    case 'startsWith':
+      return isStringField && String(compareValue).startsWith(String(compareTarget));
+    case 'endsWith':
+      return isStringField && String(compareValue).endsWith(String(compareTarget));
+    case 'greaterThan':
+      return !isStringField && Number(compareValue) > Number(compareTarget);
+    case 'lessThan':
+      return !isStringField && Number(compareValue) < Number(compareTarget);
+    default:
+      return true;
+  }
+}
+
+/**
+ * 应用自定义筛选器（所有条件必须同时满足 - AND 逻辑）
+ */
+function applyCustomFilter(bookmark: LocalBookmark, filter: CustomFilter): boolean {
+  return filter.conditions.every((condition) => applyFilterCondition(bookmark, condition));
+}
+
+/**
  * 书签搜索筛选 Hook
  */
 export function useBookmarkSearch({
   bookmarks,
   initialState = {},
+  customFilter = null,
 }: UseBookmarkSearchOptions): BookmarkSearchResult {
   // 筛选状态
   const [searchQuery, setSearchQuery] = useState(initialState.searchQuery || '');
@@ -151,10 +216,17 @@ export function useBookmarkSearch({
           }
         }
 
+        // 自定义筛选器
+        if (customFilter) {
+          if (!applyCustomFilter(b, customFilter)) {
+            return false;
+          }
+        }
+
         return true;
       })
       .sort((a, b) => b.createdAt - a.createdAt);
-  }, [bookmarks, searchQuery, selectedTags, selectedCategory, timeRange]);
+  }, [bookmarks, searchQuery, selectedTags, selectedCategory, timeRange, customFilter]);
 
   // 切换标签选择
   const toggleTagSelection = useCallback((tag: string) => {

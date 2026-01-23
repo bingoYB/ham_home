@@ -7,7 +7,9 @@ import { EdgeTrigger } from '@/components/trigger';
 import { BookmarkPanel } from '@/components/bookmarkPanel';
 import { useEdgeTrigger } from '@/hooks/useEdgeTrigger';
 import { useContentUI } from '@/utils/ContentUIContext';
+import { getBackgroundService } from '@/lib/services';
 import type { LocalBookmark, LocalCategory, PanelPosition, ThemeMode } from '@/types';
+import { bookmarkStorage } from '@/lib/storage/bookmark-storage';
 
 // 默认面板位置
 const DEFAULT_PANEL_POSITION: PanelPosition = 'left';
@@ -57,16 +59,18 @@ export function App() {
     enabled: true,
   });
 
-  // 从 background 获取数据
+  // 从 background 获取数据（使用 proxy-service）
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
       
+      const backgroundService = getBackgroundService();
+      
       // 并行获取数据
       const [bookmarksData, categoriesData, settingsData] = await Promise.all([
-        chrome.runtime.sendMessage({ type: 'GET_BOOKMARKS' }),
-        chrome.runtime.sendMessage({ type: 'GET_CATEGORIES' }),
-        chrome.runtime.sendMessage({ type: 'GET_SETTINGS' }),
+        backgroundService.getBookmarks(),
+        backgroundService.getCategories(),
+        backgroundService.getSettings(),
       ]);
 
       if (bookmarksData) setBookmarks(bookmarksData);
@@ -109,21 +113,20 @@ export function App() {
     return () => mediaQuery.removeEventListener('change', handleChange);
   }, [container, theme]);
 
-  // 监听 storage 变化
+  // 监听 storage 变化（使用 WXT Storage watch）
   useEffect(() => {
-    const handleStorageChange = () => {
+    
+    const unwatch = bookmarkStorage.watchBookmarks(() => {
       fetchData();
-    };
-
-    chrome.storage.onChanged.addListener(handleStorageChange);
-    return () => chrome.storage.onChanged.removeListener(handleStorageChange);
+    });
+    return unwatch;
   }, [fetchData]);
 
   // 监听快捷键
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ctrl+Shift+B 或 Cmd+Shift+B
-      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'b') {
+      // Ctrl+Shift+L 或 Cmd+Shift+L
+      if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key.toLowerCase() === 'l') {
         e.preventDefault();
         togglePanel();
       }
@@ -153,7 +156,8 @@ export function App() {
 
   // 打开设置（跳转到扩展选项页）
   const handleOpenSettings = useCallback(() => {
-    chrome.runtime.sendMessage({ type: 'OPEN_OPTIONS_PAGE' });
+    const backgroundService = getBackgroundService();
+    backgroundService.openOptionsPage();
   }, []);
 
   return (
