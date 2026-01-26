@@ -168,10 +168,12 @@ export function useSavePanel({
         return;
       }
 
-      // 3. 执行新的分析
+      // 3. 执行新的分析（传递已有标签避免生成语义相近的重复标签）
+      const existingTags = await bookmarkStorage.getAllTags();
       const result = await aiClient.analyzeComplete({
         pageContent,
         userCategories: categories,
+        existingTags,
       });
 
       // 4. 将结果保存到缓存

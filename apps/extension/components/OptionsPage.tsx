@@ -5,7 +5,6 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Settings,
   Sparkles,
   Globe,
   Database,
@@ -16,6 +15,8 @@ import {
   Trash2,
   Plus,
   ExternalLink,
+  Check,
+  ChevronsUpDown,
 } from 'lucide-react';
 import {
   Button,
@@ -47,6 +48,14 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+  Command,
+  CommandGroup,
+  CommandItem,
+  CommandList,
+  cn,
 } from '@hamhome/ui';
 import { useBookmarks } from '@/contexts/BookmarkContext';
 import { useLanguage } from '@/hooks/useLanguage';
@@ -54,7 +63,9 @@ import { useShortcuts } from '@/hooks/useShortcuts';
 import { configStorage } from '@/lib/storage/config-storage';
 import { CustomFilterDialog } from '@/components/bookmarkPanel/CustomFilterDialog';
 import { getBrowserSpecificURL, isFirefox, safeCreateTab } from '@/utils/browser-api';
-import type { CustomFilter, FilterCondition } from '@/types';
+import { getDefaultModel, getProviderModels } from '@hamhome/ai';
+import { aiClient } from '@/lib/ai/client';
+import type { CustomFilter, FilterCondition, AIProvider } from '@/types';
 
 export function OptionsPage() {
   const { t } = useTranslation(['common', 'settings']);
@@ -75,18 +86,19 @@ export function OptionsPage() {
   const [showClearDialog, setShowClearDialog] = useState(false);
   const [testResult, setTestResult] = useState<{ status: 'success' | 'error' | 'warning'; message: string } | null>(null);
   const [newTag, setNewTag] = useState('');
-  
+
   // 自定义筛选器管理状态
   const [customFilters, setCustomFilters] = useState<CustomFilter[]>([]);
   const [filterDialogOpen, setFilterDialogOpen] = useState(false);
   const [editingFilter, setEditingFilter] = useState<CustomFilter | null>(null);
   const [deleteFilterTarget, setDeleteFilterTarget] = useState<CustomFilter | null>(null);
-  
+
   // 本地状态用于输入框，避免光标跳动
   const [localApiKey, setLocalApiKey] = useState('');
   const [localBaseUrl, setLocalBaseUrl] = useState('');
   const [localModel, setLocalModel] = useState('');
-  
+  const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
+
   // 同步 aiConfig 到本地状态
   useEffect(() => {
     setLocalApiKey(aiConfig.apiKey || '');
@@ -110,18 +122,25 @@ export function OptionsPage() {
   const handleTestConnection = async () => {
     setIsTesting(true);
     setTestResult(null);
-    
+
     try {
-      // 模拟测试连接
-      await new Promise((resolve) => setTimeout(resolve, 1500));
-      
-      if (aiConfig.apiKey) {
-        setTestResult({ status: 'success', message: 'AI 服务连接成功！' });
+      // 确保最新配置已保存到 storage
+      await updateAIConfig({});
+
+      // 重置 AI 客户端以加载最新配置
+      aiClient.reset();
+
+      // 执行真实连接测试
+      const result = await aiClient.testConnection();
+
+      if (result.success) {
+        setTestResult({ status: 'success', message: result.message });
       } else {
-        setTestResult({ status: 'warning', message: '请先配置 API Key' });
+        setTestResult({ status: 'error', message: result.message });
       }
-    } catch {
-      setTestResult({ status: 'error', message: '连接失败，请检查配置' });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '连接失败，请检查配置';
+      setTestResult({ status: 'error', message });
     } finally {
       setIsTesting(false);
     }
@@ -246,9 +265,11 @@ export function OptionsPage() {
                 <Label htmlFor="provider">{t('settings:settings.ai.provider')}</Label>
                 <Select
                   value={aiConfig.provider}
-                  onValueChange={(value: 'openai' | 'anthropic' | 'ollama' | 'custom') => 
-                    updateAIConfig({ provider: value })
-                  }
+                  onValueChange={(value: AIProvider) => {
+                    const defaultModel = getDefaultModel(value);
+                    setLocalModel(defaultModel);
+                    updateAIConfig({ provider: value, model: defaultModel });
+                  }}
                 >
                   <SelectTrigger id="provider">
                     <SelectValue />
@@ -256,6 +277,16 @@ export function OptionsPage() {
                   <SelectContent>
                     <SelectItem value="openai">{t('settings:settings.providers.openai')}</SelectItem>
                     <SelectItem value="anthropic">{t('settings:settings.providers.anthropic')}</SelectItem>
+                    <SelectItem value="google">{t('settings:settings.providers.google')}</SelectItem>
+                    <SelectItem value="azure">{t('settings:settings.providers.azure')}</SelectItem>
+                    <SelectItem value="deepseek">{t('settings:settings.providers.deepseek')}</SelectItem>
+                    <SelectItem value="groq">{t('settings:settings.providers.groq')}</SelectItem>
+                    <SelectItem value="mistral">{t('settings:settings.providers.mistral')}</SelectItem>
+                    <SelectItem value="moonshot">{t('settings:settings.providers.moonshot')}</SelectItem>
+                    <SelectItem value="zhipu">{t('settings:settings.providers.zhipu')}</SelectItem>
+                    <SelectItem value="hunyuan">{t('settings:settings.providers.hunyuan')}</SelectItem>
+                    <SelectItem value="nvidia">{t('settings:settings.providers.nvidia')}</SelectItem>
+                    <SelectItem value="siliconflow">{t('settings:settings.providers.siliconflow')}</SelectItem>
                     <SelectItem value="ollama">{t('settings:settings.providers.ollama')}</SelectItem>
                     <SelectItem value="custom">{t('settings:settings.providers.custom')}</SelectItem>
                   </SelectContent>
@@ -277,7 +308,8 @@ export function OptionsPage() {
                 </p>
               </div>
 
-              {(aiConfig.provider === 'custom' || aiConfig.provider === 'ollama') && (
+              {/* Azure 和 Custom 必须配置 baseUrl，Ollama 可选配置 */}
+              {(['azure', 'custom', 'ollama'].includes(aiConfig.provider)) && (
                 <div className="space-y-2">
                   <Label htmlFor="baseUrl">{t('settings:settings.ai.baseUrl')}</Label>
                   <Input
@@ -292,15 +324,96 @@ export function OptionsPage() {
               )}
 
               <div className="space-y-2">
-                <Label htmlFor="model">{t('settings:settings.ai.model')}</Label>
-                <Input
-                  id="model"
-                  placeholder={t('settings:settings.ai.modelPlaceholder')}
-                  value={localModel}
-                  onChange={(e) => setLocalModel(e.target.value)}
-                  onBlur={(e) => updateAIConfig({ model: e.target.value })}
-                />
+                <Label htmlFor="model" onClick={e => e.preventDefault()}>{t('settings:settings.ai.model')}</Label>
+                <Popover open={modelSelectorOpen} onOpenChange={setModelSelectorOpen}>
+                  <PopoverTrigger asChild>
+                    <div className="relative">
+                      <Input
+                        id="model"
+                        placeholder={t('settings:settings.ai.modelPlaceholder')}
+                        value={localModel}
+                        onChange={(e) => setLocalModel(e.target.value)}
+                        onBlur={(e) => {
+                          // 延迟更新配置，允许点击下拉选项
+                          setTimeout(() => {
+                            updateAIConfig({ model: e.target.value });
+                          }, 150);
+                        }}
+                        className="pr-8"
+                      />
+                      <ChevronsUpDown
+                        className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 opacity-50 pointer-events-none"
+                      />
+                    </div>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="w-[var(--radix-popover-trigger-width)] p-0"
+                    align="start"
+                    onOpenAutoFocus={(e) => e.preventDefault()}
+                  >
+                    <Command>
+                      <CommandList>
+                        <CommandGroup>
+                          {getProviderModels(aiConfig.provider).map((model) => (
+                            <CommandItem
+                              key={model}
+                              value={model}
+                              onSelect={(value) => {
+                                setLocalModel(value);
+                                updateAIConfig({ model: value });
+                                setModelSelectorOpen(false);
+                              }}
+                            >
+                              <Check
+                                className={cn(
+                                  "mr-2 h-4 w-4",
+                                  localModel === model ? "opacity-100" : "opacity-0"
+                                )}
+                              />
+                              {model}
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      </CommandList>
+                    </Command>
+                  </PopoverContent>
+                </Popover>
               </div>
+
+              {/* 测试连接 */}
+              <div className="flex gap-2">
+                <Button
+                  onClick={handleTestConnection}
+                  disabled={isTesting || !aiConfig.apiKey}
+                  className="bg-primary hover:bg-primary/90"
+                >
+                  {isTesting ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      {t('settings:settings.ai.testing')}
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="mr-2 h-4 w-4" />
+                      {t('settings:settings.ai.testConnection')}
+                    </>
+                  )}
+                </Button>
+              </div>
+
+              {/* 测试结果显示 */}
+              {testResult && (
+                <div
+                  className={`p-3 rounded-lg border ${testResult.status === 'success'
+                    ? 'bg-green-50 border-green-200 text-green-800'
+                    : testResult.status === 'warning'
+                      ? 'bg-yellow-50 border-yellow-200 text-yellow-800'
+                      : 'bg-red-50 border-red-200 text-red-800'
+                    }`}
+                >
+                  {testResult.message}
+                </div>
+              )}
 
               {/* 高级参数折叠面板 */}
               <Collapsible open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
@@ -449,41 +562,6 @@ export function OptionsPage() {
                   )}
                 </div>
               </div>
-
-              <div className="flex gap-2 pt-4">
-                <Button
-                  onClick={handleTestConnection}
-                  disabled={isTesting || !aiConfig.apiKey}
-                  className="bg-primary hover:bg-primary/90"
-                >
-                  {isTesting ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {t('settings:settings.ai.testing')}
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="mr-2 h-4 w-4" />
-                      {t('settings:settings.ai.testConnection')}
-                    </>
-                  )}
-                </Button>
-              </div>
-
-              {/* 测试结果显示 */}
-              {testResult && (
-                <div
-                  className={`p-3 rounded-lg border ${
-                    testResult.status === 'success'
-                      ? 'bg-green-50 border-green-200 text-green-800'
-                      : testResult.status === 'warning'
-                      ? 'bg-yellow-50 border-yellow-200 text-yellow-800'
-                      : 'bg-red-50 border-red-200 text-red-800'
-                  }`}
-                >
-                  {testResult.message}
-                </div>
-              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -540,7 +618,7 @@ export function OptionsPage() {
                 </div>
                 <Select
                   value={appSettings.theme}
-                  onValueChange={(value: 'system' | 'light' | 'dark') => 
+                  onValueChange={(value: 'system' | 'light' | 'dark') =>
                     updateAppSettings({ theme: value })
                   }
                 >
@@ -624,7 +702,7 @@ export function OptionsPage() {
                 </div>
                 <Select
                   value={appSettings.panelPosition}
-                  onValueChange={(value: 'left' | 'right') => 
+                  onValueChange={(value: 'left' | 'right') =>
                     updateAppSettings({ panelPosition: value })
                   }
                 >

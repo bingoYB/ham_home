@@ -3,6 +3,7 @@
  * 获取当前页面内容
  */
 import { useState, useEffect } from 'react';
+import { browser } from 'wxt/browser';
 import type { PageContent } from '@/types';
 import { containsPrivateContent, isNonBookmarkableUrl } from '../lib/privacy';
 import { safeSendMessageToTab } from '@/utils/browser-api';
@@ -33,7 +34,7 @@ export function useCurrentPage(): UseCurrentPageResult {
 
     try {
       // 获取当前活动标签页
-      const [tab] = await chrome.tabs.query({
+      const [tab] = await browser.tabs.query({
         active: true,
         currentWindow: true,
       });
@@ -101,7 +102,7 @@ export function useCurrentPage(): UseCurrentPageResult {
       
       // 尝试获取基本标签页信息作为 fallback
       try {
-        const [tab] = await chrome.tabs.query({
+        const [tab] = await browser.tabs.query({
           active: true,
           currentWindow: true,
         });

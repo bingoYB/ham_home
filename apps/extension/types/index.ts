@@ -50,8 +50,36 @@ export interface LocalCategory {
 
 /**
  * AI 服务提供商
+ * - openai: OpenAI
+ * - anthropic: Anthropic Claude
+ * - google: Google Gemini
+ * - azure: Azure OpenAI
+ * - deepseek: DeepSeek
+ * - groq: Groq
+ * - mistral: Mistral AI
+ * - moonshot: Moonshot/Kimi (月之暗面)
+ * - zhipu: 智谱AI/GLM
+ * - hunyuan: 腾讯混元
+ * - nvidia: NVIDIA NIM
+ * - siliconflow: SiliconFlow (硅基流动)
+ * - ollama: Ollama (本地)
+ * - custom: 自定义 OpenAI 兼容 API
  */
-export type AIProvider = 'openai' | 'anthropic' | 'ollama' | 'custom';
+export type AIProvider = 
+  | 'openai' 
+  | 'anthropic' 
+  | 'google'
+  | 'azure'
+  | 'deepseek'
+  | 'groq'
+  | 'mistral'
+  | 'moonshot'
+  | 'zhipu'
+  | 'hunyuan'
+  | 'nvidia'
+  | 'siliconflow'
+  | 'ollama' 
+  | 'custom';
 
 /**
  * AI 配置
@@ -162,28 +190,6 @@ export interface BookmarkQuery {
   sortOrder?: 'asc' | 'desc';
 }
 
-// ============ 导入导出相关 ============
-
-/**
- * 导出数据格式
- */
-export interface ExportData {
-  version: string;
-  exportedAt: number;
-  bookmarks: LocalBookmark[];
-  categories: LocalCategory[];
-  settings?: LocalSettings;
-}
-
-/**
- * 导入结果
- */
-export interface ImportResult {
-  imported: number;
-  skipped: number;
-  failed: number;
-}
-
 // ============ AI 分析结果 ============
 
 /**
@@ -240,27 +246,6 @@ export interface BatchOperationResult {
   success: number;
   failed: number;
   errors?: string[];
-}
-
-/**
- * 消息类型
- */
-export type MessageType = 
-  | 'EXTRACT_CONTENT'
-  | 'GET_PAGE_HTML'
-  | 'SAVE_BOOKMARK'
-  | 'AI_ANALYZE'
-  | 'GET_BOOKMARKS'
-  | 'GET_CATEGORIES'
-  | 'GET_ALL_TAGS'
-  | 'GET_SETTINGS';
-
-/**
- * 消息结构
- */
-export interface ExtensionMessage<T = unknown> {
-  type: MessageType;
-  payload?: T;
 }
 
 // ============ 预设分类系统 ============

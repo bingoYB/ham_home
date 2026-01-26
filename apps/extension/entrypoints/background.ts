@@ -2,6 +2,7 @@
  * Background Script - Service Worker
  * 处理快捷键、消息通信、安装事件
  */
+import { browser } from 'wxt/browser';
 import { registerBackgroundService } from '@/lib/services';
 import { safeOpenPopup, safeBroadcastToTabs, safeCreateTab, getExtensionURL } from '@/utils/browser-api';
 
@@ -12,7 +13,7 @@ export default defineBackground(() => {
   registerBackgroundService();
 
   // 监听快捷键
-  chrome.commands.onCommand.addListener(async (command) => {
+  browser.commands.onCommand.addListener(async (command) => {
     console.log('[HamHome Background] 快捷键触发:', command);
     if (command === 'save-bookmark') {
       // 打开 Popup（兼容不同浏览器）
@@ -24,7 +25,7 @@ export default defineBackground(() => {
   });
 
   // 安装/更新时初始化
-  chrome.runtime.onInstalled.addListener((details) => {
+  browser.runtime.onInstalled.addListener((details) => {
     console.log('[HamHome Background] 安装/更新事件:', details.reason);
     if (details.reason === 'install') {
       // 首次安装，打开设置页面（使用安全的跨浏览器 API）

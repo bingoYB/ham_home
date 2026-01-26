@@ -12,6 +12,6 @@ export type { BookmarkHeaderProps } from './BookmarkHeader';
 export type { BookmarkListViewProps } from './BookmarkListView';
 export type { BookmarkListItemProps } from './BookmarkListItem';
 export type { CategoryTreeViewProps } from './CategoryTreeView';
-export type { FilterDropdownProps, FilterType } from './FilterDropdown';
+export type { FilterDropdownProps } from './FilterDropdown';
 export type { TagFilterPopoverProps } from './TagFilterPopover';
 export type { TimeFilterPopoverProps } from './TimeFilterPopover';

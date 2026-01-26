@@ -3,6 +3,7 @@
  * 在网页内显示书签触发器和面板
  */
 import { useState, useEffect, useCallback } from 'react';
+import { browser } from 'wxt/browser';
 import { EdgeTrigger } from '@/components/trigger';
 import { BookmarkPanel } from '@/components/bookmarkPanel';
 import { useEdgeTrigger } from '@/hooks/useEdgeTrigger';
@@ -144,8 +145,8 @@ export function App() {
       }
     };
 
-    chrome.runtime.onMessage.addListener(handleMessage);
-    return () => chrome.runtime.onMessage.removeListener(handleMessage);
+    browser.runtime.onMessage.addListener(handleMessage);
+    return () => browser.runtime.onMessage.removeListener(handleMessage);
   }, [togglePanel]);
 
   // 打开书签

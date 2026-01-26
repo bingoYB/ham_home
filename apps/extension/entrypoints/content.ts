@@ -4,6 +4,7 @@
  * 使用 createShadowRootUi 注入书签面板
  */
 /// <reference path="../.wxt/wxt.d.ts" />
+import { browser } from 'wxt/browser';
 import { Readability, isProbablyReaderable } from '@mozilla/readability';
 import TurndownService from 'turndown';
 import type { PageContent, PageMetadata } from '@/types';
@@ -184,7 +185,7 @@ function getFavicon(): string {
 }
 
 // 监听来自 Popup/Background 的消息
-chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message.type === 'EXTRACT_CONTENT') {
     const content = extractPageContent();
     sendResponse(content);

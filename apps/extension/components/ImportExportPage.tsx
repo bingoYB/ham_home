@@ -255,7 +255,8 @@ export function ImportExportPage() {
   const analyzeBookmarkWithAI = async (
     url: string,
     title: string,
-    currentCategories: LocalCategory[]
+    currentCategories: LocalCategory[],
+    existingTags: string[] = []
   ): Promise<{ 
     description: string; 
     categoryId: string | null; 
@@ -286,6 +287,7 @@ export function ImportExportPage() {
           favicon: `https://www.google.com/s2/favicons?domain=${new URL(url).hostname}&sz=32`,
         },
         userCategories: currentCategories,
+        existingTags,
       });
 
       // 匹配或创建分类
@@ -343,8 +345,9 @@ export function ImportExportPage() {
     // 跟踪本次导入中已处理的 URL（规范化后）
     const importedUrls = new Set<string>();
     
-    // 获取现有分类
+    // 获取现有分类和标签
     let allCategories = await bookmarkStorage.getCategories();
+    let existingTags = await bookmarkStorage.getAllTags();
     for (const cat of allCategories) {
       const key = `${cat.parentId || 'root'}|${cat.name}`;
       categoryMap.set(key, cat.id);
@@ -458,7 +461,7 @@ export function ImportExportPage() {
 
         // AI 分析（如果启用且不保留目录）
         if (enableAIAnalysis && !preserveFolders) {
-          const aiResult = await analyzeBookmarkWithAI(bm.url, bm.title, allCategories);
+          const aiResult = await analyzeBookmarkWithAI(bm.url, bm.title, allCategories, existingTags);
           description = aiResult.description;
           categoryId = aiResult.categoryId;
           tags = aiResult.tags;
@@ -468,6 +471,9 @@ export function ImportExportPage() {
             allCategories = [...allCategories, ...aiResult.newCategories];
             categoriesCreated += aiResult.newCategories.length;
           }
+          
+          // 更新已有标签列表（包含新生成的标签）
+          existingTags = [...new Set([...existingTags, ...tags])];
           
           aiProcessed++;
 

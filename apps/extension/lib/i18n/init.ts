@@ -21,10 +21,10 @@ export function getCurrentLanguage(): Language {
 /**
  * 改变语言
  */
-export async function changeLanguage(lng: Language): Promise<string> {
+export async function changeLanguage(lng: Language): Promise<void> {
   // 保存语言偏好到 localStorage
   localStorage.setItem('i18nextLng', lng);
-  return i18n.changeLanguage(lng);
+  await i18n.changeLanguage(lng);
 }
 
 /**

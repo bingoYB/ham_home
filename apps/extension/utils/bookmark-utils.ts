@@ -1,14 +1,14 @@
 /**
  * 书签相关工具函数
  */
-import type { Category } from '@/types';
+import type { LocalCategory } from '@/types';
 
 /**
  * 获取分类全路径（用 > 连接）
  */
 export function getCategoryPath(
   categoryId: string | null,
-  categories: Category[],
+  categories: LocalCategory[],
   uncategorizedLabel: string
 ): string {
   if (!categoryId) return uncategorizedLabel;

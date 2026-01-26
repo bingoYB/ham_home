@@ -13,6 +13,16 @@ export interface UseThemeOptions {
   targetElement?: HTMLElement | null;
 }
 
+/** 切换主题时的动画选项 */
+export interface ThemeTransitionOptions {
+  /** 点击事件的 X 坐标 */
+  x?: number;
+  /** 点击事件的 Y 坐标 */
+  y?: number;
+  /** 是否启用动画（默认 true） */
+  enableAnimation?: boolean;
+}
+
 export function useTheme(options?: UseThemeOptions) {
   const [theme, setTheme] = useState<Theme>('system');
   const targetElement = options?.targetElement;
@@ -61,7 +71,72 @@ export function useTheme(options?: UseThemeOptions) {
     await configStorage.setSettings({ theme: newTheme });
   };
 
-  return { theme, setTheme: updateTheme };
+  /**
+   * 检测是否在 Shadow DOM 环境中
+   * View Transitions API 不支持 Shadow DOM，需要禁用动画
+   */
+  const isInShadowDOM = useCallback(() => {
+    if (!targetElement) return false;
+    // 检查 targetElement 是否在 Shadow DOM 中
+    let node: Node | null = targetElement;
+    while (node) {
+      if (node instanceof ShadowRoot) return true;
+      node = node.parentNode;
+    }
+    return false;
+  }, [targetElement]);
+
+  /**
+   * 带动画效果的主题切换
+   * 使用 View Transitions API 实现从点击位置扩展的圆形动画
+   * 注意：在 Shadow DOM 环境中会自动禁用动画（View Transitions API 不支持）
+   */
+  const setThemeWithTransition = useCallback(
+    async (newTheme: Theme, transitionOptions?: ThemeTransitionOptions) => {
+      const { x, y, enableAnimation = true } = transitionOptions || {};
+      const target = targetElement || document.documentElement;
+
+      // 如果不支持 View Transitions API、禁用动画、或在 Shadow DOM 中，直接切换
+      // View Transitions API 作用于整个文档，无法在 Shadow DOM 中正常工作
+      if (!enableAnimation || !document.startViewTransition || isInShadowDOM()) {
+        setTheme(newTheme);
+        applyThemeToTarget(newTheme);
+        await configStorage.setSettings({ theme: newTheme });
+        return;
+      }
+
+      // 计算圆形动画的最大半径（从点击点到最远角落的距离）
+      const clickX = x ?? window.innerWidth / 2;
+      const clickY = y ?? window.innerHeight / 2;
+      const maxRadius = Math.hypot(
+        Math.max(clickX, window.innerWidth - clickX),
+        Math.max(clickY, window.innerHeight - clickY)
+      );
+
+      // 设置 CSS 变量用于动画
+      target.style.setProperty('--theme-transition-x', `${clickX}px`);
+      target.style.setProperty('--theme-transition-y', `${clickY}px`);
+      target.style.setProperty('--theme-transition-radius', `${maxRadius}px`);
+
+      // 使用 View Transitions API
+      const transition = document.startViewTransition(() => {
+        setTheme(newTheme);
+        applyThemeToTarget(newTheme);
+      });
+
+      // 等待动画完成后保存设置
+      transition.finished.then(() => {
+        target.style.removeProperty('--theme-transition-x');
+        target.style.removeProperty('--theme-transition-y');
+        target.style.removeProperty('--theme-transition-radius');
+      });
+
+      await configStorage.setSettings({ theme: newTheme });
+    },
+    [targetElement, applyThemeToTarget, isInShadowDOM]
+  );
+
+  return { theme, setTheme: updateTheme, setThemeWithTransition };
 }
 
 /**

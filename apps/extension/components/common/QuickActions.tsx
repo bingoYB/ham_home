@@ -40,7 +40,7 @@ export interface QuickActionsProps {
  * 快捷操作组件
  * - 主题切换按钮
  * - 语言切换按钮
- * - 更多菜单（hover 触发）：管理书签、查看快捷键、设置页面
+ * - 更多菜单（点击触发）：管理书签、查看快捷键、设置页面
  */
 export function QuickActions({
   size = 'default',
@@ -63,17 +63,20 @@ export function QuickActions({
   const container = portalContainer ?? contextContainer;
 
   // useTheme 需要传入 container 以便在 content UI 中正确应用主题
-  const { theme, setTheme } = useTheme({ targetElement: container });
+  const { theme, setThemeWithTransition } = useTheme({ targetElement: container });
   const { language, switchLanguage } = useLanguage();
 
   // 按钮尺寸配置
   const buttonSize = size === 'sm' ? 'h-6 w-6' : 'h-8 w-8';
   const iconSize = size === 'sm' ? 'h-3.5 w-3.5' : 'h-4 w-4';
 
-  // 切换主题
-  const handleToggleTheme = () => {
+  // 切换主题（带圆形扩展动画）
+  const handleToggleTheme = (e: React.MouseEvent) => {
     const newTheme = theme === 'dark' ? 'light' : 'dark';
-    setTheme(newTheme);
+    setThemeWithTransition(newTheme, {
+      x: e.clientX,
+      y: e.clientY,
+    });
   };
 
   // 切换语言
@@ -157,7 +160,6 @@ export function QuickActions({
           variant="ghost"
           size="icon"
           className={cn(buttonSize, 'text-muted-foreground hover:text-foreground')}
-          onMouseEnter={() => setIsMenuOpen(true)}
         >
           <MoreHorizontal className={iconSize} />
         </Button>
@@ -165,7 +167,6 @@ export function QuickActions({
       <DropdownMenuContent
         align="end"
         container={container}
-        onMouseLeave={() => setIsMenuOpen(false)}
         className="min-w-[180px]"
       >
         <DropdownMenuItem onClick={handleOpenBookmarkList}>
@@ -205,14 +206,7 @@ export function QuickActions({
               <p>{language === 'zh' ? t('bookmark:contentPanel.switchToEnglish') : t('bookmark:contentPanel.switchToChinese')}</p>
             </TooltipContent>
           </Tooltip>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span>{MoreMenu}</span>
-            </TooltipTrigger>
-            <TooltipContent side="bottom">
-              <p>{t('common:common.more')}</p>
-            </TooltipContent>
-          </Tooltip>
+          {MoreMenu}
         </div>
       </TooltipProvider>
     );

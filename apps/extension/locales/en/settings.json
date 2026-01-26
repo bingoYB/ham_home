@@ -97,7 +97,8 @@
       "noTags": "No preset tags added yet. After adding preset tags, AI will recommend tags more accurately.",
       "testConnection": "Test Connection",
       "testing": "Testing...",
-      "removeTag": "Delete Tag"
+      "removeTag": "Delete Tag",
+      "useCustomModel": "Use custom model: {{model}}"
     },
     "storage": {
       "title": "Storage Management",
@@ -128,6 +129,16 @@
     "providers": {
       "openai": "OpenAI",
       "anthropic": "Anthropic",
+      "google": "Google Gemini",
+      "azure": "Azure OpenAI",
+      "deepseek": "DeepSeek",
+      "groq": "Groq",
+      "mistral": "Mistral AI",
+      "moonshot": "Moonshot / Kimi",
+      "zhipu": "Zhipu AI / GLM",
+      "hunyuan": "Tencent Hunyuan",
+      "nvidia": "NVIDIA NIM",
+      "siliconflow": "SiliconFlow",
       "ollama": "Ollama (Local)",
       "custom": "Custom"
     },

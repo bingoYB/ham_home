@@ -67,7 +67,7 @@ const PAGE_TITLES: Record<string, { title: string; description?: string }> = {
 function AppContent() {
   const { t } = useTranslation(['common', 'bookmark', 'settings']);
   const { language, switchLanguage, availableLanguages } = useLanguage();
-  
+
   // 从 URL hash 获取初始页面
   const getInitialView = () => {
     const hash = window.location.hash.slice(1);
@@ -122,21 +122,62 @@ function AppContent() {
     return appSettings.theme;
   };
 
-  // Switch 切换明暗主题
-  const handleThemeSwitch = (checked: boolean) => {
-    const newTheme = checked ? 'dark' : 'light';
-    updateAppSettings({ theme: newTheme });
+  /**
+   * 使用 View Transitions API 切换主题（带圆形扩展动画）
+   */
+  const setThemeWithTransition = (
+    newTheme: 'light' | 'dark' | 'system',
+    x?: number,
+    y?: number
+  ) => {
+    const clickX = x ?? window.innerWidth / 2;
+    const clickY = y ?? window.innerHeight / 2;
+
+    // 如果不支持 View Transitions API，直接切换
+    if (!document.startViewTransition) {
+      updateAppSettings({ theme: newTheme });
+      return;
+    }
+
+    // 计算圆形动画的最大半径
+    const maxRadius = Math.hypot(
+      Math.max(clickX, window.innerWidth - clickX),
+      Math.max(clickY, window.innerHeight - clickY)
+    );
+
+    // 设置 CSS 变量
+    const root = document.documentElement;
+    root.style.setProperty('--theme-transition-x', `${clickX}px`);
+    root.style.setProperty('--theme-transition-y', `${clickY}px`);
+    root.style.setProperty('--theme-transition-radius', `${maxRadius}px`);
+
+    // 使用 View Transitions API
+    const transition = document.startViewTransition(() => {
+      updateAppSettings({ theme: newTheme });
+    });
+
+    transition.finished.then(() => {
+      root.style.removeProperty('--theme-transition-x');
+      root.style.removeProperty('--theme-transition-y');
+      root.style.removeProperty('--theme-transition-radius');
+    });
+  };
+
+  // Switch 切换明暗主题（捕获点击位置）
+  const handleThemeSwitchClick = (e: React.MouseEvent) => {
+    const newTheme = isDarkTheme ? 'light' : 'dark';
+    setThemeWithTransition(newTheme, e.clientX, e.clientY);
   };
 
   // 切换是否跟随系统
-  const handleSystemTheme = () => {
+  const handleSystemTheme = (e: React.MouseEvent) => {
     if (appSettings.theme === 'system') {
       // 如果当前是跟随系统，切换到当前实际主题
       const currentActual = getCurrentActualTheme();
-      updateAppSettings({ theme: currentActual });
+      setThemeWithTransition(currentActual, e.clientX, e.clientY);
     } else {
       // 如果当前不是跟随系统，切换到跟随系统
-      updateAppSettings({ theme: 'system' });
+      setThemeWithTransition('system', e.clientX, e.clientY);
     }
   };
 
@@ -154,44 +195,44 @@ function AppContent() {
 
   // 侧边栏菜单数据
   const navMain: AppSidebarNavItem[] = useMemo(() => [
-    { 
-      title: t('bookmark:bookmark.all'), 
-      url: '#all', 
-      icon: Bookmark, 
+    {
+      title: t('bookmark:bookmark.all'),
+      url: '#all',
+      icon: Bookmark,
       isActive: currentView === 'all',
-      badge: bookmarks.length 
+      badge: bookmarks.length
     },
-    { 
-      title: t('bookmark:bookmark.categories'), 
-      url: '#categories', 
-      icon: Folder, 
+    {
+      title: t('bookmark:bookmark.categories'),
+      url: '#categories',
+      icon: Folder,
       isActive: currentView === 'categories',
-      badge: categories.length 
+      badge: categories.length
     },
-    { 
-      title: t('bookmark:bookmark.tags'), 
-      url: '#tags', 
-      icon: Tag, 
+    {
+      title: t('bookmark:bookmark.tags'),
+      url: '#tags',
+      icon: Tag,
       isActive: currentView === 'tags',
-      badge: allTags.length 
+      badge: allTags.length
     },
-    { 
-      title: t('bookmark:bookmark.privacy'), 
-      url: '#privacy', 
-      icon: Shield, 
-      isActive: currentView === 'privacy' 
+    {
+      title: t('bookmark:bookmark.privacy'),
+      url: '#privacy',
+      icon: Shield,
+      isActive: currentView === 'privacy'
     },
-    { 
-      title: t('settings:settings.importExport.title'), 
-      url: '#import-export', 
-      icon: Download, 
-      isActive: currentView === 'import-export' 
+    {
+      title: t('settings:settings.importExport.title'),
+      url: '#import-export',
+      icon: Download,
+      isActive: currentView === 'import-export'
     },
-    { 
-      title: t('settings:settings.title'), 
-      url: '#settings', 
-      icon: Settings, 
-      isActive: currentView === 'settings' 
+    {
+      title: t('settings:settings.title'),
+      url: '#settings',
+      icon: Settings,
+      isActive: currentView === 'settings'
     },
   ], [t, currentView, bookmarks.length, categories.length, allTags.length]);
 
@@ -330,7 +371,7 @@ function AppContent() {
                   <DropdownMenuItem
                     key={lng}
                     onClick={() => switchLanguage(lng)}
-                    className={language === lng ? 'bg-accent' : ''}
+                    className={language === lng ? 'bg-accent text-accent-foreground' : ''}
                   >
                     {t(`common:common.languages.${lng}`)}
                   </DropdownMenuItem>
@@ -344,7 +385,10 @@ function AppContent() {
                   <Sun className="h-4 w-4 text-muted-foreground" />
                   <Switch
                     checked={isDarkTheme}
-                    onCheckedChange={handleThemeSwitch}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleThemeSwitchClick(e);
+                    }}
                   />
                   <Moon className="h-4 w-4 text-muted-foreground" />
                 </div>
@@ -370,7 +414,7 @@ function AppContent() {
                 {t('common:common.theme.system')}
               </TooltipContent>
             </Tooltip>
-            
+
           </div>
         </header>
         <main className="flex-1 overflow-auto">

@@ -16,12 +16,13 @@ WXT 框架已提供以下兼容性支持：
 - **位置**：`utils/browser-api.ts`
 - **功能**：
   - `getBrowserType()` - 获取当前浏览器类型
-  - `isFirefox()` / `isChrome()` / `isEdge()` - 浏览器类型检测
+  - `isFirefox()` - 浏览器类型检测
   - `getBrowserSpecificURL()` - 获取浏览器特定 URL
   - `safeOpenPopup()` - 安全打开 Popup（处理 Firefox 不支持的情况）
   - `safeCreateTab()` - 安全创建标签页
   - `getExtensionURL()` - 获取扩展内部页面 URL
-  - `browserFeatures` - 浏览器特性检测
+  - `safeSendMessageToTab()` - 安全发送消息到 Tab
+  - `safeBroadcastToTabs()` - 安全广播消息到所有 Tab
 
 ### 2. 快捷键设置页面 URL ✅
 - **问题**：不同浏览器的快捷键设置页面 URL 不同
@@ -74,7 +75,7 @@ WXT 框架已提供以下兼容性支持：
 - `entrypoints/background.ts`
 
 ### Downloads API (`chrome.downloads`)
-- `lib/export.ts`
+- `contexts/BookmarkContext.tsx`
 
 ## Manifest 配置差异
 

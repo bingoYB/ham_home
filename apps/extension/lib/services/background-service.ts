@@ -4,8 +4,10 @@
  */
 import { createProxyService, registerService } from '@webext-core/proxy-service';
 import type { ProxyServiceKey } from '@webext-core/proxy-service';
+import { browser } from 'wxt/browser';
 import { bookmarkStorage } from '@/lib/storage/bookmark-storage';
 import { configStorage } from '@/lib/storage/config-storage';
+import { getExtensionURL } from '@/utils/browser-api';
 import type { LocalBookmark, LocalCategory, LocalSettings } from '@/types';
 
 /**
@@ -51,7 +53,7 @@ class BackgroundServiceImpl implements IBackgroundService {
 
   async getPageHtml(): Promise<string | null> {
     try {
-      const [tab] = await chrome.tabs.query({
+      const [tab] = await browser.tabs.query({
         active: true,
         currentWindow: true,
       });
@@ -59,7 +61,7 @@ class BackgroundServiceImpl implements IBackgroundService {
       if (!tab?.id) return null;
 
       // 注入脚本获取完整 HTML
-      const results = await chrome.scripting.executeScript({
+      const results = await browser.scripting.executeScript({
         target: { tabId: tab.id },
         func: () => document.documentElement.outerHTML,
       });
@@ -72,11 +74,11 @@ class BackgroundServiceImpl implements IBackgroundService {
   }
 
   async openOptionsPage(): Promise<void> {
-    await chrome.tabs.create({ url: chrome.runtime.getURL('app.html#settings') });
+    await browser.tabs.create({ url: getExtensionURL('app.html#settings') });
   }
 
   async openTab(url: string): Promise<void> {
-    await chrome.tabs.create({ url });
+    await browser.tabs.create({ url });
   }
 }
 
