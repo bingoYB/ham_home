@@ -223,12 +223,19 @@ function buildUserPrompt(input: AnalyzeBookmarkInput, language: AILanguage = 'au
     tagContext = `\n预设标签: ${input.presetTags.slice(0, 20).join(', ')}`;
   }
 
+  // 构建已有标签上下文（用于去重）
+  let existingTagsContext = '';
+  if (input.existingTags && input.existingTags.length > 0) {
+    existingTagsContext = `\n用户已有标签: ${input.existingTags.slice(0, 50).join(', ')}`;
+  }
+
   return `请分析以下网页内容，生成书签元数据：
 
 网页信息：
 ${pageInfo}
 ${categoryContext}
 ${tagContext}
+${existingTagsContext}
 
 要求：
 1. title: 优化标题，简洁明了，保留核心信息，不超过50字
@@ -252,7 +259,11 @@ ${tagContext}
    - 简洁：中文2-5字，英文不超过2个单词
    - 准确：反映网页核心主题
    - 多样：涵盖网站/领域/具体内容
-   - 优先从预设标签中选择，避免重复
+   - 优先从预设标签中选择
+   - 【重要】避免与用户已有标签语义重复：
+     * 如已有"前端开发"，则不要生成"前端"、"Web开发"等相近标签
+     * 如已有"React"，则不要生成"ReactJS"、"React.js"等变体
+     * 优先复用已有标签，仅在确实需要新概念时才生成新标签
 
 ${getLanguageInstruction(language)}`;
 }
@@ -368,56 +379,158 @@ function buildTagsPrompt(input: AnalyzeBookmarkInput, language: AILanguage = 'au
     tagContext = `\n预设标签: ${input.presetTags.slice(0, 20).join(', ')}`;
   }
 
+  // 构建已有标签上下文（用于去重）
+  let existingTagsContext = '';
+  if (input.existingTags && input.existingTags.length > 0) {
+    existingTagsContext = `\n用户已有标签: ${input.existingTags.slice(0, 50).join(', ')}`;
+  }
+
   return `请分析以下网页内容，生成3-5个相关标签：
 
 网页信息：
 ${pageInfo}
 ${tagContext}
+${existingTagsContext}
 
 要求：
 - 简洁：中文2-5字，英文不超过2个单词
 - 准确：反映网页核心主题
 - 多样：涵盖网站/领域/具体内容
-- 优先从预设标签中选择，避免重复
+- 优先从预设标签中选择
+- 【重要】避免与用户已有标签语义重复：
+  * 如已有"前端开发"，则不要生成"前端"、"Web开发"等相近标签
+  * 优先复用已有标签，仅在确实需要新概念时才生成新标签
 
 ${getLanguageInstruction(language)}`;
 }
+
+/**
+ * 提供商默认配置
+ */
+interface ProviderConfig {
+  baseUrl: string;
+  models: string[];
+  requiresApiKey: boolean;
+}
+
+const PROVIDER_DEFAULTS: Record<string, ProviderConfig> = {
+  openai: {
+    baseUrl: 'https://api.openai.com/v1',
+    models: ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo', 'gpt-3.5-turbo', 'o1-mini', 'o1-preview'],
+    requiresApiKey: true,
+  },
+  anthropic: {
+    baseUrl: 'https://api.anthropic.com',
+    models: ['claude-3-5-haiku-latest', 'claude-3-5-sonnet-latest', 'claude-3-opus-latest'],
+    requiresApiKey: true,
+  },
+  google: {
+    baseUrl: 'https://generativelanguage.googleapis.com/v1beta/openai',
+    models: ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash', 'gemini-1.5-pro'],
+    requiresApiKey: true,
+  },
+  azure: {
+    baseUrl: '', // 用户必须提供
+    models: ['gpt-4o-mini', 'gpt-4o', 'gpt-4-turbo', 'gpt-35-turbo'],
+    requiresApiKey: true,
+  },
+  deepseek: {
+    baseUrl: 'https://api.deepseek.com/v1',
+    models: ['deepseek-chat', 'deepseek-reasoner'],
+    requiresApiKey: true,
+  },
+  groq: {
+    baseUrl: 'https://api.groq.com/openai/v1',
+    models: ['llama-3.3-70b-versatile', 'llama-3.1-8b-instant', 'mixtral-8x7b-32768', 'gemma2-9b-it'],
+    requiresApiKey: true,
+  },
+  mistral: {
+    baseUrl: 'https://api.mistral.ai/v1',
+    models: ['mistral-small-latest', 'mistral-medium-latest', 'mistral-large-latest', 'open-mistral-7b'],
+    requiresApiKey: true,
+  },
+  moonshot: {
+    baseUrl: 'https://api.moonshot.cn/v1',
+    models: ['moonshot-v1-8k', 'moonshot-v1-32k', 'moonshot-v1-128k'],
+    requiresApiKey: true,
+  },
+  zhipu: {
+    baseUrl: 'https://open.bigmodel.cn/api/paas/v4',
+    models: ['glm-4-flash', 'glm-4-plus', 'glm-4-air', 'glm-4-long'],
+    requiresApiKey: true,
+  },
+  hunyuan: {
+    baseUrl: 'https://api.hunyuan.cloud.tencent.com/v1',
+    models: ['hunyuan-lite', 'hunyuan-standard', 'hunyuan-pro', 'hunyuan-turbo'],
+    requiresApiKey: true,
+  },
+  nvidia: {
+    baseUrl: 'https://integrate.api.nvidia.com/v1',
+    models: ['meta/llama-3.1-8b-instruct', 'meta/llama-3.1-70b-instruct', 'nvidia/llama-3.1-nemotron-70b-instruct'],
+    requiresApiKey: true,
+  },
+  siliconflow: {
+    baseUrl: 'https://api.siliconflow.cn/v1',
+    models: ['Qwen/Qwen2.5-7B-Instruct', 'Qwen/Qwen2.5-72B-Instruct', 'deepseek-ai/DeepSeek-V3', 'Pro/deepseek-ai/DeepSeek-R1'],
+    requiresApiKey: true,
+  },
+  ollama: {
+    baseUrl: 'http://localhost:11434/v1',
+    models: ['llama3.2', 'llama3.1', 'mistral', 'qwen2.5', 'phi3'],
+    requiresApiKey: false,
+  },
+  custom: {
+    baseUrl: '',
+    models: ['gpt-4o-mini'],
+    requiresApiKey: true,
+  },
+};
 
 /**
  * 创建语言模型实例
  */
 function createLanguageModel(config: AIClientConfig): LanguageModelV1 {
   const { provider, apiKey, baseUrl, model } = config;
+  const defaults = PROVIDER_DEFAULTS[provider] || PROVIDER_DEFAULTS.custom;
 
   switch (provider) {
-    case 'openai':
-    case 'custom': {
-      const openai = createOpenAI({
-        apiKey: apiKey || '',
-        baseURL: baseUrl || 'https://api.openai.com/v1',
-      });
-      return openai(model || 'gpt-3.5-turbo');
-    }
-
     case 'anthropic': {
       const anthropic = createAnthropic({
         apiKey: apiKey || '',
-        baseURL: baseUrl,
+        baseURL: baseUrl || defaults.baseUrl,
       });
-      return anthropic(model || 'claude-3-haiku-20240307');
+      return anthropic(model || defaults.models[0]);
     }
 
     case 'ollama': {
-      // Ollama 兼容 OpenAI API
+      // Ollama 兼容 OpenAI API，不需要真实的 API key
       const ollama = createOpenAI({
-        baseURL: baseUrl || 'http://localhost:11434/v1',
-        apiKey: 'ollama', // Ollama 不需要真实的 API key
+        baseURL: baseUrl || defaults.baseUrl,
+        apiKey: 'ollama',
       });
-      return ollama(model || 'llama3');
+      return ollama(model || defaults.models[0]);
     }
 
-    default:
-      throw new Error(`Unsupported provider: ${provider}`);
+    // 所有其他提供商都兼容 OpenAI API
+    case 'openai':
+    case 'google':
+    case 'azure':
+    case 'deepseek':
+    case 'groq':
+    case 'mistral':
+    case 'moonshot':
+    case 'zhipu':
+    case 'hunyuan':
+    case 'nvidia':
+    case 'siliconflow':
+    case 'custom':
+    default: {
+      const openai = createOpenAI({
+        apiKey: apiKey || '',
+        baseURL: baseUrl || defaults.baseUrl,
+      });
+      return openai(model || defaults.models[0]);
+    }
   }
 }
 
@@ -880,19 +993,29 @@ ${description}
 }
 
 /**
- * 获取默认模型名称
+ * 获取默认模型名称（第一个模型）
  */
 export function getDefaultModel(provider: AIProvider): string {
-  switch (provider) {
-    case 'openai':
-      return 'gpt-3.5-turbo';
-    case 'anthropic':
-      return 'claude-3-haiku-20240307';
-    case 'ollama':
-      return 'llama3';
-    case 'custom':
-      return 'gpt-3.5-turbo';
-    default:
-      return 'gpt-3.5-turbo';
-  }
+  return PROVIDER_DEFAULTS[provider]?.models[0] || 'gpt-4o-mini';
+}
+
+/**
+ * 获取提供商支持的所有模型列表
+ */
+export function getProviderModels(provider: AIProvider): string[] {
+  return PROVIDER_DEFAULTS[provider]?.models || ['gpt-4o-mini'];
+}
+
+/**
+ * 获取提供商默认 Base URL
+ */
+export function getDefaultBaseUrl(provider: AIProvider): string {
+  return PROVIDER_DEFAULTS[provider]?.baseUrl || '';
+}
+
+/**
+ * 检查提供商是否需要 API Key
+ */
+export function requiresApiKey(provider: AIProvider): boolean {
+  return PROVIDER_DEFAULTS[provider]?.requiresApiKey ?? true;
 }

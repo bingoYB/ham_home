@@ -8,6 +8,7 @@ export {
   createAIClient,
   createExtendedAIClient,
   getDefaultModel,
+  getProviderModels,
   // AI 任务模式控制
   AI_BATCH_MODE,
   setAIBatchMode,

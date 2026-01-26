@@ -2,8 +2,36 @@ import { z } from 'zod';
 
 /**
  * AI 服务提供商类型
+ * - openai: OpenAI
+ * - anthropic: Anthropic Claude
+ * - google: Google Gemini
+ * - azure: Azure OpenAI
+ * - deepseek: DeepSeek
+ * - groq: Groq
+ * - mistral: Mistral AI
+ * - moonshot: Moonshot/Kimi (月之暗面)
+ * - zhipu: 智谱AI/GLM
+ * - hunyuan: 腾讯混元
+ * - nvidia: NVIDIA NIM
+ * - siliconflow: SiliconFlow (硅基流动)
+ * - ollama: Ollama (本地)
+ * - custom: 自定义 OpenAI 兼容 API
  */
-export type AIProvider = 'openai' | 'anthropic' | 'ollama' | 'custom';
+export type AIProvider = 
+  | 'openai' 
+  | 'anthropic' 
+  | 'google'
+  | 'azure'
+  | 'deepseek'
+  | 'groq'
+  | 'mistral'
+  | 'moonshot'
+  | 'zhipu'
+  | 'hunyuan'
+  | 'nvidia'
+  | 'siliconflow'
+  | 'ollama' 
+  | 'custom';
 
 /**
  * AI 配置接口
@@ -49,6 +77,7 @@ export interface AnalyzeBookmarkInput {
   // 上下文信息
   presetTags?: string[];      // 预设标签（由用户配置，用于自动匹配书签）
   existingCategories?: string[]; // 用户已有的分类
+  existingTags?: string[];    // 用户已有的标签（避免生成语义相近的重复标签）
 }
 
 /**
