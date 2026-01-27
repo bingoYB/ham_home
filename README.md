@@ -15,7 +15,7 @@
 </p>
 
 <p>
-  <a href="https://bingoyb.github.io/ham_home/">产品介绍</a> •
+  <a href="https://bingoyb.github.io/ham_home/">Product Introduction</a> •
   <a href="./docs/README_zh.md">中文文档</a> •
   <a href="#features">Features</a> •
   <a href="#development">Development</a> •
@@ -26,7 +26,7 @@
 
 HamHome is a browser extension that helps you collect, organize, and retrieve web content intelligently. It uses AI to automatically categorize pages, generate summaries, and suggest tags—while keeping your data local and private.
 
-👉 **[查看产品介绍](https://bingoyb.github.io/ham_home/)** - 了解更多功能和特性
+👉 **[View Product Introduction](https://bingoyb.github.io/ham_home/)** - Learn more about features and capabilities
 
 ## Features
 
