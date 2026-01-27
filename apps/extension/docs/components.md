@@ -985,6 +985,16 @@ AI 客户端封装，提供统一的 AI 分析接口。
 - 例如：已有 "前端开发" 标签时，AI 不会生成 "前端"、"Web开发" 等相近标签
 - 优先复用已有标签，仅在确实需要新概念时才生成新标签
 
+**AI 配置项控制：**
+
+| 配置项                | 类型      | 默认值 | 作用                                                 |
+| --------------------- | --------- | ------ | ---------------------------------------------------- |
+| `enableSmartCategory` | `boolean` | `true` | 是否自动应用 AI 推荐的分类，关闭后 AI 分类建议不生效 |
+| `enableTagSuggestion` | `boolean` | `true` | 是否自动应用 AI 推荐的标签，关闭后 AI 标签建议不生效 |
+
+- 这两个配置在设置页面的 AI 设置区域可以开关
+- 关闭后 AI 仍会执行分析，但分析结果中的分类/标签不会自动填充到表单
+
 **用法示例：**
 
 ```ts
@@ -1003,6 +1013,31 @@ const result = await aiClient.analyzeComplete({
   userCategories: categories,
   existingTags, // 传递已有标签避免重复
 });
+```
+
+#### translate
+
+翻译文本（标签或摘要），目标语言由用户设置决定。
+
+**参数：**
+
+| Property   | Type           | Required | Default           | Description          |
+| ---------- | -------------- | -------- | ----------------- | -------------------- |
+| text       | `string`       | ✓        | -                 | 要翻译的文本         |
+| targetLang | `'zh' \| 'en'` | -        | 用户语言设置      | 目标语言             |
+
+**行为说明：**
+
+- 仅在 `AIConfig.enableTranslation` 为 `true` 时执行翻译
+- 目标语言取自 `LocalSettings.language`，不再硬编码为中文
+- 未配置 AI 或未启用翻译时，直接返回原文
+
+**用法示例：**
+
+```ts
+// 翻译到用户设置的语言
+const settings = await configStorage.getSettings();
+const translated = await aiClient.translate(text, settings.language);
 ```
 
 ---

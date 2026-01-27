@@ -46,26 +46,21 @@ export function getAIBatchMode(): boolean {
 }
 
 /**
- * 获取语言指令
- */
-function getLanguageInstruction(language: AILanguage): string {
-  switch (language) {
-    case 'zh':
-      return '请使用中文输出所有结果。';
-    case 'en':
-      return 'Please output all results in English.';
-    case 'auto':
-    default:
-      return '请根据网页内容的主要语言输出结果（中文内容用中文，英文内容用英文）。';
-  }
-}
-
-/**
  * 系统提示词 - 用于书签分析（完整模式）
  * 参考 SmartBookmark 的提示词设计，强调结构化输出和约束
  */
 function getBookmarkAnalysisSystemPrompt(language: AILanguage): string {
-  const langInstruction = getLanguageInstruction(language);
+  if (language === 'en') {
+    return `You are a professional web content analyst skilled at extracting core themes and generating accurate metadata.
+
+Your task is to analyze web content and generate all of the following in one response:
+1. title: Optimized title
+2. summary: One-sentence summary
+3. category: Recommended category
+4. tags: Related tags
+
+Please strictly follow the output format requirements.`;
+  }
   return `你是一个专业的网页内容分析专家，擅长提取文章的核心主题并生成准确的元数据。
 
 你的任务是分析网页内容，一次性生成以下所有信息：
@@ -74,8 +69,6 @@ function getBookmarkAnalysisSystemPrompt(language: AILanguage): string {
 3. category: 推荐分类
 4. tags: 相关标签
 
-${langInstruction}
-
 请严格按照输出格式要求返回结果。`;
 }
 
@@ -83,14 +76,20 @@ ${langInstruction}
  * 系统提示词 - 生成标题与摘要
  */
 function getTitleSummarySystemPrompt(language: AILanguage): string {
-  const langInstruction = getLanguageInstruction(language);
+  if (language === 'en') {
+    return `You are a professional web content analyst skilled at extracting core themes from articles.
+
+Your task is to analyze web content and generate:
+1. title: Optimized title
+2. summary: One-sentence summary
+
+Please strictly follow the output format requirements.`;
+  }
   return `你是一个专业的网页内容分析专家，擅长提取文章的核心主题。
 
 你的任务是分析网页内容，生成：
 1. title: 优化后的标题
 2. summary: 一句话摘要
-
-${langInstruction}
 
 请严格按照输出格式要求返回结果。`;
 }
@@ -99,12 +98,16 @@ ${langInstruction}
  * 系统提示词 - 推荐分类
  */
 function getCategorySystemPrompt(language: AILanguage): string {
-  const langInstruction = getLanguageInstruction(language);
+  if (language === 'en') {
+    return `You are a professional information classification expert skilled at matching content to the most appropriate category.
+
+Your task is to analyze web content and recommend the most suitable category.
+
+Please strictly follow the output format requirements.`;
+  }
   return `你是一个专业的信息分类专家，擅长为内容匹配最合适的分类。
 
 你的任务是分析网页内容，推荐一个最合适的分类。
-
-${langInstruction}
 
 请严格按照输出格式要求返回结果。`;
 }
@@ -113,12 +116,16 @@ ${langInstruction}
  * 系统提示词 - 推荐标签
  */
 function getTagsSystemPrompt(language: AILanguage): string {
-  const langInstruction = getLanguageInstruction(language);
+  if (language === 'en') {
+    return `You are a professional keyword extraction expert skilled at generating precise tags for content.
+
+Your task is to analyze web content and generate 3-5 relevant tags.
+
+Please strictly follow the output format requirements.`;
+  }
   return `你是一个专业的关键词提取专家，擅长为内容生成精准的标签。
 
 你的任务是分析网页内容，生成3-5个相关标签。
-
-${langInstruction}
 
 请严格按照输出格式要求返回结果。`;
 }
@@ -229,6 +236,43 @@ function buildUserPrompt(input: AnalyzeBookmarkInput, language: AILanguage = 'au
     existingTagsContext = `\n用户已有标签: ${input.existingTags.slice(0, 50).join(', ')}`;
   }
 
+  if (language === 'en') {
+    return `Please analyze the following web content and generate bookmark metadata:
+
+Page Information:
+${pageInfo}
+${categoryContext ? categoryContext.replace('用户已有分类:', 'User existing categories:') : ''}
+${tagContext ? tagContext.replace('预设标签:', 'Preset tags:') : ''}
+${existingTagsContext ? existingTagsContext.replace('用户已有标签:', 'User existing tags:') : ''}
+
+Requirements:
+1. title: Optimize the title, keep it concise and clear, preserve core information, max 50 characters
+2. summary: One-sentence summary, objectively describe core content, max 200 characters
+3. category: Recommend the most suitable category
+   - [IMPORTANT] User category structure explanation:
+     * Categories use hierarchical structure, format: "Parent > Child > Grandchild"
+     * Example: "Technology > Programming > JavaScript" represents 3 levels
+     * Return the complete category path (including all levels)
+   - [MANDATORY] Must prioritize exact match from user's existing categories:
+     * Carefully compare page content with each category's semantics
+     * Prefer the most specific subcategory over broad parent categories
+     * If multiple categories fit, choose the most precise match
+   - [New category rules] Only when no existing category applies:
+     * Must extend based on existing category tree structure
+     * Analyze existing categories to find the most relevant parent or sibling
+     * Add new subcategory under appropriate level
+     * Example: If "Technology > Frontend" exists, recommend "Technology > Backend" not standalone "Backend"
+4. tags: Generate 3-5 keyword tags
+   - Concise: Max 2-3 words each
+   - Accurate: Reflect the page's core themes
+   - Diverse: Cover site/domain/specific content
+   - Prefer selecting from preset tags
+   - [IMPORTANT] Avoid semantic duplicates with existing tags:
+     * If "Frontend Development" exists, don't generate "Frontend", "Web Dev", etc.
+     * If "React" exists, don't generate "ReactJS", "React.js" variants
+     * Prefer reusing existing tags, only create new ones for truly new concepts`;
+  }
+
   return `请分析以下网页内容，生成书签元数据：
 
 网页信息：
@@ -263,9 +307,7 @@ ${existingTagsContext}
    - 【重要】避免与用户已有标签语义重复：
      * 如已有"前端开发"，则不要生成"前端"、"Web开发"等相近标签
      * 如已有"React"，则不要生成"ReactJS"、"React.js"等变体
-     * 优先复用已有标签，仅在确实需要新概念时才生成新标签
-
-${getLanguageInstruction(language)}`;
+     * 优先复用已有标签，仅在确实需要新概念时才生成新标签`;
 }
 
 /**
@@ -291,6 +333,17 @@ function buildTitleSummaryPrompt(input: AnalyzeBookmarkInput, language: AILangua
     pageInfo += `\nsite: ${input.metadata.siteName}`;
   }
 
+  if (language === 'en') {
+    return `Please analyze the following web content and generate an optimized title and summary:
+
+Page Information:
+${pageInfo}
+
+Requirements:
+1. title: Optimize the title, keep it concise and clear, preserve core information, max 50 characters
+2. summary: One-sentence summary, objectively describe core content, max 200 characters`;
+  }
+
   return `请分析以下网页内容，生成优化的标题和摘要：
 
 网页信息：
@@ -298,9 +351,7 @@ ${pageInfo}
 
 要求：
 1. title: 优化标题，简洁明了，保留核心信息，不超过50字
-2. summary: 一句话摘要，客观描述核心内容，不超过200字
-
-${getLanguageInstruction(language)}`;
+2. summary: 一句话摘要，客观描述核心内容，不超过200字`;
 }
 
 /**
@@ -327,6 +378,29 @@ function buildCategoryPrompt(input: AnalyzeBookmarkInput, language: AILanguage =
     categoryContext = `\n用户已有分类: ${input.existingCategories.join(', ')}`;
   }
 
+  if (language === 'en') {
+    return `Please analyze the following web content and recommend the most suitable category:
+
+Page Information:
+${pageInfo}
+${categoryContext ? categoryContext.replace('用户已有分类:', 'User existing categories:') : ''}
+
+Requirements:
+- [IMPORTANT] User category structure explanation:
+  * Categories use hierarchical structure, format: "Parent > Child > Grandchild"
+  * Example: "Technology > Programming > JavaScript" represents 3 levels
+  * Return the complete category path (including all levels)
+- [MANDATORY] Must prioritize exact match from user's existing categories:
+  * Carefully compare page content with each category's semantics
+  * Prefer the most specific subcategory over broad parent categories
+  * If multiple categories fit, choose the most precise match
+- [New category rules] Only when no existing category applies:
+  * Do not create standalone top-level categories
+  * Must extend based on existing category tree structure
+  * Analyze existing categories to find the most relevant parent or sibling
+  * Add new subcategory under appropriate level`;
+  }
+
   return `请分析以下网页内容，推荐最合适的分类：
 
 网页信息：
@@ -346,9 +420,7 @@ ${categoryContext}
   * 禁止创建独立的顶级分类
   * 必须基于已有分类树结构扩展
   * 分析已有分类，找到最相关的父分类或同级分类
-  * 在合适的层级下添加新的子分类
-
-${getLanguageInstruction(language)}`;
+  * 在合适的层级下添加新的子分类`;
 }
 
 /**
@@ -385,6 +457,24 @@ function buildTagsPrompt(input: AnalyzeBookmarkInput, language: AILanguage = 'au
     existingTagsContext = `\n用户已有标签: ${input.existingTags.slice(0, 50).join(', ')}`;
   }
 
+  if (language === 'en') {
+    return `Please analyze the following web content and generate 3-5 relevant tags:
+
+Page Information:
+${pageInfo}
+${tagContext ? tagContext.replace('预设标签:', 'Preset tags:') : ''}
+${existingTagsContext ? existingTagsContext.replace('用户已有标签:', 'User existing tags:') : ''}
+
+Requirements:
+- Concise: Max 2-3 words each
+- Accurate: Reflect the page's core themes
+- Diverse: Cover site/domain/specific content
+- Prefer selecting from preset tags
+- [IMPORTANT] Avoid semantic duplicates with existing tags:
+  * If "Frontend Development" exists, don't generate "Frontend", "Web Dev", etc.
+  * Prefer reusing existing tags, only create new ones for truly new concepts`;
+  }
+
   return `请分析以下网页内容，生成3-5个相关标签：
 
 网页信息：
@@ -399,9 +489,7 @@ ${existingTagsContext}
 - 优先从预设标签中选择
 - 【重要】避免与用户已有标签语义重复：
   * 如已有"前端开发"，则不要生成"前端"、"Web开发"等相近标签
-  * 优先复用已有标签，仅在确实需要新概念时才生成新标签
-
-${getLanguageInstruction(language)}`;
+  * 优先复用已有标签，仅在确实需要新概念时才生成新标签`;
 }
 
 /**
@@ -788,6 +876,7 @@ export function createExtendedAIClient(config: AIClientConfig) {
   const model = createLanguageModel(config);
   const { temperature = 0.3, maxTokens = 1000, debug = false } = config;
   const baseClient = createAIClient(config);
+  const { language = 'zh' } = config;
 
   return {
     ...baseClient,
@@ -801,7 +890,17 @@ export function createExtendedAIClient(config: AIClientConfig) {
       content: string;
       existingTags: string[];
     }): Promise<TagSuggestionResult[]> {
-      const prompt = `请为以下网页推荐 3-5 个相关标签。
+      const prompt = language === 'en'
+        ? `Please recommend 3-5 relevant tags for the following webpage.
+
+URL: ${input.url}
+Title: ${input.title}
+Content summary: ${input.content.slice(0, 500)}
+
+Requirements:
+1. Tags should be concise, accurate, and distinctive
+2. Use English for tags, except for proper nouns`
+        : `请为以下网页推荐 3-5 个相关标签。
 
 URL: ${input.url}
 标题: ${input.title}
@@ -840,7 +939,19 @@ URL: ${input.url}
       content: string;
       userCategories: string[];
     }): Promise<CategorySuggestionResult[]> {
-      const prompt = `请为以下网页推荐最合适的分类。
+      const prompt = language === 'en'
+        ? `Please recommend the most suitable category for the following webpage.
+
+URL: ${input.url}
+Title: ${input.title}
+Content summary: ${input.content.slice(0, 500)}
+
+User's existing categories: ${input.userCategories.join(', ') || 'None'}
+
+Requirements:
+1. Prioritize selecting from user's existing categories
+2. Return 1-2 most suitable categories`
+        : `请为以下网页推荐最合适的分类。
 
 URL: ${input.url}
 标题: ${input.title}
@@ -927,7 +1038,47 @@ ${text}`;
      * 根据用户描述生成分类方案
      */
     async generateCategories(description: string): Promise<GeneratedCategory[]> {
-      const prompt = `你是一个专业的信息架构师，擅长为用户设计个性化的书签分类系统。
+      const prompt = language === 'en'
+        ? `You are a professional information architect skilled at designing personalized bookmark categorization systems.
+
+User's description:
+${description}
+
+Please generate a personalized bookmark categorization system based on the user's description.
+
+Important: Automatically detect the language used in the user's description and use the exact same language for all category names. For example:
+- User describes in English → Category names in English
+- User describes in Chinese → Category names in Chinese
+
+Requirements:
+1. Moderate number of categories (3-8 top-level categories)
+2. Support hierarchical structure (up to 3 levels)
+3. Category names should be concise (2-8 words)
+4. Categories should not overlap
+5. Cover all scenarios described by the user
+
+Output format example:
+{
+  "categories": [
+    {
+      "name": "Technology",
+      "children": [
+        { "name": "Frontend Development" },
+        { "name": "Backend Development" }
+      ]
+    },
+    {
+      "name": "Design Resources",
+      "children": [
+        { "name": "UI Design" },
+        { "name": "Icon Libraries" }
+      ]
+    }
+  ]
+}
+
+Please return in the above JSON format, including the "categories" field.`
+        : `你是一个专业的信息架构师，擅长为用户设计个性化的书签分类系统。
 
 用户需求描述：
 ${description}

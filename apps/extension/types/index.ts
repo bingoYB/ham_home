@@ -12,26 +12,31 @@ export interface LocalBookmark {
   id: string;
   url: string;
   title: string;
-  description: string;        // AI 生成的摘要
-  content?: string;           // 提取的正文 (Markdown)
+  description: string; // AI 生成的摘要
+  content?: string; // 提取的正文 (Markdown)
   categoryId: string | null;
   tags: string[];
   favicon?: string;
-  hasSnapshot: boolean;       // 是否有本地快照
-  createdAt: number;          // 时间戳
-  updatedAt: number;          // 时间戳
-  isDeleted?: boolean;        // 软删除标记
+  hasSnapshot: boolean; // 是否有本地快照
+  createdAt: number; // 时间戳
+  updatedAt: number; // 时间戳
+  isDeleted?: boolean; // 软删除标记
 }
 
 /**
  * 创建书签的输入数据
  */
-export type CreateBookmarkInput = Omit<LocalBookmark, 'id' | 'createdAt' | 'updatedAt'>;
+export type CreateBookmarkInput = Omit<
+  LocalBookmark,
+  "id" | "createdAt" | "updatedAt"
+>;
 
 /**
  * 更新书签的输入数据
  */
-export type UpdateBookmarkInput = Partial<Omit<LocalBookmark, 'id' | 'createdAt' | 'updatedAt'>>;
+export type UpdateBookmarkInput = Partial<
+  Omit<LocalBookmark, "id" | "createdAt" | "updatedAt">
+>;
 
 // ============ 分类相关 ============
 
@@ -43,7 +48,7 @@ export interface LocalCategory {
   name: string;
   parentId: string | null;
   order: number;
-  createdAt: number;          // 时间戳
+  createdAt: number; // 时间戳
 }
 
 // ============ AI 配置相关 ============
@@ -65,21 +70,21 @@ export interface LocalCategory {
  * - ollama: Ollama (本地)
  * - custom: 自定义 OpenAI 兼容 API
  */
-export type AIProvider = 
-  | 'openai' 
-  | 'anthropic' 
-  | 'google'
-  | 'azure'
-  | 'deepseek'
-  | 'groq'
-  | 'mistral'
-  | 'moonshot'
-  | 'zhipu'
-  | 'hunyuan'
-  | 'nvidia'
-  | 'siliconflow'
-  | 'ollama' 
-  | 'custom';
+export type AIProvider =
+  | "openai"
+  | "anthropic"
+  | "google"
+  | "azure"
+  | "deepseek"
+  | "groq"
+  | "mistral"
+  | "moonshot"
+  | "zhipu"
+  | "hunyuan"
+  | "nvidia"
+  | "siliconflow"
+  | "ollama"
+  | "custom";
 
 /**
  * AI 配置
@@ -87,16 +92,17 @@ export type AIProvider =
 export interface AIConfig {
   provider: AIProvider;
   apiKey?: string;
-  baseUrl?: string;           // 自定义端点
+  baseUrl?: string; // 自定义端点
   model?: string;
   temperature?: number;
   maxTokens?: number;
   enableTranslation: boolean; // 是否启用翻译
   enableSmartCategory: boolean; // 是否启用智能分类
   enableTagSuggestion: boolean; // 是否启用标签推荐
-  presetTags?: string[];      // 预设标签列表（用于自动匹配书签）
-  privacyDomains?: string[];  // 隐私域名列表（不分析这些域名的页面内容）
+  presetTags?: string[]; // 预设标签列表（用于自动匹配书签）
+  privacyDomains?: string[]; // 隐私域名列表（不分析这些域名的页面内容）
   autoDetectPrivacy?: boolean; // 是否自动检测隐私页面（默认开启）
+  language?: Language; // AI 提示词语言
 }
 
 // ============ 用户设置相关 ============
@@ -104,29 +110,29 @@ export interface AIConfig {
 /**
  * 主题模式
  */
-export type ThemeMode = 'light' | 'dark' | 'system';
+export type ThemeMode = "light" | "dark" | "system";
 
 /**
  * 语言设置
  */
-export type Language = 'zh' | 'en';
+export type Language = "zh" | "en";
 
 /**
  * 书签面板位置
  */
-export type PanelPosition = 'left' | 'right';
+export type PanelPosition = "left" | "right";
 
 /**
  * 用户设置
  */
 export interface LocalSettings {
-  autoSaveSnapshot: boolean;  // 自动保存快照
+  autoSaveSnapshot: boolean; // 自动保存快照
   defaultCategory: string | null;
   theme: ThemeMode;
   language: Language;
-  shortcut: string;           // 快捷键配置
+  shortcut: string; // 快捷键配置
   panelPosition: PanelPosition; // 书签面板位置
-  panelShortcut: string;      // 面板快捷键
+  panelShortcut: string; // 面板快捷键
 }
 
 // ============ 快照相关 ============
@@ -139,7 +145,7 @@ export interface Snapshot {
   bookmarkId: string;
   html: Blob;
   size: number;
-  createdAt: number;          // 时间戳
+  createdAt: number; // 时间戳
 }
 
 // ============ 页面内容提取 ============
@@ -148,14 +154,14 @@ export interface Snapshot {
  * 页面元数据
  */
 export interface PageMetadata {
-  description?: string;       // meta description
-  keywords?: string;          // meta keywords
-  author?: string;            // 作者
-  siteName?: string;          // 网站名称
-  publishDate?: string;       // 发布日期
-  ogTitle?: string;           // Open Graph 标题
-  ogDescription?: string;     // Open Graph 描述
-  ogImage?: string;           // Open Graph 图片
+  description?: string; // meta description
+  keywords?: string; // meta keywords
+  author?: string; // 作者
+  siteName?: string; // 网站名称
+  publishDate?: string; // 发布日期
+  ogTitle?: string; // Open Graph 标题
+  ogDescription?: string; // Open Graph 描述
+  ogImage?: string; // Open Graph 图片
 }
 
 /**
@@ -164,14 +170,14 @@ export interface PageMetadata {
 export interface PageContent {
   url: string;
   title: string;
-  content: string;            // Markdown 格式
-  textContent: string;        // 纯文本
-  excerpt: string;            // 摘要
+  content: string; // Markdown 格式
+  textContent: string; // 纯文本
+  excerpt: string; // 摘要
   favicon: string;
-  metadata?: PageMetadata;    // 页面元数据
-  isReaderable?: boolean;     // 是否可读（Readability 判断）
-  isPrivate?: boolean;        // 是否为隐私页面
-  privacyReason?: string;     // 隐私原因
+  metadata?: PageMetadata; // 页面元数据
+  isReaderable?: boolean; // 是否可读（Readability 判断）
+  isPrivate?: boolean; // 是否为隐私页面
+  privacyReason?: string; // 隐私原因
 }
 
 // ============ 查询相关 ============
@@ -186,8 +192,8 @@ export interface BookmarkQuery {
   search?: string;
   limit?: number;
   offset?: number;
-  sortBy?: 'createdAt' | 'updatedAt' | 'title';
-  sortOrder?: 'asc' | 'desc';
+  sortBy?: "createdAt" | "updatedAt" | "title";
+  sortOrder?: "asc" | "desc";
 }
 
 // ============ AI 分析结果 ============
@@ -208,7 +214,7 @@ export interface AnalysisResult {
 export interface TagSuggestion {
   tag: string;
   confidence: number; // 0-1 置信度
-  reason?: string;    // 推荐原因
+  reason?: string; // 推荐原因
 }
 
 /**
@@ -218,7 +224,7 @@ export interface CategorySuggestion {
   categoryId: string;
   categoryName: string;
   confidence: number; // 0-1 置信度
-  reason?: string;    // 推荐原因
+  reason?: string; // 推荐原因
 }
 
 // ============ 消息通信 ============
@@ -226,7 +232,12 @@ export interface CategorySuggestion {
 /**
  * 批量操作类型
  */
-export type BatchOperationType = 'delete' | 'addTags' | 'removeTags' | 'changeCategory' | 'restore';
+export type BatchOperationType =
+  | "delete"
+  | "addTags"
+  | "removeTags"
+  | "changeCategory"
+  | "restore";
 
 /**
  * 批量操作参数
@@ -234,9 +245,9 @@ export type BatchOperationType = 'delete' | 'addTags' | 'removeTags' | 'changeCa
 export interface BatchOperationParams {
   operation: BatchOperationType;
   bookmarkIds: string[];
-  tags?: string[];        // 用于 addTags/removeTags
-  categoryId?: string | null;  // 用于 changeCategory
-  permanent?: boolean;    // 用于 delete
+  tags?: string[]; // 用于 addTags/removeTags
+  categoryId?: string | null; // 用于 changeCategory
+  permanent?: boolean; // 用于 delete
 }
 
 /**
@@ -284,12 +295,25 @@ export interface AIGeneratedCategory {
 /**
  * 筛选字段类型
  */
-export type FilterField = 'title' | 'url' | 'description' | 'tags' | 'createdAt';
+export type FilterField =
+  | "title"
+  | "url"
+  | "description"
+  | "tags"
+  | "createdAt";
 
 /**
  * 筛选操作符类型
  */
-export type FilterOperator = 'equals' | 'contains' | 'notEquals' | 'notContains' | 'startsWith' | 'endsWith' | 'greaterThan' | 'lessThan';
+export type FilterOperator =
+  | "equals"
+  | "contains"
+  | "notEquals"
+  | "notContains"
+  | "startsWith"
+  | "endsWith"
+  | "greaterThan"
+  | "lessThan";
 
 /**
  * 筛选条件

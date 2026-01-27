@@ -90,7 +90,15 @@ export function getBrowserSpecificURL(
 export async function safeOpenPopup(): Promise<boolean> {
   try {
     if (browser.action?.openPopup) {
+      console.log("[BrowserAPI] openPopup supported");
       await browser.action.openPopup();
+      return true;
+      // @ts-ignore
+    } else if (browser.browserAction?.openPopup) {
+      // 兼容火狐浏览器
+      console.log("[BrowserAPI] browserAction.openPopup supported");
+      // @ts-ignore
+      await browser.browserAction.openPopup();
       return true;
     }
   } catch (error) {

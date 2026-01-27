@@ -9,11 +9,7 @@
  * - 提供上下文（已有标签和分类）提高推荐准确性
  */
 import { createExtendedAIClient, getDefaultModel } from "@hamhome/ai";
-import type {
-  AIClient,
-  AnalyzeBookmarkInput,
-  GeneratedCategory,
-} from "@hamhome/ai";
+import type { AnalyzeBookmarkInput, GeneratedCategory } from "@hamhome/ai";
 import { configStorage } from "@/lib/storage";
 import type {
   AIConfig,
@@ -22,16 +18,12 @@ import type {
   CategorySuggestion,
   LocalCategory,
   PageContent,
-  PageMetadata,
-  HierarchicalCategory,
 } from "@/types";
 import {
   matchCategories,
-  PRESET_CATEGORIES,
   formatCategoryHierarchy,
   buildCategoryTree,
 } from "@/lib/preset-categories";
-import { bookmarkStorage } from "@/lib/storage";
 
 type ExtendedAIClient = ReturnType<typeof createExtendedAIClient>;
 
@@ -53,6 +45,8 @@ class ExtensionAIClient {
    */
   async loadConfig(): Promise<AIConfig> {
     this.config = await configStorage.getAIConfig();
+    const settings = await configStorage.getSettings();
+    this.config.language = settings.language;
     return this.config;
   }
 
@@ -83,6 +77,7 @@ class ExtensionAIClient {
         temperature: this.config.temperature,
         maxTokens: this.config.maxTokens,
         debug: true,
+        language: this.config.language,
       });
     }
     return this.client!;

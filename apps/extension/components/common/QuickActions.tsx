@@ -99,6 +99,17 @@ export function QuickActions({
     setIsMenuOpen(false);
     const backgroundService = getBackgroundService();
     const shortcutsUrl = getBrowserSpecificURL('shortcuts');
+    
+    // Firefox 不允许通过 tabs.create 打开 about: URLs（安全限制）
+    if (shortcutsUrl.startsWith('about:')) {
+      // 显示 Firefox 用户的操作指引
+      const message = language === 'zh'
+        ? '请手动打开 Firefox 扩展管理页面：\n\n1. 在地址栏输入 about:addons\n2. 点击右上角齿轮图标\n3. 选择"管理扩展快捷键"'
+        : 'Please open Firefox extension settings manually:\n\n1. Type about:addons in address bar\n2. Click the gear icon in top-right\n3. Select "Manage Extension Shortcuts"';
+      alert(message);
+      return;
+    }
+    
     backgroundService.openTab(shortcutsUrl).catch((error: unknown) => {
       console.error('[QuickActions] Failed to open shortcuts:', error);
     });

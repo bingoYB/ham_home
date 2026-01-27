@@ -125,6 +125,7 @@ export function useSavePanel({
    */
   const performAIAnalysis = useCallback(async (skipCache: boolean = false) => {
     const config = await configStorage.getAIConfig();
+    const settings = await configStorage.getSettings();
 
     // 检查 AI 是否已配置
     const isAIConfigured = config.provider === 'ollama' 
@@ -154,7 +155,8 @@ export function useSavePanel({
             setTags,
             setCategoryId,
             setAiRecommendedCategory,
-            existingBookmark
+            existingBookmark,
+            settings.language
           );
           setAIStatus('success');
           return;
@@ -189,7 +191,8 @@ export function useSavePanel({
         setTags,
         setCategoryId,
         setAiRecommendedCategory,
-        existingBookmark
+        existingBookmark,
+        settings.language
       );
 
       setAIStatus('success');
@@ -443,7 +446,8 @@ async function applyAnalysisResultWithSetters(
   setTags: (v: string[]) => void,
   setCategoryId: React.Dispatch<React.SetStateAction<string | null>>,
   setAiRecommendedCategory: React.Dispatch<React.SetStateAction<string | null>>,
-  existingBookmark: any
+  existingBookmark: any,
+  targetLang: 'zh' | 'en' = 'zh'
 ): Promise<void> {
   // 更新表单（仅非空值）
   if (result.title && !existingBookmark) {
@@ -453,18 +457,18 @@ async function applyAnalysisResultWithSetters(
   // 处理描述（翻译功能）
   if (result.summary) {
     if (config.enableTranslation) {
-      const translatedSummary = await aiClient.translate(result.summary, 'zh');
+      const translatedSummary = await aiClient.translate(result.summary, targetLang);
       setDescription(translatedSummary);
     } else {
       setDescription(result.summary);
     }
   }
 
-  // 处理标签（翻译功能）
-  if (result.tags.length > 0) {
+  // 处理标签（仅在启用标签推荐时）
+  if (config.enableTagSuggestion && result.tags.length > 0) {
     if (config.enableTranslation) {
       const translatedTags = await Promise.all(
-        result.tags.map((tag: string) => aiClient.translate(tag, 'zh'))
+        result.tags.map((tag: string) => aiClient.translate(tag, targetLang))
       );
       setTags(translatedTags);
     } else {
@@ -472,8 +476,8 @@ async function applyAnalysisResultWithSetters(
     }
   }
 
-  // 查找匹配的分类
-  if (result.category) {
+  // 查找匹配的分类（仅在启用智能分类时）
+  if (config.enableSmartCategory && result.category) {
     const matchResult = matchCategoryByName(result.category, categories);
     if (matchResult.matched) {
       setCategoryId(matchResult.categoryId);

@@ -13,6 +13,7 @@ WXT 框架已提供以下兼容性支持：
 ## 已处理的兼容性问题
 
 ### 1. 浏览器 API 兼容层 ✅
+
 - **位置**：`utils/browser-api.ts`
 - **功能**：
   - `getBrowserType()` - 获取当前浏览器类型
@@ -25,6 +26,7 @@ WXT 框架已提供以下兼容性支持：
   - `safeBroadcastToTabs()` - 安全广播消息到所有 Tab
 
 ### 2. 快捷键设置页面 URL ✅
+
 - **问题**：不同浏览器的快捷键设置页面 URL 不同
 - **解决方案**：使用 `getBrowserSpecificURL('shortcuts')`
   - Chrome/Edge: `chrome://extensions/shortcuts`
@@ -32,11 +34,13 @@ WXT 框架已提供以下兼容性支持：
 - **已更新文件**：`components/OptionsPage.tsx`
 
 ### 3. action.openPopup() API ✅
+
 - **问题**：Firefox 在某些情况下不支持 `chrome.action.openPopup()`
 - **解决方案**：使用 `safeOpenPopup()` 包装，静默处理错误
 - **已更新文件**：`entrypoints/background.ts`
 
 ### 4. 扩展内部页面跳转 ✅
+
 - **问题**：需要统一处理 `chrome.tabs.create` 和 `chrome.runtime.getURL`
 - **解决方案**：使用 `safeCreateTab()` 和 `getExtensionURL()` 组合
 - **已更新文件**：
@@ -49,7 +53,9 @@ WXT 框架已提供以下兼容性支持：
 以下 API 由 WXT 框架自动处理 polyfill，无需额外替换：
 
 ### 存储 API (WXT Storage)
+
 已迁移至 WXT Storage API，自动处理跨浏览器兼容：
+
 - `lib/storage/bookmark-storage.ts` - 使用 `storage.defineItem`
 - `lib/storage/config-storage.ts` - 使用 `storage.defineItem`
 - `lib/contentUi/index.tsx` - 使用 `configStorage.watchSettings`
@@ -58,6 +64,7 @@ WXT 框架已提供以下兼容性支持：
 - `contexts/BookmarkContext.tsx` - 使用 `bookmarkStorage.watchBookmarks/Categories`
 
 ### Runtime API (`chrome.runtime`)
+
 - `entrypoints/background.ts`
 - `entrypoints/content.ts`
 - `lib/contentUi/App.tsx`
@@ -65,16 +72,20 @@ WXT 框架已提供以下兼容性支持：
 - `components/SavePanel/useSavePanel.ts`
 
 ### Tabs API (`chrome.tabs`)
+
 - `entrypoints/background.ts`
 - `hooks/useCurrentPage.ts`
 
 ### Scripting API (`chrome.scripting`)
+
 - `entrypoints/background.ts`
 
 ### Commands API (`chrome.commands`)
+
 - `entrypoints/background.ts`
 
 ### Downloads API (`chrome.downloads`)
+
 - `contexts/BookmarkContext.tsx`
 
 ## Manifest 配置差异
@@ -99,6 +110,7 @@ WXT 框架已提供以下兼容性支持：
    - 图标路径 - 所有浏览器支持
 
 ### 5. Firefox 特定配置 ✅
+
 - **已添加**：`browser_specific_settings.gecko` 配置
 - **位置**：`wxt.config.ts`
 - **配置**：
@@ -142,15 +154,18 @@ pnpm zip:all       # 打包所有浏览器
 ## 特殊功能兼容性
 
 ### 1. `action.openPopup()`
+
 - **问题**：Firefox 在某些情况下不支持 `openPopup()`
 - **处理**：兼容层已添加错误处理，静默失败
 
 ### 2. Service Worker vs Background Page
+
 - **Chrome/Edge (Manifest V3)**：使用 Service Worker
 - **Firefox**：可能仍使用 Background Page
 - **状态**：WXT 框架已处理此差异
 
 ### 3. Content Script 执行上下文
+
 - **Firefox**：使用 Xray 视觉
 - **Chrome/Edge**：使用隔离世界
 - **状态**：当前实现应兼容两种方式
@@ -158,6 +173,7 @@ pnpm zip:all       # 打包所有浏览器
 ## 测试清单
 
 ### Chrome/Edge 测试
+
 - [ ] 存储操作（读取/写入）
 - [ ] 标签页操作（查询/创建）
 - [ ] 消息传递（runtime.sendMessage）
@@ -167,6 +183,7 @@ pnpm zip:all       # 打包所有浏览器
 - [ ] Popup 打开
 
 ### Firefox 测试
+
 - [ ] 存储操作（读取/写入）
 - [ ] 标签页操作（查询/创建）
 - [ ] 消息传递（runtime.sendMessage）
