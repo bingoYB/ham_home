@@ -1,0 +1,11 @@
+{
+  "name": "screenshot-tools",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "compress": "node compress.mjs"
+  },
+  "dependencies": {
+    "sharp": "^0.33.5"
+  }
+}
