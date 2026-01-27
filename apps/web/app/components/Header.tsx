@@ -154,7 +154,7 @@ export function Header({ isDark, isEn, onToggleTheme, onToggleLanguage }: Header
         {/* Logo + 品牌 */}
         <div className="flex items-center gap-3">
           <Image
-            src="/icon/128.png"
+            src={`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/icon/128.png`}
             alt="HamHome Logo"
             width={40}
             height={40}

@@ -25,7 +25,7 @@ app/components/
 
 ### 行为说明
 
-- Logo 使用 `/icon/128.png`，与插件 icon 保持一致
+- Logo 使用 `/icon/128.png`，路径会自动加上 `NEXT_PUBLIC_BASE_PATH` 前缀以支持 GitHub Pages 部署
 - 右上角包含下载下拉按钮和 GitHub 图标按钮
 - 下载按钮点击展开下拉菜单，包含多种安装渠道：
   - Chrome Web Store（待发布）
