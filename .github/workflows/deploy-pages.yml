@@ -59,6 +59,8 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
       - name: Build with Next.js
+        env:
+          NEXT_PUBLIC_BASE_PATH: /ham_home
         run: pnpm build:web
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
