@@ -501,19 +501,19 @@ const { containerRef, config } = useMasonryLayout({ benchWidth: 356 });
 
 **返回值：**
 
-| Property              | Type                                                             | Description                                          |
-| --------------------- | ---------------------------------------------------------------- | ---------------------------------------------------- |
-| theme                 | `'light' \| 'dark' \| 'system'`                                  | 当前主题                                             |
-| setTheme              | `(theme: Theme) => Promise<void>`                                | 设置主题并保存到存储（无动画）                       |
+| Property               | Type                                                                | Description                                          |
+| ---------------------- | ------------------------------------------------------------------- | ---------------------------------------------------- |
+| theme                  | `'light' \| 'dark' \| 'system'`                                     | 当前主题                                             |
+| setTheme               | `(theme: Theme) => Promise<void>`                                   | 设置主题并保存到存储（无动画）                       |
 | setThemeWithTransition | `(theme: Theme, options?: ThemeTransitionOptions) => Promise<void>` | 设置主题并使用 View Transitions API 圆形扩展动画切换 |
 
 **ThemeTransitionOptions 类型：**
 
-| Property        | Type      | Default | Description               |
-| --------------- | --------- | ------- | ------------------------- |
-| x               | `number`  | 屏幕中心 | 点击事件的 X 坐标          |
-| y               | `number`  | 屏幕中心 | 点击事件的 Y 坐标          |
-| enableAnimation | `boolean` | `true`  | 是否启用动画               |
+| Property        | Type      | Default  | Description       |
+| --------------- | --------- | -------- | ----------------- |
+| x               | `number`  | 屏幕中心 | 点击事件的 X 坐标 |
+| y               | `number`  | 屏幕中心 | 点击事件的 Y 坐标 |
+| enableAnimation | `boolean` | `true`   | 是否启用动画      |
 
 **用法示例：**
 
@@ -523,7 +523,9 @@ const { theme, setTheme } = useTheme();
 
 // Content UI 环境（需要传入 Shadow DOM 容器）
 const { container } = useContentUI();
-const { theme, setThemeWithTransition } = useTheme({ targetElement: container });
+const { theme, setThemeWithTransition } = useTheme({
+  targetElement: container,
+});
 
 // 使用圆形扩展动画切换主题（从点击位置向外扩展）
 const handleToggleTheme = (e: React.MouseEvent) => {
@@ -906,31 +908,31 @@ AI 配置和用户设置存储，基于 **WXT Storage (sync)** 实现，支持�
 
 支持的 AI 服务提供商：
 
-| 值           | 服务商名称     | API 兼容性   | 默认 Base URL                                          | 可用模型（第一个为默认）                  |
-| ------------ | -------------- | ------------ | ------------------------------------------------------ | ----------------------------------------- |
-| `openai`     | OpenAI         | OpenAI       | `https://api.openai.com/v1`                            | gpt-4o-mini, gpt-4o, gpt-4-turbo, gpt-3.5-turbo, o1-mini, o1-preview |
-| `anthropic`  | Anthropic      | Anthropic    | `https://api.anthropic.com`                            | claude-3-5-haiku-latest, claude-3-5-sonnet-latest, claude-3-opus-latest |
-| `google`     | Google Gemini  | OpenAI       | `https://generativelanguage.googleapis.com/v1beta/openai` | gemini-2.0-flash, gemini-2.0-flash-lite, gemini-1.5-flash, gemini-1.5-pro |
-| `azure`      | Azure OpenAI   | OpenAI       | 用户配置                                               | gpt-4o-mini, gpt-4o, gpt-4-turbo, gpt-35-turbo |
-| `deepseek`   | DeepSeek       | OpenAI       | `https://api.deepseek.com/v1`                          | deepseek-chat, deepseek-reasoner |
-| `groq`       | Groq           | OpenAI       | `https://api.groq.com/openai/v1`                       | llama-3.3-70b-versatile, llama-3.1-8b-instant, mixtral-8x7b-32768, gemma2-9b-it |
-| `mistral`    | Mistral AI     | OpenAI       | `https://api.mistral.ai/v1`                            | mistral-small-latest, mistral-medium-latest, mistral-large-latest, open-mistral-7b |
-| `moonshot`   | Moonshot/Kimi  | OpenAI       | `https://api.moonshot.cn/v1`                           | moonshot-v1-8k, moonshot-v1-32k, moonshot-v1-128k |
-| `zhipu`      | 智谱AI/GLM     | OpenAI       | `https://open.bigmodel.cn/api/paas/v4`                 | glm-4-flash, glm-4-plus, glm-4-air, glm-4-long |
-| `hunyuan`    | 腾讯混元       | OpenAI       | `https://api.hunyuan.cloud.tencent.com/v1`             | hunyuan-lite, hunyuan-standard, hunyuan-pro, hunyuan-turbo |
-| `nvidia`     | NVIDIA NIM     | OpenAI       | `https://integrate.api.nvidia.com/v1`                  | meta/llama-3.1-8b-instruct, meta/llama-3.1-70b-instruct, nvidia/llama-3.1-nemotron-70b-instruct |
-| `siliconflow`| 硅基流动       | OpenAI       | `https://api.siliconflow.cn/v1`                        | Qwen/Qwen2.5-7B-Instruct, Qwen/Qwen2.5-72B-Instruct, deepseek-ai/DeepSeek-V3, Pro/deepseek-ai/DeepSeek-R1 |
-| `ollama`     | Ollama（本地） | OpenAI       | `http://localhost:11434/v1`                            | llama3.2, llama3.1, mistral, qwen2.5, phi3 |
-| `custom`     | 自定义         | OpenAI       | 用户配置                                               | gpt-4o-mini |
+| 值            | 服务商名称     | API 兼容性 | 默认 Base URL                                             | 可用模型（第一个为默认）                                                                                  |
+| ------------- | -------------- | ---------- | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `openai`      | OpenAI         | OpenAI     | `https://api.openai.com/v1`                               | gpt-4o-mini, gpt-4o, gpt-4-turbo, gpt-3.5-turbo, o1-mini, o1-preview                                      |
+| `anthropic`   | Anthropic      | Anthropic  | `https://api.anthropic.com`                               | claude-3-5-haiku-latest, claude-3-5-sonnet-latest, claude-3-opus-latest                                   |
+| `google`      | Google Gemini  | OpenAI     | `https://generativelanguage.googleapis.com/v1beta/openai` | gemini-2.0-flash, gemini-2.0-flash-lite, gemini-1.5-flash, gemini-1.5-pro                                 |
+| `azure`       | Azure OpenAI   | OpenAI     | 用户配置                                                  | gpt-4o-mini, gpt-4o, gpt-4-turbo, gpt-35-turbo                                                            |
+| `deepseek`    | DeepSeek       | OpenAI     | `https://api.deepseek.com/v1`                             | deepseek-chat, deepseek-reasoner                                                                          |
+| `groq`        | Groq           | OpenAI     | `https://api.groq.com/openai/v1`                          | llama-3.3-70b-versatile, llama-3.1-8b-instant, mixtral-8x7b-32768, gemma2-9b-it                           |
+| `mistral`     | Mistral AI     | OpenAI     | `https://api.mistral.ai/v1`                               | mistral-small-latest, mistral-medium-latest, mistral-large-latest, open-mistral-7b                        |
+| `moonshot`    | Moonshot/Kimi  | OpenAI     | `https://api.moonshot.cn/v1`                              | moonshot-v1-8k, moonshot-v1-32k, moonshot-v1-128k                                                         |
+| `zhipu`       | 智谱AI/GLM     | OpenAI     | `https://open.bigmodel.cn/api/paas/v4`                    | glm-4-flash, glm-4-plus, glm-4-air, glm-4-long                                                            |
+| `hunyuan`     | 腾讯混元       | OpenAI     | `https://api.hunyuan.cloud.tencent.com/v1`                | hunyuan-lite, hunyuan-standard, hunyuan-pro, hunyuan-turbo                                                |
+| `nvidia`      | NVIDIA NIM     | OpenAI     | `https://integrate.api.nvidia.com/v1`                     | meta/llama-3.1-8b-instruct, meta/llama-3.1-70b-instruct, nvidia/llama-3.1-nemotron-70b-instruct           |
+| `siliconflow` | 硅基流动       | OpenAI     | `https://api.siliconflow.cn/v1`                           | Qwen/Qwen2.5-7B-Instruct, Qwen/Qwen2.5-72B-Instruct, deepseek-ai/DeepSeek-V3, Pro/deepseek-ai/DeepSeek-R1 |
+| `ollama`      | Ollama（本地） | OpenAI     | `http://localhost:11434/v1`                               | llama3.2, llama3.1, mistral, qwen2.5, phi3                                                                |
+| `custom`      | 自定义         | OpenAI     | 用户配置                                                  | gpt-4o-mini                                                                                               |
 
 **辅助函数：**
 
-| 函数                | 参数                 | 返回值       | 描述                     |
-| ------------------- | -------------------- | ------------ | ------------------------ |
-| `getDefaultModel`   | `provider: AIProvider` | `string`     | 获取默认模型（第一个）   |
-| `getProviderModels` | `provider: AIProvider` | `string[]`   | 获取提供商所有可用模型   |
-| `getDefaultBaseUrl` | `provider: AIProvider` | `string`     | 获取默认 Base URL        |
-| `requiresApiKey`    | `provider: AIProvider` | `boolean`    | 检查是否需要 API Key     |
+| 函数                | 参数                   | 返回值     | 描述                   |
+| ------------------- | ---------------------- | ---------- | ---------------------- |
+| `getDefaultModel`   | `provider: AIProvider` | `string`   | 获取默认模型（第一个） |
+| `getProviderModels` | `provider: AIProvider` | `string[]` | 获取提供商所有可用模型 |
+| `getDefaultBaseUrl` | `provider: AIProvider` | `string`   | 获取默认 Base URL      |
+| `requiresApiKey`    | `provider: AIProvider` | `boolean`  | 检查是否需要 API Key   |
 
 **行为说明：**
 
@@ -971,11 +973,11 @@ AI 客户端封装，提供统一的 AI 分析接口。
 
 **参数（EnhancedAnalyzeInput）：**
 
-| Property       | Type              | Required | Description                                    |
-| -------------- | ----------------- | -------- | ---------------------------------------------- |
-| pageContent    | `PageContent`     | ✓        | 页面内容对象                                   |
-| userCategories | `LocalCategory[]` | -        | 用户已有分类（用于智能匹配）                   |
-| existingTags   | `string[]`        | -        | 用户已有标签（避免生成语义相近的重复标签）     |
+| Property       | Type              | Required | Description                                |
+| -------------- | ----------------- | -------- | ------------------------------------------ |
+| pageContent    | `PageContent`     | ✓        | 页面内容对象                               |
+| userCategories | `LocalCategory[]` | -        | 用户已有分类（用于智能匹配）               |
+| existingTags   | `string[]`        | -        | 用户已有标签（避免生成语义相近的重复标签） |
 
 **行为说明：**
 
@@ -986,8 +988,8 @@ AI 客户端封装，提供统一的 AI 分析接口。
 **用法示例：**
 
 ```ts
-import { aiClient } from '@/lib/ai/client';
-import { bookmarkStorage } from '@/lib/storage';
+import { aiClient } from "@/lib/ai/client";
+import { bookmarkStorage } from "@/lib/storage";
 
 // 获取已有标签和分类
 const [categories, existingTags] = await Promise.all([
@@ -999,7 +1001,7 @@ const [categories, existingTags] = await Promise.all([
 const result = await aiClient.analyzeComplete({
   pageContent,
   userCategories: categories,
-  existingTags,  // 传递已有标签避免重复
+  existingTags, // 传递已有标签避免重复
 });
 ```
 

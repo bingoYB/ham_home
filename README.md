@@ -1,4 +1,3 @@
-
 <p>
   <img src="logo.png" alt="HamHome" width="280" />
 </p>
@@ -8,11 +7,11 @@
 **AI-Powered Bookmark Manager for Modern Browsers**
 
 <p>
-  <img src="https://img.shields.io/github/v/release/user/ham_home?style=flat-square" alt="Release" />
-  <img src="https://img.shields.io/github/stars/user/ham_home?style=flat-square" alt="Stars" />
-  <img src="https://img.shields.io/github/forks/user/ham_home?style=flat-square" alt="Forks" />
-  <img src="https://img.shields.io/github/issues/user/ham_home?style=flat-square" alt="Issues" />
-  <img src="https://img.shields.io/github/license/user/ham_home?style=flat-square" alt="License" />
+  <img src="https://img.shields.io/github/v/release/bingoYB/ham_home?style=flat-square" alt="Release" />
+  <img src="https://img.shields.io/github/stars/bingoYB/ham_home?style=flat-square" alt="Stars" />
+  <img src="https://img.shields.io/github/forks/bingoYB/ham_home?style=flat-square" alt="Forks" />
+  <img src="https://img.shields.io/github/issues/bingoYB/ham_home?style=flat-square" alt="Issues" />
+  <img src="https://img.shields.io/github/license/bingoYB/ham_home?style=flat-square" alt="License" />
 </p>
 
 <p>
@@ -30,32 +29,38 @@ HamHome is a browser extension that helps you collect, organize, and retrieve we
 ## Features
 
 ### 🤖 AI-Assisted Organization
+
 - Auto-categorization based on page content
 - Smart tag suggestions with configurable presets
 - AI-generated summaries for quick reference
 - BYOK (Bring Your Own Key) support for OpenAI, Anthropic, Ollama, and custom endpoints
 
 ### 🗂️ Category Management
+
 - **Preset Schemes**: Two built-in category templates—"General" and "Professional Creator"—with one-click import
 - **AI-Generated Categories**: Describe your use case and let AI create a tailored category structure
 - Unlimited hierarchical category tree
 
 ### 📸 Page Snapshots
+
 - Save complete HTML snapshots locally
 - Access content even when the original page goes offline
 - Powered by [Mozilla Readability](https://github.com/mozilla/readability) for clean extraction
 
 ### 🔍 Powerful Search & Filtering
+
 - Full-text search across titles, descriptions, and content
 - Filter by category, tags, and time range
 - Create custom filter presets for complex queries
 
 ### 🎯 Privacy-First Design
+
 - All data stored locally in Chrome Storage + IndexedDB
 - Configure privacy domains to exclude sensitive sites from AI analysis
 - Export/import your data anytime (JSON format)
 
 ### 🖥️ Modern UI
+
 - Grid (masonry) and list view modes
 - Light/dark theme with system preference detection
 - Full i18n support (English & Chinese)
@@ -63,11 +68,11 @@ HamHome is a browser extension that helps you collect, organize, and retrieve we
 
 ## Browser Support
 
-| Browser | Status |
-|---------|--------|
-| Chrome / Chromium | ✅ Manifest V3 |
-| Microsoft Edge | ✅ Manifest V3 |
-| Firefox | ✅ Manifest V2/V3 |
+| Browser           | Status            |
+| ----------------- | ----------------- |
+| Chrome / Chromium | ✅ Manifest V3    |
+| Microsoft Edge    | ✅ Manifest V3    |
+| Firefox           | ✅ Manifest V2/V3 |
 
 ## Downloads
 
@@ -77,7 +82,6 @@ HamHome is a browser extension that helps you collect, organize, and retrieve we
 - See [releases](https://github.com/user/ham_home/releases) to download and install manually.
 
 ## Installation
-
 
 ### From Source
 
@@ -115,13 +119,13 @@ pnpm --filter extension build:all
 ```
 
 ## Tech Stack
+
 <p>
   <img src="https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen?style=flat-square&logo=node.js" alt="Node" />
   <img src="https://img.shields.io/badge/pnpm-9.0.0-orange?style=flat-square&logo=pnpm" alt="pnpm" />
   <img src="https://img.shields.io/badge/TypeScript-5.7-blue?style=flat-square&logo=typescript" alt="TypeScript" />
   <img src="https://img.shields.io/badge/React-19-blue?style=flat-square&logo=react" alt="React" />
 </p>
-
 
 - **Framework**: [WXT](https://wxt.dev/) (Vite-based extension framework)
 - **UI**: React 19 + TypeScript + Tailwind CSS
