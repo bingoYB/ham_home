@@ -6,8 +6,8 @@ const nextConfig = {
   // 静态导出配置 (用于 GitHub Pages)
   output: 'export',
   // GitHub Pages 需要 basePath，值为仓库名称
-  // 如果设置了 NEXT_PUBLIC_BASE_PATH 环境变量则使用，否则默认为 /ham_home
-  basePath: process.env.NEXT_PUBLIC_BASE_PATH || '/ham_home',
+  // 开发环境不设置 basePath，生产构建时通过 NEXT_PUBLIC_BASE_PATH 环境变量设置
+  basePath: process.env.NEXT_PUBLIC_BASE_PATH || undefined,
   transpilePackages: ['@hamhome/ui', '@hamhome/types', '@hamhome/utils'],
   images: {
     unoptimized: true,
