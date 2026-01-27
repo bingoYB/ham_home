@@ -7,3 +7,43 @@
 .bookmark-list-view [data-slot="scroll-area-viewport"] > div {
   display: block !important;
 }
+
+/* ========================================
+   View Transitions API - 主题切换圆形扩展动画
+   ======================================== */
+
+/* 禁用默认的 View Transition 动画 */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
+}
+
+/* 旧视图（切换前的主题）保持在下层 */
+::view-transition-old(root) {
+  z-index: 1;
+}
+
+/* 新视图（切换后的主题）使用 clip-path 圆形扩展动画 */
+::view-transition-new(root) {
+  z-index: 9999;
+  animation: theme-transition-expand 0.4s ease-out;
+}
+
+/* 圆形扩展动画 - 从点击位置向外扩展 */
+@keyframes theme-transition-expand {
+  from {
+    clip-path: circle(0px at var(--theme-transition-x, 50%) var(--theme-transition-y, 50%));
+  }
+  to {
+    clip-path: circle(var(--theme-transition-radius, 100%) at var(--theme-transition-x, 50%) var(--theme-transition-y, 50%));
+  }
+}
+
+/* 减少动画偏好支持 */
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation-duration: 0.01ms !important;
+  }
+}

@@ -29,10 +29,43 @@ export default function HomePage() {
     }
   }, []);
 
-  // 切换主题
-  const toggleTheme = () => {
-    setIsDark(!isDark);
-    document.documentElement.classList.toggle('dark', !isDark);
+  // 切换主题（带动画效果）
+  const toggleTheme = (e?: React.MouseEvent) => {
+    const newIsDark = !isDark;
+    const root = document.documentElement;
+
+    // 如果不支持 View Transitions API，直接切换
+    if (!document.startViewTransition) {
+      setIsDark(newIsDark);
+      root.classList.toggle('dark', newIsDark);
+      return;
+    }
+
+    // 计算圆形动画的最大半径（从点击点到最远角落的距离）
+    const clickX = e?.clientX ?? window.innerWidth / 2;
+    const clickY = e?.clientY ?? window.innerHeight / 2;
+    const maxRadius = Math.hypot(
+      Math.max(clickX, window.innerWidth - clickX),
+      Math.max(clickY, window.innerHeight - clickY)
+    );
+
+    // 设置 CSS 变量用于动画
+    root.style.setProperty('--theme-transition-x', `${clickX}px`);
+    root.style.setProperty('--theme-transition-y', `${clickY}px`);
+    root.style.setProperty('--theme-transition-radius', `${maxRadius}px`);
+
+    // 使用 View Transitions API
+    const transition = document.startViewTransition(() => {
+      setIsDark(newIsDark);
+      root.classList.toggle('dark', newIsDark);
+    });
+
+    // 等待动画完成后清理 CSS 变量
+    transition.finished.then(() => {
+      root.style.removeProperty('--theme-transition-x');
+      root.style.removeProperty('--theme-transition-y');
+      root.style.removeProperty('--theme-transition-radius');
+    });
   };
 
   // 切换语言

@@ -1,5 +1,6 @@
 'use client';
 
+import * as React from 'react';
 import Image from 'next/image';
 import { Sun, Moon, Languages, Github, Download, ChevronDown, Package } from 'lucide-react';
 import {
@@ -17,7 +18,7 @@ import firefoxIcon from './icon/firefox.svg';
 interface HeaderProps {
   isDark: boolean;
   isEn: boolean;
-  onToggleTheme: () => void;
+  onToggleTheme: (e?: React.MouseEvent) => void;
   onToggleLanguage: () => void;
 }
 
@@ -128,6 +129,25 @@ function DownloadDropdown({ isEn }: { isEn: boolean }) {
 }
 
 export function Header({ isDark, isEn, onToggleTheme, onToggleLanguage }: HeaderProps) {
+  // 用于存储主题切换区域的点击位置
+  const themeToggleClickRef = React.useRef<{ x: number; y: number } | null>(null);
+  const themeToggleRef = React.useRef<HTMLDivElement>(null);
+
+  // 使用 onPointerDown 捕获点击位置（在 onCheckedChange 之前触发）
+  const handleThemeTogglePointerDown = (e: React.PointerEvent) => {
+    themeToggleClickRef.current = { x: e.clientX, y: e.clientY };
+  };
+
+  const handleThemeToggle = () => {
+    const clickPos = themeToggleClickRef.current;
+    // 创建一个合成事件对象传递点击位置
+    const syntheticEvent = {
+      clientX: clickPos?.x ?? window.innerWidth / 2,
+      clientY: clickPos?.y ?? window.innerHeight / 2,
+    } as React.MouseEvent;
+    onToggleTheme(syntheticEvent);
+  };
+
   return (
     <header className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <div className="container flex h-16 items-center justify-between px-4 mx-auto">
@@ -159,9 +179,13 @@ export function Header({ isDark, isEn, onToggleTheme, onToggleLanguage }: Header
           </Button>
 
           {/* 主题切换 */}
-          <div className="flex items-center gap-2">
+          <div
+            ref={themeToggleRef}
+            className="flex items-center gap-2"
+            onPointerDown={handleThemeTogglePointerDown}
+          >
             <Sun className="h-4 w-4 text-muted-foreground" />
-            <Switch checked={isDark} onCheckedChange={onToggleTheme} />
+            <Switch checked={isDark} onCheckedChange={handleThemeToggle} />
             <Moon className="h-4 w-4 text-muted-foreground" />
           </div>
 
