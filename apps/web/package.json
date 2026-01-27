@@ -2,7 +2,7 @@
   "name": "web",
   "version": "1.0.0",
   "private": true,
-  "description": "HamHome Web 管理端",
+  "description": "HamHome Web 产品介绍页",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -16,7 +16,8 @@
     "react-dom": "^19.0.0",
     "@hamhome/ui": "workspace:*",
     "@hamhome/types": "workspace:*",
-    "@hamhome/utils": "workspace:*"
+    "@hamhome/utils": "workspace:*",
+    "lucide-react": "^0.469.0"
   },
   "devDependencies": {
     "@types/react": "^19.0.0",
