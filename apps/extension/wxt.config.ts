@@ -22,7 +22,7 @@ export default defineConfig({
   manifest: ({ browser }) => ({
     name: "HamHome - 智能书签助手",
     description: "🐹 让收藏不再积灰，AI 驱动的智能书签管理工具",
-    version: "1.0.0",
+    version: "1.0.1",
     permissions: [
       "storage",
       "activeTab",
@@ -34,8 +34,8 @@ export default defineConfig({
     commands: {
       "save-bookmark": {
         suggested_key: {
-          default: "Ctrl+Shift+S",
-          mac: "Command+Shift+S",
+          default: "Ctrl+Shift+X",
+          mac: "Command+Shift+X",
         },
         description: "快速收藏当前页面",
       },
