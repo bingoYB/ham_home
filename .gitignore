@@ -38,3 +38,4 @@ coverage/
 # Misc
 *.tgz
 .cache/
+tsconfig.tsbuildinfo
