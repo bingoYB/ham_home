@@ -2,21 +2,21 @@
  * i18next 配置
  * 适用于 HamHome 浏览器插件
  */
-import i18n from 'i18next';
-import { initReactI18next } from 'react-i18next';
-import LanguageDetector from 'i18next-browser-languagedetector';
+import i18n from "i18next";
+import { initReactI18next } from "react-i18next";
+import LanguageDetector from "i18next-browser-languagedetector";
 
 // 导入英文翻译
-import enCommon from '@/locales/en/common.json';
-import enBookmark from '@/locales/en/bookmark.json';
-import enSettings from '@/locales/en/settings.json';
-import enAi from '@/locales/en/ai.json';
+import enCommon from "@/locales/en/common.json";
+import enBookmark from "@/locales/en/bookmark.json";
+import enSettings from "@/locales/en/settings.json";
+import enAi from "@/locales/en/ai.json";
 
 // 导入中文翻译
-import zhCommon from '@/locales/zh/common.json';
-import zhBookmark from '@/locales/zh/bookmark.json';
-import zhSettings from '@/locales/zh/settings.json';
-import zhAi from '@/locales/zh/ai.json';
+import zhCommon from "@/locales/zh/common.json";
+import zhBookmark from "@/locales/zh/bookmark.json";
+import zhSettings from "@/locales/zh/settings.json";
+import zhAi from "@/locales/zh/ai.json";
 
 const resources = {
   en: {
@@ -34,15 +34,15 @@ const resources = {
 };
 
 // localStorage key
-const I18N_STORAGE_KEY = 'i18nextLng';
+const I18N_STORAGE_KEY = "i18nextLng";
 
 // 自定义语言检测器，优先从 localStorage 读取
 const customLanguageDetector = {
-  name: 'customDetector',
+  name: "customDetector",
   lookup() {
     // 优先从 localStorage 读取
     const storedLng = localStorage.getItem(I18N_STORAGE_KEY);
-    if (storedLng && ['en', 'zh'].includes(storedLng)) {
+    if (storedLng && ["en", "zh"].includes(storedLng)) {
       return storedLng;
     }
     return undefined;
@@ -61,22 +61,17 @@ i18n
   .use(initReactI18next)
   .init({
     resources,
-    fallbackLng: 'en',
-    defaultNS: 'common',
-    ns: ['common', 'bookmark', 'settings', 'ai'],
-    debug: process.env.NODE_ENV === 'development',
+    fallbackLng: "en",
+    defaultNS: "common",
+    ns: ["common", "bookmark", "settings", "ai"],
+    debug: process.env.NODE_ENV === "development",
     interpolation: {
       escapeValue: false, // React 已处理 XSS 防护
     },
     detection: {
       // 自定义检测器优先
-      order: [
-        'customDetector',
-        'localStorage',
-        'navigator',
-        'htmlTag',
-      ],
-      caches: ['localStorage'],
+      order: ["customDetector", "localStorage", "navigator", "htmlTag"],
+      caches: ["localStorage"],
       lookupLocalStorage: I18N_STORAGE_KEY,
     },
     // 缓存用户选择的语言
@@ -87,9 +82,9 @@ i18n
 async function syncLanguageFromStorage() {
   try {
     // 动态导入避免循环依赖
-    const { configStorage } = await import('@/lib/storage');
+    const { configStorage } = await import("@/lib/storage");
     const settings = await configStorage.getSettings();
-    if (settings?.language && ['en', 'zh'].includes(settings.language)) {
+    if (settings?.language && ["en", "zh"].includes(settings.language)) {
       const currentLng = i18n.language;
       if (currentLng !== settings.language) {
         await i18n.changeLanguage(settings.language);
@@ -97,7 +92,7 @@ async function syncLanguageFromStorage() {
       }
     }
   } catch (error) {
-    console.warn('[i18n] Failed to sync language from storage:', error);
+    console.warn("[i18n] Failed to sync language from storage:", error);
   }
 }
 

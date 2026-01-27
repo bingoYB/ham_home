@@ -25,6 +25,7 @@ export default defineConfig({
       'activeTab',
       'scripting',
       'downloads',
+      'contextMenus',
     ],
     host_permissions: [
       '<all_urls>',

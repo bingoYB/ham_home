@@ -36,6 +36,9 @@
       "light": "Light mode",
       "dark": "Dark mode",
       "system": "Follow system"
+    },
+    "contextMenu": {
+      "saveToHamHome": "Save to HamHome"
     }
   }
 }
