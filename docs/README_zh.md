@@ -15,9 +15,9 @@
 </p>
 
 <p>
+  <a href="https://bingoyb.github.io/ham_home/">产品介绍</a> •
   <a href="../README.md">English</a> •
   <a href="#功能特性">功能特性</a> •
-  <a href="#安装">安装</a> •
   <a href="#开发">开发</a> •
   <a href="#贡献">贡献</a>
 </p>
@@ -25,6 +25,8 @@
 ## 什么是 HamHome？
 
 HamHome 是一款浏览器扩展，帮助你智能地收集、整理和检索网页内容。它使用 AI 自动分类页面、生成摘要、推荐标签——同时将数据完全保存在本地，保护你的隐私。
+
+👉 **[查看产品介绍](https://bingoyb.github.io/ham_home/)** - 了解更多功能和特性
 
 ## 功能特性
 
