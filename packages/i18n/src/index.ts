@@ -64,8 +64,8 @@ export function getCurrentLanguage(): Language {
 /**
  * 改变语言
  */
-export async function changeLanguage(lng: Language): Promise<string> {
-  return i18next.changeLanguage(lng);
+export async function changeLanguage(lng: Language): Promise<void> {
+  await i18next.changeLanguage(lng);
 }
 
 /**
