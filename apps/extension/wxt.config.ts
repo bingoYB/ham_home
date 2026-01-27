@@ -20,8 +20,9 @@ export default defineConfig({
     },
   },
   manifest: ({ browser }) => ({
-    name: "HamHome - 智能书签助手",
-    description: "🐹 让收藏不再积灰，AI 驱动的智能书签管理工具",
+    name: "__MSG_extName__",
+    description: "__MSG_extDescription__",
+    default_locale: "zh_CN",
     version: "1.0.1",
     permissions: [
       "storage",
@@ -37,14 +38,14 @@ export default defineConfig({
           default: "Ctrl+Shift+X",
           mac: "Command+Shift+X",
         },
-        description: "快速收藏当前页面",
+        description: "__MSG_commandSaveBookmark__",
       },
       "toggle-bookmark-panel": {
         suggested_key: {
           default: "Ctrl+Shift+L",
           mac: "Command+Shift+L",
         },
-        description: "切换书签面板",
+        description: "__MSG_commandTogglePanel__",
       },
     },
     icons: {
@@ -59,6 +60,11 @@ export default defineConfig({
         gecko: {
           id: "hamhome@example.com",
           strict_min_version: "109.0",
+          data_collection_permissions: {
+            required: false,
+            technical_data: false,
+            interaction_data: false,
+          },
         },
       },
     }),
