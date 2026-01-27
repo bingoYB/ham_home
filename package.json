@@ -14,9 +14,10 @@
     "dev:ext-firefox": "pnpm --filter extension dev:firefox",
     "dev:api": "pnpm --filter @hamhome/api dev",
     "build:web": "pnpm --filter web build",
-    "build:extension": "pnpm --filter extension build",
+    "build:extension": "pnpm --filter extension build:all",
     "build:api": "pnpm --filter @hamhome/api build",
-    "build:packages": "pnpm --filter './packages/*' build"
+    "build:packages": "pnpm --filter './packages/*' build",
+    "zip:extension": "pnpm --filter extension zip:all"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4.0.0",
