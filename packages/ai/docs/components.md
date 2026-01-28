@@ -61,7 +61,7 @@ const result = await client.analyzeBookmark({
 
 ## createExtendedAIClient
 
-扩展 AI 客户端，提供额外功能：标签推荐、分类推荐、翻译、分类生成。
+扩展 AI 客户端，提供额外功能：标签推荐、分类推荐、翻译、分类生成、通用结构化输出。
 
 ### 额外方法
 
@@ -71,5 +71,139 @@ const result = await client.analyzeBookmark({
 | suggestCategory | 推荐最合适的分类 |
 | translate | 翻译文本 |
 | generateCategories | 根据描述生成分类方案 |
+| generateObject | 通用结构化输出生成（基于 Zod schema） |
+| generateRaw | 原始文本生成 |
 
 所有方法均遵循 `language` 配置使用对应语言的提示词。
+
+### generateObject 方法
+
+用于生成符合指定 Zod schema 的结构化输出。
+
+#### 参数
+
+| 参数 | 类型 | 必填 | 说明 |
+|---|---|---|---|
+| schema | z.ZodType<T> | 是 | Zod schema 定义输出结构 |
+| prompt | string | 是 | 用户提示词 |
+| system | string | 否 | 系统提示词 |
+
+#### 使用示例
+
+```typescript
+import { createExtendedAIClient } from '@hamhome/ai';
+import { z } from 'zod';
+
+const client = createExtendedAIClient({
+  provider: 'openai',
+  apiKey: 'sk-xxx',
+});
+
+const SearchRequestSchema = z.object({
+  intent: z.enum(['find', 'summarize', 'compare', 'qa']),
+  query: z.string(),
+  topK: z.number(),
+});
+
+const result = await client.generateObject({
+  schema: SearchRequestSchema,
+  system: '你是一个搜索查询解析器...',
+  prompt: '帮我找最近保存的 React 相关文章',
+});
+
+console.log(result.intent); // 'find'
+console.log(result.query);  // 'React 相关文章'
+```
+
+## createEmbeddingClient
+
+创建 Embedding 客户端，用于生成文本向量。基于 `@ai-sdk` 的 `embed` 和 `embedMany` 函数。
+
+### Props
+
+| 参数 | 类型 | 必填 | 默认值 | 说明 |
+|---|---|---|---|---|
+| provider | AIProvider | 是 | - | AI 服务提供商 |
+| apiKey | string | 否 | - | API 密钥 |
+| baseUrl | string | 否 | 提供商默认 | 自定义 API 地址 |
+| model | string | 是 | - | Embedding 模型名 |
+| dimensions | number | 否 | - | 向量维度（部分 provider 支持） |
+
+### 支持的 Provider
+
+| Provider | 是否支持 | 默认模型 |
+|---|---|---|
+| openai | ✅ | text-embedding-3-small |
+| anthropic | ❌ | - |
+| google | ✅ | text-embedding-004 |
+| azure | ✅ | text-embedding-ada-002 |
+| deepseek | ❌ | - |
+| groq | ❌ | - |
+| mistral | ✅ | mistral-embed |
+| moonshot | ❌ | - |
+| zhipu | ✅ | embedding-3 |
+| hunyuan | ✅ | hunyuan-embedding |
+| nvidia | ✅ | nvidia/embed-qa-4 |
+| siliconflow | ✅ | BAAI/bge-m3 |
+| ollama | ✅ | nomic-embed-text |
+| custom | ✅ | text-embedding-3-small |
+
+### 返回的客户端方法
+
+| 方法 | 说明 |
+|---|---|
+| embed(text) | 生成单个文本的 embedding |
+| embedMany(texts) | 批量生成 embedding |
+| testConnection() | 测试连接 |
+| getModelKey() | 获取模型标识（用于向量存储） |
+
+### 使用示例
+
+```typescript
+import { createEmbeddingClient, isEmbeddingSupported } from '@hamhome/ai';
+
+// 检查 provider 是否支持 embedding
+if (isEmbeddingSupported('openai')) {
+  const client = createEmbeddingClient({
+    provider: 'openai',
+    apiKey: 'sk-xxx',
+    model: 'text-embedding-3-small',
+    dimensions: 1536,
+  });
+
+  // 单个文本
+  const { embedding, tokens } = await client.embed('Hello world');
+  console.log(embedding.length); // 1536
+
+  // 批量文本
+  const { embeddings } = await client.embedMany([
+    'First text',
+    'Second text',
+  ]);
+  console.log(embeddings.length); // 2
+}
+```
+
+## calculateCosineSimilarity
+
+计算两个向量的 cosine 相似度（基于 `@ai-sdk` 的 `cosineSimilarity` 函数）。
+
+### 使用示例
+
+```typescript
+import { calculateCosineSimilarity } from '@hamhome/ai';
+
+const similarity = calculateCosineSimilarity(
+  [0.1, 0.2, 0.3],
+  [0.1, 0.2, 0.4]
+);
+console.log(similarity); // 0.99...
+```
+
+## 辅助函数
+
+| 函数 | 说明 |
+|---|---|
+| isEmbeddingSupported(provider) | 检查 provider 是否支持 embedding |
+| getDefaultEmbeddingModel(provider) | 获取 provider 的默认 embedding 模型 |
+| getEmbeddingModelKey(config) | 生成模型标识字符串 |

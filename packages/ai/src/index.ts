@@ -15,5 +15,20 @@ export {
   getAIBatchMode,
 } from './client';
 
+// Embedding 相关
+export {
+  createEmbeddingClient,
+  isEmbeddingSupported,
+  getDefaultEmbeddingModel,
+  getEmbeddingModelKey,
+  calculateCosineSimilarity,
+} from './embedding';
+export type {
+  EmbeddingClientConfig,
+  EmbeddingResult,
+  EmbeddingBatchResult,
+  EmbeddingClient,
+} from './embedding';
+
 // 版本常量，用于验证模块引用
 export const AI_VERSION = '2.0.0'
