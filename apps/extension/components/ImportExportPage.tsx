@@ -112,15 +112,78 @@ export function ImportExportPage() {
     
     let imported = 0;
     let skipped = 0;
+    let categoriesCreated = 0;
 
-    // 导入分类
+    // 原始 ID -> 新 ID 的映射表
+    const categoryIdMap = new Map<string, string>();
+
+    // 获取现有分类，用于检查已存在的分类
+    const existingCategories = await bookmarkStorage.getCategories();
+    for (const cat of existingCategories) {
+      // 将现有分类也加入映射（以防导入数据引用的是已存在的分类）
+      categoryIdMap.set(cat.id, cat.id);
+    }
+
+    // 导入分类（需要按层级顺序处理，先处理根分类再处理子分类）
     if (data.categories && Array.isArray(data.categories)) {
-      for (const cat of data.categories) {
-        try {
-          await bookmarkStorage.createCategory(cat.name, cat.parentId);
-        } catch {
-          // 分类可能已存在，跳过
+      // 按层级排序：parentId 为 null 的先处理
+      const sortedCategories = [...data.categories].sort((a, b) => {
+        if (a.parentId === null && b.parentId !== null) return -1;
+        if (a.parentId !== null && b.parentId === null) return 1;
+        return 0;
+      });
+
+      // 多轮处理，确保父分类先创建
+      const pending = [...sortedCategories];
+      const maxRounds = 10; // 防止死循环
+      let round = 0;
+
+      while (pending.length > 0 && round < maxRounds) {
+        round++;
+        const stillPending: typeof pending = [];
+
+        for (const cat of pending) {
+          try {
+            // 转换 parentId：使用映射表获取新的父分类 ID
+            const newParentId = cat.parentId ? (categoryIdMap.get(cat.parentId) ?? null) : null;
+            
+            // 如果父分类还没有被创建（不在映射表中），延迟处理
+            if (cat.parentId && !categoryIdMap.has(cat.parentId)) {
+              stillPending.push(cat);
+              continue;
+            }
+
+            // 检查是否已存在同名同父级的分类
+            const allCategories = await bookmarkStorage.getCategories();
+            const existing = allCategories.find(
+              c => c.name === cat.name && c.parentId === newParentId
+            );
+
+            if (existing) {
+              // 分类已存在，记录映射关系
+              categoryIdMap.set(cat.id, existing.id);
+            } else {
+              // 创建新分类
+              const newCategory = await bookmarkStorage.createCategory(cat.name, newParentId);
+              // 记录原始 ID 到新 ID 的映射
+              categoryIdMap.set(cat.id, newCategory.id);
+              categoriesCreated++;
+            }
+          } catch {
+            // 创建失败，尝试查找已存在的分类
+            const allCategories = await bookmarkStorage.getCategories();
+            const newParentId = cat.parentId ? (categoryIdMap.get(cat.parentId) ?? null) : null;
+            const existing = allCategories.find(
+              c => c.name === cat.name && c.parentId === newParentId
+            );
+            if (existing) {
+              categoryIdMap.set(cat.id, existing.id);
+            }
+          }
         }
+
+        pending.length = 0;
+        pending.push(...stillPending);
       }
     }
 
@@ -128,11 +191,14 @@ export function ImportExportPage() {
     if (data.bookmarks && Array.isArray(data.bookmarks)) {
       for (const bm of data.bookmarks) {
         try {
+          // 转换 categoryId：使用映射表获取新的分类 ID
+          const newCategoryId = bm.categoryId ? (categoryIdMap.get(bm.categoryId) ?? null) : null;
+
           await bookmarkStorage.createBookmark({
             url: bm.url,
             title: bm.title,
             description: bm.description || bm.summary || '',
-            categoryId: bm.categoryId || null,
+            categoryId: newCategoryId,
             tags: bm.tags || [],
             favicon: bm.favicon || '',
             hasSnapshot: false,
@@ -144,10 +210,16 @@ export function ImportExportPage() {
       }
     }
 
+    // 构建结果详情
+    let details = t('settings.importExport.importDetails', { imported, skipped, ns: 'settings' });
+    if (categoriesCreated > 0) {
+      details = t('settings.importExport.importDetailsWithCategories', { imported, skipped, categoriesCreated, ns: 'settings' });
+    }
+
     setImportResult({
       success: true,
       message: t('settings.importExport.importSuccess', { ns: 'settings' }),
-      details: t('settings.importExport.importDetails', { imported, skipped, ns: 'settings' }),
+      details,
     });
   };
 
