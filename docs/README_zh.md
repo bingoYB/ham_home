@@ -7,11 +7,11 @@
 **AI 驱动的现代浏览器书签管理器**
 
 <p>
-  <img src="https://img.shields.io/github/v/release/user/ham_home?style=flat-square" alt="Release" />
-  <img src="https://img.shields.io/github/stars/user/ham_home?style=flat-square" alt="Stars" />
-  <img src="https://img.shields.io/github/forks/user/ham_home?style=flat-square" alt="Forks" />
-  <img src="https://img.shields.io/github/issues/user/ham_home?style=flat-square" alt="Issues" />
-  <img src="https://img.shields.io/github/license/user/ham_home?style=flat-square" alt="License" />
+  <img src="https://img.shields.io/github/v/release/bingoYB/ham_home?style=flat-square" alt="Release" />
+  <img src="https://img.shields.io/github/stars/bingoYB/ham_home?style=flat-square" alt="Stars" />
+  <img src="https://img.shields.io/github/forks/bingoYB/ham_home?style=flat-square" alt="Forks" />
+  <img src="https://img.shields.io/github/issues/bingoYB/ham_home?style=flat-square" alt="Issues" />
+  <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License" />
 </p>
 
 <p>
@@ -85,7 +85,7 @@ HamHome 是一款浏览器扩展，帮助你智能地收集、整理和检索网
 - [**Chrome Web Store**](): 待上传
 - [**Firefox Add-ons**](): 待上传
 - [**Microsoft Edge Addons**](https://microsoftedge.microsoft.com/addons/detail/hamhome/xxx)
-- 查看 [releases](https://github.com/user/ham_home/releases) 下载并手动安装。
+- 查看 [releases](https://github.com/bingoYB/ham_home/releases) 下载并手动安装。
 
 ## 安装
 
@@ -93,7 +93,7 @@ HamHome 是一款浏览器扩展，帮助你智能地收集、整理和检索网
 
 ```bash
 # 克隆仓库
-git clone https://github.com/user/ham_home.git
+git clone https://github.com/bingoYB/ham_home.git
 cd ham_home
 
 # 安装依赖（需要 pnpm）
