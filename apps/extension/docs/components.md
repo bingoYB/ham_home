@@ -960,6 +960,89 @@ AI 配置和用户设置存储，基于 **WXT Storage (sync)** 实现，支持�
 | `watchAIConfig`      | `callback: (config) => void`                       | `() => void`              | 监听 AI 配置变化 |
 | `watchSettings`      | `callback: (settings) => void`                     | `() => void`              | 监听设置变化     |
 | `watchCustomFilters` | `callback: (filters) => void`                      | `() => void`              | 监听筛选器变化   |
+| `getEmbeddingConfig` | -                                                  | `Promise<EmbeddingConfig>` | 获取 Embedding 配置 |
+| `setEmbeddingConfig` | `config: Partial<EmbeddingConfig>`                 | `Promise<EmbeddingConfig>` | 设置 Embedding 配置 |
+| `resetEmbeddingConfig` | -                                                | `Promise<EmbeddingConfig>` | 重置 Embedding 配置 |
+| `watchEmbeddingConfig` | `callback: (config) => void`                     | `() => void`              | 监听 Embedding 配置变化 |
+
+#### EmbeddingConfig 类型
+
+用于语义搜索的 Embedding 服务配置。
+
+| 属性 | 类型 | 必填 | 默认值 | 描述 |
+|------|------|------|--------|------|
+| `enabled` | `boolean` | ✓ | `false` | 是否启用语义检索 |
+| `provider` | `AIProvider` | ✓ | `'openai'` | 服务提供商 |
+| `baseUrl` | `string` | - | - | OpenAI-compatible base url |
+| `apiKey` | `string` | - | - | API Key（云端 provider 需要） |
+| `model` | `string` | ✓ | `'text-embedding-3-small'` | Embedding 模型名 |
+| `dimensions` | `number` | - | - | 向量维度（部分 provider 支持指定） |
+| `batchSize` | `number` | - | `16` | 批量 embedding 大小 |
+
+**支持 Embedding 的 Provider：**
+
+| Provider | 默认模型 | 说明 |
+|----------|----------|------|
+| `openai` | `text-embedding-3-small` | OpenAI Embedding API |
+| `google` | `text-embedding-004` | Google Gemini Embedding |
+| `azure` | `text-embedding-ada-002` | Azure OpenAI（需配置 baseUrl） |
+| `mistral` | `mistral-embed` | Mistral AI Embedding |
+| `zhipu` | `embedding-3` | 智谱 AI Embedding |
+| `hunyuan` | `hunyuan-embedding` | 腾讯混元 Embedding |
+| `nvidia` | `nvidia/embed-qa-4` | NVIDIA NIM Embedding |
+| `siliconflow` | `BAAI/bge-m3` | 硅基流动 BGE-M3 |
+| `ollama` | `nomic-embed-text` | Ollama 本地 Embedding（无需 API Key） |
+| `custom` | `text-embedding-3-small` | 自定义 OpenAI 兼容端点 |
+
+**不支持 Embedding 的 Provider：** `anthropic`、`deepseek`、`groq`、`moonshot`
+
+---
+
+### vector-store
+
+书签向量存储模块，基于 **IndexedDB** 实现语义搜索的向量存储。
+
+#### VectorStore 方法
+
+| Method | Parameters | Return | Description |
+|--------|------------|--------|-------------|
+| `saveEmbedding` | `embedding: BookmarkEmbedding` | `Promise<void>` | 保存单个书签向量 |
+| `saveEmbeddings` | `embeddings: BookmarkEmbedding[]` | `Promise<void>` | 批量保存书签向量 |
+| `getEmbedding` | `bookmarkId: string` | `Promise<BookmarkEmbedding \| null>` | 获取单个书签向量 |
+| `getEmbeddings` | `bookmarkIds: string[]` | `Promise<Map<string, BookmarkEmbedding>>` | 批量获取书签向量 |
+| `getEmbeddingsByModel` | `modelKey: string` | `Promise<BookmarkEmbedding[]>` | 获取指定模型的所有向量 |
+| `getAllEmbeddings` | - | `Promise<BookmarkEmbedding[]>` | 获取所有向量（用于语义搜索） |
+| `needsUpdate` | `bookmarkId: string, newChecksum: string` | `Promise<boolean>` | 检查是否需要重新生成向量 |
+| `deleteEmbedding` | `bookmarkId: string` | `Promise<void>` | 删除单个书签向量 |
+| `deleteEmbeddings` | `bookmarkIds: string[]` | `Promise<void>` | 批量删除书签向量 |
+| `deleteByModel` | `modelKey: string` | `Promise<number>` | 删除指定模型的所有向量 |
+| `clearAll` | - | `Promise<void>` | 清空所有向量 |
+| `getStats` | - | `Promise<VectorStoreStats>` | 获取存储统计信息 |
+| `getMissingBookmarkIds` | `allBookmarkIds: string[]` | `Promise<string[]>` | 获取没有向量的书签 ID 列表 |
+
+#### VectorStoreStats 类型
+
+| 属性 | 类型 | 描述 |
+|------|------|------|
+| `count` | `number` | 总向量数 |
+| `countByModel` | `Record<string, number>` | 按模型分组的向量数 |
+| `estimatedSize` | `number` | 估算存储大小（字节） |
+
+**用法示例：**
+
+```ts
+import { vectorStore } from '@/lib/storage';
+
+// 获取向量统计
+const stats = await vectorStore.getStats();
+console.log(`已索引 ${stats.count} 个书签，占用 ${(stats.estimatedSize / 1024).toFixed(1)} KB`);
+
+// 获取书签向量
+const embedding = await vectorStore.getEmbedding(bookmarkId);
+
+// 清空所有向量（重建前）
+await vectorStore.clearAll();
+```
 
 ---
 

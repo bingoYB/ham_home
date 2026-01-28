@@ -98,7 +98,48 @@
       "testConnection": "Test Connection",
       "testing": "Testing...",
       "removeTag": "Delete Tag",
-      "useCustomModel": "Use custom model: {{model}}"
+      "useCustomModel": "Use custom model: {{model}}",
+      "embedding": {
+        "title": "Semantic Search Configuration",
+        "description": "Configure Embedding service to enable semantic search",
+        "enabled": "Enable Semantic Search",
+        "enabledDesc": "Search bookmarks using vector similarity for fuzzy matching and semantic understanding",
+        "provider": "Embedding Provider",
+        "providerNotSupported": "Current provider does not support Embedding",
+        "apiKey": "API Key",
+        "apiKeyPlaceholder": "sk-...",
+        "apiKeyDesc": "API Key for Embedding service (stored locally, never uploaded)",
+        "baseUrl": "Base URL",
+        "baseUrlPlaceholder": "https://api.example.com/v1",
+        "model": "Embedding Model",
+        "modelPlaceholder": "text-embedding-3-small",
+        "batchSize": "Batch Size",
+        "batchSizeDesc": "Number of bookmarks per batch (recommended 8-32)",
+        "testConnection": "Test Connection",
+        "testing": "Testing...",
+        "testSuccess": "Connection successful, dimensions: {{dimensions}}",
+        "testFailed": "Connection failed: {{error}}",
+        "stats": {
+          "title": "Vector Index Status",
+          "vectorCount": "Indexed Bookmarks",
+          "coverage": "Coverage",
+          "storageSize": "Storage Used",
+          "calculating": "Calculating..."
+        },
+        "actions": {
+          "rebuild": "Rebuild Vector Index",
+          "rebuilding": "Rebuilding...",
+          "rebuildProgress": "{{completed}}/{{total}}",
+          "clear": "Clear Vector Data",
+          "clearing": "Clearing..."
+        },
+        "dialogs": {
+          "rebuildTitle": "Confirm Rebuild Vector Index",
+          "rebuildWarning": "This will delete existing vectors and regenerate embeddings for all bookmarks. This may take a while, continue?",
+          "clearTitle": "Confirm Clear Vector Data",
+          "clearWarning": "This will delete all bookmark vectors, semantic search will be temporarily unavailable. Confirm clear?"
+        }
+      }
     },
     "storage": {
       "title": "Storage Management",

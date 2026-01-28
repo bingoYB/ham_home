@@ -98,7 +98,48 @@
       "testConnection": "测试连接",
       "testing": "测试中...",
       "removeTag": "删除标签",
-      "useCustomModel": "使用自定义模型: {{model}}"
+      "useCustomModel": "使用自定义模型: {{model}}",
+      "embedding": {
+        "title": "语义搜索配置",
+        "description": "配置 Embedding 服务以启用语义搜索功能",
+        "enabled": "启用语义搜索",
+        "enabledDesc": "使用向量相似度搜索书签，支持模糊匹配和语义理解",
+        "provider": "Embedding 服务商",
+        "providerNotSupported": "当前服务商不支持 Embedding",
+        "apiKey": "API 密钥",
+        "apiKeyPlaceholder": "sk-...",
+        "apiKeyDesc": "Embedding 服务的 API Key（本地存储，不会上传）",
+        "baseUrl": "Base URL",
+        "baseUrlPlaceholder": "https://api.example.com/v1",
+        "model": "Embedding 模型",
+        "modelPlaceholder": "text-embedding-3-small",
+        "batchSize": "批量大小",
+        "batchSizeDesc": "每批处理的书签数量（建议 8-32）",
+        "testConnection": "测试连接",
+        "testing": "测试中...",
+        "testSuccess": "连接成功，向量维度: {{dimensions}}",
+        "testFailed": "连接失败: {{error}}",
+        "stats": {
+          "title": "向量索引状态",
+          "vectorCount": "已索引书签",
+          "coverage": "覆盖率",
+          "storageSize": "存储占用",
+          "calculating": "计算中..."
+        },
+        "actions": {
+          "rebuild": "重建向量索引",
+          "rebuilding": "重建中...",
+          "rebuildProgress": "{{completed}}/{{total}}",
+          "clear": "清除向量数据",
+          "clearing": "清除中..."
+        },
+        "dialogs": {
+          "rebuildTitle": "确认重建向量索引",
+          "rebuildWarning": "这将删除现有向量并重新为所有书签生成 Embedding。过程可能较慢，是否继续？",
+          "clearTitle": "确认清除向量数据",
+          "clearWarning": "这将删除所有书签的向量索引，语义搜索功能将暂时不可用。确认清除？"
+        }
+      }
     },
     "storage": {
       "title": "存储管理",
