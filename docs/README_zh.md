@@ -28,6 +28,16 @@ HamHome 是一款浏览器扩展，帮助你智能地收集、整理和检索网
 
 👉 **[查看产品介绍](https://bingoyb.github.io/ham_home/)** - 了解更多功能和特性
 
+## 产品截图
+
+| 侧边面板 | 保存面板 |
+|:---:|:---:|
+| ![侧边面板](screenshot/compressed/ch/side-panel.png) | ![保存面板](screenshot/compressed/ch/save-panel.png) |
+
+| 管理页面 | 设置页面 |
+|:---:|:---:|
+| ![管理页面](screenshot/compressed/ch/mng-page.png) | ![设置页面](screenshot/compressed/ch/setting-page.png) |
+
 ## 功能特性
 
 ### 🤖 AI 辅助整理

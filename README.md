@@ -28,6 +28,16 @@ HamHome is a browser extension that helps you collect, organize, and retrieve we
 
 👉 **[View Product Introduction](https://bingoyb.github.io/ham_home/)** - Learn more about features and capabilities
 
+## Screenshots
+
+| Side Panel | Save Panel |
+|:---:|:---:|
+| ![Side Panel](docs/screenshot/compressed/en/side-panel.png) | ![Save Panel](docs/screenshot/compressed/en/save-panel.png) |
+
+| Management Page | Settings Page |
+|:---:|:---:|
+| ![Management Page](docs/screenshot/compressed/en/mng-page.png) | ![Settings Page](docs/screenshot/compressed/en/setting-page.png) |
+
 ## Features
 
 ### 🤖 AI-Assisted Organization
