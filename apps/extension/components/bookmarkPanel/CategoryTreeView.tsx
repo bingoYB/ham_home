@@ -36,9 +36,12 @@ function buildCategoryTree(
   categories.forEach((cat) => categoryMap.set(cat.id, cat));
 
   // 按分类 ID 分组书签
+  // 空字符串、null、或指向不存在分类的 ID 都视为未分类
   const bookmarksByCategory = new Map<string | null, LocalBookmark[]>();
   bookmarks.forEach((bookmark) => {
-    const categoryId = bookmark.categoryId;
+    // 如果 categoryId 为空或对应的分类不存在，视为未分类
+    const rawCategoryId = bookmark.categoryId;
+    const categoryId = rawCategoryId && categoryMap.has(rawCategoryId) ? rawCategoryId : null;
     if (!bookmarksByCategory.has(categoryId)) {
       bookmarksByCategory.set(categoryId, []);
     }
@@ -201,9 +204,10 @@ export function CategoryTreeView({
 }: CategoryTreeViewProps) {
   // 展开状态管理
   const [expandedIds, setExpandedIds] = useState<Set<string>>(() => {
-    // 默认展开所有顶层分类
+    // 默认展开所有顶层分类和未分类
     const ids = new Set<string>();
     categories.filter((c) => !c.parentId).forEach((c) => ids.add(c.id));
+    ids.add('uncategorized');
     return ids;
   });
 
