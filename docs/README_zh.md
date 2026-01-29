@@ -87,7 +87,7 @@ HamHome 是一款浏览器扩展，帮助你智能地收集、整理和检索网
 
 - [**Chrome Web Store**](): 待上传
 - [**Firefox Add-ons**](): 待上传
-- [**Microsoft Edge Addons**](https://microsoftedge.microsoft.com/addons/detail/hamhome/xxx)
+- [**Microsoft Edge Addons**](https://microsoftedge.microsoft.com/addons/detail/hamhome-smart-bookmark-/nmbdgbicgagmokdmohgngcbhkaicfnpi)
 - 查看 [releases](https://github.com/bingoYB/ham_home/releases) 下载并手动安装。
 
 ## 安装

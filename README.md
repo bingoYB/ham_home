@@ -93,7 +93,7 @@ HamHome is a browser extension that helps you collect, organize, and retrieve we
 
 - [**Chrome Web Store**](): Pending upload
 - [**Firefox Add-ons**](): Pending upload
-- [**Microsoft Edge Addons**](https://microsoftedge.microsoft.com/addons/detail/hamhome/xxx)
+- [**Microsoft Edge Addons**](https://microsoftedge.microsoft.com/addons/detail/hamhome-smart-bookmark-/nmbdgbicgagmokdmohgngcbhkaicfnpi)
 - See [releases](https://github.com/bingoYB/ham_home/releases) to download and install manually.
 
 ## Installation

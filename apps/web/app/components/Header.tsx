@@ -55,8 +55,8 @@ const getDownloadChannels = (): DownloadChannel[] => [
     id: 'edge',
     label: { en: 'Edge Add-ons', zh: 'Edge 扩展商店' },
     icon: <Image src={edgeIcon} alt="Edge" width={16} height={16} />,
-    url: null,
-    published: false,
+    url: 'https://microsoftedge.microsoft.com/addons/detail/hamhome-smart-bookmark-/nmbdgbicgagmokdmohgngcbhkaicfnpi',
+    published: true,
   },
   {
     id: 'firefox',
