@@ -706,6 +706,31 @@ interface IBackgroundService {
   getPageHtml(): Promise<string | null>;
   /** 打开设置页面 */
   openOptionsPage(): Promise<void>;
+  /** 打开新标签页 */
+  openTab(url: string): Promise<void>;
+
+  // ========== Embedding 相关方法 ==========
+
+  /** 获取向量存储统计信息 */
+  getVectorStats(): Promise<VectorStoreStats>;
+  /** 清空所有向量数据 */
+  clearVectorStore(): Promise<void>;
+  /** 获取 embedding 队列状态 */
+  getEmbeddingQueueStatus(): Promise<QueueStatus>;
+  /** 开始重建向量索引 */
+  startEmbeddingRebuild(): Promise<{ jobCount: number }>;
+  /** 暂停 embedding 队列 */
+  pauseEmbeddingQueue(): Promise<void>;
+  /** 恢复 embedding 队列 */
+  resumeEmbeddingQueue(): Promise<void>;
+  /** 停止 embedding 队列 */
+  stopEmbeddingQueue(): Promise<void>;
+  /** 测试 embedding 连接 */
+  testEmbeddingConnection(): Promise<{ success: boolean; error?: string; dimensions?: number }>;
+  /** 添加书签到 embedding 队列（保存书签时调用） */
+  queueBookmarkEmbedding(bookmarkId: string): Promise<void>;
+  /** 批量添加书签到 embedding 队列（导入书签时调用） */
+  queueBookmarksEmbedding(bookmarkIds: string[]): Promise<void>;
 }
 ```
 
@@ -738,6 +763,26 @@ const html = await backgroundService.getPageHtml();
 
 // 打开设置页
 await backgroundService.openOptionsPage();
+
+// Embedding 相关操作（在 background 中执行，不受页面关闭影响）
+const stats = await backgroundService.getVectorStats();
+await backgroundService.startEmbeddingRebuild();
+```
+
+**Embedding 进度监听：**
+
+Embedding 重建任务在 background 中执行，进度通过消息广播更新：
+
+```ts
+import { browser } from 'wxt/browser';
+
+// 监听 embedding 进度
+browser.runtime.onMessage.addListener((message) => {
+  if (message.type === 'EMBEDDING_PROGRESS' && message.payload) {
+    const progress = message.payload; // { total, completed, failed, percentage }
+    console.log(`进度: ${progress.percentage}%`);
+  }
+});
 ```
 
 **行为说明：**
@@ -746,6 +791,7 @@ await backgroundService.openOptionsPage();
 - 方法调用会自动路由到 background 执行
 - 完全类型安全，提供良好的 IDE 支持
 - 替代手动编写 `chrome.runtime.sendMessage` / `onMessage` 样板代码
+- **Embedding 任务在 background 中执行**，页面关闭后任务不会中断
 
 ---
 

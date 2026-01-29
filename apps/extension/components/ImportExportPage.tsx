@@ -16,6 +16,7 @@ import {
 } from '@hamhome/ui';
 import { useBookmarks } from '@/contexts/BookmarkContext';
 import { bookmarkStorage } from '@/lib/storage/bookmark-storage';
+import { getBackgroundService } from '@/lib/services';
 import { aiClient } from '@/lib/ai/client';
 import { parseCategoryPath } from './common/CategoryTree';
 import type { LocalCategory } from '@/types';
@@ -188,13 +189,14 @@ export function ImportExportPage() {
     }
 
     // 导入书签
+    const importedBookmarkIds: string[] = [];
     if (data.bookmarks && Array.isArray(data.bookmarks)) {
       for (const bm of data.bookmarks) {
         try {
           // 转换 categoryId：使用映射表获取新的分类 ID
           const newCategoryId = bm.categoryId ? (categoryIdMap.get(bm.categoryId) ?? null) : null;
 
-          await bookmarkStorage.createBookmark({
+          const bookmark = await bookmarkStorage.createBookmark({
             url: bm.url,
             title: bm.title,
             description: bm.description || bm.summary || '',
@@ -203,10 +205,21 @@ export function ImportExportPage() {
             favicon: bm.favicon || '',
             hasSnapshot: false,
           });
+          importedBookmarkIds.push(bookmark.id);
           imported++;
         } catch {
           skipped++;
         }
+      }
+    }
+
+    // 批量添加 embedding 任务（在 background 中执行）
+    if (importedBookmarkIds.length > 0) {
+      try {
+        const bgService = getBackgroundService();
+        await bgService.queueBookmarksEmbedding(importedBookmarkIds);
+      } catch (e) {
+        console.warn('[ImportExport] Failed to queue embeddings:', e);
       }
     }
 
@@ -410,6 +423,7 @@ export function ImportExportPage() {
     let duplicateSkipped = 0; // 区分重复跳过
     let categoriesCreated = 0;
     let aiProcessed = 0;
+    const importedBookmarkIds: string[] = [];
     
     // 分类名称到 ID 的映射（用于处理重复名称）
     const categoryMap = new Map<string, string>();
@@ -561,7 +575,7 @@ export function ImportExportPage() {
           ? `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`
           : '';
 
-        await bookmarkStorage.createBookmark({
+        const bookmark = await bookmarkStorage.createBookmark({
           url: bm.url,
           title: bm.title,
           description,
@@ -570,6 +584,7 @@ export function ImportExportPage() {
           favicon,
           hasSnapshot: false,
         });
+        importedBookmarkIds.push(bookmark.id);
         imported++;
         importedUrls.add(normalizedUrl); // 标记为已导入
       } catch (err) {
@@ -584,6 +599,16 @@ export function ImportExportPage() {
     }
 
     setImportProgress(null);
+
+    // 批量添加 embedding 任务（在 background 中执行）
+    if (importedBookmarkIds.length > 0) {
+      try {
+        const bgService = getBackgroundService();
+        await bgService.queueBookmarksEmbedding(importedBookmarkIds);
+      } catch (e) {
+        console.warn('[ImportExport] Failed to queue embeddings:', e);
+      }
+    }
 
     // 合并跳过计数用于显示
     const totalSkipped = skipped + duplicateSkipped;

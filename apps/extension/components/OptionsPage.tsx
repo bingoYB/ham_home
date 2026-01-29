@@ -68,10 +68,11 @@ import { CustomFilterDialog } from '@/components/bookmarkPanel/CustomFilterDialo
 import { getBrowserSpecificURL, isFirefox, safeCreateTab } from '@/utils/browser-api';
 import { getDefaultModel, getProviderModels, isEmbeddingSupported, getDefaultEmbeddingModel } from '@hamhome/ai';
 import { aiClient } from '@/lib/ai/client';
-import { embeddingClient } from '@/lib/embedding/embedding-client';
-import { embeddingQueue, type QueueProgress } from '@/lib/embedding/embedding-queue';
-import { vectorStore, type VectorStoreStats } from '@/lib/storage/vector-store';
+import { getBackgroundService } from '@/lib/services';
+import type { QueueProgress } from '@/lib/embedding/embedding-queue';
+import type { VectorStoreStats } from '@/lib/storage/vector-store';
 import type { CustomFilter, FilterCondition, AIProvider, EmbeddingConfig } from '@/types';
+import { browser } from 'wxt/browser';
 
 export function OptionsPage() {
   const { t } = useTranslation(['common', 'settings']);
@@ -161,7 +162,7 @@ export function OptionsPage() {
     loadEmbeddingConfig();
   }, []);
 
-  // 加载向量统计信息
+  // 加载向量统计信息（通过 background service）
   const loadVectorStats = useCallback(async () => {
     // 只在 embedding 功能启用时加载统计
     if (!embeddingConfig.enabled) {
@@ -170,7 +171,8 @@ export function OptionsPage() {
     }
     setIsLoadingStats(true);
     try {
-      const stats = await vectorStore.getStats();
+      const bgService = getBackgroundService();
+      const stats = await bgService.getVectorStats();
       setVectorStats(stats);
     } catch (error) {
       console.error('[OptionsPage] Failed to load vector stats:', error);
@@ -182,6 +184,28 @@ export function OptionsPage() {
 
   useEffect(() => {
     loadVectorStats();
+  }, [loadVectorStats]);
+
+  // 监听 background service 的 embedding 进度消息
+  useEffect(() => {
+    const handleMessage = (message: { type: string; payload?: QueueProgress }) => {
+      if (message.type === 'EMBEDDING_PROGRESS' && message.payload) {
+        const progress = message.payload;
+        setRebuildProgress(progress);
+
+        // 当进度达到 100% 时，刷新统计并重置状态
+        if (progress.percentage >= 100) {
+          setIsRebuilding(false);
+          setRebuildProgress(null);
+          loadVectorStats();
+        }
+      }
+    };
+
+    browser.runtime.onMessage.addListener(handleMessage);
+    return () => {
+      browser.runtime.onMessage.removeListener(handleMessage);
+    };
   }, [loadVectorStats]);
 
   const handleTestConnection = async () => {
@@ -249,14 +273,13 @@ export function OptionsPage() {
     try {
       const updated = await configStorage.setEmbeddingConfig(updates);
       setEmbeddingConfig(updated);
-      // 重置客户端以加载新配置
-      await embeddingClient.loadConfig();
+      // 配置保存后，background service 会自动加载新配置
     } catch (error) {
       console.error('[OptionsPage] Failed to update embedding config:', error);
     }
   };
 
-  // 测试 Embedding 连接
+  // 测试 Embedding 连接（通过 background service）
   const handleTestEmbeddingConnection = async () => {
     setIsEmbeddingTesting(true);
     setEmbeddingTestResult(null);
@@ -264,9 +287,10 @@ export function OptionsPage() {
     try {
       // 确保最新配置已保存
       await updateEmbeddingConfig({});
-      await embeddingClient.loadConfig();
 
-      const result = await embeddingClient.testConnection();
+      // 通过 background service 测试连接
+      const bgService = getBackgroundService();
+      const result = await bgService.testEmbeddingConnection();
 
       if (result.success) {
         setEmbeddingTestResult({
@@ -291,47 +315,35 @@ export function OptionsPage() {
     }
   };
 
-  // 重建向量索引
+  // 重建向量索引（通过 background service，任务在后台执行）
   const handleRebuildVectors = async () => {
     setShowRebuildDialog(false);
     setIsRebuilding(true);
     setRebuildProgress(null);
 
     try {
-      // 加载配置
-      await embeddingClient.loadConfig();
+      const bgService = getBackgroundService();
 
-      // 清空现有向量
-      await vectorStore.clearAll();
+      // 开始重建（在 background 中执行，不会因页面关闭而停止）
+      await bgService.startEmbeddingRebuild();
 
-      // 设置进度回调
-      embeddingQueue.onProgress((progress) => {
-        setRebuildProgress(progress);
-      });
-
-      // 添加所有书签到队列
-      await embeddingQueue.addAllBookmarks();
-
-      // 开始处理
-      await embeddingQueue.start();
-
-      // 刷新统计
-      await loadVectorStats();
+      // 注意：进度更新通过消息监听器接收（见 useEffect）
+      // 当队列完成时，消息会触发 loadVectorStats
     } catch (error) {
-      console.error('[OptionsPage] Failed to rebuild vectors:', error);
-    } finally {
+      console.error('[OptionsPage] Failed to start rebuild:', error);
       setIsRebuilding(false);
       setRebuildProgress(null);
     }
   };
 
-  // 清除向量数据
+  // 清除向量数据（通过 background service）
   const handleClearVectors = async () => {
     setShowClearVectorsDialog(false);
     setIsClearing(true);
 
     try {
-      await vectorStore.clearAll();
+      const bgService = getBackgroundService();
+      await bgService.clearVectorStore();
       await loadVectorStats();
     } catch (error) {
       console.error('[OptionsPage] Failed to clear vectors:', error);
