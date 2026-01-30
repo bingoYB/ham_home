@@ -2,10 +2,9 @@
  * MainContent 主内容区组件
  * 展示书签列表，支持筛选、视图切换和批量操作
  */
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Search,
   LayoutGrid,
   List,
   Tag,
@@ -15,9 +14,9 @@ import {
   Folder,
   FolderX,
   Filter,
+  FolderOpen,
 } from 'lucide-react';
 import {
-  Input,
   Button,
   Badge,
   Checkbox,
@@ -37,14 +36,18 @@ import {
   cn,
 } from '@hamhome/ui';
 import { useBookmarks } from '@/contexts/BookmarkContext';
+import { bookmarkStorage } from '@/lib/storage/bookmark-storage';
 import { CategoryFilterDropdown } from '@/components/common/CategoryTree';
-import { BookmarkCard, BookmarkListItem, EditBookmarkDialog, SnapshotViewer } from '@/components/bookmarkListMng';
+import { BookmarkCard, BookmarkListItem, EditBookmarkDialog, SnapshotViewer, BatchTagDialog, BatchMoveCategoryDialog } from '@/components/bookmarkListMng';
+import { SearchInputArea, AIChatPanel } from '@/components/aiSearch';
 import { useSnapshot } from '@/hooks/useSnapshot';
 import { FilterDropdownMenu } from '@/components/bookmarkPanel/FilterPopover';
 import { CustomFilterDialog } from '@/components/bookmarkPanel/CustomFilterDialog';
 import { useBookmarkSearch } from '@/hooks/useBookmarkSearch';
 import { useBookmarkSelection } from '@/hooks/useBookmarkSelection';
 import { useMasonryLayout } from '@/hooks/useMasonryLayout';
+import { useConversationalSearch } from '@/hooks/useConversationalSearch';
+import { useVirtualBookmarkList } from '@/hooks/useVirtualBookmarkList';
 import { getCategoryPath, formatDate } from '@/utils/bookmark-utils';
 import { configStorage } from '@/lib/storage/config-storage';
 import type { LocalBookmark, CustomFilter, FilterCondition } from '@/types';
@@ -57,13 +60,36 @@ interface MainContentProps {
 }
 
 export function MainContent({ currentView, onViewChange }: MainContentProps) {
-  const { t, i18n } = useTranslation(['common', 'bookmark']);
+  const { t, i18n } = useTranslation(['common', 'bookmark', 'ai']);
   const { bookmarks, categories, allTags, deleteBookmark, refreshBookmarks } = useBookmarks();
 
   // 自定义筛选器状态
   const [customFilters, setCustomFilters] = useState<CustomFilter[]>([]);
   const [selectedCustomFilterId, setSelectedCustomFilterId] = useState<string | undefined>();
   const [customFilterDialogOpen, setCustomFilterDialogOpen] = useState(false);
+
+  // 书签卡片引用（用于滚动定位）- grid 视图使用
+  const bookmarkRefsForGrid = useRef<Map<string, HTMLElement>>(new Map());
+
+  // 瀑布流组件引用（用于触发重排）
+  const masonryRef = useRef<{ relayout: () => void } | null>(null);
+
+  // AI 对话式搜索
+  const {
+    query: aiQuery,
+    setQuery: setAIQuery,
+    messages: aiMessages,
+    currentAnswer: aiCurrentAnswer,
+    status: aiStatus,
+    error: aiError,
+    results: aiResults,
+    suggestions: aiSuggestions,
+    highlightedBookmarkId,
+    setHighlightedBookmarkId,
+    handleSearch: handleAISearch,
+    closeChat: closeAIChat,
+    isChatOpen: isAIChatOpen,
+  } = useConversationalSearch();
 
   // 加载自定义筛选器
   useEffect(() => {
@@ -91,7 +117,7 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
     selectedCategory,
     timeRange,
     hasFilters,
-    filteredBookmarks,
+    filteredBookmarks: keywordFilteredBookmarks,
     setSearchQuery,
     setSelectedCategory,
     setTimeRange,
@@ -105,6 +131,24 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
     customFilter: selectedCustomFilter,
   });
 
+  // 视图模式
+  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+
+  // 根据 AI 对话是否打开决定显示的书签列表
+  const filteredBookmarks = useMemo(() => {
+    if (isAIChatOpen && aiResults.length > 0) {
+      // AI 对话模式下，按 AI 结果排序显示
+      const aiBookmarkIds = aiResults.map((r) => r.bookmarkId);
+      return bookmarks.filter((b) => aiBookmarkIds.includes(b.id));
+    }
+    return keywordFilteredBookmarks;
+  }, [isAIChatOpen, aiResults, bookmarks, keywordFilteredBookmarks]);
+
+  // 处理关键词搜索查询变化
+  const handleKeywordQueryChange = useCallback((query: string) => {
+    setSearchQuery(query);
+  }, [setSearchQuery]);
+
   // 批量选择逻辑
   const {
     selectedIds,
@@ -117,12 +161,45 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
   // 瀑布流布局
   const { containerRef: masonryContainerRef, config: masonryConfig } = useMasonryLayout();
 
-  // 视图模式
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  // 虚拟列表（列表视图）
+  const {
+    parentRef: virtualListParentRef,
+    virtualItems,
+    totalSize: virtualListTotalSize,
+    scrollToBookmark,
+    bookmarkRefs: virtualBookmarkRefs,
+  } = useVirtualBookmarkList({
+    items: filteredBookmarks,
+    estimateSize: 88,
+    overscan: 5,
+  });
+
+  // 处理引用点击 - 滚动到对应书签
+  const handleSourceClick = useCallback((bookmarkId: string) => {
+    setHighlightedBookmarkId(bookmarkId);
+    if (viewMode === 'list') {
+      // 列表视图使用虚拟列表滚动
+      scrollToBookmark(bookmarkId);
+    } else {
+      // 网格视图使用 ref 滚动
+      const element = bookmarkRefsForGrid.current.get(bookmarkId);
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+    }
+    // 3秒后清除高亮
+    setTimeout(() => setHighlightedBookmarkId(null), 3000);
+  }, [setHighlightedBookmarkId, viewMode, scrollToBookmark]);
 
   // 删除确认弹窗状态
   const [deleteTarget, setDeleteTarget] = useState<LocalBookmark | null>(null);
   const [showBatchDeleteDialog, setShowBatchDeleteDialog] = useState(false);
+
+  // 批量打标签弹窗状态
+  const [showBatchTagDialog, setShowBatchTagDialog] = useState(false);
+
+  // 批量迁移分类弹窗状态
+  const [showBatchMoveCategoryDialog, setShowBatchMoveCategoryDialog] = useState(false);
 
   // 编辑弹窗状态
   const [editingBookmark, setEditingBookmark] = useState<LocalBookmark | null>(null);
@@ -216,7 +293,7 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
   const handleDeleteSnapshot = async () => {
     if (!snapshotBookmark) return;
     if (!confirm(t('bookmark:bookmark.snapshot.deleteConfirm'))) return;
-    
+
     try {
       await deleteSnapshot(snapshotBookmark.id);
       refreshBookmarks();
@@ -254,31 +331,55 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
     setShowBatchDeleteDialog(false);
   };
 
+  // 批量打标签
+  const handleBatchAddTags = async (tags: string[]) => {
+    if (tags.length === 0 || selectedIds.size === 0) return;
+    try {
+      await bookmarkStorage.batchAddTags(Array.from(selectedIds), tags);
+      await refreshBookmarks();
+      // 瀑布流视图需要重排
+      if (viewMode === 'grid' && masonryRef.current) {
+        // 延迟一下确保 DOM 更新完成
+        setTimeout(() => {
+          masonryRef.current?.relayout();
+        }, 100);
+      }
+    } catch (error) {
+      console.error('[MainContent] Failed to batch add tags:', error);
+      throw error;
+    }
+  };
+
+  // 批量迁移分类
+  const handleBatchMoveCategory = async (categoryId: string | null) => {
+    if (selectedIds.size === 0) return;
+    try {
+      await bookmarkStorage.batchChangeCategory(Array.from(selectedIds), categoryId);
+      await refreshBookmarks();
+      // 瀑布流视图需要重排
+      if (viewMode === 'grid' && masonryRef.current) {
+        // 延迟一下确保 DOM 更新完成
+        setTimeout(() => {
+          masonryRef.current?.relayout();
+        }, 100);
+      }
+    } catch (error) {
+      console.error('[MainContent] Failed to batch move category:', error);
+      throw error;
+    }
+  };
+
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-background">
+    <div className="flex flex-col bg-background h-full">
       {/* 筛选栏 */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border px-6 py-4 pt-6">
-        <div className="flex items-center justify-between gap-4">
-          {/* 左侧：搜索框 */}
+        <div className="flex items-start justify-between gap-4">
+          {/* 左侧：关键词搜索框 */}
           <div className="w-full max-w-md">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="text"
-                placeholder={t('bookmark:bookmark.search')}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 bg-muted/50 border-border/50 focus:bg-muted"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
+            <SearchInputArea
+              value={searchQuery}
+              onChange={handleKeywordQueryChange}
+            />
           </div>
 
           {/* 右侧：筛选和视图切换 */}
@@ -468,6 +569,22 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
                     {t('bookmark:bookmark.batch.selected', { count: selectedIds.size })}
                   </span>
                   <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setShowBatchTagDialog(true)}
+                  >
+                    <Tag className="h-4 w-4 mr-1" />
+                    {t('bookmark:bookmark.batch.addTags')}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => setShowBatchMoveCategoryDialog(true)}
+                  >
+                    <FolderOpen className="h-4 w-4 mr-1" />
+                    {t('bookmark:bookmark.batch.moveCategory')}
+                  </Button>
+                  <Button
                     variant="destructive"
                     size="sm"
                     onClick={handleBatchDelete}
@@ -484,7 +601,13 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
       </div>
 
       {/* 书签列表 */}
-      <div ref={masonryContainerRef} className="flex-1 overflow-auto p-6">
+      <div
+        ref={viewMode === 'grid' ? masonryContainerRef : virtualListParentRef}
+        className={cn(
+          'flex-1 overflow-auto',
+          viewMode === 'grid' ? 'p-6' : 'p-6'
+        )}
+      >
         {filteredBookmarks.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
             <p className="text-lg">
@@ -498,45 +621,76 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
           </div>
         ) : viewMode === 'grid' ? (
           <Masonry
+            ref={masonryRef}
             brickId="id"
             bricks={filteredBookmarks}
             gutter={16}
             columnSize={masonryConfig.columnSize}
             columnNum={masonryConfig.cols}
+            scrollElement={() => {
+              return document.querySelector('#main-content>div');
+            }}
             render={(bookmark) => (
-              <BookmarkCard
+              <div
                 key={bookmark.id}
-                bookmark={bookmark}
-                categoryName={getBookmarkCategoryPath(bookmark.categoryId)}
-                formattedDate={formatBookmarkDate(bookmark.createdAt)}
-                isSelected={selectedIds.has(bookmark.id)}
-                onToggleSelect={() => toggleSelect(bookmark.id)}
-                onOpen={() => openBookmark(bookmark.url)}
-                onEdit={() => setEditingBookmark(bookmark)}
-                onDelete={() => handleDelete(bookmark)}
-                onViewSnapshot={bookmark.hasSnapshot ? () => handleViewSnapshot(bookmark) : undefined}
-                columnSize={masonryConfig.columnSize}
-                t={t}
-              />
+                ref={(el) => {
+                  if (el) bookmarkRefsForGrid.current.set(bookmark.id, el);
+                }}
+              >
+                <BookmarkCard
+                  bookmark={bookmark}
+                  categoryName={getBookmarkCategoryPath(bookmark.categoryId)}
+                  formattedDate={formatBookmarkDate(bookmark.createdAt)}
+                  isSelected={selectedIds.has(bookmark.id)}
+                  isHighlighted={highlightedBookmarkId === bookmark.id}
+                  onToggleSelect={() => toggleSelect(bookmark.id)}
+                  onOpen={() => openBookmark(bookmark.url)}
+                  onEdit={() => setEditingBookmark(bookmark)}
+                  onDelete={() => handleDelete(bookmark)}
+                  onViewSnapshot={bookmark.hasSnapshot ? () => handleViewSnapshot(bookmark) : undefined}
+                  columnSize={masonryConfig.columnSize}
+                  t={t}
+                />
+              </div>
             )}
           />
         ) : (
-          <div className="space-y-2 w-full min-w-0">
-            {filteredBookmarks.map((bookmark) => (
-              <BookmarkListItem
-                key={bookmark.id}
-                bookmark={bookmark}
-                categoryName={getBookmarkCategoryPath(bookmark.categoryId)}
-                formattedDate={formatBookmarkDate(bookmark.createdAt)}
-                isSelected={selectedIds.has(bookmark.id)}
-                onToggleSelect={() => toggleSelect(bookmark.id)}
-                onOpen={() => openBookmark(bookmark.url)}
-                onEdit={() => setEditingBookmark(bookmark)}
-                onDelete={() => handleDelete(bookmark)}
-                onViewSnapshot={bookmark.hasSnapshot ? () => handleViewSnapshot(bookmark) : undefined}
-                t={t}
-              />
-            ))}
+          <div
+            className="relative w-full"
+            style={{ height: `${virtualListTotalSize}px` }}
+          >
+            {virtualItems.map((virtualItem) => {
+              const bookmark = filteredBookmarks[virtualItem.index];
+              if (!bookmark) return null;
+              return (
+                <div
+                  key={virtualItem.key}
+                  data-index={virtualItem.index}
+                  ref={(el) => {
+                    if (el) virtualBookmarkRefs.current.set(bookmark.id, el);
+                  }}
+                  className="absolute left-0 right-0"
+                  style={{
+                    top: `${virtualItem.start}px`,
+                    height: `${virtualItem.size}px`,
+                  }}
+                >
+                  <BookmarkListItem
+                    bookmark={bookmark}
+                    categoryName={getBookmarkCategoryPath(bookmark.categoryId)}
+                    formattedDate={formatBookmarkDate(bookmark.createdAt)}
+                    isSelected={selectedIds.has(bookmark.id)}
+                    isHighlighted={highlightedBookmarkId === bookmark.id}
+                    onToggleSelect={() => toggleSelect(bookmark.id)}
+                    onOpen={() => openBookmark(bookmark.url)}
+                    onEdit={() => setEditingBookmark(bookmark)}
+                    onDelete={() => handleDelete(bookmark)}
+                    onViewSnapshot={bookmark.hasSnapshot ? () => handleViewSnapshot(bookmark) : undefined}
+                    t={t}
+                  />
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -609,6 +763,45 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
         onClose={handleCloseSnapshot}
         onDelete={handleDeleteSnapshot}
         t={t}
+      />
+
+      {/* 批量打标签弹窗 */}
+      <BatchTagDialog
+        open={showBatchTagDialog}
+        onOpenChange={setShowBatchTagDialog}
+        selectedCount={selectedIds.size}
+        allTags={allTags}
+        onConfirm={handleBatchAddTags}
+      />
+
+      {/* 批量迁移分类弹窗 */}
+      <BatchMoveCategoryDialog
+        open={showBatchMoveCategoryDialog}
+        onOpenChange={setShowBatchMoveCategoryDialog}
+        selectedCount={selectedIds.size}
+        categories={categories}
+        onConfirm={handleBatchMoveCategory}
+      />
+
+      {/* AI 对话面板（sticky 吸底） */}
+      <AIChatPanel
+        isOpen={isAIChatOpen}
+        onClose={closeAIChat}
+        query={aiQuery}
+        onQueryChange={setAIQuery}
+        onSubmit={handleAISearch}
+        messages={aiMessages}
+        currentAnswer={aiCurrentAnswer}
+        status={aiStatus}
+        error={aiError}
+        sources={aiResults}
+        onSourceClick={handleSourceClick}
+        suggestions={aiSuggestions}
+        onSuggestionClick={(suggestion) => {
+          setAIQuery(suggestion);
+          handleAISearch();
+        }}
+        onRetry={handleAISearch}
       />
     </div>
   );

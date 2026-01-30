@@ -3,13 +3,14 @@
  * 包含搜索框、筛选器和设置入口
  */
 import { useState } from 'react';
-import { Search, X, Bookmark, Tag, Filter } from 'lucide-react';
+import { Bookmark, Tag, Filter } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-import { Input, Button, cn } from '@hamhome/ui';
+import { Button, cn } from '@hamhome/ui';
 import { TagFilterDropdown } from './TagFilterDropdown';
 import { FilterDropdownMenu } from './FilterPopover';
 import { CustomFilterDialog } from './CustomFilterDialog';
 import { QuickActions } from '@/components/common/QuickActions';
+import { SearchInputArea } from '@/components/aiSearch';
 import { useContentUI } from '@/utils/ContentUIContext';
 import type { TimeRange } from '@/hooks/useBookmarkSearch';
 import type { FilterCondition, CustomFilter } from '@/types';
@@ -89,25 +90,12 @@ export function BookmarkHeader({
 
       {/* 搜索框和筛选器 */}
       <div className="flex items-center gap-2">
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-          <Input
-            type="text"
-            placeholder={t('bookmark:contentPanel.searchPlaceholder')}
-            value={searchQuery}
-            onChange={(e) => onSearchChange(e.target.value)}
-            className="pl-9 pr-8 h-9 bg-muted/50 border-border/50 focus:bg-background"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => onSearchChange('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-              title={t('bookmark:contentPanel.clearSearch')}
-            >
-              <X className="h-4 w-4" />
-            </button>
-          )}
-        </div>
+        <SearchInputArea
+          value={searchQuery}
+          onChange={onSearchChange}
+          compact
+          className="flex-1"
+        />
 
         {/* 筛选器 */}
         <div className="flex items-center gap-1">

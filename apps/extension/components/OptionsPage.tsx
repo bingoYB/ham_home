@@ -520,7 +520,7 @@ export function OptionsPage() {
                     </div>
                   </PopoverTrigger>
                   <PopoverContent
-                    className="w-[var(--radix-popover-trigger-width)] p-0"
+                    className="w-(--radix-popover-trigger-width) p-0"
                     align="start"
                     onOpenAutoFocus={(e) => e.preventDefault()}
                   >
@@ -911,11 +911,10 @@ export function OptionsPage() {
                   {/* 测试结果 */}
                   {embeddingTestResult && (
                     <div
-                      className={`p-3 rounded-lg border ${
-                        embeddingTestResult.status === 'success'
+                      className={`p-3 rounded-lg border ${embeddingTestResult.status === 'success'
                           ? 'bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-200'
                           : 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-200'
-                      }`}
+                        }`}
                     >
                       {embeddingTestResult.message}
                     </div>
@@ -982,9 +981,9 @@ export function OptionsPage() {
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                             {rebuildProgress
                               ? t('settings:settings.ai.embedding.actions.rebuildProgress', {
-                                  completed: rebuildProgress.completed,
-                                  total: rebuildProgress.total,
-                                })
+                                completed: rebuildProgress.completed,
+                                total: rebuildProgress.total,
+                              })
                               : t('settings:settings.ai.embedding.actions.rebuilding')}
                           </>
                         ) : (

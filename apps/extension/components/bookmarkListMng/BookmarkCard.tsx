@@ -31,6 +31,7 @@ export interface BookmarkCardProps {
   categoryName: string;
   formattedDate: string;
   isSelected: boolean;
+  isHighlighted?: boolean;
   columnSize?: number;
   onToggleSelect: () => void;
   onOpen: () => void;
@@ -45,6 +46,7 @@ export function BookmarkCard({
   categoryName,
   formattedDate,
   isSelected,
+  isHighlighted = false,
   columnSize = 356,
   onToggleSelect,
   onOpen,
@@ -73,8 +75,12 @@ export function BookmarkCard({
   return (
     <div
       style={{ width: columnSize }}
-      className={`group bg-card rounded-2xl border transition-shadow hover:shadow-lg ${
-        isSelected ? 'border-primary ring-2 ring-primary/20' : 'border-border hover:border-border/80'
+      className={`group bg-card rounded-2xl border transition-all hover:shadow-lg ${
+        isHighlighted
+          ? 'border-indigo-500 ring-2 ring-indigo-500/50 animate-pulse'
+          : isSelected
+            ? 'border-primary ring-2 ring-primary/20'
+            : 'border-border hover:border-border/80'
       }`}
     >
       <div className="p-4">

@@ -9,10 +9,12 @@ import { bookmarkStorage } from '@/lib/storage/bookmark-storage';
 import { configStorage } from '@/lib/storage/config-storage';
 import { vectorStore } from '@/lib/storage/vector-store';
 import { embeddingClient, embeddingQueue } from '@/lib/embedding';
+import { semanticRetriever } from '@/lib/search/semantic-retriever';
 import type { QueueStatus, QueueProgress } from '@/lib/embedding';
-import { getExtensionURL } from '@/utils/browser-api';
-import type { LocalBookmark, LocalCategory, LocalSettings } from '@/types';
+import { getExtensionURL, type ShortcutCommand } from '@/utils/browser-api';
+import type { LocalBookmark, LocalCategory, LocalSettings, BookmarkEmbedding } from '@/types';
 import type { VectorStoreStats } from '@/lib/storage/vector-store';
+import type { SemanticSearchOptions, SemanticSearchResult } from '@/lib/search/semantic-retriever';
 
 /**
  * Background 服务接口
@@ -55,6 +57,26 @@ export interface IBackgroundService {
   queueBookmarkEmbedding(bookmarkId: string): Promise<void>;
   /** 批量添加书签到 embedding 队列（导入书签时调用） */
   queueBookmarksEmbedding(bookmarkIds: string[]): Promise<void>;
+
+  // ========== 语义搜索相关方法（用于 content script 调用） ==========
+
+  /** 执行语义搜索（在 background 中执行，确保访问正确的 IndexedDB） */
+  semanticSearch(query: string, options?: SemanticSearchOptions): Promise<SemanticSearchResult>;
+  /** 检查语义搜索是否可用 */
+  isSemanticAvailable(): Promise<boolean>;
+  /** 查找相似书签 */
+  findSimilarBookmarks(bookmarkId: string, options?: SemanticSearchOptions): Promise<SemanticSearchResult>;
+  /** 获取书签的 embedding */
+  getBookmarkEmbedding(bookmarkId: string): Promise<BookmarkEmbedding | null>;
+  /** 获取指定模型的所有 embeddings */
+  getEmbeddingsByModel(modelKey: string): Promise<BookmarkEmbedding[]>;
+  /** 获取 embedding 覆盖率统计 */
+  getEmbeddingCoverageStats(): Promise<{ total: number; withEmbedding: number; coverage: number }>;
+
+  // ========== 其他方法 ==========
+
+  /** 获取扩展快捷键配置（commands API 只能在 background 中调用） */
+  getShortcuts(): Promise<ShortcutCommand[]>;
 }
 
 /**
@@ -224,6 +246,69 @@ class BackgroundServiceImpl implements IBackgroundService {
     const status = embeddingQueue.getStatus();
     if (!status.isProcessing) {
       await embeddingQueue.start();
+    }
+  }
+
+  // ========== 语义搜索相关方法实现 ==========
+
+  async semanticSearch(query: string, options?: SemanticSearchOptions): Promise<SemanticSearchResult> {
+    return semanticRetriever.search(query, options);
+  }
+
+  async isSemanticAvailable(): Promise<boolean> {
+    return semanticRetriever.isAvailable();
+  }
+
+  async findSimilarBookmarks(bookmarkId: string, options?: SemanticSearchOptions): Promise<SemanticSearchResult> {
+    return semanticRetriever.findSimilar(bookmarkId, options);
+  }
+
+  async getBookmarkEmbedding(bookmarkId: string): Promise<BookmarkEmbedding | null> {
+    return vectorStore.getEmbedding(bookmarkId);
+  }
+
+  async getEmbeddingsByModel(modelKey: string): Promise<BookmarkEmbedding[]> {
+    return vectorStore.getEmbeddingsByModel(modelKey);
+  }
+
+  async getEmbeddingCoverageStats(): Promise<{ total: number; withEmbedding: number; coverage: number }> {
+    return semanticRetriever.getCoverageStats();
+  }
+
+  // ========== 其他方法实现 ==========
+
+  async getShortcuts(): Promise<ShortcutCommand[]> {
+    try {
+      if (!browser?.commands?.getAll) {
+        console.warn('[BackgroundService] browser.commands.getAll not available');
+        return [];
+      }
+
+      const commands = await browser.commands.getAll();
+
+      // 过滤条件：排除内置命令和开发用命令
+      const excludeCommands = [
+        '_execute_action',
+        '_execute_browser_action',
+        'reload',
+      ];
+
+      return commands
+        .filter((cmd) => {
+          if (!cmd.name) return false;
+          if (excludeCommands.some((exc) => cmd.name!.toLowerCase().includes(exc))) {
+            return false;
+          }
+          return true;
+        })
+        .map((cmd) => ({
+          name: cmd.name || '',
+          description: cmd.description || '',
+          shortcut: cmd.shortcut || '',
+        }));
+    } catch (error) {
+      console.error('[BackgroundService] Failed to get shortcuts:', error);
+      return [];
     }
   }
 

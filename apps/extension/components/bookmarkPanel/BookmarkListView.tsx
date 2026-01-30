@@ -2,6 +2,7 @@
  * BookmarkListView - 书签列表视图组件
  * 展示书签列表，支持滚动、空状态和分类树视图
  */
+import type { MutableRefObject } from 'react';
 import { Bookmark, SearchX } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { cn } from '@hamhome/ui';
@@ -14,6 +15,8 @@ export interface BookmarkListViewProps {
   emptyText?: string;
   searchQuery?: string;
   hasFilters?: boolean;
+  highlightedBookmarkId?: string | null;
+  bookmarkRefs?: MutableRefObject<Map<string, HTMLElement>>;
   onOpenBookmark?: (url: string) => void;
   className?: string;
 }
@@ -24,6 +27,8 @@ export function BookmarkListView({
   emptyText,
   searchQuery,
   hasFilters,
+  highlightedBookmarkId,
+  bookmarkRefs,
   onOpenBookmark,
   className,
 }: BookmarkListViewProps) {
@@ -57,6 +62,8 @@ export function BookmarkListView({
     <CategoryTreeView
       bookmarks={bookmarks}
       categories={categories}
+      highlightedBookmarkId={highlightedBookmarkId}
+      bookmarkRefs={bookmarkRefs}
       onOpenBookmark={onOpenBookmark}
       className={cn('bookmark-list-view', className)}
     />

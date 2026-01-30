@@ -2,7 +2,7 @@
  * CategoryTreeView - 分类层级树视图组件
  * 按分类层级展示书签，支持展开/折叠
  */
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, type MutableRefObject } from 'react';
 import { ChevronRight, ChevronDown, Folder, FolderOpen } from 'lucide-react';
 import { Button, ScrollArea, cn } from '@hamhome/ui';
 import { BookmarkListItem } from './BookmarkListItem';
@@ -11,6 +11,8 @@ import type { LocalBookmark, LocalCategory } from '@/types';
 export interface CategoryTreeViewProps {
   bookmarks: LocalBookmark[];
   categories: LocalCategory[];
+  highlightedBookmarkId?: string | null;
+  bookmarkRefs?: MutableRefObject<Map<string, HTMLElement>>;
   onOpenBookmark?: (url: string) => void;
   className?: string;
 }
@@ -110,6 +112,8 @@ interface CategoryTreeNodeProps {
   level: number;
   expandedIds: Set<string>;
   onToggleExpand: (id: string) => void;
+  highlightedBookmarkId?: string | null;
+  bookmarkRefs?: MutableRefObject<Map<string, HTMLElement>>;
   onOpenBookmark?: (url: string) => void;
 }
 
@@ -118,6 +122,8 @@ function CategoryTreeNode({
   level,
   expandedIds,
   onToggleExpand,
+  highlightedBookmarkId,
+  bookmarkRefs,
   onOpenBookmark,
 }: CategoryTreeNodeProps) {
   const nodeId = node.category?.id || 'uncategorized';
@@ -177,6 +183,8 @@ function CategoryTreeNode({
               level={level + 1}
               expandedIds={expandedIds}
               onToggleExpand={onToggleExpand}
+              highlightedBookmarkId={highlightedBookmarkId}
+              bookmarkRefs={bookmarkRefs}
               onOpenBookmark={onOpenBookmark}
             />
           ))}
@@ -184,10 +192,19 @@ function CategoryTreeNode({
           {/* 书签列表 */}
           <div style={{ paddingLeft: `${(level + 1) * 16 + 8}px` }}>
             {node.bookmarks.map((bookmark) => (
-              <BookmarkListItem
+              <div
                 key={bookmark.id}
-                bookmark={bookmark}
-              />
+                ref={(el) => {
+                  if (el && bookmarkRefs) {
+                    bookmarkRefs.current.set(bookmark.id, el);
+                  }
+                }}
+              >
+                <BookmarkListItem
+                  bookmark={bookmark}
+                  isHighlighted={highlightedBookmarkId === bookmark.id}
+                />
+              </div>
             ))}
           </div>
         </div>
@@ -199,6 +216,8 @@ function CategoryTreeNode({
 export function CategoryTreeView({
   bookmarks,
   categories,
+  highlightedBookmarkId,
+  bookmarkRefs,
   onOpenBookmark,
   className,
 }: CategoryTreeViewProps) {
@@ -245,6 +264,8 @@ export function CategoryTreeView({
             level={0}
             expandedIds={expandedIds}
             onToggleExpand={handleToggleExpand}
+            highlightedBookmarkId={highlightedBookmarkId}
+            bookmarkRefs={bookmarkRefs}
             onOpenBookmark={onOpenBookmark}
           />
         ))}

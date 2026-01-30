@@ -48,6 +48,12 @@
       "selected": "{{count}} selected",
       "selectAll": "Select All",
       "deselectAll": "Deselect All",
+      "addTags": "Add Tags",
+      "addTagsConfirm": "Add Tags",
+      "addTagsDescription": "Add tags to {{count}} selected bookmarks",
+      "moveCategory": "Move to Category",
+      "moveCategoryConfirm": "Move",
+      "moveCategoryDescription": "Move {{count}} selected bookmarks to category",
       "delete": "Delete Selected",
       "deleteTitle": "Confirm Batch Delete",
       "deleteConfirm": "Are you sure you want to delete {{count}} bookmarks? This action cannot be undone."

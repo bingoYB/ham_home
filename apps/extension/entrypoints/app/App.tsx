@@ -42,6 +42,7 @@ import {
   Tooltip,
   TooltipTrigger,
   TooltipContent,
+  ScrollArea,
 } from '@hamhome/ui';
 import type { AppSidebarNavItem, AppSidebarBrand } from '@hamhome/ui';
 import { BookmarkProvider, useBookmarks } from '@/contexts/BookmarkContext';
@@ -331,7 +332,7 @@ function AppContent() {
         navLabel=''
         showNavLabel={false}
       />
-      <SidebarInset>
+      <SidebarInset className="h-[calc(100vh-1rem)] flex flex-col overflow-hidden">
         <header className="flex h-16 shrink-0 items-center gap-2 border-b">
           <div className="flex items-center gap-2 px-4">
             <SidebarTrigger className="-ml-1" />
@@ -417,8 +418,10 @@ function AppContent() {
 
           </div>
         </header>
-        <main className="flex-1 overflow-auto">
-          {renderContent()}
+        <main className="flex-1 min-h-0 overflow-hidden">
+          <ScrollArea id="main-content" className="h-full">
+            {renderContent()}
+          </ScrollArea>
         </main>
       </SidebarInset>
       <Toaster />

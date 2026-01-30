@@ -24,6 +24,7 @@ WXT 框架已提供以下兼容性支持：
   - `getExtensionURL()` - 获取扩展内部页面 URL
   - `safeSendMessageToTab()` - 安全发送消息到 Tab
   - `safeBroadcastToTabs()` - 安全广播消息到所有 Tab
+  - `getExtensionShortcuts()` - 获取扩展快捷键配置（自动判断环境：extension page 直接调用，content script 通过 background service）
 
 ### 2. 快捷键设置页面 URL ✅
 

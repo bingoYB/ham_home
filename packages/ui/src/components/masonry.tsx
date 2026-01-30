@@ -96,12 +96,22 @@ interface IWaterfallProps {
   columnSize?: number;
   columnNum?: number;
   threshold?: number;
-  /** id 或者 dom引用 */
-  scrollElement?: HTMLElement | string;
+  /** id 或者 dom引用 或者返回元素的函数 */
+  scrollElement?: HTMLElement | string | (() => HTMLElement | null);
   className?: string;
   onRendered?: () => void;
   children?: React.ReactNode;
 }
+
+// 解析 scrollElement 为实际的 HTMLElement
+const resolveScrollElement = (
+  scrollElement: HTMLElement | string | (() => HTMLElement | null) | undefined
+): HTMLElement | null => {
+  if (!scrollElement) return null;
+  if (typeof scrollElement === "function") return scrollElement();
+  if (typeof scrollElement === "string") return document.getElementById(scrollElement);
+  return scrollElement;
+};
 
 export default forwardRef(
   /**
@@ -120,9 +130,9 @@ export default forwardRef(
       threshold = 1, // 预加载的滚动区域，小于10是容器倍数，大于10是绝对值
       scrollElement, // 滚动元素
       className = "masonry",
-      onRendered = () => {},
+      onRendered = () => { },
     }: // getBrickHeight,
-    IWaterfallProps,
+      IWaterfallProps,
     ref
   ) {
 
@@ -130,7 +140,7 @@ export default forwardRef(
     const computedBricks = useRef<Map<string, BrickRect>>(new Map()); // 已经计算大小和位置的bricks
     const columnHeightArr = useRef<number[]>([]); // 瀑布流各列高度
 
-    const [containerOffsetTop, setContainerOffsetTop] = useState(0); 
+    const [containerOffsetTop, setContainerOffsetTop] = useState(0);
     const [containerHeight, setContainerHeight] = useState(0); // 瀑布流容器高度
     const [scrollTop, setScrollTop] = useState(0); // 页面滚动高度
 
@@ -182,14 +192,7 @@ export default forwardRef(
 
     // 获取瀑布流容器位置（距离视图顶部的距离）
     useEffect(() => {
-      let realScrollElement: HTMLElement;
-
-      if (typeof scrollElement === "string") {
-        realScrollElement =
-          document.getElementById(scrollElement) || document.documentElement;
-      } else {
-        realScrollElement = scrollElement || document.documentElement;
-      }
+      const realScrollElement = resolveScrollElement(scrollElement) || document.documentElement;
 
       const containerRectTop = containerRef.current?.getBoundingClientRect()
         ?.top as number;
@@ -200,19 +203,15 @@ export default forwardRef(
       } else {
         setContainerOffsetTop(
           containerRectTop -
-            realScrollElement?.getBoundingClientRect()?.top +
-            realScrollElement.scrollTop
+          realScrollElement?.getBoundingClientRect()?.top +
+          realScrollElement.scrollTop
         );
       }
     }, [scrollElement]);
 
     // 获取瀑布流容器高度
     const getContainerHeight = useCallback(() => {
-      // 真实滚动元素
-      const realScrollElement =
-        typeof scrollElement === "string"
-          ? document.getElementById(scrollElement)
-          : scrollElement || document.documentElement;
+      const realScrollElement = resolveScrollElement(scrollElement) || document.documentElement;
       const containerHeight = realScrollElement?.clientHeight || 0;
       setContainerHeight(containerHeight);
     }, [scrollElement]);
@@ -293,12 +292,12 @@ export default forwardRef(
     }, [allBricks, brickId]);
 
     // 重新渲染整个瀑布流所有内容
-  const relayout = useCallback(() => {
-    columnHeightArr.current = Array(columnNum).fill(0);
-    computedBricks.current.clear();
+    const relayout = useCallback(() => {
+      columnHeightArr.current = Array(columnNum).fill(0);
+      computedBricks.current.clear();
 
-    setScrollTop((scrollTop) => scrollTop + 1);
-  }, [columnNum, columnSize]);
+      setScrollTop((scrollTop) => scrollTop + 1);
+    }, [columnNum, columnSize]);
 
     // 列数量发生变化
     useEffect(() => {
@@ -428,10 +427,7 @@ export default forwardRef(
     // 滚动事件
     useEffect(() => {
       // 没有提供 scrollElement 的话，绑定window的滚动事件
-      const target: HTMLElement | Window | null =
-        typeof scrollElement === "string"
-          ? document.getElementById(scrollElement)
-          : scrollElement || window;
+      const target: HTMLElement | Window | null = resolveScrollElement(scrollElement) || window;
 
       const getScrollTop = (): number => {
         if (!target) return 0;

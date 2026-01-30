@@ -2,19 +2,23 @@
  * 语义检索器
  * 基于 embedding 向量的 cosine 相似度检索
  */
-import type { LocalBookmark, SearchResultItem, BookmarkEmbedding } from '@/types';
-import { vectorStore, bookmarkStorage } from '@/lib/storage';
-import { embeddingClient } from '@/lib/embedding';
-import { createLogger } from '@hamhome/utils';
+import type {
+  LocalBookmark,
+  SearchResultItem,
+  BookmarkEmbedding,
+} from "@/types";
+import { vectorStore, bookmarkStorage } from "@/lib/storage";
+import { embeddingClient } from "@/lib/embedding";
+import { createLogger } from "@hamhome/utils";
 
-const logger = createLogger({ namespace: 'SemanticRetriever' });
+const logger = createLogger({ namespace: "SemanticRetriever" });
 
 /**
  * 计算两个向量的 cosine 相似度
  */
 function cosineSimilarity(a: Float32Array, b: Float32Array): number {
   if (a.length !== b.length) {
-    throw new Error('Vector dimensions do not match');
+    throw new Error("Vector dimensions do not match");
   }
 
   let dotProduct = 0;
@@ -76,23 +80,50 @@ class SemanticRetriever {
    */
   async isAvailable(): Promise<boolean> {
     await embeddingClient.loadConfig();
-    return embeddingClient.isEnabled() && embeddingClient.isProviderSupported();
+    const isEnabled = embeddingClient.isEnabled();
+    const isSupported = embeddingClient.isProviderSupported();
+    const config = embeddingClient.getConfig();
+    
+    const available = isEnabled && isSupported;
+    
+    // 使用 info 级别日志，确保在生产环境也能看到
+    if (!available) {
+      logger.info('Semantic retriever not available', {
+        isEnabled,
+        isSupported,
+        provider: config?.provider,
+        enabled: config?.enabled,
+        hasApiKey: !!config?.apiKey,
+        reason: !config?.enabled 
+          ? 'Embedding not enabled in settings' 
+          : !isSupported 
+            ? `Provider ${config?.provider} does not support embedding`
+            : !config?.apiKey && config?.provider !== 'ollama'
+              ? 'API key not configured'
+              : 'Unknown',
+      });
+    } else {
+      logger.debug('Semantic retriever available', {
+        provider: config?.provider,
+        model: config?.model,
+      });
+    }
+    
+    return available;
   }
 
   /**
    * 执行语义搜索
    */
-  async search(query: string, options: SemanticSearchOptions = {}): Promise<SemanticSearchResult> {
-    const {
-      topK = 20,
-      minScore = 0.3,
-      excludeIds = [],
-      filterIds,
-    } = options;
+  async search(
+    query: string,
+    options: SemanticSearchOptions = {},
+  ): Promise<SemanticSearchResult> {
+    const { topK = 20, minScore = 0.3, excludeIds = [], filterIds } = options;
 
     // 检查是否可用
-    if (!await this.isAvailable()) {
-      logger.warn('Semantic search is not available');
+    if (!(await this.isAvailable())) {
+      logger.warn("Semantic search is not available");
       return {
         items: [],
         queryDimensions: 0,
@@ -101,7 +132,7 @@ class SemanticRetriever {
     }
 
     // 获取查询向量
-    logger.debug('Generating query embedding', { query: query.slice(0, 50) });
+    logger.debug("Generating query embedding", { query: query.slice(0, 50) });
     const queryVector = await embeddingClient.embed(query);
     const queryFloat32 = new Float32Array(queryVector);
 
@@ -109,23 +140,31 @@ class SemanticRetriever {
     const modelKey = embeddingClient.getModelKey();
     const embeddings = await vectorStore.getEmbeddingsByModel(modelKey);
 
-    logger.debug('Searching embeddings', {
+    logger.debug("Searching embeddings", {
       modelKey,
       embeddingCount: embeddings.length,
       queryDimensions: queryVector.length,
     });
+
+    if (embeddings.length === 0) {
+      logger.warn("No embeddings found for model", { modelKey });
+    }
 
     // 过滤向量
     let filteredEmbeddings = embeddings;
 
     if (filterIds && filterIds.length > 0) {
       const filterSet = new Set(filterIds);
-      filteredEmbeddings = embeddings.filter(e => filterSet.has(e.bookmarkId));
+      filteredEmbeddings = embeddings.filter((e) =>
+        filterSet.has(e.bookmarkId),
+      );
     }
 
     if (excludeIds.length > 0) {
       const excludeSet = new Set(excludeIds);
-      filteredEmbeddings = filteredEmbeddings.filter(e => !excludeSet.has(e.bookmarkId));
+      filteredEmbeddings = filteredEmbeddings.filter(
+        (e) => !excludeSet.has(e.bookmarkId),
+      );
     }
 
     // 计算相似度并排序
@@ -134,7 +173,7 @@ class SemanticRetriever {
     for (const embedding of filteredEmbeddings) {
       // 检查维度匹配
       if (embedding.dim !== queryVector.length) {
-        logger.warn('Dimension mismatch', {
+        logger.warn("Dimension mismatch", {
           bookmarkId: embedding.bookmarkId,
           embeddingDim: embedding.dim,
           queryDim: queryVector.length,
@@ -157,14 +196,14 @@ class SemanticRetriever {
     const topResults = scores.slice(0, topK);
 
     // 转换为 SearchResultItem
-    const items: SearchResultItem[] = topResults.map(result => ({
+    const items: SearchResultItem[] = topResults.map((result) => ({
       bookmarkId: result.bookmarkId,
       score: result.score,
       semanticScore: result.score,
       matchReason: `语义相似度: ${(result.score * 100).toFixed(1)}%`,
     }));
 
-    logger.debug('Semantic search completed', {
+    logger.debug("Semantic search completed", {
       query: query.slice(0, 50),
       searchedCount: filteredEmbeddings.length,
       resultCount: items.length,
@@ -181,17 +220,16 @@ class SemanticRetriever {
   /**
    * 查找相似书签（基于书签 ID）
    */
-  async findSimilar(bookmarkId: string, options: SemanticSearchOptions = {}): Promise<SemanticSearchResult> {
-    const {
-      topK = 10,
-      minScore = 0.5,
-      excludeIds = [],
-    } = options;
+  async findSimilar(
+    bookmarkId: string,
+    options: SemanticSearchOptions = {},
+  ): Promise<SemanticSearchResult> {
+    const { topK = 10, minScore = 0.5, excludeIds = [] } = options;
 
     // 获取目标书签的向量
     const embedding = await vectorStore.getEmbedding(bookmarkId);
     if (!embedding) {
-      logger.warn('Bookmark embedding not found', { bookmarkId });
+      logger.warn("Bookmark embedding not found", { bookmarkId });
       return {
         items: [],
         queryDimensions: 0,
@@ -202,11 +240,15 @@ class SemanticRetriever {
     const queryVector = bufferToFloat32Array(embedding.vector);
 
     // 获取同模型的所有向量
-    const embeddings = await vectorStore.getEmbeddingsByModel(embedding.modelKey);
+    const embeddings = await vectorStore.getEmbeddingsByModel(
+      embedding.modelKey,
+    );
 
     // 排除自身和指定 ID
     const excludeSet = new Set([bookmarkId, ...excludeIds]);
-    const filteredEmbeddings = embeddings.filter(e => !excludeSet.has(e.bookmarkId));
+    const filteredEmbeddings = embeddings.filter(
+      (e) => !excludeSet.has(e.bookmarkId),
+    );
 
     // 计算相似度并排序
     const scores: Array<{ bookmarkId: string; score: number }> = [];
@@ -225,7 +267,7 @@ class SemanticRetriever {
     scores.sort((a, b) => b.score - a.score);
     const topResults = scores.slice(0, topK);
 
-    const items: SearchResultItem[] = topResults.map(result => ({
+    const items: SearchResultItem[] = topResults.map((result) => ({
       bookmarkId: result.bookmarkId,
       score: result.score,
       semanticScore: result.score,
@@ -242,7 +284,11 @@ class SemanticRetriever {
   /**
    * 获取覆盖率统计
    */
-  async getCoverageStats(): Promise<{ total: number; withEmbedding: number; coverage: number }> {
+  async getCoverageStats(): Promise<{
+    total: number;
+    withEmbedding: number;
+    coverage: number;
+  }> {
     const bookmarks = await bookmarkStorage.getBookmarks({ isDeleted: false });
     const total = bookmarks.length;
 
@@ -250,7 +296,7 @@ class SemanticRetriever {
       return { total: 0, withEmbedding: 0, coverage: 0 };
     }
 
-    const bookmarkIds = bookmarks.map(b => b.id);
+    const bookmarkIds = bookmarks.map((b) => b.id);
     const embeddings = await vectorStore.getEmbeddings(bookmarkIds);
     const withEmbedding = embeddings.size;
 

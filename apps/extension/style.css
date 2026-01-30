@@ -8,15 +8,20 @@
   display: block !important;
 }
 
+/* achieve scroll area viewport height 100% */
+#main-content [data-slot="scroll-area-viewport"] > div {
+  height: 100%;
+}
+
 /* content ui root init style */
-#hamhome-root{
+#hamhome-root {
   @apply bg-background text-foreground;
 }
 
-#hamhome-root{
+#hamhome-root {
   position: fixed;
   height: 100%;
-  z-index: 999999
+  z-index: 999999;
 }
 
 /* ========================================
@@ -44,10 +49,15 @@
 /* 圆形扩展动画 - 从点击位置向外扩展 */
 @keyframes theme-transition-expand {
   from {
-    clip-path: circle(0px at var(--theme-transition-x, 50%) var(--theme-transition-y, 50%));
+    clip-path: circle(
+      0px at var(--theme-transition-x, 50%) var(--theme-transition-y, 50%)
+    );
   }
   to {
-    clip-path: circle(var(--theme-transition-radius, 100%) at var(--theme-transition-x, 50%) var(--theme-transition-y, 50%));
+    clip-path: circle(
+      var(--theme-transition-radius, 100%) at var(--theme-transition-x, 50%)
+        var(--theme-transition-y, 50%)
+    );
   }
 }
 

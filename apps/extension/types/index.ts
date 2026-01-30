@@ -3,6 +3,9 @@
  * 适配本地存储的数据结构（时间戳为 number）
  */
 
+// AI 对话式搜索类型
+export * from './ai-search';
+
 // ============ 书签相关 ============
 
 /**
@@ -380,8 +383,21 @@ export interface BookmarkEmbedding {
 
 /**
  * 对话意图类型
+ * - query: 查询书签（包含各种筛选条件）
+ * - statistics: 统计查询（如"昨天收藏了多少"）
+ * - help: 帮助查询（如"快捷键是什么"）
  */
-export type ConversationIntent = "find" | "summarize" | "compare" | "qa";
+export type ConversationIntent = "query" | "statistics" | "help";
+
+/**
+ * 查询子类型（用于 query 意图的细分）
+ * - time: 按时间查询
+ * - category: 按分类查询
+ * - tag: 按标签查询
+ * - semantic: 语义化查询
+ * - compound: 复合查询（包含多个条件）
+ */
+export type QuerySubtype = "time" | "category" | "tag" | "semantic" | "compound";
 
 /**
  * 检索过滤条件
@@ -407,8 +423,12 @@ export interface SearchFilters {
 export interface ConversationState {
   /** 当前意图 */
   intent: ConversationIntent;
+  /** 查询子类型 */
+  querySubtype?: QuerySubtype;
   /** 当前主查询 */
   query: string;
+  /** 提炼后的语义查询关键词 */
+  refinedQuery?: string;
   /** 筛选条件 */
   filters: SearchFilters;
   /** 已展示过的结果 ID（用于去重与"继续找"） */
@@ -425,8 +445,12 @@ export interface ConversationState {
 export interface SearchRequest {
   /** 意图 */
   intent: ConversationIntent;
-  /** 查询文本 */
+  /** 查询子类型（仅 query 意图时有效） */
+  querySubtype?: QuerySubtype;
+  /** 原始查询文本 */
   query: string;
+  /** 提炼后的语义查询关键词 */
+  refinedQuery: string;
   /** 筛选条件 */
   filters: SearchFilters;
   /** 返回数量 */
