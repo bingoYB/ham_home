@@ -8,6 +8,45 @@
 export type SearchMode = 'keyword' | 'chat';
 
 /**
+ * 建议操作类型
+ * - text: 文本建议，点击后填入输入框
+ * - copyAllLinks: 复制所有链接
+ * - batchAddTags: 批量打标签
+ * - batchMoveCategory: 批量移动分类
+ * - showMore: 显示更多结果
+ * - timeFilter: 时间过滤
+ * - domainFilter: 域名过滤
+ * - categoryFilter: 分类过滤
+ * - semanticOnly: 只看语义匹配
+ * - keywordOnly: 只看关键词匹配
+ * - findDuplicates: 查找重复书签
+ */
+export type SuggestionActionType =
+  | 'text'
+  | 'copyAllLinks'
+  | 'batchAddTags'
+  | 'batchMoveCategory'
+  | 'showMore'
+  | 'timeFilter'
+  | 'domainFilter'
+  | 'categoryFilter'
+  | 'semanticOnly'
+  | 'keywordOnly'
+  | 'findDuplicates';
+
+/**
+ * 建议项
+ */
+export interface Suggestion {
+  /** 显示文本 */
+  label: string;
+  /** 操作类型 */
+  action: SuggestionActionType;
+  /** 操作参数 */
+  payload?: Record<string, unknown>;
+}
+
+/**
  * AI 搜索状态
  */
 export type AISearchStatus = 'idle' | 'thinking' | 'searching' | 'writing' | 'done' | 'error';
@@ -42,8 +81,8 @@ export interface AISearchResult {
   answer: string;
   /** 引用源列表 */
   sources: Source[];
-  /** 后续建议问题 */
-  suggestions: string[];
+  /** 后续建议 */
+  suggestions: Suggestion[];
 }
 
 /**
@@ -79,7 +118,7 @@ export interface ConversationalSearchState {
   /** 检索结果（书签列表） */
   results: Source[];
   /** 后续建议 */
-  suggestions: string[];
+  suggestions: Suggestion[];
   /** 高亮的书签 ID */
   highlightedBookmarkId: string | null;
   /** 设置高亮书签 */

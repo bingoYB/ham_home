@@ -12,6 +12,8 @@ import type {
   ConversationIntent,
   QuerySubtype,
   SearchFilters,
+  Suggestion,
+  SuggestionActionType,
 } from "@/types";
 import { queryPlanner } from "./query-planner";
 import { hybridRetriever } from "./hybrid-retriever";
@@ -153,7 +155,7 @@ function buildAnswerContext(
 /**
  * 动态生成快捷键帮助内容
  */
-async function generateShortcutHelpContent(language: "zh" | "en"): Promise<{ content: string; suggestions: string[] }> {
+async function generateShortcutHelpContent(language: "zh" | "en"): Promise<{ content: string; suggestions: Suggestion[] }> {
   const shortcuts = await getExtensionShortcuts();
   
   if (shortcuts.length === 0) {
@@ -162,8 +164,16 @@ async function generateShortcutHelpContent(language: "zh" | "en"): Promise<{ con
         ? "暂时无法获取快捷键配置，请在浏览器扩展设置中查看。" 
         : "Unable to fetch shortcut settings. Please check browser extension settings.",
       suggestions: language === "zh" 
-        ? ["如何设置快捷键", "其他功能介绍", "设置页面在哪"]
-        : ["How to set shortcuts", "Feature introduction", "Where is settings"],
+        ? [
+            createSuggestion("如何设置快捷键", "text"),
+            createSuggestion("其他功能介绍", "text"),
+            createSuggestion("设置页面在哪", "text"),
+          ]
+        : [
+            createSuggestion("How to set shortcuts", "text"),
+            createSuggestion("Feature introduction", "text"),
+            createSuggestion("Where is settings", "text"),
+          ],
     };
   }
 
@@ -181,29 +191,70 @@ async function generateShortcutHelpContent(language: "zh" | "en"): Promise<{ con
   return {
     content: lines.join("\n"),
     suggestions: language === "zh" 
-      ? ["如何更改快捷键", "其他功能介绍", "设置页面在哪"]
-      : ["How to change shortcuts", "Feature introduction", "Where is settings"],
+      ? [
+          createSuggestion("如何更改快捷键", "text"),
+          createSuggestion("其他功能介绍", "text"),
+          createSuggestion("设置页面在哪", "text"),
+        ]
+      : [
+          createSuggestion("How to change shortcuts", "text"),
+          createSuggestion("Feature introduction", "text"),
+          createSuggestion("Where is settings", "text"),
+        ],
   };
 }
 
 /**
  * 帮助内容配置
  */
-const HELP_CONTENT: Record<string, { zh: string; en: string; suggestions: string[] }> = {
+const HELP_CONTENT: Record<string, { zh: string; en: string; suggestions: { zh: Suggestion[]; en: Suggestion[] } }> = {
   settings: {
     zh: "设置页面可以在插件图标右键菜单中找到，或者点击面板右上角的设置图标。您可以配置：\n- AI 服务（用于智能分类和语义搜索）\n- 主题和语言\n- 快捷键\n- 自动保存选项",
     en: "Settings can be found in the plugin icon right-click menu, or click the settings icon at the top right of the panel. You can configure:\n- AI service (for smart categorization and semantic search)\n- Theme and language\n- Keyboard shortcuts\n- Auto-save options",
-    suggestions: ["如何配置 AI", "如何启用语义搜索", "快捷键设置"],
+    suggestions: {
+      zh: [
+        { label: "如何配置 AI", action: "text" },
+        { label: "如何启用语义搜索", action: "text" },
+        { label: "快捷键设置", action: "text" },
+      ],
+      en: [
+        { label: "How to configure AI", action: "text" },
+        { label: "How to enable semantic search", action: "text" },
+        { label: "Shortcut settings", action: "text" },
+      ],
+    },
   },
   features: {
     zh: "HamHome 主要功能：\n- 智能收藏：AI 自动分类和打标签\n- 语义搜索：通过含义查找书签\n- 对话式搜索：自然语言查询\n- 快照保存：保存网页离线版本\n- 批量管理：批量移动、打标签、删除",
     en: "HamHome main features:\n- Smart bookmarking: AI auto-categorization and tagging\n- Semantic search: Find bookmarks by meaning\n- Conversational search: Natural language queries\n- Snapshot saving: Save offline versions of pages\n- Batch management: Bulk move, tag, delete",
-    suggestions: ["如何使用语义搜索", "如何批量管理", "如何保存快照"],
+    suggestions: {
+      zh: [
+        { label: "如何使用语义搜索", action: "text" },
+        { label: "如何批量管理", action: "text" },
+        { label: "如何保存快照", action: "text" },
+      ],
+      en: [
+        { label: "How to use semantic search", action: "text" },
+        { label: "How to batch manage", action: "text" },
+        { label: "How to save snapshot", action: "text" },
+      ],
+    },
   },
   default: {
     zh: "我可以帮助您：\n- 搜索和查找书签\n- 了解插件功能和设置\n- 统计您的收藏情况\n\n请问您想了解什么？",
     en: "I can help you:\n- Search and find bookmarks\n- Learn about plugin features and settings\n- View your bookmark statistics\n\nWhat would you like to know?",
-    suggestions: ["快捷键是什么", "如何设置 AI", "功能介绍"],
+    suggestions: {
+      zh: [
+        { label: "快捷键是什么", action: "text" },
+        { label: "如何设置 AI", action: "text" },
+        { label: "功能介绍", action: "text" },
+      ],
+      en: [
+        { label: "What are the shortcuts", action: "text" },
+        { label: "How to set up AI", action: "text" },
+        { label: "Feature introduction", action: "text" },
+      ],
+    },
   },
 };
 
@@ -231,28 +282,28 @@ function getDefaultSuggestions(
   result: SearchResult,
   request: SearchRequest,
   hasMore: boolean,
-): string[] {
-  const suggestions: string[] = [];
+): Suggestion[] {
+  const suggestions: Suggestion[] = [];
 
   // 基于结果状态
   if (result.items.length === 0) {
-    suggestions.push("尝试其他关键词");
+    suggestions.push(createSuggestion("尝试其他关键词", "text"));
     if (request.filters.timeRangeDays) {
-      suggestions.push("扩大时间范围");
+      suggestions.push(createSuggestion("扩大时间范围", "text"));
     }
     if (!request.filters.semantic) {
-      suggestions.push("使用语义搜索");
+      suggestions.push(createSuggestion("使用语义搜索", "semanticOnly"));
     }
   } else {
     if (hasMore) {
-      suggestions.push("显示更多结果");
+      suggestions.push(createSuggestion("显示更多结果", "showMore"));
     }
     if (!request.filters.timeRangeDays) {
-      suggestions.push("只看最近 30 天");
+      suggestions.push(createSuggestion("只看最近 30 天", "timeFilter", { days: 30 }));
     }
     if (result.usedSemantic && result.usedKeyword) {
-      suggestions.push("只看关键词匹配");
-      suggestions.push("只看语义匹配");
+      suggestions.push(createSuggestion("只看关键词匹配", "keywordOnly"));
+      suggestions.push(createSuggestion("只看语义匹配", "semanticOnly"));
     }
   }
 
@@ -385,59 +436,96 @@ function analyzeResults(
 }
 
 /**
+ * 创建建议项的辅助函数
+ */
+function createSuggestion(
+  label: string,
+  action: SuggestionActionType,
+  payload?: Record<string, unknown>,
+): Suggestion {
+  return { label, action, payload };
+}
+
+/**
  * 生成智能下一步建议
  */
 function generateSmartSuggestions(
   context: ResultAnalysisContext,
   request: SearchRequest,
   language: "zh" | "en",
-): string[] {
-  const suggestions: string[] = [];
+): Suggestion[] {
+  const suggestions: Suggestion[] = [];
 
   // === Refine suggestions ===
   
   // 结果过多，建议缩小范围
   if (context.resultCount >= 20 || context.totalMatches > 20) {
     if (!request.filters.timeRangeDays) {
-      suggestions.push(language === "zh" ? "只看最近 30 天" : "Last 30 days only");
+      suggestions.push(createSuggestion(
+        language === "zh" ? "只看最近 30 天" : "Last 30 days only",
+        "timeFilter",
+        { days: 30 },
+      ));
     }
     if (context.topDomains.length > 0 && !request.filters.domain) {
-      suggestions.push(
+      suggestions.push(createSuggestion(
         language === "zh"
           ? `只看 ${context.topDomains[0].domain}`
-          : `Only from ${context.topDomains[0].domain}`
-      );
+          : `Only from ${context.topDomains[0].domain}`,
+        "domainFilter",
+        { domain: context.topDomains[0].domain },
+      ));
     }
     if (context.topCategories.length > 0 && !request.filters.categoryId) {
-      suggestions.push(
+      suggestions.push(createSuggestion(
         language === "zh"
           ? `限定 ${context.topCategories[0].name} 分类`
-          : `In ${context.topCategories[0].name} category`
-      );
+          : `In ${context.topCategories[0].name} category`,
+        "categoryFilter",
+        { categoryId: context.topCategories[0].categoryId, categoryName: context.topCategories[0].name },
+      ));
     }
   }
 
   // 结果过少，建议扩大范围
   if (context.resultCount < 3 && context.resultCount > 0) {
     if (request.filters.timeRangeDays) {
-      suggestions.push(language === "zh" ? "扩大时间范围" : "Expand time range");
+      suggestions.push(createSuggestion(
+        language === "zh" ? "扩大时间范围" : "Expand time range",
+        "text",
+      ));
     }
-    suggestions.push(language === "zh" ? "尝试相近关键词" : "Try similar keywords");
+    suggestions.push(createSuggestion(
+      language === "zh" ? "尝试相近关键词" : "Try similar keywords",
+      "text",
+    ));
   }
 
   // 没有结果
   if (context.resultCount === 0) {
-    suggestions.push(language === "zh" ? "尝试其他关键词" : "Try different keywords");
+    suggestions.push(createSuggestion(
+      language === "zh" ? "尝试其他关键词" : "Try different keywords",
+      "text",
+    ));
     if (!context.usedSemantic) {
-      suggestions.push(language === "zh" ? "使用语义搜索" : "Use semantic search");
+      suggestions.push(createSuggestion(
+        language === "zh" ? "使用语义搜索" : "Use semantic search",
+        "semanticOnly",
+      ));
     }
   }
 
   // 分数分散度高，建议切换搜索模式
   if (context.scoreDistribution.variance > 0.15) {
     if (context.usedSemantic && context.usedKeyword) {
-      suggestions.push(language === "zh" ? "只看关键词匹配" : "Keyword matches only");
-      suggestions.push(language === "zh" ? "只看语义匹配" : "Semantic matches only");
+      suggestions.push(createSuggestion(
+        language === "zh" ? "只看关键词匹配" : "Keyword matches only",
+        "keywordOnly",
+      ));
+      suggestions.push(createSuggestion(
+        language === "zh" ? "只看语义匹配" : "Semantic matches only",
+        "semanticOnly",
+      ));
     }
   }
 
@@ -445,33 +533,40 @@ function generateSmartSuggestions(
   
   // 来自同一主题，建议批量整理
   if (context.isSameTopic && context.resultCount >= 3) {
-    if (context.topTags.length > 0) {
-      suggestions.push(
-        language === "zh"
-          ? `批量添加 #${context.topTags[0].tag} 标签`
-          : `Batch add #${context.topTags[0].tag} tag`
-      );
-    } else {
-      suggestions.push(language === "zh" ? "批量打标签" : "Batch add tags");
-    }
-    suggestions.push(language === "zh" ? "批量移动分类" : "Batch move to category");
+    suggestions.push(createSuggestion(
+      language === "zh" ? "批量打标签" : "Batch add tags",
+      "batchAddTags",
+    ));
+    suggestions.push(createSuggestion(
+      language === "zh" ? "批量移动分类" : "Batch move to category",
+      "batchMoveCategory",
+    ));
   }
 
   // 如果有多个结果，提供复制链接选项
   if (context.resultCount >= 2) {
-    suggestions.push(language === "zh" ? "复制所有链接" : "Copy all links");
+    suggestions.push(createSuggestion(
+      language === "zh" ? "复制所有链接" : "Copy all links",
+      "copyAllLinks",
+    ));
   }
 
   // === Discover suggestions ===
   
   // 可能有重复
   if (context.hasPotentialDuplicates) {
-    suggestions.push(language === "zh" ? "查找重复书签" : "Find duplicate bookmarks");
+    suggestions.push(createSuggestion(
+      language === "zh" ? "查找重复书签" : "Find duplicate bookmarks",
+      "findDuplicates",
+    ));
   }
 
   // 更多结果
   if (context.totalMatches > context.resultCount) {
-    suggestions.push(language === "zh" ? "显示更多结果" : "Show more results");
+    suggestions.push(createSuggestion(
+      language === "zh" ? "显示更多结果" : "Show more results",
+      "showMore",
+    ));
   }
 
   // 限制建议数量
@@ -569,7 +664,7 @@ class ChatSearchAgent {
     const topic = matchHelpTopic(userInput);
     
     let answer: string;
-    let suggestions: string[];
+    let suggestions: Suggestion[];
     
     // 快捷键需要动态获取
     if (topic === "shortcut") {
@@ -579,7 +674,7 @@ class ChatSearchAgent {
     } else {
       const helpContent = HELP_CONTENT[topic];
       answer = language === "zh" ? helpContent.zh : helpContent.en;
-      suggestions = helpContent.suggestions;
+      suggestions = language === "zh" ? helpContent.suggestions.zh : helpContent.suggestions.en;
     }
     
     const response: ChatSearchResponse = {
@@ -700,13 +795,16 @@ class ChatSearchAgent {
       : timeRangeDays === 1 ? "yesterday" : timeRangeDays <= 7 ? "this week" : `last ${timeRangeDays} days`;
 
     let answer: string;
-    const suggestions: string[] = [];
+    const suggestions: Suggestion[] = [];
 
     if (stats.total === 0) {
       answer = language === "zh"
         ? `${timeDesc}没有收藏任何书签。`
         : `No bookmarks saved ${timeDesc}.`;
-      suggestions.push(language === "zh" ? "扩大时间范围" : "Expand time range");
+      suggestions.push(createSuggestion(
+        language === "zh" ? "扩大时间范围" : "Expand time range",
+        "text",
+      ));
     } else {
       // 获取 Top 分类
       const topCategories = Array.from(stats.byCategory.entries())
@@ -729,9 +827,9 @@ class ChatSearchAgent {
       }
 
       suggestions.push(
-        language === "zh" ? "查看详细列表" : "View detailed list",
-        language === "zh" ? "按分类筛选" : "Filter by category",
-        language === "zh" ? "查看本月统计" : "View monthly stats",
+        createSuggestion(language === "zh" ? "查看详细列表" : "View detailed list", "showMore"),
+        createSuggestion(language === "zh" ? "按分类筛选" : "Filter by category", "text"),
+        createSuggestion(language === "zh" ? "查看本月统计" : "View monthly stats", "timeFilter", { days: 30 }),
       );
     }
 
@@ -844,7 +942,7 @@ class ChatSearchAgent {
     bookmarks: LocalBookmark[],
     intent: ConversationIntent,
     searchResult: SearchResult,
-    smartSuggestions: string[],
+    smartSuggestions: Suggestion[],
   ): Promise<ChatSearchResponse> {
     // 准备来源列表
     const sources = bookmarks.map((b) => b.id);
@@ -855,8 +953,8 @@ class ChatSearchAgent {
         answer: "未找到相关书签。您可以尝试其他关键词，或者扩大搜索范围。",
         sources: [],
         nextSuggestions: smartSuggestions.length > 0 ? smartSuggestions : [
-          "尝试其他关键词",
-          "使用语义搜索",
+          createSuggestion("尝试其他关键词", "text"),
+          createSuggestion("使用语义搜索", "semanticOnly"),
         ],
       };
     }
@@ -896,12 +994,12 @@ class ChatSearchAgent {
         prompt: userPrompt,
       });
 
-      // 优先使用智能建议，其次使用 AI 生成的建议
+      // 优先使用智能建议，其次使用 AI 生成的建议（转换为 text 类型）
       const nextSuggestions = smartSuggestions.length > 0
         ? smartSuggestions
         : result.nextSuggestions.length > 0
-          ? result.nextSuggestions
-          : ["显示更多结果"];
+          ? result.nextSuggestions.map((s) => createSuggestion(s, "text"))
+          : [createSuggestion("显示更多结果", "showMore")];
 
       return {
         answer: result.answer,
@@ -979,7 +1077,7 @@ class ChatSearchAgent {
         sources,
         nextSuggestions:
           result.nextSuggestions.length > 0
-            ? result.nextSuggestions
+            ? result.nextSuggestions.map((s) => createSuggestion(s, "text"))
             : getDefaultSuggestions(
                 searchResult,
                 { intent, query, refinedQuery: query, filters: {}, topK: 20 },
@@ -998,7 +1096,7 @@ class ChatSearchAgent {
   private generateRuleBasedAnswerWithSuggestions(
     bookmarks: LocalBookmark[],
     sources: string[],
-    smartSuggestions: string[],
+    smartSuggestions: Suggestion[],
   ): ChatSearchResponse {
     const count = bookmarks.length;
     let answer: string;
@@ -1017,7 +1115,7 @@ class ChatSearchAgent {
     return {
       answer,
       sources,
-      nextSuggestions: smartSuggestions.length > 0 ? smartSuggestions : ["显示更多结果"],
+      nextSuggestions: smartSuggestions.length > 0 ? smartSuggestions : [createSuggestion("显示更多结果", "showMore")],
     };
   }
 

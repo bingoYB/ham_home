@@ -13,6 +13,7 @@ import { useShortcuts } from "@/hooks/useShortcuts";
 import { bookmarkStorage } from "@/lib/storage/bookmark-storage";
 import type { LocalBookmark } from "@/types";
 import "../../style.css";
+import { useBookmarks } from "@/contexts";
 
 export function App() {
   const { t } = useTranslation(["common", "bookmark"]);
@@ -41,6 +42,8 @@ export function App() {
       setExistingBookmark(bookmark);
     }
   };
+
+  const { appSettings } = useBookmarks();
 
   return (
     <div className="w-[420px] min-h-[400px] max-h-[1200px] flex flex-col bg-background text-foreground">
@@ -73,7 +76,7 @@ export function App() {
         </div>
       </footer>
 
-      <Toaster />
+      <Toaster theme={appSettings.theme}/>
     </div>
   );
 }
@@ -83,7 +86,7 @@ function LoadingState() {
   const { t } = useTranslation("bookmark");
   return (
     <div className="flex flex-col items-center justify-center h-full gap-4 p-6">
-      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary-100 to-primary-200 dark:from-primary-900 dark:to-primary-800 flex items-center justify-center">
+      <div className="w-16 h-16 rounded-2xl bg-linear-to-br from-primary-100 to-primary-200 dark:from-primary-900 dark:to-primary-800 flex items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
       </div>
       <div className="text-center">
@@ -105,7 +108,7 @@ function ErrorState({ error }: ErrorStateProps) {
   const { t } = useTranslation("bookmark");
   return (
     <div className="flex flex-col items-center justify-center h-full gap-4 p-6 text-center">
-      <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-100 to-orange-100 dark:from-amber-900/30 dark:to-orange-900/30 flex items-center justify-center">
+      <div className="w-16 h-16 rounded-2xl bg-linear-to-br from-amber-100 to-orange-100 dark:from-amber-900/30 dark:to-orange-900/30 flex items-center justify-center">
         <span className="text-4xl">😅</span>
       </div>
       <div>

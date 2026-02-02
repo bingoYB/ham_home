@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import {
   Toaster,
+  toast,
   Breadcrumb,
   BreadcrumbItem,
   BreadcrumbList,
@@ -416,6 +417,18 @@ function AppContent() {
               </TooltipContent>
             </Tooltip>
 
+            {/* 测试按钮 */}
+            {/* <Button
+              variant="outline"
+              size="sm"
+              onClick={() => toast.success('Test Toast Notification', {
+                
+                position: "top-center"
+              })}
+            >
+              Test Toast
+            </Button> */}
+
           </div>
         </header>
         <main className="flex-1 min-h-0 overflow-hidden">
@@ -424,7 +437,7 @@ function AppContent() {
           </ScrollArea>
         </main>
       </SidebarInset>
-      <Toaster />
+      <Toaster theme={appSettings.theme}/>
     </SidebarProvider>
   );
 }

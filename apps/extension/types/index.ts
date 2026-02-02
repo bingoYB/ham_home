@@ -496,8 +496,11 @@ export interface ChatSearchResponse {
   /** 结果 bookmarkId 列表（带引用编号） */
   sources: string[];
   /** 建议的下一步操作（2-4 个 chip） */
-  nextSuggestions: string[];
+  nextSuggestions: Suggestion[];
 }
+
+// Re-export Suggestion from ai-search
+export type { Suggestion, SuggestionActionType } from './ai-search';
 
 /**
  * Embedding 任务状态

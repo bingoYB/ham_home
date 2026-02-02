@@ -75,5 +75,9 @@
     "testPassed": "Connection test successful",
     "categorySuggested": "Category suggestion generated",
     "tagsSuggested": "Tag suggestions generated"
+  },
+  "suggestion": {
+    "copySuccess": "Copied successfully",
+    "copySuccessDesc": "Copied {{count}} links to clipboard"
   }
 }

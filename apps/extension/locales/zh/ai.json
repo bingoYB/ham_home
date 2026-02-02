@@ -75,5 +75,9 @@
     "testPassed": "连接测试成功",
     "categorySuggested": "分类推荐已生成",
     "tagsSuggested": "标签推荐已生成"
+  },
+  "suggestion": {
+    "copySuccess": "复制成功",
+    "copySuccessDesc": "已复制 {{count}} 个链接到剪贴板"
   }
 }

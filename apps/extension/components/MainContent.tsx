@@ -34,6 +34,7 @@ import {
   AlertDialogTitle,
   Masonry,
   cn,
+  toast,
 } from '@hamhome/ui';
 import { useBookmarks } from '@/contexts/BookmarkContext';
 import { bookmarkStorage } from '@/lib/storage/bookmark-storage';
@@ -50,7 +51,7 @@ import { useConversationalSearch } from '@/hooks/useConversationalSearch';
 import { useVirtualBookmarkList } from '@/hooks/useVirtualBookmarkList';
 import { getCategoryPath, formatDate } from '@/utils/bookmark-utils';
 import { configStorage } from '@/lib/storage/config-storage';
-import type { LocalBookmark, CustomFilter, FilterCondition } from '@/types';
+import type { LocalBookmark, CustomFilter, FilterCondition, Suggestion } from '@/types';
 
 type ViewMode = 'grid' | 'list';
 
@@ -89,6 +90,7 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
     handleSearch: handleAISearch,
     closeChat: closeAIChat,
     isChatOpen: isAIChatOpen,
+    resultBookmarkIds: aiResultBookmarkIds,
   } = useConversationalSearch();
 
   // 加载自定义筛选器
@@ -190,6 +192,66 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
     // 3秒后清除高亮
     setTimeout(() => setHighlightedBookmarkId(null), 3000);
   }, [setHighlightedBookmarkId, viewMode, scrollToBookmark]);
+
+  // 处理 AI 建议点击
+  const handleAISuggestionClick = useCallback(async (suggestion: Suggestion) => {
+    const { action, payload, label } = suggestion;
+    
+    switch (action) {
+      case 'copyAllLinks': {
+        // 复制所有链接
+        const links = aiResultBookmarkIds
+          .map((id) => bookmarks.find((b) => b.id === id)?.url)
+          .filter(Boolean)
+          .join('\n');
+        
+        if (links) {
+          await navigator.clipboard.writeText(links);
+          toast.success(t('ai:suggestion.copySuccess'), {
+            position: "top-center"
+          });
+        }
+        break;
+      }
+      
+      case 'batchAddTags': {
+        // 批量打标签 - 先选中所有 AI 结果书签，再打开弹窗
+        for (const id of aiResultBookmarkIds) {
+          if (!selectedIds.has(id)) {
+            toggleSelect(id);
+          }
+        }
+        setShowBatchTagDialog(true);
+        break;
+      }
+      
+      case 'batchMoveCategory': {
+        // 批量移动分类 - 先选中所有 AI 结果书签，再打开弹窗
+        for (const id of aiResultBookmarkIds) {
+          if (!selectedIds.has(id)) {
+            toggleSelect(id);
+          }
+        }
+        setShowBatchMoveCategoryDialog(true);
+        break;
+      }
+      
+      case 'showMore':
+      case 'timeFilter':
+      case 'domainFilter':
+      case 'categoryFilter':
+      case 'semanticOnly':
+      case 'keywordOnly':
+      case 'findDuplicates':
+      case 'text':
+      default: {
+        // 文本类建议 - 放入输入框并搜索
+        setAIQuery(label);
+        handleAISearch();
+        break;
+      }
+    }
+  }, [aiResultBookmarkIds, bookmarks, selectedIds, toggleSelect, setAIQuery, handleAISearch, toast, t]);
 
   // 删除确认弹窗状态
   const [deleteTarget, setDeleteTarget] = useState<LocalBookmark | null>(null);
@@ -797,10 +859,7 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
         sources={aiResults}
         onSourceClick={handleSourceClick}
         suggestions={aiSuggestions}
-        onSuggestionClick={(suggestion) => {
-          setAIQuery(suggestion);
-          handleAISearch();
-        }}
+        onSuggestionClick={handleAISuggestionClick}
         onRetry={handleAISearch}
       />
     </div>

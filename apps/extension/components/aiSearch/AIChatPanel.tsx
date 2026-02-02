@@ -6,7 +6,7 @@ import { useCallback, useRef, useEffect } from 'react';
 import { Bot, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button, ScrollArea, cn } from '@hamhome/ui';
-import type { AISearchStatus, Source, ChatMessage } from '@/types';
+import type { AISearchStatus, Source, ChatMessage, Suggestion } from '@/types';
 import { AIChatSearchBar } from './AIChatSearchBar';
 import { AIChatStatusIndicator } from './AIChatStatusIndicator';
 import { AIChatSources } from './AIChatSources';
@@ -37,9 +37,9 @@ export interface AIChatPanelProps {
   /** 点击引用回调 */
   onSourceClick: (bookmarkId: string) => void;
   /** 后续建议 */
-  suggestions?: string[];
+  suggestions?: Suggestion[];
   /** 后续建议点击回调 */
-  onSuggestionClick?: (suggestion: string) => void;
+  onSuggestionClick?: (suggestion: Suggestion) => void;
   /** 重试回调 */
   onRetry?: () => void;
   /** 自定义类名 */

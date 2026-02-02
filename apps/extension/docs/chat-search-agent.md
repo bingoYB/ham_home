@@ -378,8 +378,27 @@ interface SearchFilters {
 interface ChatSearchResponse {
   answer: string;              // AI 生成的回答（1-5句）
   sources: string[];           // 引用的 bookmarkId 列表
-  nextSuggestions: string[];   // 后续建议（2-4个）
+  nextSuggestions: Suggestion[]; // 后续建议（2-4个，可执行操作）
 }
+
+interface Suggestion {
+  label: string;               // 显示文本
+  action: SuggestionActionType; // 操作类型
+  payload?: Record<string, unknown>; // 操作参数
+}
+
+type SuggestionActionType =
+  | 'text'              // 文本建议（点击填入输入框）
+  | 'copyAllLinks'      // 复制所有链接
+  | 'batchAddTags'      // 批量打标签
+  | 'batchMoveCategory' // 批量移动分类
+  | 'showMore'          // 显示更多结果
+  | 'timeFilter'        // 时间过滤
+  | 'domainFilter'      // 域名过滤
+  | 'categoryFilter'    // 分类过滤
+  | 'semanticOnly'      // 只看语义匹配
+  | 'keywordOnly'       // 只看关键词匹配
+  | 'findDuplicates';   // 查找重复书签
 ```
 
 ---
@@ -414,20 +433,31 @@ Hook (UI) → Agent (编排) → Retriever (检索) → Storage (存储)
 - **短期记忆**: 保留最近 6 轮对话用于上下文理解
 - **去重机制**: `seenBookmarkIds` 避免重复展示
 
-### 5. 智能建议生成 (V2)
+### 5. 智能建议生成 (V2) - 可执行操作
 
-基于结果分析自动生成三类建议：
+基于结果分析自动生成三类建议，每个建议包含 `action` 类型，支持直接执行操作：
 
 **精炼 (Refine) - 调整搜索范围：**
-- 结果 > 20: "只看最近 30 天"、"限定 XX 分类"、"只看 XX 网站"
-- 结果 < 3: "扩大时间范围"、"尝试相近关键词"
-- 无结果: "尝试其他关键词"、"使用语义搜索"
+| 条件 | 建议 | action |
+|------|------|--------|
+| 结果 > 20 | "只看最近 30 天" | `timeFilter` |
+| 结果 > 20 | "限定 XX 分类" | `categoryFilter` |
+| 结果 > 20 | "只看 XX 网站" | `domainFilter` |
+| 结果 < 3 | "扩大时间范围" | `text` |
+| 无结果 | "使用语义搜索" | `semanticOnly` |
 
-**整理 (Organize) - 批量操作：**
-- 同一主题: "批量添加 #标签"、"批量移动分类"、"复制所有链接"
+**整理 (Organize) - 批量操作（直接执行）：**
+| 条件 | 建议 | action | 行为 |
+|------|------|--------|------|
+| 同一主题 | "批量打标签" | `batchAddTags` | 全选结果 + 打开标签弹窗 |
+| 同一主题 | "批量移动分类" | `batchMoveCategory` | 全选结果 + 打开分类弹窗 |
+| 结果 >= 2 | "复制所有链接" | `copyAllLinks` | 复制到剪贴板 + Toast 提示 |
 
 **发现 (Discover) - 查找规律：**
-- 高相似度: "查找重复书签"
+| 条件 | 建议 | action |
+|------|------|--------|
+| 高相似度 | "查找重复书签" | `findDuplicates` |
+| 有更多结果 | "显示更多结果" | `showMore` |
 
 ### 6. 多意图支持 (V2)
 
