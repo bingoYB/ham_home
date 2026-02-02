@@ -63,7 +63,7 @@ export function TagCloud({ sortedTags, tagStats, maxUsage }: TagCloudProps) {
                         {hasMore && (
                             <div className="mt-6 text-center">
                                 <Button variant="outline" onClick={handleLoadMore}>
-                                    {t('common:loadMore') || 'Load More'}
+                                    {t('common:common:loadMore') || 'Load More'}
                                 </Button>
                                 <div className="mt-2 text-xs text-muted-foreground">
                                     {t('bookmark:tags.cloud.showing', { count: visibleTags.length, total: sortedTags.length }) || `${visibleTags.length} / ${sortedTags.length}`}

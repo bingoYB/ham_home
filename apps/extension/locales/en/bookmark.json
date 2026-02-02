@@ -113,7 +113,8 @@
     },
     "cloud": {
       "title": "Tag Cloud",
-      "description": "Darker color indicates more frequent usage"
+      "description": "Darker color indicates more frequent usage",
+      "showing": "Showing {{count}} / {{total}} tags"
     }
   },
   "popup": {

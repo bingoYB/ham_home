@@ -113,7 +113,8 @@
     },
     "cloud": {
       "title": "标签云",
-      "description": "颜色越深表示使用越频繁"
+      "description": "颜色越深表示使用越频繁",
+      "showing": "正在显示 {{count}} / {{total}} 个标签"
     }
   },
   "popup": {

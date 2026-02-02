@@ -3,7 +3,7 @@
  */
 import { useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Download, Upload, FileJson, FileText, Check, AlertCircle, Loader2, FolderTree, Sparkles, Globe } from 'lucide-react';
+import { Download, Upload, FileJson, FileText, Check, AlertCircle, Loader2, FolderTree, Sparkles, Globe, BookmarkIcon } from 'lucide-react';
 import {
   Card,
   CardContent,
@@ -19,12 +19,14 @@ import { bookmarkStorage } from '@/lib/storage/bookmark-storage';
 import { getBackgroundService } from '@/lib/services';
 import { aiClient } from '@/lib/ai/client';
 import { parseCategoryPath } from './common/CategoryTree';
+import { useChromeBookmarks } from '@/hooks/useChromeBookmarks';
 import type { LocalCategory } from '@/types';
 
 export function ImportExportPage() {
   const { t } = useTranslation(['common', 'settings']);
   const { bookmarks, categories, exportData, refreshBookmarks, refreshCategories } = useBookmarks();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const { getBookmarks: getChromeBookmarks, loading: loadingBrowserBookmarks } = useChromeBookmarks();
   
   const [importing, setImporting] = useState(false);
   const [preserveFolders, setPreserveFolders] = useState(true);
@@ -104,6 +106,31 @@ export function ImportExportPage() {
       if (fileInputRef.current) {
         fileInputRef.current.value = '';
       }
+    }
+  };
+
+  // 从浏览器导入
+  const handleBrowserImport = async () => {
+    setImporting(true);
+    setImportResult(null);
+
+    try {
+      const { html, count } = await getChromeBookmarks();
+      
+      // 使用现有的 HTML 导入逻辑
+      await importFromHTML(html);
+
+      await refreshBookmarks();
+      await refreshCategories();
+      
+    } catch (error) {
+      setImportResult({
+        success: false,
+        message: t('settings.importExport.importFailed', { ns: 'settings' }),
+        details: error instanceof Error ? error.message : t('settings.importExport.errors.unknown', { ns: 'settings' }),
+      });
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -804,40 +831,76 @@ export function ImportExportPage() {
             </div>
           </div>
 
-          <button
-            onClick={triggerFileInput}
-            disabled={importing}
-            className="w-full p-8 rounded-xl border-2 border-dashed border-border hover:border-primary hover:bg-primary/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {importing ? (
-              <div className="flex flex-col items-center gap-3 w-full">
-                <Loader2 className="h-12 w-12 text-primary animate-spin" />
-                <span className="text-muted-foreground">{t('settings.importExport.import.importing', { ns: 'settings' })}</span>
-                {importProgress && (
-                  <div className="w-full max-w-xs space-y-2">
-                    <Progress value={(importProgress.current / importProgress.total) * 100} className="h-2" />
-                    <p className="text-xs text-center text-muted-foreground">
-                      {t('settings.importExport.import.progress', { 
-                        current: importProgress.current, 
-                        total: importProgress.total,
-                        ns: 'settings' 
-                      })}
-                    </p>
-                  </div>
-                )}
-              </div>
-            ) : (
-              <div className="flex flex-col items-center gap-3">
-                <Upload className="h-12 w-12 text-muted-foreground" />
-                <div className="text-center">
-                  <p className="font-medium text-foreground">{t('settings.importExport.import.selectFile', { ns: 'settings' })}</p>
-                  <p className="text-sm text-muted-foreground mt-1">
+          {/* 导入来源选择 */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {/* 从文件导入 */}
+            <button
+              onClick={triggerFileInput}
+              disabled={importing}
+              className="p-6 rounded-xl border-2 border-dashed border-border hover:border-primary hover:bg-primary/5 transition-colors text-left group disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-12 h-12 rounded-xl bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                  <Upload className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground group-hover:text-primary">
+                    {t('settings.importExport.import.selectFile', { ns: 'settings' })}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
                     {t('settings.importExport.import.supportedFormats', { ns: 'settings' })}
                   </p>
                 </div>
               </div>
-            )}
-          </button>
+            </button>
+
+            {/* 从浏览器导入 */}
+            <button
+              onClick={handleBrowserImport}
+              disabled={importing || loadingBrowserBookmarks}
+              className="p-6 rounded-xl border-2 border-dashed border-border hover:border-primary hover:bg-primary/5 transition-colors text-left group disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-12 h-12 rounded-xl bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+                  <BookmarkIcon className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-foreground group-hover:text-primary">
+                    {t('settings.importExport.import.fromBrowser', { ns: 'settings' })}
+                  </h3>
+                  <p className="text-sm text-muted-foreground">
+                    {t('settings.importExport.import.fromBrowserDesc', { ns: 'settings' })}
+                  </p>
+                </div>
+              </div>
+            </button>
+          </div>
+
+          {/* 导入进度 */}
+          {importing && importProgress && (
+            <div className="p-4 rounded-lg bg-muted">
+              <div className="flex items-center gap-3 mb-3">
+                <Loader2 className="h-5 w-5 text-primary animate-spin" />
+                <span className="text-sm font-medium">{t('settings.importExport.import.importing', { ns: 'settings' })}</span>
+              </div>
+              <Progress value={(importProgress.current / importProgress.total) * 100} className="h-2" />
+              <p className="text-xs text-center text-muted-foreground mt-2">
+                {t('settings.importExport.import.progress', { 
+                  current: importProgress.current, 
+                  total: importProgress.total,
+                  ns: 'settings' 
+                })}
+              </p>
+            </div>
+          )}
+
+          {/* 仅加载状态（无导入进度时） */}
+          {importing && !importProgress && (
+            <div className="p-4 rounded-lg bg-muted flex items-center justify-center gap-3">
+              <Loader2 className="h-5 w-5 text-primary animate-spin" />
+              <span className="text-sm text-muted-foreground">{t('settings.importExport.import.importing', { ns: 'settings' })}</span>
+            </div>
+          )}
 
           {/* 导入结果 */}
           {importResult && (

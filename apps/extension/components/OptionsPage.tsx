@@ -66,6 +66,7 @@ import { useShortcuts } from '@/hooks/useShortcuts';
 import { configStorage } from '@/lib/storage/config-storage';
 import { CustomFilterDialog } from '@/components/bookmarkPanel/CustomFilterDialog';
 import { getBrowserSpecificURL, isFirefox, safeCreateTab } from '@/utils/browser-api';
+import { snapshotStorage } from '@/lib/storage/snapshot-storage';
 import { getDefaultModel, getProviderModels, isEmbeddingSupported, getDefaultEmbeddingModel, PROVIDER_DEFAULTS, EMBEDDING_PROVIDER_DEFAULTS } from '@hamhome/ai';
 import { aiClient } from '@/lib/ai/client';
 import { getBackgroundService } from '@/lib/services';
@@ -125,6 +126,16 @@ export function OptionsPage() {
   const [showFullRebuildDialog, setShowFullRebuildDialog] = useState(false);
   const [showClearVectorsDialog, setShowClearVectorsDialog] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
+  const [snapshotStats, setSnapshotStats] = useState<{ count: number; totalSize: number } | null>(null);
+
+  // 辅助函数：格式化字节大小
+  const formatBytes = (bytes: number) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
 
   // 同步 aiConfig 到本地状态
   useEffect(() => {
@@ -207,6 +218,21 @@ export function OptionsPage() {
       browser.runtime.onMessage.removeListener(handleMessage);
     };
   }, [loadVectorStats]);
+
+  // 加载快照统计信息
+  const loadSnapshotStats = useCallback(async () => {
+    try {
+      const stats = await snapshotStorage.getStorageUsage();
+      setSnapshotStats(stats);
+    } catch (error) {
+      console.error('[OptionsPage] Failed to load snapshot stats:', error);
+      setSnapshotStats(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadSnapshotStats();
+  }, [loadSnapshotStats]);
 
   const handleTestConnection = async () => {
     setIsTesting(true);
@@ -1283,7 +1309,7 @@ export function OptionsPage() {
               <CardDescription>{t('settings:settings.storage.description')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div className="p-4 rounded-lg bg-muted">
                   <p className="text-sm text-muted-foreground mb-1">{t('settings:settings.storage.bookmarkCount')}</p>
                   <p className="text-2xl font-semibold text-foreground">
@@ -1300,6 +1326,30 @@ export function OptionsPage() {
                   <p className="text-sm text-muted-foreground mb-1">{t('settings:settings.storage.storageUsed')}</p>
                   <p className="text-2xl font-semibold text-foreground">
                     {storageInfo.storageSize}
+                  </p>
+                </div>
+                <div className="p-4 rounded-lg bg-muted">
+                  <p className="text-sm text-muted-foreground mb-1">{t('settings:settings.storage.snapshotCount')}</p>
+                  <p className="text-2xl font-semibold text-foreground">
+                    {snapshotStats?.count || 0}
+                  </p>
+                </div>
+                <div className="p-4 rounded-lg bg-muted">
+                  <p className="text-sm text-muted-foreground mb-1">{t('settings:settings.storage.snapshotSize')}</p>
+                  <p className="text-2xl font-semibold text-foreground">
+                    {formatBytes(snapshotStats?.totalSize || 0)}
+                  </p>
+                </div>
+                <div className="p-4 rounded-lg bg-muted">
+                  <p className="text-sm text-muted-foreground mb-1">{t('settings:settings.storage.vectorCount')}</p>
+                  <p className="text-2xl font-semibold text-foreground">
+                    {vectorStats?.count || 0}
+                  </p>
+                </div>
+                <div className="p-4 rounded-lg bg-muted">
+                  <p className="text-sm text-muted-foreground mb-1">{t('settings:settings.storage.vectorSize')}</p>
+                  <p className="text-2xl font-semibold text-foreground">
+                    {formatBytes(vectorStats?.estimatedSize || 0)}
                   </p>
                 </div>
               </div>

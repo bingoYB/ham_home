@@ -155,7 +155,11 @@
       "description": "Manage your bookmark data and snapshots",
       "bookmarkCount": "Bookmark Count",
       "categoryCount": "Category Count",
-      "storageUsed": "Storage Used",
+      "snapshotCount": "Snapshot Count",
+      "vectorCount": "Vector Count",
+      "storageUsed": "Metadata Size",
+      "snapshotSize": "Snapshot Size",
+      "vectorSize": "Vector Size",
       "dataExport": "Data Export",
       "exportJSON": "Export as JSON",
       "exportHTML": "Export as HTML",
@@ -233,7 +237,10 @@
         "enableAIAnalysis": "Use AI for auto categorization",
         "enableAIAnalysisDesc": "Use AI to analyze bookmark content during import, automatically generating summaries, categories and tags (mutually exclusive with preserve folders)",
         "fetchPageContent": "Fetch page content for analysis",
-        "fetchPageContentDesc": "Access bookmark URLs to get page content for more accurate AI analysis (slower)"
+        "fetchPageContentDesc": "Access bookmark URLs to get page content for more accurate AI analysis (slower)",
+        "fromBrowser": "Import from Browser",
+        "fromBrowserDesc": "Directly read bookmarks from current browser",
+        "browserBookmarkCount": "Total {{count}} bookmarks in browser"
       },
       "errors": {
         "unsupportedFormat": "Unsupported file format, please select a JSON or HTML file",

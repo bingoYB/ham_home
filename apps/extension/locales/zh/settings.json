@@ -155,7 +155,11 @@
       "description": "管理你的书签数据和快照",
       "bookmarkCount": "书签数量",
       "categoryCount": "分类数量",
-      "storageUsed": "占用空间",
+      "snapshotCount": "快照数量",
+      "vectorCount": "向量数量",
+      "storageUsed": "书签数据占用",
+      "snapshotSize": "快照占用空间",
+      "vectorSize": "向量占用空间",
       "dataExport": "数据导出",
       "exportJSON": "导出为 JSON",
       "exportHTML": "导出为 HTML",
@@ -233,7 +237,10 @@
         "enableAIAnalysis": "使用 AI 自动分类打标",
         "enableAIAnalysisDesc": "导入时使用 AI 分析书签内容，自动生成摘要、分类和标签（与保留目录结构互斥）",
         "fetchPageContent": "获取页面内容进行分析",
-        "fetchPageContentDesc": "访问书签 URL 获取页面内容以获得更准确的 AI 分析结果（较慢）"
+        "fetchPageContentDesc": "访问书签 URL 获取页面内容以获得更准确的 AI 分析结果（较慢）",
+        "fromBrowser": "从浏览器导入",
+        "fromBrowserDesc": "直接读取当前浏览器的书签数据",
+        "browserBookmarkCount": "浏览器中共有 {{count}} 个书签"
       },
       "errors": {
         "unsupportedFormat": "不支持的文件格式，请选择 JSON 或 HTML 文件",
