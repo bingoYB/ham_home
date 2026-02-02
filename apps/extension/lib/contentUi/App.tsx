@@ -156,9 +156,9 @@ export function App() {
   }, [closePanel]);
 
   // 打开设置（跳转到扩展选项页）
-  const handleOpenSettings = useCallback(() => {
+  const handleOpenSettings = useCallback((view?: string) => {
     const backgroundService = getBackgroundService();
-    backgroundService.openOptionsPage();
+    backgroundService.openOptionsPage(view);
   }, []);
 
   return (

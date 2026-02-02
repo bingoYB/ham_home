@@ -4,7 +4,7 @@
  */
 import { useEffect, useCallback, useMemo, useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { cn } from '@hamhome/ui';
+import { cn, toast } from '@hamhome/ui';
 import { BookmarkHeader } from './BookmarkHeader';
 import { BookmarkListView } from './BookmarkListView';
 import { AIChatPanel } from '@/components/aiSearch';
@@ -12,7 +12,7 @@ import { useBookmarkSearch } from '@/hooks/useBookmarkSearch';
 import { useConversationalSearch } from '@/hooks/useConversationalSearch';
 import { nanoid } from 'nanoid';
 import { configStorage } from '@/lib/storage/config-storage';
-import type { LocalBookmark, LocalCategory, PanelPosition, FilterCondition, CustomFilter } from '@/types';
+import type { LocalBookmark, LocalCategory, PanelPosition, FilterCondition, CustomFilter, Suggestion } from '@/types';
 
 export interface BookmarkPanelProps {
   bookmarks: LocalBookmark[];
@@ -21,7 +21,7 @@ export interface BookmarkPanelProps {
   position: PanelPosition;
   onClose: () => void;
   onOpenBookmark?: (url: string) => void;
-  onOpenSettings?: () => void;
+  onOpenSettings?: (view?: string) => void;
 }
 
 export function BookmarkPanel({
@@ -37,10 +37,9 @@ export function BookmarkPanel({
   const [customFilters, setCustomFilters] = useState<CustomFilter[]>([]);
   const [selectedCustomFilterId, setSelectedCustomFilterId] = useState<string | undefined>();
 
-  // 列表项引用（用于滚动定位）
   const bookmarkRefs = useRef<Map<string, HTMLElement>>(new Map());
 
-  const { t } = useTranslation('bookmark');
+  const { t } = useTranslation(['bookmark', 'ai']);
 
   // AI 对话式搜索
   const {
@@ -57,6 +56,7 @@ export function BookmarkPanel({
     handleSearch: handleAISearch,
     closeChat: closeAIChat,
     isChatOpen: isAIChatOpen,
+    resultBookmarkIds: aiResultBookmarkIds,
   } = useConversationalSearch();
 
   // 加载自定义筛选器
@@ -182,6 +182,58 @@ export function BookmarkPanel({
     setSelectedCustomFilterId(filterId || undefined);
   }, []);
 
+  // 处理 AI 建议点击
+  const handleAISuggestionClick = useCallback(async (suggestion: Suggestion) => {
+    const { action, payload, label } = suggestion;
+
+    switch (action) {
+      case 'navigate': {
+        if (payload?.view && typeof payload.view === 'string') {
+          onOpenSettings?.(payload.view);
+        }
+        break;
+      }
+
+      case 'copyAllLinks': {
+        const links = aiResultBookmarkIds
+          .map((id) => bookmarks.find((b) => b.id === id)?.url)
+          .filter(Boolean)
+          .join('\n');
+
+        if (links) {
+          await navigator.clipboard.writeText(links);
+          toast.success(t('ai:suggestion.copySuccess'), {
+            duration: 2000,
+          });
+        }
+        break;
+      }
+
+      case 'batchAddTags':
+      case 'batchMoveCategory': {
+        // 侧边栏目前暂不支持批量操作，提示用户去设置页面
+        toast.info(t('ai:search.suggestions.narrowSearch'), {
+          duration: 3000,
+        });
+        break;
+      }
+
+      case 'showMore':
+      case 'timeFilter':
+      case 'domainFilter':
+      case 'categoryFilter':
+      case 'semanticOnly':
+      case 'keywordOnly':
+      case 'findDuplicates':
+      case 'text':
+      default: {
+        setAIQuery(label);
+        handleAISearch();
+        break;
+      }
+    }
+  }, [aiResultBookmarkIds, bookmarks, setAIQuery, handleAISearch, onOpenSettings, t]);
+
   return (
     <>
       {/* 背景遮罩 - 覆盖整个屏幕 */}
@@ -260,10 +312,7 @@ export function BookmarkPanel({
           sources={aiResults}
           onSourceClick={handleSourceClick}
           suggestions={aiSuggestions}
-          onSuggestionClick={(suggestion) => {
-            setAIQuery(suggestion);
-            handleAISearch();
-          }}
+          onSuggestionClick={handleAISuggestionClick}
           onRetry={handleAISearch}
         />
       </div>

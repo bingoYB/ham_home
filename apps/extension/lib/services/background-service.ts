@@ -30,8 +30,8 @@ export interface IBackgroundService {
   getSettings(): Promise<LocalSettings>;
   /** 获取当前页面 HTML */
   getPageHtml(): Promise<string | null>;
-  /** 打开设置页面 */
-  openOptionsPage(): Promise<void>;
+  /** 打开设置页面或特定子页面 */
+  openOptionsPage(view?: string): Promise<void>;
   /** 打开新标签页 */
   openTab(url: string): Promise<void>;
 
@@ -124,8 +124,8 @@ class BackgroundServiceImpl implements IBackgroundService {
     }
   }
 
-  async openOptionsPage(): Promise<void> {
-    await browser.tabs.create({ url: getExtensionURL('app.html#settings') });
+  async openOptionsPage(view: string = 'settings'): Promise<void> {
+    await browser.tabs.create({ url: getExtensionURL(`app.html#${view}`) });
   }
 
   async openTab(url: string): Promise<void> {
