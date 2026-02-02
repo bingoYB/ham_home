@@ -41,6 +41,18 @@
       "filterByTime": "按时间筛选",
       "narrowSearch": "缩小搜索范围",
       "addBookmark": "添加新书签"
+    },
+    "quickActions": {
+      "title": "试试这些示例",
+      "dismiss": "关闭",
+      "examples": {
+        "features": "查看插件功能",
+        "featuresQuery": "这个插件有哪些功能？",
+        "shortcuts": "了解快捷键",
+        "shortcutsQuery": "有哪些快捷键可以使用？",
+        "semantic": "语义搜索示例",
+        "semanticQuery": "帮我找到关于前端开发的书签"
+      }
     }
   },
   "settings": {

@@ -206,6 +206,13 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
     const { action, payload, label } = suggestion;
 
     switch (action) {
+      case 'navigate': {
+        if (payload?.view && typeof payload.view === 'string') {
+          onViewChange?.(payload.view);
+        }
+        break;
+      }
+
       case 'copyAllLinks': {
         // 复制所有链接
         const links = aiResultBookmarkIds

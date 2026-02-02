@@ -41,6 +41,18 @@
       "filterByTime": "Filter by time",
       "narrowSearch": "Narrow search scope",
       "addBookmark": "Add new bookmark"
+    },
+    "quickActions": {
+      "title": "Try these examples",
+      "dismiss": "Dismiss",
+      "examples": {
+        "features": "View features",
+        "featuresQuery": "What features does this extension have?",
+        "shortcuts": "Learn shortcuts",
+        "shortcutsQuery": "What keyboard shortcuts are available?",
+        "semantic": "Semantic search example",
+        "semanticQuery": "Find me bookmarks about frontend development"
+      }
     }
   },
   "settings": {
