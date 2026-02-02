@@ -1,6 +1,5 @@
 ---
 description: 代码优化
-alwaysApply: false
 ---
 # 代码优化重构指南
 
