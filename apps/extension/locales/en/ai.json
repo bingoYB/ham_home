@@ -23,6 +23,7 @@
     "aiAnswer": "AI Answer",
     "sources": "Sources",
     "close": "Close",
+    "aiFiltered": "AI Results ({{count}})",
     "status": {
       "thinking": "AI is thinking...",
       "searching": "Searching bookmarks...",

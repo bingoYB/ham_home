@@ -15,6 +15,7 @@ import {
   FolderX,
   Filter,
   FolderOpen,
+  Sparkles,
 } from 'lucide-react';
 import {
   Button,
@@ -139,12 +140,19 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
   // 根据 AI 对话是否打开决定显示的书签列表
   const filteredBookmarks = useMemo(() => {
     if (isAIChatOpen && aiResults.length > 0) {
-      // AI 对话模式下，按 AI 结果排序显示
-      const aiBookmarkIds = aiResults.map((r) => r.bookmarkId);
-      return bookmarks.filter((b) => aiBookmarkIds.includes(b.id));
+      // AI 对话模式下，在 AI 结果的基础上应用其他筛选条件
+      // 创建一个已筛选书签的 Set，用于快速查找
+      const filteredBookmarkIds = new Set(keywordFilteredBookmarks.map((b) => b.id));
+      
+      // 保持 AI 结果的相关性排序，只保留满足其他筛选条件的书签
+      return aiResults
+        .map((r) => r.bookmarkId)
+        .filter((id) => filteredBookmarkIds.has(id))
+        .map((id) => bookmarks.find((b) => b.id === id))
+        .filter((b): b is LocalBookmark => b !== undefined);
     }
     return keywordFilteredBookmarks;
-  }, [isAIChatOpen, aiResults, bookmarks, keywordFilteredBookmarks]);
+  }, [isAIChatOpen, aiResults, keywordFilteredBookmarks, bookmarks]);
 
   // 处理关键词搜索查询变化
   const handleKeywordQueryChange = useCallback((query: string) => {
@@ -172,7 +180,7 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
     bookmarkRefs: virtualBookmarkRefs,
   } = useVirtualBookmarkList({
     items: filteredBookmarks,
-    estimateSize: 88,
+    estimateSize: 104, // 88px content + 16px gap
     overscan: 5,
   });
 
@@ -196,7 +204,7 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
   // 处理 AI 建议点击
   const handleAISuggestionClick = useCallback(async (suggestion: Suggestion) => {
     const { action, payload, label } = suggestion;
-    
+
     switch (action) {
       case 'copyAllLinks': {
         // 复制所有链接
@@ -204,7 +212,7 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
           .map((id) => bookmarks.find((b) => b.id === id)?.url)
           .filter(Boolean)
           .join('\n');
-        
+
         if (links) {
           await navigator.clipboard.writeText(links);
           toast.success(t('ai:suggestion.copySuccess'), {
@@ -213,7 +221,7 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
         }
         break;
       }
-      
+
       case 'batchAddTags': {
         // 批量打标签 - 先选中所有 AI 结果书签，再打开弹窗
         for (const id of aiResultBookmarkIds) {
@@ -224,7 +232,7 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
         setShowBatchTagDialog(true);
         break;
       }
-      
+
       case 'batchMoveCategory': {
         // 批量移动分类 - 先选中所有 AI 结果书签，再打开弹窗
         for (const id of aiResultBookmarkIds) {
@@ -235,7 +243,7 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
         setShowBatchMoveCategoryDialog(true);
         break;
       }
-      
+
       case 'showMore':
       case 'timeFilter':
       case 'domainFilter':
@@ -552,10 +560,29 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
         </div>
 
         {/* 筛选状态和批量操作 */}
-        {(hasFilters || selectedIds.size > 0) && (
+        {(hasFilters || selectedIds.size > 0 || (isAIChatOpen && aiResults.length > 0)) && (
           <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/50">
             {/* 左侧：当前分类和筛选标签 */}
             <div className="flex items-center gap-2 flex-wrap">
+              {/* AI 搜索筛选指示器 */}
+              {isAIChatOpen && aiResults.length > 0 && (
+                <Badge
+                  variant="secondary"
+                  className="text-xs px-2 py-1 gap-1.5 cursor-pointer bg-linear-to-r from-blue-500/90 to-cyan-500/90 dark:from-blue-600/80 dark:to-cyan-600/80 text-white border-0 shadow-sm group/ai"
+                >
+                  <Sparkles className="h-3 w-3" />
+                  {t('ai:search.aiFiltered', { count: aiResults.length })}
+                  <X
+                    className="h-3 w-3 hover:bg-white/20 rounded-full cursor-pointer"
+                    style={{ pointerEvents: 'auto' }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      closeAIChat();
+                      deselectAll();
+                    }}
+                  />
+                </Badge>
+              )}
               {selectedCategory !== 'all' && (
                 <Badge
                   variant="secondary"
@@ -848,7 +875,10 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
       {/* AI 对话面板（sticky 吸底） */}
       <AIChatPanel
         isOpen={isAIChatOpen}
-        onClose={closeAIChat}
+        onClose={() => {
+          closeAIChat();
+          deselectAll();
+        }}
         query={aiQuery}
         onQueryChange={setAIQuery}
         onSubmit={handleAISearch}

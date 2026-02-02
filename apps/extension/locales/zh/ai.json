@@ -23,6 +23,7 @@
     "aiAnswer": "AI 回答",
     "sources": "信息来源",
     "close": "关闭",
+    "aiFiltered": "AI 搜索结果（{{count}} 个）",
     "status": {
       "thinking": "AI 正在思考...",
       "searching": "正在检索书签...",
