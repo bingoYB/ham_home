@@ -127,6 +127,9 @@ export function AIChatPanel({
   const showCurrentAnswer =
     status === 'thinking' || status === 'searching' || status === 'writing' || status === 'error' || (status === 'done' && !!currentAnswer);
 
+  // 判断是否显示快速操作：输入框为空且无对话历史
+  const showQuickActions = !query.trim() && messages.length === 0 && !isOpen;
+
   return (
     <div
       className={cn(
@@ -226,12 +229,13 @@ export function AIChatPanel({
         </div>
       )}
 
-      {/* 搜索输入栏（始终显示） */}
+      {/* 搜索输入栏（始终显示，快速操作集成在内部） */}
       <AIChatSearchBar
         query={query}
         isSearching={isSearching}
         onQueryChange={onQueryChange}
         onSubmit={onSubmit}
+        showQuickActions={showQuickActions}
       />
     </div>
   );

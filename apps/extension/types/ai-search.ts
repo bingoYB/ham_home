@@ -32,7 +32,8 @@ export type SuggestionActionType =
   | 'categoryFilter'
   | 'semanticOnly'
   | 'keywordOnly'
-  | 'findDuplicates';
+  | 'findDuplicates'
+  | 'navigate';
 
 /**
  * 建议项

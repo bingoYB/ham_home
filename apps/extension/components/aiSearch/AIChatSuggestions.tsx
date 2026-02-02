@@ -12,6 +12,7 @@ import {
   Search,
   Keyboard,
   Copy as Duplicate,
+  ArrowRight,
 } from 'lucide-react';
 import { Button, cn } from '@hamhome/ui';
 import type { Suggestion, SuggestionActionType } from '@/types';
@@ -47,6 +48,8 @@ function getSuggestionIcon(action: SuggestionActionType) {
       return Search;
     case 'findDuplicates':
       return Duplicate;
+    case 'navigate':
+      return ArrowRight;
     case 'text':
     default:
       return Keyboard;
@@ -57,7 +60,7 @@ function getSuggestionIcon(action: SuggestionActionType) {
  * 判断是否为可直接执行的操作
  */
 function isDirectAction(action: SuggestionActionType): boolean {
-  return ['copyAllLinks', 'batchAddTags', 'batchMoveCategory', 'showMore', 'findDuplicates'].includes(action);
+  return ['copyAllLinks', 'batchAddTags', 'batchMoveCategory', 'showMore', 'findDuplicates', 'navigate'].includes(action);
 }
 
 export function AIChatSuggestions({
