@@ -403,11 +403,16 @@ class EmbeddingQueue {
   private notifyProgress(): void {
     if (this.progressCallback) {
       const status = this.getStatus();
+      // 当队列为空且不在处理中时，表示已完成（可能是所有书签都已是最新的）
+      const percentage = status.total > 0
+        ? Math.round((status.completed / status.total) * 100)
+        : (!this.isProcessing ? 100 : 0);
+
       this.progressCallback({
         total: status.total,
         completed: status.completed,
         failed: status.failed,
-        percentage: status.total > 0 ? Math.round((status.completed / status.total) * 100) : 0,
+        percentage,
       });
     }
   }

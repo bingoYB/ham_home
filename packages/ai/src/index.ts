@@ -9,6 +9,7 @@ export {
   createExtendedAIClient,
   getDefaultModel,
   getProviderModels,
+  PROVIDER_DEFAULTS,
   // AI 任务模式控制
   AI_BATCH_MODE,
   setAIBatchMode,
@@ -22,6 +23,7 @@ export {
   getDefaultEmbeddingModel,
   getEmbeddingModelKey,
   calculateCosineSimilarity,
+  EMBEDDING_PROVIDER_DEFAULTS,
 } from './embedding';
 export type {
   EmbeddingClientConfig,

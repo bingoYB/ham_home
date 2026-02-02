@@ -49,7 +49,7 @@ export interface EmbeddingBatchResult {
 /**
  * Provider 默认 Embedding 配置
  */
-const EMBEDDING_PROVIDER_DEFAULTS: Record<AIProvider, {
+export const EMBEDDING_PROVIDER_DEFAULTS: Record<AIProvider, {
   baseUrl: string;
   defaultModel: string;
   supportsEmbedding: boolean;

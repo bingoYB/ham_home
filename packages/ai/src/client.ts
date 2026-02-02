@@ -515,7 +515,7 @@ interface ProviderConfig {
   requiresApiKey: boolean;
 }
 
-const PROVIDER_DEFAULTS: Record<string, ProviderConfig> = {
+export const PROVIDER_DEFAULTS: Record<string, ProviderConfig> = {
   openai: {
     baseUrl: "https://api.openai.com/v1",
     models: [
