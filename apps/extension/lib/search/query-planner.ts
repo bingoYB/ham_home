@@ -10,7 +10,7 @@ import type {
   ConversationState,
   LocalCategory,
 } from "@/types";
-import { configStorage, bookmarkStorage } from "@/lib/storage";
+import { configStorage } from "@/lib/storage";
 import { createExtendedAIClient, getDefaultModel } from "@hamhome/ai";
 import { createLogger } from "@hamhome/utils";
 import { z } from "zod";
