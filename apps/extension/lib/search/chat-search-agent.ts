@@ -121,13 +121,24 @@ function buildAnswerContext(
   bookmarks: LocalBookmark[],
   categories: Map<string, LocalCategory>,
   intent: ConversationIntent,
+  state?: ConversationState,
 ): string {
   const parts: string[] = [];
 
-  parts.push(`用户查询: "${query}"`);
-  parts.push(`搜索意图: ${intent}`);
+  if (state && state.shortMemory.length > 0) {
+    parts.push("当前对话历史:");
+    state.shortMemory.forEach((m) => {
+      parts.push(`- ${m.role === "user" ? "用户" : "助手"}: ${m.text}`);
+    });
+    parts.push("");
+    parts.push(`当前结构化查询: "${state.refinedQuery || query}"`);
+  } else {
+    parts.push(`用户查询: "${query}"`);
+  }
+
+  parts.push(`当前意图: ${intent}`);
   parts.push("");
-  parts.push("搜索结果:");
+  parts.push("检索到的书签 (Sources):");
 
   if (bookmarks.length === 0) {
     parts.push("(无结果)");
@@ -915,6 +926,7 @@ class ChatSearchAgent {
       mergedRequest.intent,
       searchResult,
       smartSuggestions,
+      state,
     );
 
     // 更新状态
@@ -943,6 +955,7 @@ class ChatSearchAgent {
     intent: ConversationIntent,
     searchResult: SearchResult,
     smartSuggestions: Suggestion[],
+    state: ConversationState,
   ): Promise<ChatSearchResponse> {
     // 准备来源列表
     const sources = bookmarks.map((b) => b.id);
@@ -984,6 +997,7 @@ class ChatSearchAgent {
         bookmarks,
         this.categories,
         intent,
+        state,
       );
 
       logger.debug("Generating answer with AI");
@@ -1020,6 +1034,7 @@ class ChatSearchAgent {
     bookmarks: LocalBookmark[],
     intent: ConversationIntent,
     searchResult: SearchResult,
+    state?: ConversationState,
   ): Promise<ChatSearchResponse> {
     // 准备来源列表
     const sources = bookmarks.map((b) => b.id);
@@ -1062,6 +1077,7 @@ class ChatSearchAgent {
         bookmarks,
         this.categories,
         intent,
+        state,
       );
 
       logger.debug("Generating answer with AI");

@@ -120,6 +120,18 @@ function getSystemPrompt(language: "zh" | "en"): string {
   if (language === "en") {
     return `You are a search query parser for a bookmark management plugin. Your task is to convert natural language queries into structured search requests.
 
+## Multi-turn Conversation Handling (IMPORTANT)
+
+You should refer to the "current conversation state" to parse the user's latest intent:
+
+1. **Continue/Filter**: If the user says "only show recent ones", "add XX tag", "only education related", this is usually adding filters to the previous query.
+   - You should keep or slightly adjust the previous \`refinedQuery\` and update \`filters\`.
+   - If the user is just adding filters without new search keywords, set \`refinedQuery\` to EMPTY STRING "" (it will be inherited from the previous state by backend logic).
+
+2. **Correction/Switch Topic**: If the user says "search Vue instead", "stop looking for React, search Vue", you should generate a new \`refinedQuery\` and reset irrelevant \`filters\`.
+
+3. **Follow-up/Clarification**: If the user says "also include basic tutorials", you should merge new keywords into the previous ones, e.g., "React" -> "React basic tutorials".
+
 ## Intent Recognition
 
 Identify the user's intent:
@@ -167,6 +179,18 @@ Output JSON only.`;
   }
 
   return `你是书签管理插件的查询解析器。将自然语言查询转换为结构化搜索请求。
+
+## 多轮对话处理 (重要)
+
+你需要参考"当前对话状态"来解析用户的最新意图：
+
+1. **延续/筛选**：如果用户说"只看最近的"、"再加上 XX 标签"、"只要教育类的"，这通常是在上一次查询的基础上增加过滤条件。
+   - 此时，你应该保持或微调之前的 \`refinedQuery\`，并更新 \`filters\`。
+   - 如果用户只是在增加过滤条件而没有提供新的搜索关键词，\`refinedQuery\` 应该设为空字符串 "" (由后端的 merge 逻辑自动继承旧值的关键词)。
+
+2. **修正/切换主题**：如果用户说"换成搜 Vue"、"不找 React 了，搜 Vue"，你应该生成全新的 \`refinedQuery\` 并重置不相关的 \`filters\`。
+
+3. **追问/进一步描述**：如果用户说"还要包含基础教程的"，你应该将新的关键词合并到之前的关键词中，例如 "React" -> "React 基础教程"。
 
 ## 意图识别
 
@@ -245,10 +269,15 @@ function buildUserPrompt(
   }
 
   if (context.conversationState) {
-    parts.push(`当前对话状态:`);
-    parts.push(`- 已有查询: ${context.conversationState.query}`);
+    parts.push(`当前对话历史:`);
+    context.conversationState.shortMemory.forEach((m) => {
+      parts.push(`- ${m.role === "user" ? "用户" : "助手"}: ${m.text}`);
+    });
+
+    parts.push(`当前结构化状态:`);
+    parts.push(`- 已有查询词: ${context.conversationState.refinedQuery || context.conversationState.query}`);
     parts.push(
-      `- 已有过滤: ${JSON.stringify(context.conversationState.filters)}`,
+      `- 已有过滤条件: ${JSON.stringify(context.conversationState.filters)}`,
     );
     parts.push(
       `- 已展示结果数: ${context.conversationState.seenBookmarkIds.length}`,
@@ -528,6 +557,9 @@ class QueryPlanner {
       mergedFilters.timeRangeDays = state.filters.timeRangeDays;
     }
 
+    // 合并提炼后的查询词：如果新查询没有关键词，继承上一次的
+    const mergedRefinedQuery = request.refinedQuery || state.refinedQuery || "";
+
     // 检测合并后的查询子类型
     const querySubtype = request.intent === "query"
       ? detectQuerySubtype(request.query, mergedFilters)
@@ -536,6 +568,7 @@ class QueryPlanner {
     return {
       ...request,
       querySubtype,
+      refinedQuery: mergedRefinedQuery,
       filters: mergedFilters,
     };
   }
