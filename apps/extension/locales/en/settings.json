@@ -128,6 +128,8 @@
         },
         "actions": {
           "rebuild": "Rebuild Vector Index",
+          "rebuildIncremental": "Incremental Rebuild",
+          "rebuildFull": "Full Rebuild",
           "rebuilding": "Rebuilding...",
           "rebuildProgress": "{{completed}}/{{total}}",
           "clear": "Clear Vector Data",
@@ -135,7 +137,14 @@
         },
         "dialogs": {
           "rebuildTitle": "Confirm Rebuild Vector Index",
-          "rebuildWarning": "This will delete existing vectors and regenerate embeddings for all bookmarks. This may take a while, continue?",
+          "rebuildWarning": "Rebuilding the vector index will generate embeddings for bookmarks. This may take a while, continue?",
+          "rebuildMode": "Rebuild Mode",
+          "rebuildModeIncremental": "Incremental Rebuild (Recommended)",
+          "rebuildModeIncrementalDesc": "Only generate vectors for uncovered bookmarks, keeping existing data",
+          "rebuildModeFull": "Full Rebuild",
+          "rebuildModeFullDesc": "Clear all vectors and regenerate, useful for switching models or fixing data",
+          "fullRebuildTitle": "Confirm Full Rebuild",
+          "fullRebuildWarning": "This will delete all existing vectors and regenerate embeddings for all bookmarks. This is used for switching models or fixing data. This may take a while, continue?",
           "clearTitle": "Confirm Clear Vector Data",
           "clearWarning": "This will delete all bookmark vectors, semantic search will be temporarily unavailable. Confirm clear?"
         }

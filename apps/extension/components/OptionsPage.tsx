@@ -66,7 +66,7 @@ import { useShortcuts } from '@/hooks/useShortcuts';
 import { configStorage } from '@/lib/storage/config-storage';
 import { CustomFilterDialog } from '@/components/bookmarkPanel/CustomFilterDialog';
 import { getBrowserSpecificURL, isFirefox, safeCreateTab } from '@/utils/browser-api';
-import { getDefaultModel, getProviderModels, isEmbeddingSupported, getDefaultEmbeddingModel } from '@hamhome/ai';
+import { getDefaultModel, getProviderModels, isEmbeddingSupported, getDefaultEmbeddingModel, PROVIDER_DEFAULTS, EMBEDDING_PROVIDER_DEFAULTS } from '@hamhome/ai';
 import { aiClient } from '@/lib/ai/client';
 import { getBackgroundService } from '@/lib/services';
 import type { QueueProgress } from '@/lib/embedding/embedding-queue';
@@ -122,7 +122,7 @@ export function OptionsPage() {
   const [isLoadingStats, setIsLoadingStats] = useState(false);
   const [isRebuilding, setIsRebuilding] = useState(false);
   const [rebuildProgress, setRebuildProgress] = useState<QueueProgress | null>(null);
-  const [showRebuildDialog, setShowRebuildDialog] = useState(false);
+  const [showFullRebuildDialog, setShowFullRebuildDialog] = useState(false);
   const [showClearVectorsDialog, setShowClearVectorsDialog] = useState(false);
   const [isClearing, setIsClearing] = useState(false);
 
@@ -315,22 +315,40 @@ export function OptionsPage() {
     }
   };
 
-  // 重建向量索引（通过 background service，任务在后台执行）
-  const handleRebuildVectors = async () => {
-    setShowRebuildDialog(false);
+  // 增量重建向量索引（直接执行，不需要确认）
+  const handleIncrementalRebuild = async () => {
     setIsRebuilding(true);
     setRebuildProgress(null);
 
     try {
       const bgService = getBackgroundService();
+      // 增量重建（只对未覆盖的书签生成向量）
+      await bgService.startEmbeddingRebuildIncremental();
 
-      // 开始重建（在 background 中执行，不会因页面关闭而停止）
+      // 注意：进度更新通过消息监听器接收（见 useEffect）
+      // 当队列完成时，消息会触发 loadVectorStats
+    } catch (error) {
+      console.error('[OptionsPage] Failed to start incremental rebuild:', error);
+      setIsRebuilding(false);
+      setRebuildProgress(null);
+    }
+  };
+
+  // 全量重建向量索引（需要确认，会删除所有向量）
+  const handleFullRebuild = async () => {
+    setShowFullRebuildDialog(false);
+    setIsRebuilding(true);
+    setRebuildProgress(null);
+
+    try {
+      const bgService = getBackgroundService();
+      // 全量重建（清空现有向量 + 重新生成所有）
       await bgService.startEmbeddingRebuild();
 
       // 注意：进度更新通过消息监听器接收（见 useEffect）
       // 当队列完成时，消息会触发 loadVectorStats
     } catch (error) {
-      console.error('[OptionsPage] Failed to start rebuild:', error);
+      console.error('[OptionsPage] Failed to start full rebuild:', error);
       setIsRebuilding(false);
       setRebuildProgress(null);
     }
@@ -440,8 +458,10 @@ export function OptionsPage() {
                   value={aiConfig.provider}
                   onValueChange={(value: AIProvider) => {
                     const defaultModel = getDefaultModel(value);
+                    const defaultBaseUrl = PROVIDER_DEFAULTS[value]?.baseUrl || '';
                     setLocalModel(defaultModel);
-                    updateAIConfig({ provider: value, model: defaultModel });
+                    setLocalBaseUrl(defaultBaseUrl);
+                    updateAIConfig({ provider: value, model: defaultModel, baseUrl: defaultBaseUrl });
                   }}
                 >
                   <SelectTrigger id="provider">
@@ -481,20 +501,18 @@ export function OptionsPage() {
                 </p>
               </div>
 
-              {/* Azure 和 Custom 必须配置 baseUrl，Ollama 可选配置 */}
-              {(['azure', 'custom', 'ollama'].includes(aiConfig.provider)) && (
-                <div className="space-y-2">
-                  <Label htmlFor="baseUrl">{t('settings:settings.ai.baseUrl')}</Label>
-                  <Input
-                    id="baseUrl"
-                    type="url"
-                    placeholder={t('settings:settings.ai.baseUrlPlaceholder')}
-                    value={localBaseUrl}
-                    onChange={(e) => setLocalBaseUrl(e.target.value)}
-                    onBlur={(e) => updateAIConfig({ baseUrl: e.target.value })}
-                  />
-                </div>
-              )}
+              {/* Base URL 始终显示 */}
+              <div className="space-y-2">
+                <Label htmlFor="baseUrl">{t('settings:settings.ai.baseUrl')}</Label>
+                <Input
+                  id="baseUrl"
+                  type="url"
+                  placeholder={t('settings:settings.ai.baseUrlPlaceholder')}
+                  value={localBaseUrl}
+                  onChange={(e) => setLocalBaseUrl(e.target.value)}
+                  onBlur={(e) => updateAIConfig({ baseUrl: e.target.value })}
+                />
+              </div>
 
               <div className="space-y-2">
                 <Label htmlFor="model" onClick={e => e.preventDefault()}>{t('settings:settings.ai.model')}</Label>
@@ -771,8 +789,10 @@ export function OptionsPage() {
                       value={embeddingConfig.provider}
                       onValueChange={(value: AIProvider) => {
                         const defaultModel = getDefaultEmbeddingModel(value);
+                        const defaultBaseUrl = EMBEDDING_PROVIDER_DEFAULTS[value]?.baseUrl || '';
                         setLocalEmbeddingModel(defaultModel);
-                        updateEmbeddingConfig({ provider: value, model: defaultModel });
+                        setLocalEmbeddingBaseUrl(defaultBaseUrl);
+                        updateEmbeddingConfig({ provider: value, model: defaultModel, baseUrl: defaultBaseUrl });
                       }}
                     >
                       <SelectTrigger>
@@ -845,19 +865,17 @@ export function OptionsPage() {
                     </div>
                   )}
 
-                  {/* Base URL（ollama/custom/azure 需要） */}
-                  {['ollama', 'custom', 'azure'].includes(embeddingConfig.provider) && (
-                    <div className="space-y-2">
-                      <Label>{t('settings:settings.ai.embedding.baseUrl')}</Label>
-                      <Input
-                        type="url"
-                        placeholder={t('settings:settings.ai.embedding.baseUrlPlaceholder')}
-                        value={localEmbeddingBaseUrl}
-                        onChange={(e) => setLocalEmbeddingBaseUrl(e.target.value)}
-                        onBlur={(e) => updateEmbeddingConfig({ baseUrl: e.target.value })}
-                      />
-                    </div>
-                  )}
+                  {/* Base URL 始终显示 */}
+                  <div className="space-y-2">
+                    <Label>{t('settings:settings.ai.embedding.baseUrl')}</Label>
+                    <Input
+                      type="url"
+                      placeholder={t('settings:settings.ai.embedding.baseUrlPlaceholder')}
+                      value={localEmbeddingBaseUrl}
+                      onChange={(e) => setLocalEmbeddingBaseUrl(e.target.value)}
+                      onBlur={(e) => updateEmbeddingConfig({ baseUrl: e.target.value })}
+                    />
+                  </div>
 
                   {/* Model */}
                   <div className="space-y-2">
@@ -887,12 +905,12 @@ export function OptionsPage() {
                     </p>
                   </div>
 
-                  {/* 测试连接 */}
+                  {/* 测试连接 - 与 AI 配置样式保持一致 */}
                   <div className="flex gap-2">
                     <Button
                       onClick={handleTestEmbeddingConnection}
                       disabled={isEmbeddingTesting || (!embeddingConfig.apiKey && embeddingConfig.provider !== 'ollama')}
-                      variant="outline"
+                      className="bg-primary hover:bg-primary/90"
                     >
                       {isEmbeddingTesting ? (
                         <>
@@ -912,8 +930,8 @@ export function OptionsPage() {
                   {embeddingTestResult && (
                     <div
                       className={`p-3 rounded-lg border ${embeddingTestResult.status === 'success'
-                          ? 'bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-200'
-                          : 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-200'
+                        ? 'bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-200'
+                        : 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-200'
                         }`}
                     >
                       {embeddingTestResult.message}
@@ -969,12 +987,16 @@ export function OptionsPage() {
                       </div>
                     ) : null}
 
-                    {/* 重建/清除操作 */}
+                    {/* 重建/清除操作 - 统一按钮样式 */}
                     <div className="flex gap-2">
                       <Button
-                        variant="outline"
-                        onClick={() => setShowRebuildDialog(true)}
-                        disabled={isRebuilding || isClearing}
+                        onClick={handleIncrementalRebuild}
+                        disabled={
+                          isRebuilding ||
+                          isClearing ||
+                          !!(vectorStats && storageInfo.bookmarkCount > 0 && vectorStats.count >= storageInfo.bookmarkCount)
+                        }
+                        className="bg-primary hover:bg-primary/90"
                       >
                         {isRebuilding ? (
                           <>
@@ -989,15 +1011,22 @@ export function OptionsPage() {
                         ) : (
                           <>
                             <RefreshCw className="mr-2 h-4 w-4" />
-                            {t('settings:settings.ai.embedding.actions.rebuild')}
+                            {t('settings:settings.ai.embedding.actions.rebuildIncremental')}
                           </>
                         )}
                       </Button>
                       <Button
-                        variant="outline"
+                        onClick={() => setShowFullRebuildDialog(true)}
+                        disabled={isRebuilding || isClearing}
+                        variant="secondary"
+                      >
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        {t('settings:settings.ai.embedding.actions.rebuildFull')}
+                      </Button>
+                      <Button
                         onClick={() => setShowClearVectorsDialog(true)}
                         disabled={isRebuilding || isClearing || (vectorStats?.count ?? 0) === 0}
-                        className="text-destructive hover:text-destructive"
+                        variant="destructive"
                       >
                         {isClearing ? (
                           <>
@@ -1371,21 +1400,21 @@ export function OptionsPage() {
         editingFilter={editingFilter}
       />
 
-      {/* 重建向量索引确认对话框 */}
-      <AlertDialog open={showRebuildDialog} onOpenChange={setShowRebuildDialog}>
+      {/* 全量重建向量索引确认对话框 */}
+      <AlertDialog open={showFullRebuildDialog} onOpenChange={setShowFullRebuildDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {t('settings:settings.ai.embedding.dialogs.rebuildTitle')}
+              {t('settings:settings.ai.embedding.dialogs.fullRebuildTitle')}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {t('settings:settings.ai.embedding.dialogs.rebuildWarning')}
+              {t('settings:settings.ai.embedding.dialogs.fullRebuildWarning')}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>{t('settings:settings.dialogs.cancel')}</AlertDialogCancel>
-            <AlertDialogAction onClick={handleRebuildVectors}>
-              {t('settings:settings.ai.embedding.actions.rebuild')}
+            <AlertDialogAction onClick={handleFullRebuild} className="bg-destructive hover:bg-destructive/90">
+              {t('settings:settings.ai.embedding.actions.rebuildFull')}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

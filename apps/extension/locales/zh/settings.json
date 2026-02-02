@@ -128,6 +128,8 @@
         },
         "actions": {
           "rebuild": "重建向量索引",
+          "rebuildIncremental": "增量重建索引",
+          "rebuildFull": "全量重建索引",
           "rebuilding": "重建中...",
           "rebuildProgress": "{{completed}}/{{total}}",
           "clear": "清除向量数据",
@@ -135,7 +137,14 @@
         },
         "dialogs": {
           "rebuildTitle": "确认重建向量索引",
-          "rebuildWarning": "这将删除现有向量并重新为所有书签生成 Embedding。过程可能较慢，是否继续？",
+          "rebuildWarning": "重建向量索引将为书签生成 Embedding。过程可能较慢，是否继续？",
+          "rebuildMode": "重建模式",
+          "rebuildModeIncremental": "增量重建（推荐）",
+          "rebuildModeIncrementalDesc": "只对未覆盖的书签生成向量，保留现有数据",
+          "rebuildModeFull": "全量重建",
+          "rebuildModeFullDesc": "清空所有向量并重新生成，用于切换模型或修复数据",
+          "fullRebuildTitle": "确认全量重建索引",
+          "fullRebuildWarning": "这将删除所有现有向量并重新为所有书签生成 Embedding。此操作用于切换模型或修复数据。过程可能较慢，是否继续？",
           "clearTitle": "确认清除向量数据",
           "clearWarning": "这将删除所有书签的向量索引，语义搜索功能将暂时不可用。确认清除？"
         }

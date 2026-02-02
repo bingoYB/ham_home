@@ -45,6 +45,8 @@ export interface IBackgroundService {
   getEmbeddingQueueStatus(): Promise<QueueStatus>;
   /** 开始重建向量索引 */
   startEmbeddingRebuild(): Promise<{ jobCount: number }>;
+  /** 增量重建向量索引（只对未覆盖的书签生成向量） */
+  startEmbeddingRebuildIncremental(): Promise<{ jobCount: number }>;
   /** 暂停 embedding 队列 */
   pauseEmbeddingQueue(): Promise<void>;
   /** 恢复 embedding 队列 */
@@ -154,6 +156,25 @@ class BackgroundServiceImpl implements IBackgroundService {
     await vectorStore.clearAll();
 
     // 清空队列并重新添加所有书签
+    embeddingQueue.clear();
+    const jobCount = await embeddingQueue.addAllBookmarks();
+
+    // 设置进度回调，通过消息广播给前端
+    embeddingQueue.onProgress((progress) => {
+      this.broadcastEmbeddingProgress(progress);
+    });
+
+    // 开始处理
+    await embeddingQueue.start();
+
+    return { jobCount };
+  }
+
+  async startEmbeddingRebuildIncremental(): Promise<{ jobCount: number }> {
+    // 加载配置
+    await embeddingClient.loadConfig();
+
+    // 不清空现有向量，只添加未覆盖的书签
     embeddingQueue.clear();
     const jobCount = await embeddingQueue.addAllBookmarks();
 
