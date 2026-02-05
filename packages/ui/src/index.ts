@@ -29,14 +29,29 @@ export * from "./components/sidebar";
 export * from "./components/app-sidebar";
 export * from "./components/breadcrumb";
 export { default as Masonry } from "./components/masonry";
+export type { MasonryRef } from "./components/masonry";
 export { Toaster, toast } from "./components/sonner";
 
 // Hooks 导出
 export { useDebounce } from "./hooks/useDebounce";
+export {
+  useForceUpdate,
+  usePositioner,
+  useResizeObserver,
+  useScroller,
+  useContainerPosition,
+  createResizeObserver,
+  type UsePositionerOptions,
+  type ResizeObserverInstance,
+  type ScrollerResult,
+  type ContainerPosition,
+} from "./hooks/useMasonry";
 
 // 工具函数导出
 export { cn } from "./lib/utils";
 export { masonryCompute, MasonryComputeMode } from "./lib/masonryCompute";
+export { createIntervalTree, type IIntervalTree } from "./lib/interval-tree";
+export { createPositioner, type IPositioner, type PositionerItem } from "./lib/positioner";
 
 // 示例导出
 export * from "./example";

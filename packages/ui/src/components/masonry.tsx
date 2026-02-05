@@ -1,3 +1,11 @@
+/**
+ * 瀑布流组件 (高性能版)
+ *
+ * 优化点:
+ * 1. 使用 O(1) 索引直接访问，去除 ID-Map 映射
+ * 2. 滚动时禁用 pointer-events
+ * 3. 修复窗口调整和初始加载问题
+ */
 import React, {
   forwardRef,
   useCallback,
@@ -7,480 +15,432 @@ import React, {
   useRef,
   useState,
 } from "react";
+import { createPositioner, type IPositioner, type PositionerItem } from "../lib/positioner";
+import { elementsCache } from "../lib/elements-cache";
+import {
+  useForceUpdate,
+  useResizeObserver,
+  useScroller,
+  useContainerPosition,
+  type ResizeObserverInstance,
+} from "../hooks/useMasonry";
 
-// Simple debounce implementation
-function debounce<T extends (...args: unknown[]) => void>(
-  fn: T,
-  wait: number,
-  options?: { trailing?: boolean; maxWait?: number; leading?: boolean }
-): T & { cancel: () => void } {
-  let timeoutId: ReturnType<typeof setTimeout> | null = null;
-  let lastCallTime: number | null = null;
-  let lastInvokeTime = 0;
+// ==================== 工具函数 ====================
 
-  const maxWait = options?.maxWait;
-  const leading = options?.leading ?? false;
-  const trailing = options?.trailing ?? true;
-
-  const invokeFunc = (args: unknown[]) => {
-    lastInvokeTime = Date.now();
-    fn(...args);
-  };
-
-  const debounced = ((...args: unknown[]) => {
-    const now = Date.now();
-    const isInvoking = shouldInvoke(now);
-
-    lastCallTime = now;
-
-    if (isInvoking && leading && lastInvokeTime === 0) {
-      invokeFunc(args);
-    }
-
-    if (timeoutId) clearTimeout(timeoutId);
-
-    timeoutId = setTimeout(() => {
-      if (trailing && lastCallTime !== null) {
-        invokeFunc(args);
-      }
-      timeoutId = null;
-    }, wait);
-
-    if (maxWait !== undefined) {
-      const timeSinceLastInvoke = now - lastInvokeTime;
-      if (timeSinceLastInvoke >= maxWait) {
-        invokeFunc(args);
-      }
-    }
-  }) as T & { cancel: () => void };
-
-  const shouldInvoke = (time: number): boolean => {
-    return lastCallTime === null || time - lastCallTime >= wait;
-  };
-
-  debounced.cancel = () => {
-    if (timeoutId) clearTimeout(timeoutId);
-    timeoutId = null;
-    lastCallTime = null;
-    lastInvokeTime = 0;
-  };
-
-  return debounced;
-}
-
-interface BrickRect {
-  column: number;
-  left: number;
-  top: number;
-  height: number;
-  bottom: number;
-  right: number;
-}
-
-interface BrickRecord {
-  mansonryInnerChildIndex?: number;
-  [key: string]: string | number | undefined;
-}
-
-// Helper to get brick id as string
-const getBrickId = (record: BrickRecord, brickIdKey: string): string => {
-  const id = record[brickIdKey];
-  return id !== undefined ? String(id) : "";
-};
-
-interface IWaterfallProps {
-  brickId?: string;
-  bricks?: any[];
-  render: (brick: any) => React.ReactNode;
-  gutter?: number;
-  columnSize?: number;
-  columnNum?: number;
-  threshold?: number;
-  /** id 或者 dom引用 或者返回元素的函数 */
-  scrollElement?: HTMLElement | string | (() => HTMLElement | null);
-  className?: string;
-  onRendered?: () => void;
-  children?: React.ReactNode;
-}
-
-// 解析 scrollElement 为实际的 HTMLElement
-const resolveScrollElement = (
+function resolveScrollElement(
   scrollElement: HTMLElement | string | (() => HTMLElement | null) | undefined
-): HTMLElement | null => {
+): HTMLElement | null {
   if (!scrollElement) return null;
   if (typeof scrollElement === "function") return scrollElement();
   if (typeof scrollElement === "string") return document.getElementById(scrollElement);
   return scrollElement;
-};
+}
 
-export default forwardRef(
-  /**
-   * 瀑布流
-   * @param {*} props
-   */
-  function Waterfall(
+// ==================== 类型定义 ====================
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AnyRecord = Record<string, any>;
+
+/**
+ * 获取 brick 的 id
+ */
+function defaultGetBrickId(record: AnyRecord, index: number, brickIdKey?: string): string {
+  if (brickIdKey && record[brickIdKey] !== undefined) {
+    return String(record[brickIdKey]);
+  }
+  return String(index);
+}
+
+export interface MasonryProps<T extends AnyRecord = AnyRecord> {
+  /** 用于标识 brick 的 key，如果不传则使用索引 */
+  brickId?: string;
+  /** 数据列表 */
+  bricks?: T[];
+  /** 渲染函数 */
+  render: (brick: T) => React.ReactNode;
+  /** 间距 */
+  gutter?: number;
+  /** 列宽 */
+  columnSize?: number;
+  /** 列数 */
+  columnNum?: number;
+  /** 预加载区域（倍数或像素值） */
+  threshold?: number;
+  /** 滚动元素 */
+  scrollElement?: HTMLElement | string | (() => HTMLElement | null);
+  /** 容器类名 */
+  className?: string;
+  /** 渲染完成回调 */
+  onRendered?: (startIndex: number, stopIndex: number) => void;
+  /** 子元素 */
+  children?: React.ReactNode;
+  /** 默认元素高度估算值 */
+  itemHeightEstimate?: number;
+}
+
+export interface MasonryRef {
+  /** 获取所有元素位置信息（用于框选） */
+  getBricksPosition: () => {
+    containerOffsetTop: number | undefined;
+    containerOffsetLeft: number | undefined;
+    computedBricks: React.MutableRefObject<Map<string, PositionerItem>>;
+  };
+  /** 强制重新布局 */
+  relayout: () => void;
+}
+
+// ==================== 内部组件 ====================
+
+interface MasonryItemProps {
+  index: number;
+  position: PositionerItem | null;
+  columnWidth: number;
+  resizeObserver: ResizeObserverInstance;
+  positioner: IPositioner;
+  children: React.ReactNode;
+  recordId: string;
+}
+
+/**
+ * 单个瀑布流元素
+ */
+const MasonryItem = React.memo(function MasonryItem({
+  index,
+  position,
+  columnWidth,
+  resizeObserver,
+  positioner,
+  children,
+  recordId,
+}: MasonryItemProps) {
+  const refCallback = useCallback(
+    (el: HTMLDivElement | null) => {
+      if (el === null) return;
+
+      resizeObserver.observe(el);
+      elementsCache.set(el, index);
+
+      if (positioner.get(index) === undefined) {
+        positioner.set(index, el.offsetHeight);
+      }
+    },
+    [index, resizeObserver, positioner]
+  );
+
+  let style: React.CSSProperties;
+  let className: string;
+
+  if (position) {
+    style = {
+      position: "absolute",
+      top: 0,
+      left: 0,
+      transform: `translate(${position.left}px, ${position.top}px)`,
+      width: columnWidth,
+      writingMode: "horizontal-tb",
+    };
+    className = "masonry-item visible pointer-events-auto";
+  } else {
+    style = {
+      position: "absolute",
+      width: columnWidth,
+      zIndex: -1000,
+      visibility: "hidden",
+      writingMode: "horizontal-tb",
+    };
+    className = "masonry-item invisible pointer-events-none";
+  }
+
+  return (
+    <div
+      ref={refCallback}
+      data-masonry-id={recordId}
+      data-masonry-index={index}
+      className={className}
+      style={style}
+    >
+      {children}
+    </div>
+  );
+});
+
+// ==================== 主组件 ====================
+
+// 默认视口高度，用于初始加载时容器高度还未测量的情况
+const DEFAULT_VIEWPORT_HEIGHT = 800;
+
+export default forwardRef<MasonryRef, MasonryProps>(
+  function Masonry(
     {
-      brickId = "id",
+      brickId,
       bricks = [],
       render,
       gutter = 24,
       columnSize = 240,
       columnNum = 4,
       children,
-      threshold = 1, // 预加载的滚动区域，小于10是容器倍数，大于10是绝对值
-      scrollElement, // 滚动元素
+      threshold = 2,
+      scrollElement,
       className = "masonry",
-      onRendered = () => { },
-    }: // getBrickHeight,
-      IWaterfallProps,
+      onRendered,
+      itemHeightEstimate = 300,
+    },
     ref
   ) {
-
     const containerRef = useRef<HTMLDivElement>(null);
-    const computedBricks = useRef<Map<string, BrickRect>>(new Map()); // 已经计算大小和位置的bricks
-    const columnHeightArr = useRef<number[]>([]); // 瀑布流各列高度
+    const forceUpdate = useForceUpdate();
+    
+    // 用于追踪 positioner 版本，当配置变化时强制重新渲染
+    const [positionerVersion, setPositionerVersion] = useState(0);
 
-    const [containerOffsetTop, setContainerOffsetTop] = useState(0);
-    const [containerHeight, setContainerHeight] = useState(0); // 瀑布流容器高度
-    const [scrollTop, setScrollTop] = useState(0); // 页面滚动高度
+    // 解析滚动元素
+    const resolvedScrollElement = useMemo(
+      () => resolveScrollElement(scrollElement),
+      [scrollElement]
+    );
 
-    const isUnmount = useRef(false); // 是否销毁
+    // 容器位置
+    const containerPosition = useContainerPosition(
+      containerRef,
+      resolvedScrollElement
+    );
+
+    // 创建位置管理器
+    const positioner = useMemo<IPositioner>(() => {
+      return createPositioner(columnNum, columnSize, gutter, gutter);
+    }, [columnNum, columnSize, gutter]);
+
+    // 当 positioner 重建时，触发版本更新以强制重新渲染
+    const prevPositionerRef = useRef(positioner);
     useEffect(() => {
-      isUnmount.current = false;
-      return () => {
-        isUnmount.current = true;
-      };
-    }, []);
-
-    const renderChild = useMemo(() => {
-      const childrenNode = React.Children.toArray(children);
-      return function Fn(record: BrickRecord) {
-        const computedBrickMap = computedBricks.current;
-
-        let props: React.DetailedHTMLProps<
-          React.HTMLAttributes<HTMLDivElement>,
-          HTMLDivElement
-        > = {
-          className: "invisible pointer-events-none",
-        };
-
-        const recordId = getBrickId(record, brickId);
-        if (computedBrickMap.has(recordId)) {
-          const rect = computedBrickMap.get(recordId)!;
-          props = {
-            className: "absolute top-0 left-0 visible pointer-events-auto",
-            style: { transform: `translate(${rect.left}px, ${rect.top}px)` },
-          };
-        }
-
-        // 先渲染 组件子元素
-        if (record.mansonryInnerChildIndex !== undefined) {
-          return (
-            <div key={record.mansonryInnerChildIndex} {...props}>
-              {childrenNode[record.mansonryInnerChildIndex]}
-            </div>
-          );
-        }
-
-        return (
-          <div key={recordId} {...props}>
-            {render(record)}
-          </div>
-        );
-      };
-    }, [brickId, children, render]);
-
-    // 获取瀑布流容器位置（距离视图顶部的距离）
-    useEffect(() => {
-      const realScrollElement = resolveScrollElement(scrollElement) || document.documentElement;
-
-      const containerRectTop = containerRef.current?.getBoundingClientRect()
-        ?.top as number;
-
-      if (!scrollElement) {
-        // 窗口滚动距离 + 容器距离顶部距离
-        setContainerOffsetTop(containerRectTop + window.scrollY);
-      } else {
-        setContainerOffsetTop(
-          containerRectTop -
-          realScrollElement?.getBoundingClientRect()?.top +
-          realScrollElement.scrollTop
-        );
+      if (prevPositionerRef.current !== positioner) {
+        prevPositionerRef.current = positioner;
+        // 延迟一帧更新，确保 DOM 已更新
+        requestAnimationFrame(() => {
+          setPositionerVersion(v => v + 1);
+        });
       }
-    }, [scrollElement]);
+    }, [positioner]);
 
-    // 获取瀑布流容器高度
-    const getContainerHeight = useCallback(() => {
-      const realScrollElement = resolveScrollElement(scrollElement) || document.documentElement;
-      const containerHeight = realScrollElement?.clientHeight || 0;
-      setContainerHeight(containerHeight);
-    }, [scrollElement]);
+    // ResizeObserver
+    const resizeObserver = useResizeObserver(positioner);
 
-    useEffect(() => {
-      getContainerHeight();
-      window.addEventListener("resize", getContainerHeight);
-      return () => {
-        window.removeEventListener("resize", getContainerHeight);
-      };
-    }, [getContainerHeight]);
+    // 滚动状态
+    const { scrollTop, isScrolling } = useScroller(
+      resolvedScrollElement,
+      containerPosition.offset
+    );
 
-    // 所有要渲染的元素：子元素+列表
-    const allBricks = useMemo(() => {
-      const list: BrickRecord[] = [];
-      React.Children.map(children, (child, index) => {
+    // 合并子元素和 bricks -> items
+    const allItems = useMemo(() => {
+      const list: AnyRecord[] = [];
+      React.Children.forEach(children, (child, index) => {
         if (child) {
           list.push({
             mansonryInnerChildIndex: index,
-            [brickId]: `childId_${index}`,
+            [brickId || 'id']: `childId_${index}`,
           });
         }
       });
-
       list.push(...bricks);
       return list;
     }, [brickId, bricks, children]);
 
-    // 顶部加载新数据 或 删除某个brick
-    useEffect(() => {
-      const bricks = allBricks;
+    // 使用实际视口高度或默认值
+    const effectiveViewportHeight = containerPosition.height > 0 
+      ? containerPosition.height 
+      : DEFAULT_VIEWPORT_HEIGHT;
 
-      // 清除bricks
-      if (!bricks.length) {
-        columnHeightArr.current.fill(0);
-        computedBricks.current.clear();
-        return;
-      }
-
-      const keys: Record<string, boolean> = {};
-      let index = 0;
-      for (let [key] of computedBricks.current) {
-        let realKey = bricks[index] ? getBrickId(bricks[index], brickId) : "";
-
-        // 循环跳过重复的brick
-        while (keys[realKey] && index < bricks.length - 1) {
-          index += 1;
-          realKey = getBrickId(bricks[index], brickId);
-        }
-
-        if (!bricks[index] || getBrickId(bricks[index], brickId) !== key) {
-          // 变更出现在前面几个，直接全部清空
-          if (index < 5) {
-            columnHeightArr.current.fill(0);
-            computedBricks.current.clear();
-            break;
-          }
-
-          // 清除当前brick后的所有brick缓存
-          let clearAfter = false;
-          for (let [remainKey, remainBrick] of computedBricks.current) {
-            if (clearAfter || remainKey === key) {
-              clearAfter = true;
-
-              computedBricks.current.delete(remainKey);
-              columnHeightArr.current[remainBrick.column] = Math.min(
-                remainBrick.top,
-                columnHeightArr.current[remainBrick.column]
-              );
-            }
-          }
-          break;
-        }
-
-        keys[key] = true;
-        index += 1;
-      }
-    }, [allBricks, brickId]);
-
-    // 重新渲染整个瀑布流所有内容
-    const relayout = useCallback(() => {
-      columnHeightArr.current = Array(columnNum).fill(0);
-      computedBricks.current.clear();
-
-      setScrollTop((scrollTop) => scrollTop + 1);
-    }, [columnNum, columnSize]);
-
-    // 列数量发生变化
-    useEffect(() => {
-      relayout();
-    }, [relayout]);
-
-    // 可视区域坐标
+    // 可视区域计算
     const visibleRect = useMemo(() => {
-      const expandSize =
-        threshold > 10 ? threshold : containerHeight * threshold;
-      const top = scrollTop - containerOffsetTop - expandSize;
-      const bottom =
-        scrollTop + containerHeight - containerOffsetTop + expandSize;
-
+      const overscan = effectiveViewportHeight * threshold;
+      const top = Math.max(0, scrollTop - overscan / 2);
+      const bottom = scrollTop + effectiveViewportHeight + overscan;
       return { top, bottom };
-    }, [threshold, containerHeight, containerOffsetTop, scrollTop]);
+    }, [scrollTop, effectiveViewportHeight, threshold]);
 
-    // 需要被渲染的brick
-    const renderBricks = useMemo(() => {
-      const bricks = allBricks;
-      const keys: Record<string, boolean> = {}; // 避免重复
-      const beRenders: BrickRecord[] = [];
+    // 渲染项目
+    const { renderedItems, startIndex, stopIndex, needsFreshBatch } = useMemo(() => {
+      const { columnWidth, range, size, shortestColumn } = positioner;
+      const measuredCount = size();
+      const itemCount = allItems.length;
+      const shortestColumnSize = shortestColumn();
 
-      let unRect = 0; // 未定位过的元素个数
-      for (let i = 0; i < bricks.length; i++) {
-        const brick = bricks[i];
-        const id = getBrickId(brick, brickId);
-        const rect = computedBricks.current.get(id);
-        if (rect) {
-          if (rect.bottom > visibleRect.top && rect.top < visibleRect.bottom) {
-            // 视口范围内
-            if (!keys[id]) {
-              beRenders.push(brick);
-              keys[id] = true;
-            }
-          }
-        } else {
-          // 找到没有加载过的brick
-          if (!keys[id]) {
-            beRenders.push(brick);
-            keys[id] = true;
-            unRect += 1;
-          }
-        }
+      const items: Array<{
+        index: number;
+        brick: AnyRecord;
+        position: PositionerItem | null;
+        recordId: string;
+      }> = [];
 
-        // 最多200个， TODO
-        if (unRect >= 20) {
-          break;
-        }
-      }
+      let start = 0;
+      let stop: number | undefined;
 
-      return beRenders;
-    }, [allBricks, brickId, visibleRect]);
+      // 1. 查找可视区域内的元素
+      range(visibleRect.top, visibleRect.bottom, (index, left, top) => {
+        const brick = allItems[index];
+        if (brick) {
+          const position = positioner.get(index);
+          const recordId = defaultGetBrickId(brick, index, brickId);
+          
+          items.push({
+            index,
+            brick,
+            position: position || null,
+            recordId,
+          });
 
-    // 定位所有Dom节点
-    useEffect(() => {
-      const container = containerRef.current;
-      if (!container) return;
-
-      const brickDom = [...container.children] as HTMLElement[];
-
-      const computedBrickMap = computedBricks.current;
-      const columnHeightArrCurrent = columnHeightArr.current;
-      let unRect = 0;
-      let outVisibleRect = false;
-      brickDom.forEach((brick, index) => {
-        const brickItemId = getBrickId(renderBricks[index], brickId);
-        const rect = computedBrickMap.get(brickItemId);
-
-        if (!rect) {
-          // 找到高度最小的列
-          let targetColumn = 0;
-          let minHeight = Infinity;
-          for (let i = 0; i < columnHeightArrCurrent.length; i++) {
-            const value = columnHeightArrCurrent[i];
-            if (value < minHeight) {
-              targetColumn = i;
-              minHeight = value;
-            }
-          }
-
-          const clientHeight = brick.clientHeight;
-          // const clientWidth = columnSize;
-          const newRect = {
-            column: targetColumn,
-            left: targetColumn * (columnSize + gutter),
-            top: minHeight,
-            height: clientHeight,
-            bottom: minHeight + clientHeight,
-            right: targetColumn * (columnSize + gutter) + columnSize,
-          };
-          // visibleRect 线上打印出来值为{}，跟本地有差异
-          if (
-            (newRect.bottom > visibleRect.top && newRect.top < visibleRect.bottom) ||
-            !visibleRect.top
-          ) {
-            // 视口范围内
-            Promise.resolve().then(() => {
-              brick.classList.remove("invisible", "pointer-events-none");
-              brick.classList.add("absolute", "top-0", "left-0", "visible", "pointer-events-auto");
-              brick.style.transform = `translate(${newRect.left}px, ${newRect.top}px)`;
-            });
-          }
-
-          // 更新已经渲染数据
-          computedBrickMap.set(brickItemId, newRect);
-          columnHeightArrCurrent[targetColumn] = minHeight + clientHeight + gutter;
-
-          unRect += 1;
-          if (newRect.top > visibleRect.bottom) {
-            outVisibleRect = true;
+          if (stop === undefined) {
+            start = index;
+            stop = index;
+          } else {
+            start = Math.min(start, index);
+            stop = Math.max(stop, index);
           }
         }
       });
 
-      container.style.height = Math.max(...columnHeightArr.current) + "px";
-
-      // 加载更多未定位brick
-      if (unRect >= 20 && !outVisibleRect) {
-        setScrollTop((scrollTop) => scrollTop + 1);
-      }
-
-      // 定位完成后回调函数
-      onRendered();
-    }, [renderBricks, visibleRect, columnSize, gutter, brickId, onRendered]);
-
-    // 滚动事件
-    useEffect(() => {
-      // 没有提供 scrollElement 的话，绑定window的滚动事件
-      const target: HTMLElement | Window | null = resolveScrollElement(scrollElement) || window;
-
-      const getScrollTop = (): number => {
-        if (!target) return 0;
-        if (target instanceof Window) {
-          return target.scrollY;
-        }
-        return target.scrollTop;
-      };
-
-      const change = debounce(
-        () => {
-          if (isUnmount.current) {
-            return;
-          }
-          setScrollTop(getScrollTop());
-        },
-        100,
-        { trailing: true, maxWait: 200, leading: false }
+      // 2. 检查是否需要新批次
+      // 修复：确保初始时也能加载足够元素
+      const needsBatch = measuredCount < itemCount && (
+        shortestColumnSize < visibleRect.bottom || measuredCount === 0
       );
 
-      // 初始化设置
-      change();
+      // 3. 添加未测量元素
+      if (needsBatch) {
+        // 修复：确保初始批次大小足够填满视口
+        const estimatedItemsPerColumn = Math.ceil(effectiveViewportHeight / itemHeightEstimate);
+        const minBatchSize = Math.max(positioner.columnCount * estimatedItemsPerColumn, 10);
+        
+        const batchSize = Math.min(
+          itemCount - measuredCount,
+          Math.max(
+            minBatchSize,
+            Math.ceil(
+              ((scrollTop + effectiveViewportHeight * threshold - shortestColumnSize) /
+                itemHeightEstimate) *
+                positioner.columnCount
+            )
+          ),
+          50 // 增加单次最大加载数量
+        );
 
-      // 绑定滚动事件
-      target?.addEventListener("scroll", change, { passive: true });
+        for (let i = measuredCount; i < measuredCount + batchSize && i < itemCount; i++) {
+          const brick = allItems[i];
+          if (brick) {
+            const recordId = defaultGetBrickId(brick, i, brickId);
+            
+            items.push({
+              index: i,
+              brick,
+              position: null,
+              recordId,
+            });
+          }
+        }
+      }
 
-      // 取消滚动事件
-      return () => {
-        target?.removeEventListener("scroll", change);
+      return {
+        renderedItems: items,
+        startIndex: start,
+        stopIndex: stop,
+        needsFreshBatch: needsBatch,
       };
-    }, [scrollElement]);
+    }, [
+      positioner,
+      allItems,
+      visibleRect,
+      scrollTop,
+      effectiveViewportHeight,
+      threshold,
+      itemHeightEstimate,
+      brickId,
+      positionerVersion, // 添加版本依赖，确保 positioner 变化时重新计算
+    ]);
+
+    // 如果需要新批次，触发重渲染
+    useEffect(() => {
+      if (needsFreshBatch) {
+        const timer = requestAnimationFrame(() => {
+          forceUpdate();
+        });
+        return () => cancelAnimationFrame(timer);
+      }
+    }, [needsFreshBatch, forceUpdate, renderedItems.length]);
+
+    // 渲染回调
+    useEffect(() => {
+      if (onRendered && stopIndex !== undefined) {
+        onRendered(startIndex, stopIndex);
+      }
+    }, [startIndex, stopIndex, onRendered]);
+
+    const childrenNodes = useMemo(() => React.Children.toArray(children), [children]);
+
+    const renderContent = useCallback(
+      (brick: AnyRecord) => {
+        if (brick.mansonryInnerChildIndex !== undefined) {
+          return childrenNodes[brick.mansonryInnerChildIndex];
+        }
+        return render(brick);
+      },
+      [childrenNodes, render]
+    );
 
     useImperativeHandle(ref, () => ({
-      // 获取所有图片的位置，用来做框选操作
       getBricksPosition: () => {
+        const computedBricks = new Map<string, PositionerItem>();
+        
+        const count = positioner.size();
+        for (let i = 0; i < count; i++) {
+          const pos = positioner.get(i);
+          const brick = allItems[i];
+          if (pos && brick) {
+            const id = defaultGetBrickId(brick, i, brickId);
+            computedBricks.set(id, pos);
+          }
+        }
+
         return {
-          containerOffsetTop:
-            containerRef.current?.getBoundingClientRect()?.top,
-          containerOffsetLeft:
-            containerRef.current?.getBoundingClientRect()?.left,
-          computedBricks,
+          containerOffsetTop: containerRef.current?.getBoundingClientRect()?.top,
+          containerOffsetLeft: containerRef.current?.getBoundingClientRect()?.left,
+          computedBricks: { current: computedBricks },
         };
       },
-      relayout,
+      relayout: () => {
+        positioner.clear();
+        setPositionerVersion(v => v + 1);
+        forceUpdate();
+      },
     }));
 
+    const containerStyle: React.CSSProperties = useMemo(
+      () => ({
+        position: "relative",
+        width: "100%",
+        height: positioner.estimateHeight(allItems.length, itemHeightEstimate),
+        maxHeight: positioner.estimateHeight(allItems.length, itemHeightEstimate),
+        willChange: isScrolling ? "contents" : undefined,
+        pointerEvents: isScrolling ? "none" : undefined,
+      }),
+      [positioner, allItems.length, itemHeightEstimate, isScrolling]
+    );
+
     return (
-      <div
-        className={className}
-        style={{ position: "relative", overflow: "hidden", }}
-        ref={containerRef}
-      >
-        {renderBricks.map(renderChild)}
+      <div className={className} style={containerStyle} ref={containerRef}>
+        {renderedItems.map((item) => (
+          <MasonryItem
+            key={item.recordId}
+            index={item.index}
+            position={item.position}
+            columnWidth={positioner.columnWidth}
+            resizeObserver={resizeObserver}
+            positioner={positioner}
+            recordId={item.recordId}
+          >
+            {renderContent(item.brick)}
+          </MasonryItem>
+        ))}
       </div>
     );
   }
