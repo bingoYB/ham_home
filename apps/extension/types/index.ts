@@ -5,6 +5,7 @@
 
 // AI 对话式搜索类型
 export * from './ai-search';
+import type { Suggestion } from './ai-search';
 
 // ============ 书签相关 ============
 

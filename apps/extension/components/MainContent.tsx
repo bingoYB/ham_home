@@ -34,6 +34,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   Masonry,
+  MasonryRef,
   cn,
   toast,
 } from '@hamhome/ui';
@@ -74,7 +75,7 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
   const bookmarkRefsForGrid = useRef<Map<string, HTMLElement>>(new Map());
 
   // 瀑布流组件引用（用于触发重排）
-  const masonryRef = useRef<{ relayout: () => void } | null>(null);
+  const masonryRef = useRef<MasonryRef | null>(null);
 
   // AI 对话式搜索
   const {
@@ -726,29 +727,32 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
             scrollElement={() => {
               return document.querySelector('#main-content>div');
             }}
-            render={(bookmark) => (
+            render={(bookmark) => {
+              const bm = bookmark as LocalBookmark;
+              return (
               <div
-                key={bookmark.id}
+                key={bm.id}
                 ref={(el) => {
-                  if (el) bookmarkRefsForGrid.current.set(bookmark.id, el);
+                  if (el) bookmarkRefsForGrid.current.set(bm.id, el);
                 }}
               >
                 <BookmarkCard
-                  bookmark={bookmark}
-                  categoryName={getBookmarkCategoryPath(bookmark.categoryId)}
-                  formattedDate={formatBookmarkDate(bookmark.createdAt)}
-                  isSelected={selectedIds.has(bookmark.id)}
-                  isHighlighted={highlightedBookmarkId === bookmark.id}
-                  onToggleSelect={() => toggleSelect(bookmark.id)}
-                  onOpen={() => openBookmark(bookmark.url)}
-                  onEdit={() => setEditingBookmark(bookmark)}
-                  onDelete={() => handleDelete(bookmark)}
-                  onViewSnapshot={bookmark.hasSnapshot ? () => handleViewSnapshot(bookmark) : undefined}
+                  bookmark={bm}
+                  categoryName={getBookmarkCategoryPath(bm.categoryId)}
+                  formattedDate={formatBookmarkDate(bm.createdAt)}
+                  isSelected={selectedIds.has(bm.id)}
+                  isHighlighted={highlightedBookmarkId === bm.id}
+                  onToggleSelect={() => toggleSelect(bm.id)}
+                  onOpen={() => openBookmark(bm.url)}
+                  onEdit={() => setEditingBookmark(bm)}
+                  onDelete={() => handleDelete(bm)}
+                  onViewSnapshot={bm.hasSnapshot ? () => handleViewSnapshot(bm) : undefined}
                   columnSize={masonryConfig.columnSize}
                   t={t}
                 />
               </div>
-            )}
+            );
+            }}
           />
         ) : (
           <div
