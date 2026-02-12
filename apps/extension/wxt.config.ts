@@ -23,7 +23,7 @@ export default defineConfig({
     name: "__MSG_extName__",
     description: "__MSG_extDescription__",
     default_locale: "zh_CN",
-    version: "1.0.2",
+    version: "1.1.0",
     permissions: [
       "storage",
       "activeTab",
