@@ -1,53 +1,96 @@
 {
-  "ai": {
+  "analyzing": "AI is analyzing...",
+  "generatingTitle": "Generating title...",
+  "generatingDescription": "Generating description...",
+  "extractingContent": "Extracting content...",
+  "suggestedCategory": "Suggested Category",
+  "suggestedTags": "Suggested Tags",
+  "aiNotEnabled": "AI features are not enabled. Please configure AI in settings.",
+  "status": {
     "analyzing": "AI is analyzing...",
-    "generatingTitle": "Generating title...",
-    "generatingDescription": "Generating description...",
-    "extractingContent": "Extracting content...",
-    "suggestedCategory": "Suggested Category",
-    "suggestedTags": "Suggested Tags",
-    "aiNotEnabled": "AI features are not enabled. Please configure AI in settings.",
+    "completed": "AI analysis completed",
+    "failed": "AI analysis failed",
+    "notConfigured": "AI not configured, using manual input",
+    "retry": "Retry",
+    "configure": "Configure"
+  },
+  "search": {
+    "switchToAI": "Switch to AI search",
+    "switchToKeyword": "Switch to keyword search",
+    "aiPlaceholder": "Ask AI about your bookmarks...",
+    "keywordPlaceholder": "Search bookmarks...",
+    "aiModeHint": "AI mode: Ask questions in natural language",
+    "aiAnswer": "AI Answer",
+    "sources": "Sources",
+    "close": "Close",
+    "aiFiltered": "AI Results ({{count}})",
     "status": {
-      "analyzing": "AI is analyzing...",
-      "completed": "AI analysis completed",
-      "failed": "AI analysis failed",
-      "notConfigured": "AI not configured, using manual input",
-      "retry": "Retry",
-      "configure": "Configure"
+      "thinking": "AI is thinking...",
+      "searching": "Searching bookmarks...",
+      "writing": "Generating answer...",
+      "error": "An error occurred"
     },
-    "settings": {
-      "provider": "Provider",
-      "providers": {
-        "openai": "OpenAI",
-        "anthropic": "Anthropic Claude",
-        "deepseek": "DeepSeek",
-        "ollama": "Ollama (Local)",
-        "custom": "Custom"
-      },
-      "apiKeyPlaceholder": "Enter your API key",
-      "baseUrlPlaceholder": "Enter custom endpoint (optional)",
-      "modelPlaceholder": "Enter model name, e.g.: gpt-4-turbo",
-      "testConnection": "Test Connection",
-      "features": {
-        "enableSmartCategory": "Enable Smart Categorization",
-        "enableTagSuggestion": "Enable Tag Suggestion",
-        "enableTranslation": "Enable Translation"
+    "answer": {
+      "noResults": "No related bookmarks found. Please try different keywords or phrasing.",
+      "noResultsShort": "No bookmarks found matching your query.",
+      "foundIntro": "Based on your question \"{{query}}\", I found {{count}} related bookmarks:",
+      "moreResults": "There are {{count}} more related results, you can view them in the list below."
+    },
+    "suggestions": {
+      "viewMore": "View more related bookmarks",
+      "filterByTime": "Filter by time",
+      "narrowSearch": "Narrow search scope",
+      "addBookmark": "Add new bookmark"
+    },
+    "quickActions": {
+      "title": "Try these examples",
+      "dismiss": "Dismiss",
+      "examples": {
+        "features": "View features",
+        "featuresQuery": "What features does this extension have?",
+        "shortcuts": "Learn shortcuts",
+        "shortcutsQuery": "What keyboard shortcuts are available?",
+        "semantic": "Semantic search example",
+        "semanticQuery": "Find me bookmarks about frontend development"
       }
-    },
-    "error": {
-      "configNotFound": "AI configuration not found",
-      "apiKeyInvalid": "Invalid API key",
-      "requestFailed": "AI request failed: {{error}}",
-      "networkError": "Network error, please check your connection",
-      "modelNotFound": "Model not found",
-      "rateLimited": "Too many requests, please try again later",
-      "timeout": "Request timeout"
-    },
-    "success": {
-      "configSaved": "Configuration saved",
-      "testPassed": "Connection test successful",
-      "categorySuggested": "Category suggestion generated",
-      "tagsSuggested": "Tag suggestions generated"
     }
+  },
+  "settings": {
+    "provider": "Provider",
+    "providers": {
+      "openai": "OpenAI",
+      "anthropic": "Anthropic Claude",
+      "deepseek": "DeepSeek",
+      "ollama": "Ollama (Local)",
+      "custom": "Custom"
+    },
+    "apiKeyPlaceholder": "Enter your API key",
+    "baseUrlPlaceholder": "Enter custom endpoint (optional)",
+    "modelPlaceholder": "Enter model name, e.g.: gpt-4-turbo",
+    "testConnection": "Test Connection",
+    "features": {
+      "enableSmartCategory": "Enable Smart Categorization",
+      "enableTagSuggestion": "Enable Tag Suggestion",
+      "enableTranslation": "Enable Translation"
+    }
+  },
+  "error": {
+    "configNotFound": "AI configuration not found",
+    "apiKeyInvalid": "Invalid API key",
+    "requestFailed": "AI request failed: {{error}}",
+    "networkError": "Network error, please check your connection",
+    "modelNotFound": "Model not found",
+    "rateLimited": "Too many requests, please try again later",
+    "timeout": "Request timeout"
+  },
+  "success": {
+    "configSaved": "Configuration saved",
+    "testPassed": "Connection test successful",
+    "categorySuggested": "Category suggestion generated",
+    "tagsSuggested": "Tag suggestions generated"
+  },
+  "suggestion": {
+    "copySuccess": "Copied successfully",
+    "copySuccessDesc": "Copied {{count}} links to clipboard"
   }
 }

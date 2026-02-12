@@ -8,6 +8,7 @@ export * from './user';
 export * from './ai';
 export * from './api';
 export * from './settings';
+export * from './search';
 
 // 版本常量，用于验证模块引用
 export const TYPES_VERSION = '1.0.0';

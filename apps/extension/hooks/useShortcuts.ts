@@ -1,9 +1,9 @@
 /**
  * useShortcuts - 获取扩展快捷键配置
- * 使用 browser.commands.getAll() API 读取当前配置
+ * 使用 getExtensionShortcuts() 统一处理不同运行环境
  */
 import { useState, useEffect, useCallback } from "react";
-import { browser } from "wxt/browser";
+import { getExtensionShortcuts } from "@/utils/browser-api";
 
 export interface ShortcutInfo {
   /** 命令名称 */
@@ -79,38 +79,14 @@ export function useShortcuts(): UseShortcutsReturn {
 
   const fetchShortcuts = useCallback(async () => {
     try {
-      // 检查 API 是否可用
-      if (!browser?.commands?.getAll) {
-        console.warn("[useShortcuts] browser.commands.getAll not available");
-        setShortcuts([]);
-        return;
-      }
+      const commands = await getExtensionShortcuts();
 
-      const commands = await browser.commands.getAll();
-
-      // 过滤条件：排除内置命令和开发用命令
-      const excludeCommands = [
-        "_execute_action",
-        "_execute_browser_action",
-        "reload",
-      ];
-
-      const result: ShortcutInfo[] = commands
-        .filter((cmd) => {
-          if (!cmd.name) return false;
-          // 过滤掉内置命令和开发用命令
-          if (
-            excludeCommands.some((exc) => cmd.name!.toLowerCase().includes(exc))
-          )
-            return false;
-          return true;
-        })
-        .map((cmd) => ({
-          name: cmd.name || "",
-          description: cmd.description || "",
-          shortcut: cmd.shortcut || "",
-          formattedShortcut: formatShortcut(cmd.shortcut || ""),
-        }));
+      const result: ShortcutInfo[] = commands.map((cmd) => ({
+        name: cmd.name,
+        description: cmd.description,
+        shortcut: cmd.shortcut,
+        formattedShortcut: formatShortcut(cmd.shortcut),
+      }));
 
       setShortcuts(result);
     } catch (error) {

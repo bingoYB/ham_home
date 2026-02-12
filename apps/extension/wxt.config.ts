@@ -30,6 +30,7 @@ export default defineConfig({
       "scripting",
       "downloads",
       "contextMenus",
+      "bookmarks",
     ],
     host_permissions: ["<all_urls>"],
     commands: {

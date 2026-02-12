@@ -55,6 +55,31 @@ export function isFirefox(): boolean {
 }
 
 /**
+ * 检查当前是否在 content script 环境中运行
+ * Content script 运行在网页的 origin 下，而非扩展的 origin
+ *
+ * 用于判断是否需要通过 background service 访问扩展的 IndexedDB
+ */
+export function isContentScriptContext(): boolean {
+  if (typeof window === "undefined" || typeof location === "undefined") {
+    return false;
+  }
+
+  // 扩展页面的 protocol 是 chrome-extension: 或 moz-extension:
+  const protocol = location.protocol;
+  const isExtensionPage =
+    protocol === "chrome-extension:" || protocol === "moz-extension:";
+
+  // 如果不是扩展页面，且不是 background service worker，则是 content script
+  // Service worker 没有 window.document
+  if (!isExtensionPage) {
+    return true;
+  }
+
+  return false;
+}
+
+/**
  * 获取浏览器特定的 URL
  */
 export function getBrowserSpecificURL(
@@ -179,5 +204,80 @@ export async function safeBroadcastToTabs(
     );
   } catch (error) {
     console.error("[BrowserAPI] broadcastToTabs failed:", error);
+  }
+}
+
+/**
+ * 快捷键信息
+ */
+export interface ShortcutCommand {
+  /** 命令名称 */
+  name: string;
+  /** 命令描述 */
+  description: string;
+  /** 当前快捷键 (可能为空) */
+  shortcut: string;
+}
+
+/**
+ * 直接调用 browser.commands.getAll 获取快捷键
+ * 仅在 extension page / background 中可用
+ */
+async function getShortcutsDirect(): Promise<ShortcutCommand[]> {
+  try {
+    if (!browser?.commands?.getAll) {
+      return [];
+    }
+
+    const commands = await browser.commands.getAll();
+
+    // 过滤条件：排除内置命令和开发用命令
+    const excludeCommands = [
+      "_execute_action",
+      "_execute_browser_action",
+      "reload",
+    ];
+
+    return commands
+      .filter((cmd) => {
+        if (!cmd.name) return false;
+        if (
+          excludeCommands.some((exc) => cmd.name!.toLowerCase().includes(exc))
+        ) {
+          return false;
+        }
+        return true;
+      })
+      .map((cmd) => ({
+        name: cmd.name || "",
+        description: cmd.description || "",
+        shortcut: cmd.shortcut || "",
+      }));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * 获取扩展的快捷键配置
+ * 自动判断运行环境：
+ * - extension page / background: 直接调用 browser.commands.getAll
+ * - content script: 通过 background service 获取
+ */
+export async function getExtensionShortcuts(): Promise<ShortcutCommand[]> {
+  // 在 extension page 或 background 中可以直接调用
+  if (!isContentScriptContext()) {
+    return getShortcutsDirect();
+  }
+
+  // 在 content script 中需要通过 background service 获取
+  try {
+    // 动态导入避免循环依赖
+    const { getBackgroundService } = await import("@/lib/services/background-service");
+    const service = getBackgroundService();
+    return await service.getShortcuts();
+  } catch (error) {
+    console.error("[BrowserAPI] Failed to get shortcuts via background service:", error);
+    return [];
   }
 }

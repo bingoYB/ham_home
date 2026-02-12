@@ -48,6 +48,12 @@
       "selected": "已选择 {{count}} 项",
       "selectAll": "全选",
       "deselectAll": "取消全选",
+      "addTags": "批量打标签",
+      "addTagsConfirm": "添加标签",
+      "addTagsDescription": "为选中的 {{count}} 个书签添加标签",
+      "moveCategory": "批量迁移",
+      "moveCategoryConfirm": "迁移",
+      "moveCategoryDescription": "将选中的 {{count}} 个书签迁移到分类",
       "delete": "批量删除",
       "deleteTitle": "批量删除确认",
       "deleteConfirm": "确定删除选中的 {{count}} 个书签吗？此操作无法撤销。"
@@ -107,7 +113,8 @@
     },
     "cloud": {
       "title": "标签云",
-      "description": "颜色越深表示使用越频繁"
+      "description": "颜色越深表示使用越频繁",
+      "showing": "正在显示 {{count}} / {{total}} 个标签"
     }
   },
   "popup": {

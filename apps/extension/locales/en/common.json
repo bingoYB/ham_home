@@ -23,6 +23,7 @@
     "daysAgo": "{{days}} days ago",
     "storage": "Storage",
     "more": "More",
+    "loadMore": "Load More",
     "manageBookmarks": "Manage Bookmarks",
     "viewShortcuts": "View Shortcuts",
     "languages": {

@@ -98,14 +98,68 @@
       "testConnection": "Test Connection",
       "testing": "Testing...",
       "removeTag": "Delete Tag",
-      "useCustomModel": "Use custom model: {{model}}"
+      "useCustomModel": "Use custom model: {{model}}",
+      "embedding": {
+        "title": "Semantic Search Configuration",
+        "description": "Configure Embedding service to enable semantic search",
+        "enabled": "Enable Semantic Search",
+        "enabledDesc": "Search bookmarks using vector similarity for fuzzy matching and semantic understanding",
+        "provider": "Embedding Provider",
+        "providerNotSupported": "Current provider does not support Embedding",
+        "apiKey": "API Key",
+        "apiKeyPlaceholder": "sk-...",
+        "apiKeyDesc": "API Key for Embedding service (stored locally, never uploaded)",
+        "baseUrl": "Base URL",
+        "baseUrlPlaceholder": "https://api.example.com/v1",
+        "model": "Embedding Model",
+        "modelPlaceholder": "text-embedding-3-small",
+        "batchSize": "Batch Size",
+        "batchSizeDesc": "Number of bookmarks per batch (recommended 8-32)",
+        "testConnection": "Test Connection",
+        "testing": "Testing...",
+        "testSuccess": "Connection successful, dimensions: {{dimensions}}",
+        "testFailed": "Connection failed: {{error}}",
+        "stats": {
+          "title": "Vector Index Status",
+          "vectorCount": "Indexed Bookmarks",
+          "coverage": "Coverage",
+          "storageSize": "Storage Used",
+          "calculating": "Calculating..."
+        },
+        "actions": {
+          "rebuild": "Rebuild Vector Index",
+          "rebuildIncremental": "Incremental Rebuild",
+          "rebuildFull": "Full Rebuild",
+          "rebuilding": "Rebuilding...",
+          "rebuildProgress": "{{completed}}/{{total}}",
+          "clear": "Clear Vector Data",
+          "clearing": "Clearing..."
+        },
+        "dialogs": {
+          "rebuildTitle": "Confirm Rebuild Vector Index",
+          "rebuildWarning": "Rebuilding the vector index will generate embeddings for bookmarks. This may take a while, continue?",
+          "rebuildMode": "Rebuild Mode",
+          "rebuildModeIncremental": "Incremental Rebuild (Recommended)",
+          "rebuildModeIncrementalDesc": "Only generate vectors for uncovered bookmarks, keeping existing data",
+          "rebuildModeFull": "Full Rebuild",
+          "rebuildModeFullDesc": "Clear all vectors and regenerate, useful for switching models or fixing data",
+          "fullRebuildTitle": "Confirm Full Rebuild",
+          "fullRebuildWarning": "This will delete all existing vectors and regenerate embeddings for all bookmarks. This is used for switching models or fixing data. This may take a while, continue?",
+          "clearTitle": "Confirm Clear Vector Data",
+          "clearWarning": "This will delete all bookmark vectors, semantic search will be temporarily unavailable. Confirm clear?"
+        }
+      }
     },
     "storage": {
       "title": "Storage Management",
       "description": "Manage your bookmark data and snapshots",
       "bookmarkCount": "Bookmark Count",
       "categoryCount": "Category Count",
-      "storageUsed": "Storage Used",
+      "snapshotCount": "Snapshot Count",
+      "vectorCount": "Vector Count",
+      "storageUsed": "Metadata Size",
+      "snapshotSize": "Snapshot Size",
+      "vectorSize": "Vector Size",
       "dataExport": "Data Export",
       "exportJSON": "Export as JSON",
       "exportHTML": "Export as HTML",
@@ -183,7 +237,10 @@
         "enableAIAnalysis": "Use AI for auto categorization",
         "enableAIAnalysisDesc": "Use AI to analyze bookmark content during import, automatically generating summaries, categories and tags (mutually exclusive with preserve folders)",
         "fetchPageContent": "Fetch page content for analysis",
-        "fetchPageContentDesc": "Access bookmark URLs to get page content for more accurate AI analysis (slower)"
+        "fetchPageContentDesc": "Access bookmark URLs to get page content for more accurate AI analysis (slower)",
+        "fromBrowser": "Import from Browser",
+        "fromBrowserDesc": "Directly read bookmarks from current browser",
+        "browserBookmarkCount": "Total {{count}} bookmarks in browser"
       },
       "errors": {
         "unsupportedFormat": "Unsupported file format, please select a JSON or HTML file",

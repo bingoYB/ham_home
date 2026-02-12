@@ -9,9 +9,10 @@ import type { LocalBookmark } from '@/types';
 
 export interface BookmarkListItemProps {
   bookmark: LocalBookmark;
+  isHighlighted?: boolean;
 }
 
-export function BookmarkListItem({ bookmark }: BookmarkListItemProps) {
+export function BookmarkListItem({ bookmark, isHighlighted = false }: BookmarkListItemProps) {
   const { container: portalContainer } = useContentUI();
 
   return (
@@ -23,7 +24,8 @@ export function BookmarkListItem({ bookmark }: BookmarkListItemProps) {
           rel="noopener noreferrer"
           className={cn(
             buttonVariants({ variant: 'outline', size: 'default' }),
-            'group flex items-center gap-3 px-3 py-2.5 w-full justify-start border-0 shadow-none'
+            'group flex items-center gap-3 px-3 py-2.5 w-full justify-start border-0 shadow-none',
+            isHighlighted && 'ring-2 ring-indigo-500/50 bg-indigo-50/50 dark:bg-indigo-950/20 animate-pulse rounded-lg'
           )}
         >
           {/* Favicon */}

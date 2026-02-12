@@ -28,6 +28,7 @@ export interface BookmarkListItemProps {
   categoryName: string;
   formattedDate: string;
   isSelected: boolean;
+  isHighlighted?: boolean;
   onToggleSelect: () => void;
   onOpen: () => void;
   onEdit: () => void;
@@ -41,6 +42,7 @@ export function BookmarkListItem({
   categoryName,
   formattedDate,
   isSelected,
+  isHighlighted = false,
   onToggleSelect,
   onOpen,
   onEdit,
@@ -67,8 +69,12 @@ export function BookmarkListItem({
 
   return (
     <div
-      className={`group flex items-center gap-4 p-4 rounded-xl border transition-[shadow,background-color] hover:shadow-md ${
-        isSelected ? 'border-primary bg-primary/5' : 'border-border bg-card hover:bg-muted/50'
+      className={`group flex items-center gap-4 p-4 rounded-xl border transition-all hover:shadow-md ${
+        isHighlighted
+          ? 'border-indigo-500 ring-2 ring-indigo-500/50 bg-indigo-50/50 dark:bg-indigo-950/20 animate-pulse'
+          : isSelected
+            ? 'border-primary bg-primary/5'
+            : 'border-border bg-card hover:bg-muted/50'
       }`}
     >
       {/* 选择框 */}

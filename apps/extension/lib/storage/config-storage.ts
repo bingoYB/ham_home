@@ -2,7 +2,7 @@
  * 配置存储模块
  * 基于 WXT Storage 存储 AI 配置和用户设置
  */
-import type { AIConfig, LocalSettings, CustomFilter } from '@/types';
+import type { AIConfig, LocalSettings, CustomFilter, EmbeddingConfig } from '@/types';
 
 // 默认 AI 配置
 const DEFAULT_AI_CONFIG: AIConfig = {
@@ -17,6 +17,14 @@ const DEFAULT_AI_CONFIG: AIConfig = {
   enableTagSuggestion: true, // 默认开启标签推荐
   privacyDomains: [], // 隐私域名列表
   autoDetectPrivacy: true, // 默认开启自动隐私检测
+};
+
+// 默认 Embedding 配置
+const DEFAULT_EMBEDDING_CONFIG: EmbeddingConfig = {
+  enabled: false, // 默认关闭语义搜索
+  provider: 'openai',
+  model: 'text-embedding-3-small',
+  batchSize: 16,
 };
 
 // 默认设置
@@ -41,6 +49,11 @@ const settingsItem = storage.defineItem<LocalSettings>('sync:settings', {
 
 const customFiltersItem = storage.defineItem<CustomFilter[]>('sync:customFilters', {
   fallback: [],
+});
+
+// Embedding 配置（使用 sync 实现跨设备同步）
+const embeddingConfigItem = storage.defineItem<EmbeddingConfig>('sync:embeddingConfig', {
+  fallback: DEFAULT_EMBEDDING_CONFIG,
 });
 
 class ConfigStorage {
@@ -138,6 +151,33 @@ class ConfigStorage {
     await customFiltersItem.setValue(filtered);
   }
 
+  // ============ Embedding 配置 ============
+
+  /**
+   * 获取 Embedding 配置
+   */
+  async getEmbeddingConfig(): Promise<EmbeddingConfig> {
+    return embeddingConfigItem.getValue();
+  }
+
+  /**
+   * 设置 Embedding 配置
+   */
+  async setEmbeddingConfig(config: Partial<EmbeddingConfig>): Promise<EmbeddingConfig> {
+    const current = await embeddingConfigItem.getValue();
+    const updated = { ...current, ...config };
+    await embeddingConfigItem.setValue(updated);
+    return updated;
+  }
+
+  /**
+   * 重置 Embedding 配置为默认值
+   */
+  async resetEmbeddingConfig(): Promise<EmbeddingConfig> {
+    await embeddingConfigItem.setValue(DEFAULT_EMBEDDING_CONFIG);
+    return DEFAULT_EMBEDDING_CONFIG;
+  }
+
   // ============ 监听变化 ============
 
   /**
@@ -166,7 +206,16 @@ class ConfigStorage {
       callback(newValue ?? []);
     });
   }
+
+  /**
+   * 监听 Embedding 配置变化
+   */
+  watchEmbeddingConfig(callback: (config: EmbeddingConfig) => void): () => void {
+    return embeddingConfigItem.watch((newValue: EmbeddingConfig | null) => {
+      callback(newValue ?? DEFAULT_EMBEDDING_CONFIG);
+    });
+  }
 }
 
 export const configStorage = new ConfigStorage();
-export { DEFAULT_AI_CONFIG, DEFAULT_SETTINGS };
+export { DEFAULT_AI_CONFIG, DEFAULT_SETTINGS, DEFAULT_EMBEDDING_CONFIG };

@@ -325,6 +325,14 @@ export function useSavePanel({
         }
       }
 
+      // 添加 embedding 生成任务（在 background 中执行）
+      try {
+        const backgroundService = getBackgroundService();
+        await backgroundService.queueBookmarkEmbedding(bookmark.id);
+      } catch (e) {
+        console.warn('[useSavePanel] Failed to queue embedding:', e);
+      }
+
       onSaved?.();
     } catch (err: unknown) {
       console.error('[useSavePanel] Save failed:', err);

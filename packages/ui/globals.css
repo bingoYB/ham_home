@@ -56,6 +56,7 @@
   --shadow-2xl: 0px 4px 10px 0px hsl(240 4% 60% / 0.45);
   --tracking-normal: 0em;
   --spacing: 0.25rem;
+  --success-color: #3ABE84;
 }
 
 .dark {
@@ -109,6 +110,7 @@
   --shadow-lg: 0px 4px 10px 0px hsl(0 0% 0% / 0.18), 0px 4px 6px -1px hsl(0 0% 0% / 0.18);
   --shadow-xl: 0px 4px 10px 0px hsl(0 0% 0% / 0.18), 0px 8px 10px -1px hsl(0 0% 0% / 0.18);
   --shadow-2xl: 0px 4px 10px 0px hsl(0 0% 0% / 0.45);
+  --success-color: #3ABE84;
 }
 
 @theme inline {
@@ -144,6 +146,7 @@
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
+  --color-success: var(--success-color);
   --bg-accent: var(--accent);
 
   --font-sans: var(--font-sans);
@@ -177,7 +180,7 @@ body {
   body {
     @apply bg-background text-foreground;
   }
-  
+
   :root {
     --sidebar-background: 0 0% 98%;
     --sidebar-foreground: 240 5.3% 26.1%;
@@ -188,6 +191,7 @@ body {
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
+
   .dark {
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
@@ -208,6 +212,7 @@ body {
   * {
     @apply border-border;
   }
+
   body {
     @apply bg-background text-foreground;
   }

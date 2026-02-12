@@ -9,11 +9,28 @@ export {
   createExtendedAIClient,
   getDefaultModel,
   getProviderModels,
+  PROVIDER_DEFAULTS,
   // AI 任务模式控制
   AI_BATCH_MODE,
   setAIBatchMode,
   getAIBatchMode,
 } from './client';
+
+// Embedding 相关
+export {
+  createEmbeddingClient,
+  isEmbeddingSupported,
+  getDefaultEmbeddingModel,
+  getEmbeddingModelKey,
+  calculateCosineSimilarity,
+  EMBEDDING_PROVIDER_DEFAULTS,
+} from './embedding';
+export type {
+  EmbeddingClientConfig,
+  EmbeddingResult,
+  EmbeddingBatchResult,
+  EmbeddingClient,
+} from './embedding';
 
 // 版本常量，用于验证模块引用
 export const AI_VERSION = '2.0.0'

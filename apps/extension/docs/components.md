@@ -22,7 +22,7 @@
 
 ### BookmarkHeader
 
-书签面板头部组件，包含搜索框、筛选器和快捷操作（QuickActions）。
+书签面板头部组件，包含关键词搜索框、筛选器和快捷操作（QuickActions）。
 
 | Prop                   | Type                                                    | Required | Default | Description           |
 | ---------------------- | ------------------------------------------------------- | -------- | ------- | --------------------- |
@@ -47,6 +47,7 @@
 
 - 快捷操作区域使用共享的 `QuickActions` 组件
 - 包含主题切换、语言切换和"更多"下拉菜单
+- AI 搜索使用底部的 `AIChatPanel` 组件
 
 ---
 
@@ -97,12 +98,14 @@ const { container: portalContainer } = useContentUI();
 
 分类层级树视图组件，按分类层级展示书签，支持展开/折叠。
 
-| Prop           | Type                    | Required | Default | Description  |
-| -------------- | ----------------------- | -------- | ------- | ------------ |
-| bookmarks      | `LocalBookmark[]`       | ✓        | -       | 书签数据列表 |
-| categories     | `LocalCategory[]`       | ✓        | -       | 分类数据列表 |
-| onOpenBookmark | `(url: string) => void` | -        | -       | 打开书签回调 |
-| className      | `string`                | -        | -       | 自定义样式类 |
+| Prop                  | Type                                        | Required | Default | Description              |
+| --------------------- | ------------------------------------------- | -------- | ------- | ------------------------ |
+| bookmarks             | `LocalBookmark[]`                           | ✓        | -       | 书签数据列表             |
+| categories            | `LocalCategory[]`                           | ✓        | -       | 分类数据列表             |
+| highlightedBookmarkId | `string \| null`                            | -        | -       | 高亮的书签 ID            |
+| bookmarkRefs          | `MutableRefObject<Map<string, HTMLElement>>`| -        | -       | 书签元素引用（用于滚动） |
+| onOpenBookmark        | `(url: string) => void`                     | -        | -       | 打开书签回调             |
+| className             | `string`                                    | -        | -       | 自定义样式类             |
 
 **行为说明：**
 
@@ -187,6 +190,255 @@ const { container: portalContainer } = useContentUI();
 
 ---
 
+## aiSearch
+
+AI 对话式搜索相关组件，提供底部 AI 搜索栏和对话窗口。
+
+### SearchInputArea
+
+关键词搜索输入组件（纯关键词搜索）。
+
+| Prop        | Type                    | Required | Default | Description        |
+| ----------- | ----------------------- | -------- | ------- | ------------------ |
+| value       | `string`                | ✓        | -       | 搜索值             |
+| onChange    | `(val: string) => void` | ✓        | -       | 值变化回调         |
+| onSubmit    | `() => void`            | -        | -       | 搜索提交回调       |
+| compact     | `boolean`               | -        | `false` | 紧凑模式（侧边栏） |
+| className   | `string`                | -        | -       | 自定义样式类       |
+| placeholder | `string`                | -        | -       | placeholder 覆盖   |
+
+**用法示例：**
+
+```tsx
+<SearchInputArea
+  value={searchQuery}
+  onChange={setSearchQuery}
+  compact
+/>
+```
+
+**行为说明：**
+
+- 纯关键词搜索输入框
+- Enter 键触发搜索提交
+- 支持 compact 模式用于侧边栏紧凑布局
+
+---
+
+### AIChatPanel
+
+AI 对话面板组件，合并了搜索栏和对话窗口，使用 sticky 布局吸附在底部。内容区域最大宽度 720px，居中显示，顶部圆角。
+
+| Prop              | Type                              | Required | Default | Description          |
+| ----------------- | --------------------------------- | -------- | ------- | -------------------- |
+| isOpen            | `boolean`                         | ✓        | -       | 是否展开对话窗口     |
+| onClose           | `() => void`                      | ✓        | -       | 关闭回调             |
+| query             | `string`                          | ✓        | -       | 搜索值               |
+| onQueryChange     | `(val: string) => void`           | ✓        | -       | 搜索值变化回调       |
+| onSubmit          | `() => void`                      | ✓        | -       | 搜索提交回调         |
+| messages          | `ChatMessage[]`                   | ✓        | -       | 对话历史             |
+| currentAnswer     | `string`                          | ✓        | -       | 当前正在生成的回答   |
+| status            | `AISearchStatus`                  | ✓        | -       | 当前状态             |
+| error             | `string \| null`                  | -        | -       | 错误信息             |
+| sources           | `Source[]`                        | ✓        | -       | 当前回答的引用源     |
+| onSourceClick     | `(bookmarkId: string) => void`    | ✓        | -       | 点击引用回调         |
+| suggestions       | `string[]`                        | -        | `[]`    | 后续建议             |
+| onSuggestionClick | `(suggestion: string) => void`    | -        | -       | 后续建议点击回调     |
+| onRetry           | `() => void`                      | -        | -       | 重试回调             |
+| className         | `string`                          | -        | -       | 自定义样式类         |
+
+**子组件：**
+
+该组件由以下子组件组成，可单独使用：
+
+- `AIChatSearchBar` - 搜索输入栏
+- `AIChatStatusIndicator` - 状态指示器
+- `AIChatSources` - 引用源列表
+- `AIChatSuggestions` - 后续建议
+- `AIChatMessage` - 消息组件
+
+---
+
+### AIChatSearchBar
+
+AI 搜索输入栏组件，包含输入框和提交按钮。搜索栏最大宽度 720px，居中显示。
+
+| Prop          | Type                      | Required | Default | Description      |
+| ------------- | ------------------------- | -------- | ------- | ---------------- |
+| query         | `string`                  | ✓        | -       | 搜索值           |
+| isSearching   | `boolean`                 | ✓        | -       | 是否正在搜索     |
+| onQueryChange | `(value: string) => void` | ✓        | -       | 搜索值变化回调   |
+| onSubmit      | `() => void`              | ✓        | -       | 提交回调         |
+
+**用法示例：**
+
+```tsx
+<AIChatSearchBar
+  query={query}
+  isSearching={isSearching}
+  onQueryChange={setQuery}
+  onSubmit={handleSearch}
+/>
+```
+
+---
+
+### AIChatStatusIndicator
+
+AI 状态指示器组件，显示当前搜索/生成状态。
+
+| Prop    | Type                | Required | Default | Description |
+| ------- | ------------------- | -------- | ------- | ----------- |
+| status  | `AISearchStatus`    | ✓        | -       | 当前状态    |
+| error   | `string \| null`    | -        | -       | 错误信息    |
+| onRetry | `() => void`        | -        | -       | 重试回调    |
+
+**用法示例：**
+
+```tsx
+<AIChatStatusIndicator status={status} error={error} onRetry={handleRetry} />
+```
+
+---
+
+### AIChatSources
+
+AI 引用源列表组件，显示回答引用的书签来源。
+
+| Prop          | Type                         | Required | Default | Description    |
+| ------------- | ---------------------------- | -------- | ------- | -------------- |
+| sources       | `Source[]`                   | ✓        | -       | 引用源列表     |
+| onSourceClick | `(source: Source) => void`   | ✓        | -       | 点击引用回调   |
+
+**用法示例：**
+
+```tsx
+<AIChatSources sources={sources} onSourceClick={handleSourceClick} />
+```
+
+---
+
+### AIChatSuggestions
+
+AI 后续建议组件，显示可点击的建议操作。
+
+| Prop              | Type                           | Required | Default | Description        |
+| ----------------- | ------------------------------ | -------- | ------- | ------------------ |
+| suggestions       | `string[]`                     | ✓        | -       | 建议列表           |
+| onSuggestionClick | `(suggestion: string) => void` | -        | -       | 点击建议回调       |
+
+**用法示例：**
+
+```tsx
+<AIChatSuggestions
+  suggestions={suggestions}
+  onSuggestionClick={handleSuggestionClick}
+/>
+```
+
+---
+
+### AIChatMessage
+
+AI 消息组件，显示单条对话消息（用户或助手）。
+
+| Prop          | Type                         | Required | Default | Description            |
+| ------------- | ---------------------------- | -------- | ------- | ---------------------- |
+| message       | `ChatMessage`                | ✓        | -       | 消息内容               |
+| sources       | `Source[]`                   | -        | `[]`    | 引用源（解析引用标记） |
+| onSourceClick | `(source: Source) => void`   | ✓        | -       | 点击引用回调           |
+
+**用法示例：**
+
+```tsx
+<AIChatMessage
+  message={message}
+  sources={sources}
+  onSourceClick={handleSourceClick}
+/>
+```
+
+**行为说明：**
+
+- 用户消息显示在右侧，助手消息显示在左侧
+- 自动解析消息内容中的 `[1]`、`[2]` 等引用标记并转换为可点击按钮
+
+**用法示例：**
+
+```tsx
+<AIChatPanel
+  isOpen={isAIChatOpen}
+  onClose={closeAIChat}
+  query={aiQuery}
+  onQueryChange={setAIQuery}
+  onSubmit={handleAISearch}
+  messages={aiMessages}
+  currentAnswer={aiCurrentAnswer}
+  status={aiStatus}
+  error={aiError}
+  sources={aiResults}
+  onSourceClick={handleSourceClick}
+  suggestions={aiSuggestions}
+  onSuggestionClick={(suggestion) => {
+    setAIQuery(suggestion);
+    handleAISearch();
+  }}
+  onRetry={handleAISearch}
+/>
+```
+
+**行为说明：**
+
+- 使用 `sticky bottom-0` 布局，始终吸附在滚动容器底部
+- 搜索输入栏始终可见，对话窗口在搜索后展开
+- 对话窗口最大高度为 50vh，超出时内部滚动
+- 回答中的 `[1]`、`[2]` 等引用标记可点击跳转
+- 点击引用会触发 `onSourceClick` 回调，滚动定位到对应书签
+- 支持流式输出动画显示
+
+---
+
+### AIAnswerPanel（已弃用）
+
+AI 回答面板组件，展示 AI 回答、引用源和后续建议。已被 `AIChatPanel` 替代，保留用于向后兼容。
+
+| Prop              | Type                              | Required | Default | Description          |
+| ----------------- | --------------------------------- | -------- | ------- | -------------------- |
+| compact           | `boolean`                         | -        | `false` | 紧凑模式（侧边栏）   |
+| answer            | `string`                          | ✓        | -       | AI 回答内容          |
+| status            | `AISearchStatus`                  | ✓        | -       | AI 状态              |
+| error             | `string \| null`                  | -        | -       | 错误信息             |
+| sources           | `Source[]`                        | ✓        | -       | 引用源列表           |
+| onSourceClick     | `(bookmarkId: string) => void`    | ✓        | -       | 点击引用回调         |
+| onClose           | `() => void`                      | ✓        | -       | 关闭/收起回调        |
+| suggestions       | `string[]`                        | -        | `[]`    | 后续建议列表         |
+| onSuggestionClick | `(suggestion: string) => void`    | -        | -       | 后续建议点击回调     |
+| onRetry           | `() => void`                      | -        | -       | 重试回调             |
+| className         | `string`                          | -        | -       | 自定义样式类         |
+
+**AISearchStatus 类型：**
+
+```ts
+type AISearchStatus = 'idle' | 'thinking' | 'searching' | 'writing' | 'done' | 'error';
+```
+
+**Source 类型：**
+
+```ts
+interface Source {
+  index: number;         // 引用编号（从 1 开始）
+  bookmarkId: string;    // 书签 ID
+  title: string;         // 书签标题
+  url: string;           // 书签 URL
+  score?: number;        // 综合相关度分数 (0-1)
+  keywordScore?: number; // 关键词匹配分数 (0-1)
+  semanticScore?: number;// 语义匹配分数 (0-1)
+  matchReason?: string;  // 匹配原因描述
+}
+```
+
+---
+
 ## bookmarkListMng
 
 书签列表管理相关组件，用于 `MainContent` 主内容区的书签展示和编辑。
@@ -195,17 +447,18 @@ const { container: portalContainer } = useContentUI();
 
 网格视图下的书签卡片组件。
 
-| Prop           | Type            | Required | Default | Description        |
-| -------------- | --------------- | -------- | ------- | ------------------ |
-| bookmark       | `LocalBookmark` | ✓        | -       | 书签数据           |
-| categoryName   | `string`        | ✓        | -       | 分类全路径名称     |
-| formattedDate  | `string`        | ✓        | -       | 格式化后的创建日期 |
-| isSelected     | `boolean`       | ✓        | -       | 是否被选中         |
-| columnSize     | `number`        | -        | `356`   | 卡片宽度           |
-| onToggleSelect | `() => void`    | ✓        | -       | 切换选中状态       |
-| onEdit         | `() => void`    | ✓        | -       | 编辑回调           |
-| onDelete       | `() => void`    | ✓        | -       | 删除回调           |
-| t              | `TFunction`     | ✓        | -       | i18n 翻译函数      |
+| Prop           | Type            | Required | Default | Description              |
+| -------------- | --------------- | -------- | ------- | ------------------------ |
+| bookmark       | `LocalBookmark` | ✓        | -       | 书签数据                 |
+| categoryName   | `string`        | ✓        | -       | 分类全路径名称           |
+| formattedDate  | `string`        | ✓        | -       | 格式化后的创建日期       |
+| isSelected     | `boolean`       | ✓        | -       | 是否被选中               |
+| isHighlighted  | `boolean`       | -        | `false` | AI 引用高亮状态          |
+| columnSize     | `number`        | -        | `356`   | 卡片宽度                 |
+| onToggleSelect | `() => void`    | ✓        | -       | 切换选中状态             |
+| onEdit         | `() => void`    | ✓        | -       | 编辑回调                 |
+| onDelete       | `() => void`    | ✓        | -       | 删除回调                 |
+| t              | `TFunction`     | ✓        | -       | i18n 翻译函数            |
 
 **用法示例：**
 
@@ -234,6 +487,7 @@ const { container: portalContainer } = useContentUI();
 | categoryName   | `string`        | ✓        | -       | 分类全路径名称     |
 | formattedDate  | `string`        | ✓        | -       | 格式化后的创建日期 |
 | isSelected     | `boolean`       | ✓        | -       | 是否被选中         |
+| isHighlighted  | `boolean`       | -        | `false` | AI 引用高亮状态    |
 | onToggleSelect | `() => void`    | ✓        | -       | 切换选中状态       |
 | onOpen         | `() => void`    | ✓        | -       | 打开书签回调       |
 | onEdit         | `() => void`    | ✓        | -       | 编辑回调           |
@@ -338,6 +592,80 @@ const { snapshotUrl, loading, error, openSnapshot, closeSnapshot } =
 ---
 
 ## Hooks
+
+### useConversationalSearch
+
+AI 对话式搜索 Hook，封装 AI 对话状态机与检索逻辑。内部集成 `chatSearchAgent` 进行完整的对话式搜索（意图解析 + 混合检索 + LLM 回答生成）。
+
+**返回值：**
+
+| Property                 | Type                              | Description            |
+| ------------------------ | --------------------------------- | ---------------------- |
+| query                    | `string`                          | 查询文本               |
+| setQuery                 | `(query: string) => void`         | 设置查询               |
+| messages                 | `ChatMessage[]`                   | 对话历史               |
+| currentAnswer            | `string`                          | 当前正在生成的回答     |
+| status                   | `AISearchStatus`                  | AI 状态                |
+| error                    | `string \| null`                  | 错误信息               |
+| results                  | `Source[]`                        | 当前回答的引用源       |
+| suggestions              | `string[]`                        | 后续建议               |
+| highlightedBookmarkId    | `string \| null`                  | 高亮的书签 ID          |
+| setHighlightedBookmarkId | `(id: string \| null) => void`    | 设置高亮书签           |
+| handleSearch             | `() => Promise<void>`             | 执行搜索               |
+| clearConversation        | `() => void`                      | 清除对话               |
+| closeChat                | `() => void`                      | 关闭对话窗口           |
+| isChatOpen               | `boolean`                         | 对话窗口是否打开       |
+
+**ChatMessage 类型：**
+
+```ts
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: number;
+  sources?: Source[];
+}
+```
+
+**用法示例：**
+
+```tsx
+const {
+  query,
+  setQuery,
+  messages,
+  currentAnswer,
+  status,
+  results,
+  suggestions,
+  highlightedBookmarkId,
+  setHighlightedBookmarkId,
+  handleSearch,
+  closeChat,
+  isChatOpen,
+} = useConversationalSearch();
+
+// 处理引用点击 - 滚动到对应书签
+const handleSourceClick = (bookmarkId: string) => {
+  setHighlightedBookmarkId(bookmarkId);
+  // 滚动定位...
+};
+```
+
+**行为说明：**
+
+- 调用 `handleSearch()` 打开对话窗口并执行 AI 搜索
+- AI 搜索调用 `chatSearchAgent.search()` 执行完整流程：
+  1. **Query Planner**: 使用 LLM 解析用户意图，提取筛选条件
+  2. **Hybrid Retriever**: 混合检索（关键词 + 语义向量）
+  3. **Answer Writer**: 使用 LLM 基于检索结果生成回答
+- 支持多轮对话，维护对话历史记录
+- 支持流式输出动画
+- 自动生成后续建议操作
+- 关闭对话窗口时自动清除对话状态
+- 若 AI 未配置，自动回退到基于规则的回答生成
+
+---
 
 ### useBookmarkSearch
 
@@ -453,6 +781,75 @@ const { searchQuery, filteredBookmarks, setSearchQuery, clearFilters } =
 ```tsx
 const { selectedIds, toggleSelect, toggleSelectAll } = useBookmarkSelection();
 ```
+
+---
+
+### useVirtualBookmarkList
+
+虚拟书签列表 Hook，使用 TanStack Virtual 实现高性能虚拟滚动。
+
+**参数：**
+
+| Param        | Type                   | Default | Description                    |
+| ------------ | ---------------------- | ------- | ------------------------------ |
+| items        | `{ id: string }[]`     | -       | 书签列表                       |
+| estimateSize | `number`               | `88`    | 每项估计高度（像素）           |
+| overscan     | `number`               | `5`     | 过扫描数量（预渲染的额外项数） |
+
+**返回值：**
+
+| Property         | Type                                      | Description                |
+| ---------------- | ----------------------------------------- | -------------------------- |
+| parentRef        | `RefObject<HTMLDivElement>`               | 滚动容器 ref               |
+| virtualizer      | `Virtualizer`                             | TanStack Virtual 实例      |
+| virtualItems     | `VirtualItem[]`                           | 当前可见的虚拟项列表       |
+| totalSize        | `number`                                  | 列表总高度（像素）         |
+| scrollToBookmark | `(bookmarkId: string) => void`            | 滚动到指定书签             |
+| bookmarkRefs     | `RefObject<Map<string, HTMLElement>>`     | 书签元素引用 Map           |
+
+**用法示例：**
+
+```tsx
+const {
+  parentRef,
+  virtualItems,
+  totalSize,
+  scrollToBookmark,
+  bookmarkRefs,
+} = useVirtualBookmarkList({
+  items: filteredBookmarks,
+  estimateSize: 88,
+  overscan: 5,
+});
+
+// 渲染虚拟列表
+<div ref={parentRef} className="h-full overflow-auto">
+  <div style={{ height: `${totalSize}px`, position: 'relative' }}>
+    {virtualItems.map((virtualItem) => {
+      const bookmark = filteredBookmarks[virtualItem.index];
+      return (
+        <div
+          key={virtualItem.key}
+          style={{
+            position: 'absolute',
+            top: `${virtualItem.start}px`,
+            height: `${virtualItem.size}px`,
+          }}
+        >
+          <BookmarkListItem bookmark={bookmark} />
+        </div>
+      );
+    })}
+  </div>
+</div>
+```
+
+**行为说明：**
+
+- 使用 TanStack Virtual 实现虚拟滚动，仅渲染可见区域的书签
+- `estimateSize` 应设置为 BookmarkListItem 的估计高度（默认 88px）
+- `overscan` 控制预渲染的额外项数，增加可减少滚动时的空白
+- `scrollToBookmark` 支持平滑滚动到指定书签（用于 AI 引用点击定位）
 
 ---
 
@@ -706,6 +1103,51 @@ interface IBackgroundService {
   getPageHtml(): Promise<string | null>;
   /** 打开设置页面 */
   openOptionsPage(): Promise<void>;
+  /** 打开新标签页 */
+  openTab(url: string): Promise<void>;
+
+  // ========== Embedding 相关方法 ==========
+
+  /** 获取向量存储统计信息 */
+  getVectorStats(): Promise<VectorStoreStats>;
+  /** 清空所有向量数据 */
+  clearVectorStore(): Promise<void>;
+  /** 获取 embedding 队列状态 */
+  getEmbeddingQueueStatus(): Promise<QueueStatus>;
+  /** 开始重建向量索引 */
+  startEmbeddingRebuild(): Promise<{ jobCount: number }>;
+  /** 暂停 embedding 队列 */
+  pauseEmbeddingQueue(): Promise<void>;
+  /** 恢复 embedding 队列 */
+  resumeEmbeddingQueue(): Promise<void>;
+  /** 停止 embedding 队列 */
+  stopEmbeddingQueue(): Promise<void>;
+  /** 测试 embedding 连接 */
+  testEmbeddingConnection(): Promise<{ success: boolean; error?: string; dimensions?: number }>;
+  /** 添加书签到 embedding 队列（保存书签时调用） */
+  queueBookmarkEmbedding(bookmarkId: string): Promise<void>;
+  /** 批量添加书签到 embedding 队列（导入书签时调用） */
+  queueBookmarksEmbedding(bookmarkIds: string[]): Promise<void>;
+
+  // ========== 语义搜索相关方法（用于 content script 调用） ==========
+
+  /** 执行语义搜索（在 background 中执行，确保访问正确的 IndexedDB） */
+  semanticSearch(query: string, options?: SemanticSearchOptions): Promise<SemanticSearchResult>;
+  /** 检查语义搜索是否可用 */
+  isSemanticAvailable(): Promise<boolean>;
+  /** 查找相似书签 */
+  findSimilarBookmarks(bookmarkId: string, options?: SemanticSearchOptions): Promise<SemanticSearchResult>;
+  /** 获取书签的 embedding */
+  getBookmarkEmbedding(bookmarkId: string): Promise<BookmarkEmbedding | null>;
+  /** 获取指定模型的所有 embeddings */
+  getEmbeddingsByModel(modelKey: string): Promise<BookmarkEmbedding[]>;
+  /** 获取 embedding 覆盖率统计 */
+  getEmbeddingCoverageStats(): Promise<{ total: number; withEmbedding: number; coverage: number }>;
+
+  // ========== 其他方法 ==========
+
+  /** 获取扩展快捷键配置（commands API 只能在 background 中调用） */
+  getShortcuts(): Promise<ShortcutCommand[]>;
 }
 ```
 
@@ -738,6 +1180,30 @@ const html = await backgroundService.getPageHtml();
 
 // 打开设置页
 await backgroundService.openOptionsPage();
+
+// Embedding 相关操作（在 background 中执行，不受页面关闭影响）
+const stats = await backgroundService.getVectorStats();
+await backgroundService.startEmbeddingRebuild();
+
+// 语义搜索（在 content script 中使用时自动通过 background service 调用）
+const available = await backgroundService.isSemanticAvailable();
+const result = await backgroundService.semanticSearch("查找前端相关书签");
+```
+
+**Embedding 进度监听：**
+
+Embedding 重建任务在 background 中执行，进度通过消息广播更新：
+
+```ts
+import { browser } from 'wxt/browser';
+
+// 监听 embedding 进度
+browser.runtime.onMessage.addListener((message) => {
+  if (message.type === 'EMBEDDING_PROGRESS' && message.payload) {
+    const progress = message.payload; // { total, completed, failed, percentage }
+    console.log(`进度: ${progress.percentage}%`);
+  }
+});
 ```
 
 **行为说明：**
@@ -746,6 +1212,8 @@ await backgroundService.openOptionsPage();
 - 方法调用会自动路由到 background 执行
 - 完全类型安全，提供良好的 IDE 支持
 - 替代手动编写 `chrome.runtime.sendMessage` / `onMessage` 样板代码
+- **Embedding 任务在 background 中执行**，页面关闭后任务不会中断
+- **语义搜索在 content script 中自动通过 background service 调用**，确保访问扩展的 IndexedDB 而非当前网页的 IndexedDB
 
 ---
 
@@ -785,6 +1253,29 @@ await safeBroadcastToTabs({ type: "REFRESH" }, { url: "*://*.example.com/*" });
 - WXT 框架自动处理 `chrome.*` / `browser.*` API polyfill
 - 这些工具函数提供额外的错误处理和静默失败机制
 - 适用于 Chrome、Firefox、Edge 等主流浏览器
+
+#### isContentScriptContext
+
+检查当前是否在 content script 环境中运行。用于判断是否需要通过 background service 访问扩展的 IndexedDB。
+
+```ts
+import { isContentScriptContext } from "@/utils/browser-api";
+
+if (isContentScriptContext()) {
+  // 在 content script 中，需要通过 background service 访问扩展存储
+  const bgService = getBackgroundService();
+  const result = await bgService.semanticSearch(query);
+} else {
+  // 在扩展页面或 background 中，可以直接访问
+  const result = await semanticRetriever.search(query);
+}
+```
+
+**原理说明：**
+
+- Content script 运行在网页的 origin 下，访问 IndexedDB 时会使用网页的数据库
+- 扩展页面（popup、options）和 background 运行在扩展的 origin 下
+- 通过检查 `location.protocol` 是否为 `chrome-extension:` 或 `moz-extension:` 来判断环境
 
 ---
 
@@ -960,6 +1451,89 @@ AI 配置和用户设置存储，基于 **WXT Storage (sync)** 实现，支持�
 | `watchAIConfig`      | `callback: (config) => void`                       | `() => void`              | 监听 AI 配置变化 |
 | `watchSettings`      | `callback: (settings) => void`                     | `() => void`              | 监听设置变化     |
 | `watchCustomFilters` | `callback: (filters) => void`                      | `() => void`              | 监听筛选器变化   |
+| `getEmbeddingConfig` | -                                                  | `Promise<EmbeddingConfig>` | 获取 Embedding 配置 |
+| `setEmbeddingConfig` | `config: Partial<EmbeddingConfig>`                 | `Promise<EmbeddingConfig>` | 设置 Embedding 配置 |
+| `resetEmbeddingConfig` | -                                                | `Promise<EmbeddingConfig>` | 重置 Embedding 配置 |
+| `watchEmbeddingConfig` | `callback: (config) => void`                     | `() => void`              | 监听 Embedding 配置变化 |
+
+#### EmbeddingConfig 类型
+
+用于语义搜索的 Embedding 服务配置。
+
+| 属性 | 类型 | 必填 | 默认值 | 描述 |
+|------|------|------|--------|------|
+| `enabled` | `boolean` | ✓ | `false` | 是否启用语义检索 |
+| `provider` | `AIProvider` | ✓ | `'openai'` | 服务提供商 |
+| `baseUrl` | `string` | - | - | OpenAI-compatible base url |
+| `apiKey` | `string` | - | - | API Key（云端 provider 需要） |
+| `model` | `string` | ✓ | `'text-embedding-3-small'` | Embedding 模型名 |
+| `dimensions` | `number` | - | - | 向量维度（部分 provider 支持指定） |
+| `batchSize` | `number` | - | `16` | 批量 embedding 大小 |
+
+**支持 Embedding 的 Provider：**
+
+| Provider | 默认模型 | 说明 |
+|----------|----------|------|
+| `openai` | `text-embedding-3-small` | OpenAI Embedding API |
+| `google` | `text-embedding-004` | Google Gemini Embedding |
+| `azure` | `text-embedding-ada-002` | Azure OpenAI（需配置 baseUrl） |
+| `mistral` | `mistral-embed` | Mistral AI Embedding |
+| `zhipu` | `embedding-3` | 智谱 AI Embedding |
+| `hunyuan` | `hunyuan-embedding` | 腾讯混元 Embedding |
+| `nvidia` | `nvidia/embed-qa-4` | NVIDIA NIM Embedding |
+| `siliconflow` | `BAAI/bge-m3` | 硅基流动 BGE-M3 |
+| `ollama` | `nomic-embed-text` | Ollama 本地 Embedding（无需 API Key） |
+| `custom` | `text-embedding-3-small` | 自定义 OpenAI 兼容端点 |
+
+**不支持 Embedding 的 Provider：** `anthropic`、`deepseek`、`groq`、`moonshot`
+
+---
+
+### vector-store
+
+书签向量存储模块，基于 **IndexedDB** 实现语义搜索的向量存储。
+
+#### VectorStore 方法
+
+| Method | Parameters | Return | Description |
+|--------|------------|--------|-------------|
+| `saveEmbedding` | `embedding: BookmarkEmbedding` | `Promise<void>` | 保存单个书签向量 |
+| `saveEmbeddings` | `embeddings: BookmarkEmbedding[]` | `Promise<void>` | 批量保存书签向量 |
+| `getEmbedding` | `bookmarkId: string` | `Promise<BookmarkEmbedding \| null>` | 获取单个书签向量 |
+| `getEmbeddings` | `bookmarkIds: string[]` | `Promise<Map<string, BookmarkEmbedding>>` | 批量获取书签向量 |
+| `getEmbeddingsByModel` | `modelKey: string` | `Promise<BookmarkEmbedding[]>` | 获取指定模型的所有向量 |
+| `getAllEmbeddings` | - | `Promise<BookmarkEmbedding[]>` | 获取所有向量（用于语义搜索） |
+| `needsUpdate` | `bookmarkId: string, newChecksum: string` | `Promise<boolean>` | 检查是否需要重新生成向量 |
+| `deleteEmbedding` | `bookmarkId: string` | `Promise<void>` | 删除单个书签向量 |
+| `deleteEmbeddings` | `bookmarkIds: string[]` | `Promise<void>` | 批量删除书签向量 |
+| `deleteByModel` | `modelKey: string` | `Promise<number>` | 删除指定模型的所有向量 |
+| `clearAll` | - | `Promise<void>` | 清空所有向量 |
+| `getStats` | - | `Promise<VectorStoreStats>` | 获取存储统计信息 |
+| `getMissingBookmarkIds` | `allBookmarkIds: string[]` | `Promise<string[]>` | 获取没有向量的书签 ID 列表 |
+
+#### VectorStoreStats 类型
+
+| 属性 | 类型 | 描述 |
+|------|------|------|
+| `count` | `number` | 总向量数 |
+| `countByModel` | `Record<string, number>` | 按模型分组的向量数 |
+| `estimatedSize` | `number` | 估算存储大小（字节） |
+
+**用法示例：**
+
+```ts
+import { vectorStore } from '@/lib/storage';
+
+// 获取向量统计
+const stats = await vectorStore.getStats();
+console.log(`已索引 ${stats.count} 个书签，占用 ${(stats.estimatedSize / 1024).toFixed(1)} KB`);
+
+// 获取书签向量
+const embedding = await vectorStore.getEmbedding(bookmarkId);
+
+// 清空所有向量（重建前）
+await vectorStore.clearAll();
+```
 
 ---
 

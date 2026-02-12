@@ -2,7 +2,7 @@
  * OptionsPage 设置页面
  * 迁移自 design-example，整合现有设置功能
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Sparkles,
@@ -17,6 +17,9 @@ import {
   ExternalLink,
   Check,
   ChevronsUpDown,
+  Search,
+  RefreshCw,
+  AlertTriangle,
 } from 'lucide-react';
 import {
   Button,
@@ -63,9 +66,14 @@ import { useShortcuts } from '@/hooks/useShortcuts';
 import { configStorage } from '@/lib/storage/config-storage';
 import { CustomFilterDialog } from '@/components/bookmarkPanel/CustomFilterDialog';
 import { getBrowserSpecificURL, isFirefox, safeCreateTab } from '@/utils/browser-api';
-import { getDefaultModel, getProviderModels } from '@hamhome/ai';
+import { snapshotStorage } from '@/lib/storage/snapshot-storage';
+import { getDefaultModel, getProviderModels, isEmbeddingSupported, getDefaultEmbeddingModel, PROVIDER_DEFAULTS, EMBEDDING_PROVIDER_DEFAULTS } from '@hamhome/ai';
 import { aiClient } from '@/lib/ai/client';
-import type { CustomFilter, FilterCondition, AIProvider } from '@/types';
+import { getBackgroundService } from '@/lib/services';
+import type { QueueProgress } from '@/lib/embedding/embedding-queue';
+import type { VectorStoreStats } from '@/lib/storage/vector-store';
+import type { CustomFilter, FilterCondition, AIProvider, EmbeddingConfig } from '@/types';
+import { browser } from 'wxt/browser';
 
 export function OptionsPage() {
   const { t } = useTranslation(['common', 'settings']);
@@ -99,6 +107,36 @@ export function OptionsPage() {
   const [localModel, setLocalModel] = useState('');
   const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
 
+  // Embedding 配置状态
+  const [embeddingConfig, setEmbeddingConfig] = useState<EmbeddingConfig>({
+    enabled: false,
+    provider: 'openai',
+    model: 'text-embedding-3-small',
+    batchSize: 16,
+  });
+  const [localEmbeddingApiKey, setLocalEmbeddingApiKey] = useState('');
+  const [localEmbeddingBaseUrl, setLocalEmbeddingBaseUrl] = useState('');
+  const [localEmbeddingModel, setLocalEmbeddingModel] = useState('');
+  const [embeddingTestResult, setEmbeddingTestResult] = useState<{ status: 'success' | 'error'; message: string } | null>(null);
+  const [isEmbeddingTesting, setIsEmbeddingTesting] = useState(false);
+  const [vectorStats, setVectorStats] = useState<VectorStoreStats | null>(null);
+  const [isLoadingStats, setIsLoadingStats] = useState(false);
+  const [isRebuilding, setIsRebuilding] = useState(false);
+  const [rebuildProgress, setRebuildProgress] = useState<QueueProgress | null>(null);
+  const [showFullRebuildDialog, setShowFullRebuildDialog] = useState(false);
+  const [showClearVectorsDialog, setShowClearVectorsDialog] = useState(false);
+  const [isClearing, setIsClearing] = useState(false);
+  const [snapshotStats, setSnapshotStats] = useState<{ count: number; totalSize: number } | null>(null);
+
+  // 辅助函数：格式化字节大小
+  const formatBytes = (bytes: number) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
   // 同步 aiConfig 到本地状态
   useEffect(() => {
     setLocalApiKey(aiConfig.apiKey || '');
@@ -118,6 +156,83 @@ export function OptionsPage() {
     };
     loadCustomFilters();
   }, []);
+
+  // 加载 Embedding 配置
+  useEffect(() => {
+    const loadEmbeddingConfig = async () => {
+      try {
+        const config = await configStorage.getEmbeddingConfig();
+        setEmbeddingConfig(config);
+        setLocalEmbeddingApiKey(config.apiKey || '');
+        setLocalEmbeddingBaseUrl(config.baseUrl || '');
+        setLocalEmbeddingModel(config.model || '');
+      } catch (error) {
+        console.error('[OptionsPage] Failed to load embedding config:', error);
+      }
+    };
+    loadEmbeddingConfig();
+  }, []);
+
+  // 加载向量统计信息（通过 background service）
+  const loadVectorStats = useCallback(async () => {
+    // 只在 embedding 功能启用时加载统计
+    if (!embeddingConfig.enabled) {
+      setVectorStats(null);
+      return;
+    }
+    setIsLoadingStats(true);
+    try {
+      const bgService = getBackgroundService();
+      const stats = await bgService.getVectorStats();
+      setVectorStats(stats);
+    } catch (error) {
+      console.error('[OptionsPage] Failed to load vector stats:', error);
+      setVectorStats(null);
+    } finally {
+      setIsLoadingStats(false);
+    }
+  }, [embeddingConfig.enabled]);
+
+  useEffect(() => {
+    loadVectorStats();
+  }, [loadVectorStats]);
+
+  // 监听 background service 的 embedding 进度消息
+  useEffect(() => {
+    const handleMessage = (message: { type: string; payload?: QueueProgress }) => {
+      if (message.type === 'EMBEDDING_PROGRESS' && message.payload) {
+        const progress = message.payload;
+        setRebuildProgress(progress);
+
+        // 当进度达到 100% 时，刷新统计并重置状态
+        if (progress.percentage >= 100) {
+          setIsRebuilding(false);
+          setRebuildProgress(null);
+          loadVectorStats();
+        }
+      }
+    };
+
+    browser.runtime.onMessage.addListener(handleMessage);
+    return () => {
+      browser.runtime.onMessage.removeListener(handleMessage);
+    };
+  }, [loadVectorStats]);
+
+  // 加载快照统计信息
+  const loadSnapshotStats = useCallback(async () => {
+    try {
+      const stats = await snapshotStorage.getStorageUsage();
+      setSnapshotStats(stats);
+    } catch (error) {
+      console.error('[OptionsPage] Failed to load snapshot stats:', error);
+      setSnapshotStats(null);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadSnapshotStats();
+  }, [loadSnapshotStats]);
 
   const handleTestConnection = async () => {
     setIsTesting(true);
@@ -176,6 +291,108 @@ export function OptionsPage() {
     if (e.key === 'Enter') {
       e.preventDefault();
       handleAddTag();
+    }
+  };
+
+  // Embedding 配置更新
+  const updateEmbeddingConfig = async (updates: Partial<EmbeddingConfig>) => {
+    try {
+      const updated = await configStorage.setEmbeddingConfig(updates);
+      setEmbeddingConfig(updated);
+      // 配置保存后，background service 会自动加载新配置
+    } catch (error) {
+      console.error('[OptionsPage] Failed to update embedding config:', error);
+    }
+  };
+
+  // 测试 Embedding 连接（通过 background service）
+  const handleTestEmbeddingConnection = async () => {
+    setIsEmbeddingTesting(true);
+    setEmbeddingTestResult(null);
+
+    try {
+      // 确保最新配置已保存
+      await updateEmbeddingConfig({});
+
+      // 通过 background service 测试连接
+      const bgService = getBackgroundService();
+      const result = await bgService.testEmbeddingConnection();
+
+      if (result.success) {
+        setEmbeddingTestResult({
+          status: 'success',
+          message: t('settings:settings.ai.embedding.testSuccess', { dimensions: result.dimensions }),
+        });
+      } else {
+        setEmbeddingTestResult({
+          status: 'error',
+          message: t('settings:settings.ai.embedding.testFailed', { error: result.error }),
+        });
+      }
+    } catch (error) {
+      setEmbeddingTestResult({
+        status: 'error',
+        message: t('settings:settings.ai.embedding.testFailed', {
+          error: error instanceof Error ? error.message : 'Unknown error',
+        }),
+      });
+    } finally {
+      setIsEmbeddingTesting(false);
+    }
+  };
+
+  // 增量重建向量索引（直接执行，不需要确认）
+  const handleIncrementalRebuild = async () => {
+    setIsRebuilding(true);
+    setRebuildProgress(null);
+
+    try {
+      const bgService = getBackgroundService();
+      // 增量重建（只对未覆盖的书签生成向量）
+      await bgService.startEmbeddingRebuildIncremental();
+
+      // 注意：进度更新通过消息监听器接收（见 useEffect）
+      // 当队列完成时，消息会触发 loadVectorStats
+    } catch (error) {
+      console.error('[OptionsPage] Failed to start incremental rebuild:', error);
+      setIsRebuilding(false);
+      setRebuildProgress(null);
+    }
+  };
+
+  // 全量重建向量索引（需要确认，会删除所有向量）
+  const handleFullRebuild = async () => {
+    setShowFullRebuildDialog(false);
+    setIsRebuilding(true);
+    setRebuildProgress(null);
+
+    try {
+      const bgService = getBackgroundService();
+      // 全量重建（清空现有向量 + 重新生成所有）
+      await bgService.startEmbeddingRebuild();
+
+      // 注意：进度更新通过消息监听器接收（见 useEffect）
+      // 当队列完成时，消息会触发 loadVectorStats
+    } catch (error) {
+      console.error('[OptionsPage] Failed to start full rebuild:', error);
+      setIsRebuilding(false);
+      setRebuildProgress(null);
+    }
+  };
+
+  // 清除向量数据（通过 background service）
+  const handleClearVectors = async () => {
+    setShowClearVectorsDialog(false);
+    setIsClearing(true);
+
+    try {
+      const bgService = getBackgroundService();
+      await bgService.clearVectorStore();
+      await loadVectorStats();
+    } catch (error) {
+      console.error('[OptionsPage] Failed to clear vectors:', error);
+    } finally {
+      setIsClearing(false);
     }
   };
 
@@ -267,8 +484,10 @@ export function OptionsPage() {
                   value={aiConfig.provider}
                   onValueChange={(value: AIProvider) => {
                     const defaultModel = getDefaultModel(value);
+                    const defaultBaseUrl = PROVIDER_DEFAULTS[value]?.baseUrl || '';
                     setLocalModel(defaultModel);
-                    updateAIConfig({ provider: value, model: defaultModel });
+                    setLocalBaseUrl(defaultBaseUrl);
+                    updateAIConfig({ provider: value, model: defaultModel, baseUrl: defaultBaseUrl });
                   }}
                 >
                   <SelectTrigger id="provider">
@@ -308,20 +527,18 @@ export function OptionsPage() {
                 </p>
               </div>
 
-              {/* Azure 和 Custom 必须配置 baseUrl，Ollama 可选配置 */}
-              {(['azure', 'custom', 'ollama'].includes(aiConfig.provider)) && (
-                <div className="space-y-2">
-                  <Label htmlFor="baseUrl">{t('settings:settings.ai.baseUrl')}</Label>
-                  <Input
-                    id="baseUrl"
-                    type="url"
-                    placeholder={t('settings:settings.ai.baseUrlPlaceholder')}
-                    value={localBaseUrl}
-                    onChange={(e) => setLocalBaseUrl(e.target.value)}
-                    onBlur={(e) => updateAIConfig({ baseUrl: e.target.value })}
-                  />
-                </div>
-              )}
+              {/* Base URL 始终显示 */}
+              <div className="space-y-2">
+                <Label htmlFor="baseUrl">{t('settings:settings.ai.baseUrl')}</Label>
+                <Input
+                  id="baseUrl"
+                  type="url"
+                  placeholder={t('settings:settings.ai.baseUrlPlaceholder')}
+                  value={localBaseUrl}
+                  onChange={(e) => setLocalBaseUrl(e.target.value)}
+                  onBlur={(e) => updateAIConfig({ baseUrl: e.target.value })}
+                />
+              </div>
 
               <div className="space-y-2">
                 <Label htmlFor="model" onClick={e => e.preventDefault()}>{t('settings:settings.ai.model')}</Label>
@@ -347,7 +564,7 @@ export function OptionsPage() {
                     </div>
                   </PopoverTrigger>
                   <PopoverContent
-                    className="w-[var(--radix-popover-trigger-width)] p-0"
+                    className="w-(--radix-popover-trigger-width) p-0"
                     align="start"
                     onOpenAutoFocus={(e) => e.preventDefault()}
                   >
@@ -562,6 +779,297 @@ export function OptionsPage() {
                   )}
                 </div>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Embedding 语义搜索配置 */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Search className="h-5 w-5" />
+                {t('settings:settings.ai.embedding.title')}
+              </CardTitle>
+              <CardDescription>{t('settings:settings.ai.embedding.description')}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {/* 启用/禁用开关 */}
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>{t('settings:settings.ai.embedding.enabled')}</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {t('settings:settings.ai.embedding.enabledDesc')}
+                  </p>
+                </div>
+                <Switch
+                  checked={embeddingConfig.enabled}
+                  onCheckedChange={(checked) => updateEmbeddingConfig({ enabled: checked })}
+                />
+              </div>
+
+              {embeddingConfig.enabled && (
+                <>
+                  {/* Provider 选择 */}
+                  <div className="space-y-2">
+                    <Label>{t('settings:settings.ai.embedding.provider')}</Label>
+                    <Select
+                      value={embeddingConfig.provider}
+                      onValueChange={(value: AIProvider) => {
+                        const defaultModel = getDefaultEmbeddingModel(value);
+                        const defaultBaseUrl = EMBEDDING_PROVIDER_DEFAULTS[value]?.baseUrl || '';
+                        setLocalEmbeddingModel(defaultModel);
+                        setLocalEmbeddingBaseUrl(defaultBaseUrl);
+                        updateEmbeddingConfig({ provider: value, model: defaultModel, baseUrl: defaultBaseUrl });
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="openai" disabled={!isEmbeddingSupported('openai')}>
+                          {t('settings:settings.providers.openai')}
+                          {!isEmbeddingSupported('openai') && ' ⚠️'}
+                        </SelectItem>
+                        <SelectItem value="google" disabled={!isEmbeddingSupported('google')}>
+                          {t('settings:settings.providers.google')}
+                          {!isEmbeddingSupported('google') && ' ⚠️'}
+                        </SelectItem>
+                        <SelectItem value="azure" disabled={!isEmbeddingSupported('azure')}>
+                          {t('settings:settings.providers.azure')}
+                          {!isEmbeddingSupported('azure') && ' ⚠️'}
+                        </SelectItem>
+                        <SelectItem value="mistral" disabled={!isEmbeddingSupported('mistral')}>
+                          {t('settings:settings.providers.mistral')}
+                          {!isEmbeddingSupported('mistral') && ' ⚠️'}
+                        </SelectItem>
+                        <SelectItem value="zhipu" disabled={!isEmbeddingSupported('zhipu')}>
+                          {t('settings:settings.providers.zhipu')}
+                          {!isEmbeddingSupported('zhipu') && ' ⚠️'}
+                        </SelectItem>
+                        <SelectItem value="hunyuan" disabled={!isEmbeddingSupported('hunyuan')}>
+                          {t('settings:settings.providers.hunyuan')}
+                          {!isEmbeddingSupported('hunyuan') && ' ⚠️'}
+                        </SelectItem>
+                        <SelectItem value="nvidia" disabled={!isEmbeddingSupported('nvidia')}>
+                          {t('settings:settings.providers.nvidia')}
+                          {!isEmbeddingSupported('nvidia') && ' ⚠️'}
+                        </SelectItem>
+                        <SelectItem value="siliconflow" disabled={!isEmbeddingSupported('siliconflow')}>
+                          {t('settings:settings.providers.siliconflow')}
+                          {!isEmbeddingSupported('siliconflow') && ' ⚠️'}
+                        </SelectItem>
+                        <SelectItem value="ollama" disabled={!isEmbeddingSupported('ollama')}>
+                          {t('settings:settings.providers.ollama')}
+                          {!isEmbeddingSupported('ollama') && ' ⚠️'}
+                        </SelectItem>
+                        <SelectItem value="custom" disabled={!isEmbeddingSupported('custom')}>
+                          {t('settings:settings.providers.custom')}
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                    {!isEmbeddingSupported(embeddingConfig.provider) && (
+                      <p className="text-xs text-destructive flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" />
+                        {t('settings:settings.ai.embedding.providerNotSupported')}
+                      </p>
+                    )}
+                  </div>
+
+                  {/* API Key */}
+                  {embeddingConfig.provider !== 'ollama' && (
+                    <div className="space-y-2">
+                      <Label>{t('settings:settings.ai.embedding.apiKey')}</Label>
+                      <Input
+                        type="password"
+                        placeholder={t('settings:settings.ai.embedding.apiKeyPlaceholder')}
+                        value={localEmbeddingApiKey}
+                        onChange={(e) => setLocalEmbeddingApiKey(e.target.value)}
+                        onBlur={(e) => updateEmbeddingConfig({ apiKey: e.target.value })}
+                      />
+                      <p className="text-xs text-muted-foreground">
+                        {t('settings:settings.ai.embedding.apiKeyDesc')}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Base URL 始终显示 */}
+                  <div className="space-y-2">
+                    <Label>{t('settings:settings.ai.embedding.baseUrl')}</Label>
+                    <Input
+                      type="url"
+                      placeholder={t('settings:settings.ai.embedding.baseUrlPlaceholder')}
+                      value={localEmbeddingBaseUrl}
+                      onChange={(e) => setLocalEmbeddingBaseUrl(e.target.value)}
+                      onBlur={(e) => updateEmbeddingConfig({ baseUrl: e.target.value })}
+                    />
+                  </div>
+
+                  {/* Model */}
+                  <div className="space-y-2">
+                    <Label>{t('settings:settings.ai.embedding.model')}</Label>
+                    <Input
+                      placeholder={t('settings:settings.ai.embedding.modelPlaceholder')}
+                      value={localEmbeddingModel}
+                      onChange={(e) => setLocalEmbeddingModel(e.target.value)}
+                      onBlur={(e) => updateEmbeddingConfig({ model: e.target.value })}
+                    />
+                  </div>
+
+                  {/* Batch Size */}
+                  <div className="space-y-2">
+                    <Label>{t('settings:settings.ai.embedding.batchSize')}: {embeddingConfig.batchSize || 16}</Label>
+                    <input
+                      type="range"
+                      min="4"
+                      max="64"
+                      step="4"
+                      value={embeddingConfig.batchSize || 16}
+                      onChange={(e) => updateEmbeddingConfig({ batchSize: parseInt(e.target.value) })}
+                      className="w-full accent-primary"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      {t('settings:settings.ai.embedding.batchSizeDesc')}
+                    </p>
+                  </div>
+
+                  {/* 测试连接 - 与 AI 配置样式保持一致 */}
+                  <div className="flex gap-2">
+                    <Button
+                      onClick={handleTestEmbeddingConnection}
+                      disabled={isEmbeddingTesting || (!embeddingConfig.apiKey && embeddingConfig.provider !== 'ollama')}
+                      className="bg-primary hover:bg-primary/90"
+                    >
+                      {isEmbeddingTesting ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          {t('settings:settings.ai.embedding.testing')}
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 className="mr-2 h-4 w-4" />
+                          {t('settings:settings.ai.embedding.testConnection')}
+                        </>
+                      )}
+                    </Button>
+                  </div>
+
+                  {/* 测试结果 */}
+                  {embeddingTestResult && (
+                    <div
+                      className={`p-3 rounded-lg border ${embeddingTestResult.status === 'success'
+                        ? 'bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-200'
+                        : 'bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-200'
+                        }`}
+                    >
+                      {embeddingTestResult.message}
+                    </div>
+                  )}
+
+                  {/* 向量索引状态 */}
+                  <div className="space-y-4 pt-4 border-t">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-base font-semibold">
+                        {t('settings:settings.ai.embedding.stats.title')}
+                      </Label>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={loadVectorStats}
+                        disabled={isLoadingStats}
+                      >
+                        <RefreshCw className={cn("h-4 w-4", isLoadingStats && "animate-spin")} />
+                      </Button>
+                    </div>
+
+                    {isLoadingStats ? (
+                      <p className="text-sm text-muted-foreground">
+                        {t('settings:settings.ai.embedding.stats.calculating')}
+                      </p>
+                    ) : vectorStats ? (
+                      <div className="grid grid-cols-3 gap-4">
+                        <div className="p-3 rounded-lg bg-muted">
+                          <p className="text-xs text-muted-foreground mb-1">
+                            {t('settings:settings.ai.embedding.stats.vectorCount')}
+                          </p>
+                          <p className="text-lg font-semibold">{vectorStats.count}</p>
+                        </div>
+                        <div className="p-3 rounded-lg bg-muted">
+                          <p className="text-xs text-muted-foreground mb-1">
+                            {t('settings:settings.ai.embedding.stats.coverage')}
+                          </p>
+                          <p className="text-lg font-semibold">
+                            {storageInfo.bookmarkCount > 0
+                              ? `${Math.round((vectorStats.count / storageInfo.bookmarkCount) * 100)}%`
+                              : '-'}
+                          </p>
+                        </div>
+                        <div className="p-3 rounded-lg bg-muted">
+                          <p className="text-xs text-muted-foreground mb-1">
+                            {t('settings:settings.ai.embedding.stats.storageSize')}
+                          </p>
+                          <p className="text-lg font-semibold">
+                            {(vectorStats.estimatedSize / 1024).toFixed(1)} KB
+                          </p>
+                        </div>
+                      </div>
+                    ) : null}
+
+                    {/* 重建/清除操作 - 统一按钮样式 */}
+                    <div className="flex gap-2">
+                      <Button
+                        onClick={handleIncrementalRebuild}
+                        disabled={
+                          isRebuilding ||
+                          isClearing ||
+                          !!(vectorStats && storageInfo.bookmarkCount > 0 && vectorStats.count >= storageInfo.bookmarkCount)
+                        }
+                        className="bg-primary hover:bg-primary/90"
+                      >
+                        {isRebuilding ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            {rebuildProgress
+                              ? t('settings:settings.ai.embedding.actions.rebuildProgress', {
+                                completed: rebuildProgress.completed,
+                                total: rebuildProgress.total,
+                              })
+                              : t('settings:settings.ai.embedding.actions.rebuilding')}
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCw className="mr-2 h-4 w-4" />
+                            {t('settings:settings.ai.embedding.actions.rebuildIncremental')}
+                          </>
+                        )}
+                      </Button>
+                      <Button
+                        onClick={() => setShowFullRebuildDialog(true)}
+                        disabled={isRebuilding || isClearing}
+                        variant="secondary"
+                      >
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        {t('settings:settings.ai.embedding.actions.rebuildFull')}
+                      </Button>
+                      <Button
+                        onClick={() => setShowClearVectorsDialog(true)}
+                        disabled={isRebuilding || isClearing || (vectorStats?.count ?? 0) === 0}
+                        variant="destructive"
+                      >
+                        {isClearing ? (
+                          <>
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            {t('settings:settings.ai.embedding.actions.clearing')}
+                          </>
+                        ) : (
+                          <>
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            {t('settings:settings.ai.embedding.actions.clear')}
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
@@ -801,7 +1309,7 @@ export function OptionsPage() {
               <CardDescription>{t('settings:settings.storage.description')}</CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 <div className="p-4 rounded-lg bg-muted">
                   <p className="text-sm text-muted-foreground mb-1">{t('settings:settings.storage.bookmarkCount')}</p>
                   <p className="text-2xl font-semibold text-foreground">
@@ -818,6 +1326,30 @@ export function OptionsPage() {
                   <p className="text-sm text-muted-foreground mb-1">{t('settings:settings.storage.storageUsed')}</p>
                   <p className="text-2xl font-semibold text-foreground">
                     {storageInfo.storageSize}
+                  </p>
+                </div>
+                <div className="p-4 rounded-lg bg-muted">
+                  <p className="text-sm text-muted-foreground mb-1">{t('settings:settings.storage.snapshotCount')}</p>
+                  <p className="text-2xl font-semibold text-foreground">
+                    {snapshotStats?.count || 0}
+                  </p>
+                </div>
+                <div className="p-4 rounded-lg bg-muted">
+                  <p className="text-sm text-muted-foreground mb-1">{t('settings:settings.storage.snapshotSize')}</p>
+                  <p className="text-2xl font-semibold text-foreground">
+                    {formatBytes(snapshotStats?.totalSize || 0)}
+                  </p>
+                </div>
+                <div className="p-4 rounded-lg bg-muted">
+                  <p className="text-sm text-muted-foreground mb-1">{t('settings:settings.storage.vectorCount')}</p>
+                  <p className="text-2xl font-semibold text-foreground">
+                    {vectorStats?.count || 0}
+                  </p>
+                </div>
+                <div className="p-4 rounded-lg bg-muted">
+                  <p className="text-sm text-muted-foreground mb-1">{t('settings:settings.storage.vectorSize')}</p>
+                  <p className="text-2xl font-semibold text-foreground">
+                    {formatBytes(vectorStats?.estimatedSize || 0)}
                   </p>
                 </div>
               </div>
@@ -917,6 +1449,49 @@ export function OptionsPage() {
         onSave={handleSaveFilter}
         editingFilter={editingFilter}
       />
+
+      {/* 全量重建向量索引确认对话框 */}
+      <AlertDialog open={showFullRebuildDialog} onOpenChange={setShowFullRebuildDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t('settings:settings.ai.embedding.dialogs.fullRebuildTitle')}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('settings:settings.ai.embedding.dialogs.fullRebuildWarning')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('settings:settings.dialogs.cancel')}</AlertDialogCancel>
+            <AlertDialogAction onClick={handleFullRebuild} className="bg-destructive hover:bg-destructive/90">
+              {t('settings:settings.ai.embedding.actions.rebuildFull')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 清除向量数据确认对话框 */}
+      <AlertDialog open={showClearVectorsDialog} onOpenChange={setShowClearVectorsDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {t('settings:settings.ai.embedding.dialogs.clearTitle')}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {t('settings:settings.ai.embedding.dialogs.clearWarning')}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('settings:settings.dialogs.cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleClearVectors}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {t('settings:settings.ai.embedding.actions.clear')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
