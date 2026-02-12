@@ -62,8 +62,8 @@ const getDownloadChannels = (): DownloadChannel[] => [
     id: 'firefox',
     label: { en: 'Firefox Add-ons', zh: 'Firefox 扩展商店' },
     icon: <Image src={firefoxIcon} alt="Firefox" width={16} height={16} />,
-    url: null,
-    published: false,
+    url: 'https://addons.mozilla.org/zh-CN/firefox/addon/hamhome-%E6%99%BA%E8%83%BD%E4%B9%A6%E7%AD%BE%E5%8A%A9%E6%89%8B/',
+    published: true,
   },
   {
     id: 'offline',
