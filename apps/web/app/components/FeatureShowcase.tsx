@@ -1,11 +1,12 @@
 'use client';
 
-import { Bookmark, FolderOpen, Tag, Sparkles, Sidebar } from 'lucide-react';
+import { Bookmark, FolderTree, Sparkles, Sidebar, Upload } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@hamhome/ui';
 import { SaveBookmarkDemo } from './demos/SaveBookmarkDemo';
 import { BookmarkPanelDemo } from './demos/BookmarkPanelDemo';
 import { BookmarkListMngDemo } from './demos/BookmarkListMngDemo';
 import { CategoriesDemo } from './demos/CategoriesDemo';
+import { ImportExportDemo } from './demos/ImportExportDemo';
 import type { Bookmark as BookmarkType, Category, PageContent } from '@/data/mock-bookmarks';
 
 interface FeatureShowcaseProps {
@@ -40,17 +41,22 @@ export function FeatureShowcase({
       label: isEn ? 'Manage' : '书签管理',
     },
     {
-      value: 'ai',
-      icon: <FolderOpen className="h-4 w-4" />,
-      label: isEn ? 'AI Categories' : '智能分类',
+      value: 'categories',
+      icon: <FolderTree className="h-4 w-4" />,
+      label: isEn ? 'Categories' : '分类方案',
+    },
+    {
+      value: 'import',
+      icon: <Upload className="h-4 w-4" />,
+      label: isEn ? 'Import/Export' : '导入导出',
     },
   ];
 
   return (
     <Tabs defaultValue="save" className="space-y-8">
-      <TabsList className="grid w-full max-w-xl mx-auto grid-cols-4">
+      <TabsList className="w-full max-w-5xl mx-auto justify-start overflow-x-auto px-1">
         {tabs.map((tab) => (
-          <TabsTrigger key={tab.value} value={tab.value} className="gap-2">
+          <TabsTrigger key={tab.value} value={tab.value} className="gap-2 shrink-0">
             {tab.icon}
             <span className="hidden sm:inline">{tab.label}</span>
           </TabsTrigger>
@@ -84,8 +90,12 @@ export function FeatureShowcase({
         />
       </TabsContent>
 
-      <TabsContent value="ai" className="space-y-6">
+      <TabsContent value="categories" className="space-y-6">
         <CategoriesDemo isEn={isEn} />
+      </TabsContent>
+
+      <TabsContent value="import" className="space-y-6">
+        <ImportExportDemo bookmarks={bookmarks} categories={categories} isEn={isEn} />
       </TabsContent>
     </Tabs>
   );

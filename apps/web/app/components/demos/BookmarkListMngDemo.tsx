@@ -24,6 +24,7 @@ import {
   Checkbox,
 } from '@hamhome/ui';
 import { BookmarkCardDemo } from './BookmarkCardDemo';
+import { AIChatSearchDemo } from './AIChatSearchDemo';
 import type { Bookmark, Category } from '@/data/mock-bookmarks';
 import { getCategoryName, formatRelativeDate } from '@/data/mock-bookmarks';
 
@@ -277,6 +278,8 @@ export function BookmarkListMngDemo({
             ))}
           </div>
         )}
+
+        <AIChatSearchDemo bookmarks={bookmarks} isEn={isEn} />
       </CardContent>
     </Card>
   );

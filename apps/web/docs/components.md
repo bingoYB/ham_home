@@ -13,7 +13,9 @@ app/components/
     ├── SaveBookmarkDemo.tsx    # 保存书签演示
     ├── BookmarkPanelDemo.tsx   # 书签面板演示
     ├── BookmarkListMngDemo.tsx # 书签管理演示
-    ├── AIFeatureDemo.tsx       # AI 功能演示
+    ├── CategoriesDemo.tsx      # 分类方案演示
+    ├── AIChatSearchDemo.tsx    # AI 对话搜索演示
+    ├── ImportExportDemo.tsx    # 导入导出演示
     └── index.ts
 ```
 
@@ -30,7 +32,7 @@ app/components/
 - 下载按钮点击展开下拉菜单，包含多种安装渠道：
   - Chrome Web Store（待发布）
   - Edge Add-ons（待发布）
-  - Firefox Add-ons（待发布）
+  - Firefox Add-ons（已发布）
   - 离线安装包（已发布，链接至 GitHub Releases）
 - 自动检测当前浏览器类型，显示"推荐"标签
 - 未发布的渠道显示"待发布"标签，点击跳转至 GitHub Releases
@@ -106,7 +108,10 @@ app/components/
 1. **保存书签** - SaveBookmarkDemo
 2. **书签面板** - BookmarkPanelDemo
 3. **书签管理** - BookmarkListMngDemo
-4. **AI 功能** - AIFeatureDemo
+4. **分类方案** - CategoriesDemo
+5. **导入导出** - ImportExportDemo
+
+> AI 对话搜索不再单独占用 Tab，已集成到 **书签面板** 和 **书签管理** 两个演示中。
 
 ---
 
@@ -176,6 +181,7 @@ app/components/
 - 搜索框 + 清除按钮 + 标签筛选 + 筛选器按钮
 - 分类树视图: 按分类层级展示书签，支持展开/折叠
 - 书签项: HoverCard 预览，与 extension BookmarkListItem 样式一致
+- AI 对话面板挂载在侧边栏容器内部底部（与 extension `BookmarkPanel` 相同位置与样式）
 
 ---
 
@@ -201,10 +207,11 @@ app/components/
 - 视图切换 (网格/列表)
 - 筛选状态显示
 - 批量选择操作
+- AI 对话面板位于管理视图根容器底部（与 extension `MainContent` 相同相对位置）
 
 ---
 
-## AIFeatureDemo
+## CategoriesDemo
 
 AI 功能演示组件，直接展示预设分类选择和 AI 生成分类功能。
 
@@ -234,8 +241,51 @@ AI 功能演示组件，直接展示预设分类选择和 AI 生成分类功能�
 ### Usage
 
 ```tsx
-<AIFeatureDemo isEn={false} />
+<CategoriesDemo isEn={false} />
 ```
+
+---
+
+## AIChatSearchDemo
+
+AI 对话搜索演示组件，对齐插件端的自然语言问答、来源引用和建议操作。
+
+> 该组件作为子模块复用在 `BookmarkPanelDemo` 和 `BookmarkListMngDemo` 内部。
+
+### Props
+
+| name | type | required | default | description |
+|------|------|----------|---------|-------------|
+| bookmarks | Bookmark[] | ✓ | - | 书签列表 |
+| isEn | boolean | ✓ | - | 当前是否为英文模式 |
+
+### 功能
+
+- 快速提问示例（与插件 `quickActions` 一致）
+- 对话消息区（用户问题 + AI 回答）
+- 来源引用列表（可点击打开链接）
+- 后续建议（查看更多、时间筛选、复制链接）
+
+---
+
+## ImportExportDemo
+
+导入导出演示组件，对齐插件端的导入配置和进度反馈流程。
+
+### Props
+
+| name | type | required | default | description |
+|------|------|----------|---------|-------------|
+| bookmarks | Bookmark[] | ✓ | - | 书签列表 |
+| categories | Category[] | ✓ | - | 分类列表 |
+| isEn | boolean | ✓ | - | 当前是否为英文模式 |
+
+### 功能
+
+- 导出为 JSON / HTML
+- 从文件导入、从浏览器导入
+- 保留目录结构 与 AI 自动分析互斥开关
+- 模拟导入进度与结果反馈
 
 ---
 

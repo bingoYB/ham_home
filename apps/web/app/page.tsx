@@ -80,10 +80,10 @@ export default function HomePage() {
   const allTags = isEn ? mockAllTagsEn : mockAllTags;
 
   const texts = {
-    heroTitle: isEn ? 'Product Feature Showcase' : '产品功能展示',
+    heroTitle: isEn ? 'Extension Feature Showcase' : '插件功能展示',
     heroDesc: isEn
-      ? 'HamHome is an AI-powered smart bookmark management tool that helps you collect, organize, and search web pages more efficiently.'
-      : 'HamHome 是一款 AI 驱动的智能书签管理工具，帮助你更高效地收藏、整理和检索网页。',
+      ? 'HamHome demonstrates the latest extension capabilities: AI conversational search, semantic retrieval, smart categorization, browser import/export, and privacy-first local storage.'
+      : 'HamHome 展示插件最新能力：AI 对话搜索、语义检索、智能分类、浏览器导入导出，以及以本地存储为核心的隐私保护。',
   };
 
   return (
@@ -121,4 +121,3 @@ export default function HomePage() {
     </div>
   );
 }
-

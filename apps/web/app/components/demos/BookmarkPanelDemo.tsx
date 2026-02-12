@@ -27,6 +27,7 @@ import {
   buttonVariants,
 } from '@hamhome/ui';
 import type { Bookmark, Category } from '@/data/mock-bookmarks';
+import { AIChatSearchDemo } from './AIChatSearchDemo';
 
 interface BookmarkPanelDemoProps {
   bookmarks: Bookmark[];
@@ -252,145 +253,150 @@ export function BookmarkPanelDemo({
   const rootCategories = categories.filter((c) => !c.parentId);
 
   return (
-    <div className="relative w-full h-[520px] rounded-xl overflow-hidden border border-border shadow-lg">
-      {/* 底层：模拟网页 */}
-      <MockWebpage isEn={isEn} />
+    <div className="space-y-4">
+      <div className="relative w-full h-[520px] rounded-xl overflow-hidden border border-border shadow-lg">
+        {/* 底层：模拟网页 */}
+        <MockWebpage isEn={isEn} />
 
-      {/* 中层：模糊遮罩 */}
-      <div
-        className={cn(
-          'absolute inset-0 z-10 bg-black/20 backdrop-blur-[2px]',
-          'transition-opacity duration-300',
-          isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
-        )}
-        onClick={() => setIsOpen(false)}
-      />
+        {/* 中层：模糊遮罩 */}
+        <div
+          className={cn(
+            'absolute inset-0 z-10 bg-black/20 backdrop-blur-[2px]',
+            'transition-opacity duration-300',
+            isOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'
+          )}
+          onClick={() => setIsOpen(false)}
+        />
 
-      {/* 上层：侧边栏面板 - 从左侧滑入 */}
-      <div
-        onClick={(e) => e.stopPropagation()}
-        className={cn(
-          'absolute top-1 bottom-1 left-1 z-20',
-          'w-[360px] max-w-[90%]',
-          'bg-background border border-border rounded-lg shadow-2xl',
-          'flex flex-col overflow-hidden',
-          'transition-transform duration-300 ease-out',
-          isOpen ? 'translate-x-0' : '-translate-x-[calc(100%+8px)]'
-        )}
-      >
-        {/* 头部 - 与 extension BookmarkHeader 一致 */}
-        <div className="px-4 py-3 border-b border-border bg-background/95 backdrop-blur-sm">
-          {/* 标题行 */}
-          <div className="flex items-center justify-between mb-3">
+        {/* 上层：侧边栏面板 - 从左侧滑入 */}
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className={cn(
+            'absolute top-1 bottom-1 left-1 z-20',
+            'w-[360px] max-w-[90%]',
+            'bg-background border border-border rounded-lg shadow-2xl',
+            'flex flex-col overflow-hidden',
+            'transition-transform duration-300 ease-out',
+            isOpen ? 'translate-x-0' : '-translate-x-[calc(100%+8px)]'
+          )}
+        >
+          {/* 头部 - 与 extension BookmarkHeader 一致 */}
+          <div className="px-4 py-3 border-b border-border bg-background/95 backdrop-blur-sm">
+            {/* 标题行 */}
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <BookmarkIcon className="h-5 w-5 text-primary" />
+                <h2 className="text-base font-semibold text-foreground">{texts.title}</h2>
+                <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
+                  {bookmarks.length}
+                </span>
+              </div>
+              {/* 快捷操作 */}
+              <div className="flex items-center gap-1">
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <LayoutGrid className="h-4 w-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <Settings className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* 搜索框和筛选器 */}
             <div className="flex items-center gap-2">
-              <BookmarkIcon className="h-5 w-5 text-primary" />
-              <h2 className="text-base font-semibold text-foreground">{texts.title}</h2>
-              <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-                {bookmarks.length}
-              </span>
-            </div>
-            {/* 快捷操作 */}
-            <div className="flex items-center gap-1">
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <LayoutGrid className="h-4 w-4" />
-              </Button>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <Settings className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-
-          {/* 搜索框和筛选器 */}
-          <div className="flex items-center gap-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="text"
-                placeholder={texts.searchPlaceholder}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9 pr-8 h-9 bg-muted/50 border-border/50 focus:bg-background"
-              />
-              {searchQuery && (
-                <button
-                  onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              )}
-            </div>
-
-            {/* 筛选器 */}
-            <div className="flex items-center gap-1">
-              {/* 标签筛选 */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className={cn('h-8 w-8', hasTagFilter && 'text-primary bg-primary/10')}
-              >
-                <TagIcon className="h-4 w-4" />
-              </Button>
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="text"
+                  placeholder={texts.searchPlaceholder}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 pr-8 h-9 bg-muted/50 border-border/50 focus:bg-background"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
 
               {/* 筛选器 */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className={cn('h-8 w-8', hasFilter && 'text-primary bg-primary/10')}
-              >
-                <Filter className="h-4 w-4" />
-              </Button>
+              <div className="flex items-center gap-1">
+                {/* 标签筛选 */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn('h-8 w-8', hasTagFilter && 'text-primary bg-primary/10')}
+                >
+                  <TagIcon className="h-4 w-4" />
+                </Button>
+
+                {/* 筛选器 */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className={cn('h-8 w-8', hasFilter && 'text-primary bg-primary/10')}
+                >
+                  <Filter className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </div>
+
+          {/* 分类树视图 - 与 extension CategoryTreeView 一致 */}
+          <ScrollArea className="flex-1 min-h-0 bookmark-list-view pb-8">
+            <div className="p-2 overflow-hidden">
+              {rootCategories.map((cat) => (
+                <CategoryNode
+                  key={cat.id}
+                  category={cat}
+                  bookmarks={bookmarksByCategory.get(cat.id) || []}
+                  level={0}
+                  isExpanded={expandedIds.has(cat.id)}
+                  onToggle={() => toggleExpand(cat.id)}
+                  isEn={isEn}
+                />
+              ))}
+              {/* 未分类 */}
+              {bookmarksByCategory.get(null) && (
+                <CategoryNode
+                  category={null}
+                  bookmarks={bookmarksByCategory.get(null) || []}
+                  level={0}
+                  isExpanded={expandedIds.has('uncategorized')}
+                  onToggle={() => toggleExpand('uncategorized')}
+                  isEn={isEn}
+                />
+              )}
+            </div>
+          </ScrollArea>
+
+          <AIChatSearchDemo bookmarks={bookmarks} isEn={isEn} className="px-2 w-full" />
         </div>
 
-        {/* 分类树视图 - 与 extension CategoryTreeView 一致 */}
-        <ScrollArea className="flex-1 min-h-0 bookmark-list-view">
-          <div className="p-2 overflow-hidden">
-            {rootCategories.map((cat) => (
-              <CategoryNode
-                key={cat.id}
-                category={cat}
-                bookmarks={bookmarksByCategory.get(cat.id) || []}
-                level={0}
-                isExpanded={expandedIds.has(cat.id)}
-                onToggle={() => toggleExpand(cat.id)}
-                isEn={isEn}
-              />
-            ))}
-            {/* 未分类 */}
-            {bookmarksByCategory.get(null) && (
-              <CategoryNode
-                category={null}
-                bookmarks={bookmarksByCategory.get(null) || []}
-                level={0}
-                isExpanded={expandedIds.has('uncategorized')}
-                onToggle={() => toggleExpand('uncategorized')}
-                isEn={isEn}
-              />
-            )}
-          </div>
-        </ScrollArea>
+        {/* 打开按钮提示 - 当面板关闭时显示 */}
+        <div
+          className={cn(
+            'absolute inset-0 z-5 flex items-center justify-center',
+            'transition-opacity duration-300',
+            isOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'
+          )}
+        >
+          <Button
+            variant="secondary"
+            size="lg"
+            onClick={() => setIsOpen(true)}
+            className="shadow-lg"
+          >
+            <BookmarkIcon className="h-5 w-5 mr-2" />
+            {texts.clickToOpen}
+          </Button>
+        </div>
       </div>
 
-      {/* 打开按钮提示 - 当面板关闭时显示 */}
-      <div
-        className={cn(
-          'absolute inset-0 z-5 flex items-center justify-center',
-          'transition-opacity duration-300',
-          isOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'
-        )}
-      >
-        <Button
-          variant="secondary"
-          size="lg"
-          onClick={() => setIsOpen(true)}
-          className="shadow-lg"
-        >
-          <BookmarkIcon className="h-5 w-5 mr-2" />
-          {texts.clickToOpen}
-        </Button>
-      </div>
     </div>
   );
 }
