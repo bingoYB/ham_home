@@ -62,7 +62,7 @@ export default defineConfig({
           id: "hamhome@example.com",
           strict_min_version: "109.0",
           data_collection_permissions: {
-            required: [null],
+            required: ["none"],
           },
         },
       },
