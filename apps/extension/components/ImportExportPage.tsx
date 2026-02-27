@@ -1,7 +1,7 @@
 /**
  * ImportExportPage 导入导出页面
  */
-import { useState, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Download, Upload, FileJson, FileText, Check, AlertCircle, Loader2, FolderTree, Sparkles, Globe, BookmarkIcon } from 'lucide-react';
 import {
@@ -16,11 +16,15 @@ import {
 } from '@hamhome/ui';
 import { useBookmarks } from '@/contexts/BookmarkContext';
 import { bookmarkStorage } from '@/lib/storage/bookmark-storage';
+import { importTaskStorage } from '@/lib/storage/import-task-storage';
 import { getBackgroundService } from '@/lib/services';
 import { aiClient } from '@/lib/ai/client';
 import { parseCategoryPath } from './common/CategoryTree';
 import { useChromeBookmarks } from '@/hooks/useChromeBookmarks';
 import type { LocalCategory } from '@/types';
+import type { BookmarkToImport, HtmlImportTask, ImportTaskOptions } from '@/lib/storage/import-task-storage';
+
+const MAX_IMPORT_CONCURRENCY = 5;
 
 export function ImportExportPage() {
   const { t } = useTranslation(['common', 'settings']);
@@ -72,6 +76,54 @@ export function ImportExportPage() {
     fileInputRef.current?.click();
   };
 
+  // 页面刷新后自动恢复未完成的 HTML 导入任务
+  useEffect(() => {
+    const resumePendingTask = async () => {
+      const task = await importTaskStorage.getHtmlTask();
+      if (!task) {
+        return;
+      }
+
+      if (task.progress.status === 'failed') {
+        await importTaskStorage.clearHtmlTask();
+        return;
+      }
+
+      if (task.progress.status !== 'running') {
+        return;
+      }
+
+      // 同步 UI 选项到任务快照，避免续跑时选项漂移
+      setPreserveFolders(task.payload.options.preserveFolders);
+      setEnableAIAnalysis(task.payload.options.enableAIAnalysis);
+      setFetchPageContent(task.payload.options.fetchPageContent);
+
+      setImporting(true);
+      setImportResult(null);
+
+      try {
+        await runHtmlImportTask(task);
+        await refreshBookmarks();
+        await refreshCategories();
+      } catch (error) {
+        const errorMessage = error instanceof Error
+          ? error.message
+          : t('settings.importExport.errors.unknown', { ns: 'settings' });
+
+        await importTaskStorage.markHtmlTaskFailed(errorMessage);
+        setImportResult({
+          success: false,
+          message: t('settings.importExport.importFailed', { ns: 'settings' }),
+          details: errorMessage,
+        });
+      } finally {
+        setImporting(false);
+      }
+    };
+
+    void resumePendingTask();
+  }, []);
+
   // 处理文件导入
   const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -86,7 +138,7 @@ export function ImportExportPage() {
       if (file.name.endsWith('.json')) {
         await importFromJSON(content);
       } else if (file.name.endsWith('.html') || file.name.endsWith('.htm')) {
-        await importFromHTML(content);
+        await importFromHTML(content, 'file');
       } else {
         throw new Error(t('settings.importExport.errors.unsupportedFormat', { ns: 'settings' }));
       }
@@ -115,10 +167,10 @@ export function ImportExportPage() {
     setImportResult(null);
 
     try {
-      const { html, count } = await getChromeBookmarks();
+      const { html } = await getChromeBookmarks();
       
       // 使用现有的 HTML 导入逻辑
-      await importFromHTML(html);
+      await importFromHTML(html, 'browser');
 
       await refreshBookmarks();
       await refreshCategories();
@@ -343,13 +395,29 @@ export function ImportExportPage() {
         if (existing) {
           parentId = existing.id;
           finalCategory = existing;
-        } else {
-          // 创建新分类
+          continue;
+        }
+
+        // 创建新分类（并发导入时可能有竞态，失败后尝试回读）
+        try {
           const newCat = await bookmarkStorage.createCategory(trimmedName, parentId);
           newCategories.push(newCat);
           parentId = newCat.id;
           finalCategory = newCat;
           allCategories = [...allCategories, newCat];
+        } catch {
+          const latestCategories = await bookmarkStorage.getCategories();
+          const fallback = latestCategories.find(
+            c => c.name.toLowerCase() === trimmedName.toLowerCase() && c.parentId === parentId
+          );
+
+          if (!fallback) {
+            throw new Error(`Failed to create or resolve category: ${trimmedName}`);
+          }
+
+          parentId = fallback.id;
+          finalCategory = fallback;
+          allCategories = latestCategories;
         }
       }
 
@@ -368,7 +436,8 @@ export function ImportExportPage() {
     url: string,
     title: string,
     currentCategories: LocalCategory[],
-    existingTags: string[] = []
+    existingTags: string[] = [],
+    shouldFetchPageContent = false
   ): Promise<{ 
     description: string; 
     categoryId: string | null; 
@@ -383,7 +452,7 @@ export function ImportExportPage() {
 
       // 构建页面内容
       let content = '';
-      if (fetchPageContent) {
+      if (shouldFetchPageContent) {
         content = await fetchPageContentForAI(url);
       }
 
@@ -440,38 +509,69 @@ export function ImportExportPage() {
     }
   };
 
-  // 从 HTML 导入（浏览器书签格式）
-  const importFromHTML = async (content: string) => {
-    const parser = new DOMParser();
-    const doc = parser.parseFromString(content, 'text/html');
-    
-    let imported = 0;
-    let skipped = 0;
-    let duplicateSkipped = 0; // 区分重复跳过
+  const buildHTMLImportDetails = (stats: {
+    imported: number;
+    skipped: number;
+    duplicateSkipped: number;
+    categoriesCreated: number;
+    aiProcessed: number;
+  }, options: ImportTaskOptions) => {
+    const totalSkipped = stats.skipped + stats.duplicateSkipped;
+
+    let details: string;
+    if (options.preserveFolders && stats.categoriesCreated > 0) {
+      details = t('settings.importExport.importDetailsWithCategories', {
+        imported: stats.imported,
+        skipped: totalSkipped,
+        categoriesCreated: stats.categoriesCreated,
+        ns: 'settings',
+      });
+    } else if (options.enableAIAnalysis && stats.aiProcessed > 0) {
+      if (stats.categoriesCreated > 0) {
+        details = t('settings.importExport.importDetailsWithAIAndCategories', {
+          imported: stats.imported,
+          skipped: totalSkipped,
+          aiProcessed: stats.aiProcessed,
+          categoriesCreated: stats.categoriesCreated,
+          ns: 'settings',
+        });
+      } else {
+        details = t('settings.importExport.importDetailsWithAI', {
+          imported: stats.imported,
+          skipped: totalSkipped,
+          aiProcessed: stats.aiProcessed,
+          ns: 'settings',
+        });
+      }
+    } else {
+      details = t('settings.importExport.importDetails', {
+        imported: stats.imported,
+        skipped: totalSkipped,
+        ns: 'settings',
+      });
+    }
+
+    if (stats.skipped > 0) {
+      details += ` (${t('settings.importExport.importErrorSkipped', { count: stats.skipped, ns: 'settings' })})`;
+    }
+
+    return details;
+  };
+
+  const collectHTMLBookmarks = async (
+    doc: Document,
+    options: ImportTaskOptions
+  ): Promise<{ bookmarksToImport: BookmarkToImport[]; categoriesCreated: number }> => {
     let categoriesCreated = 0;
-    let aiProcessed = 0;
-    const importedBookmarkIds: string[] = [];
-    
+    let allCategories = await bookmarkStorage.getCategories();
+
     // 分类名称到 ID 的映射（用于处理重复名称）
     const categoryMap = new Map<string, string>();
-    
-    // 跟踪本次导入中已处理的 URL（规范化后）
-    const importedUrls = new Set<string>();
-    
-    // 获取现有分类和标签
-    let allCategories = await bookmarkStorage.getCategories();
-    let existingTags = await bookmarkStorage.getAllTags();
     for (const cat of allCategories) {
       const key = `${cat.parentId || 'root'}|${cat.name}`;
       categoryMap.set(key, cat.id);
     }
 
-    // 收集所有书签（用于进度显示和 AI 批量处理）
-    interface BookmarkToImport {
-      url: string;
-      title: string;
-      parentCategoryId: string | null;
-    }
     const bookmarksToImport: BookmarkToImport[] = [];
 
     // 递归解析 DL 结构，收集书签
@@ -480,92 +580,135 @@ export function ImportExportPage() {
       parentCategoryId: string | null
     ): Promise<void> => {
       const children = dl.children;
-      
+
       for (let i = 0; i < children.length; i++) {
         const child = children[i];
-        
-        if (child.tagName === 'DT') {
-          const h3 = child.querySelector(':scope > H3');
-          const nestedDl = child.querySelector(':scope > DL');
-          
-          if (h3 && nestedDl && preserveFolders) {
-            // 文件夹处理
-            const folderName = h3.textContent?.trim() || '未命名文件夹';
-            const mapKey = `${parentCategoryId || 'root'}|${folderName}`;
-            
-            let categoryId = categoryMap.get(mapKey);
-            
-            if (!categoryId) {
-              try {
-                const newCategory = await bookmarkStorage.createCategory(folderName, parentCategoryId);
-                categoryId = newCategory.id;
+
+        if (child.tagName !== 'DT') {
+          continue;
+        }
+
+        const h3 = child.querySelector(':scope > H3');
+        const nestedDl = child.querySelector(':scope > DL');
+
+        if (h3 && nestedDl && options.preserveFolders) {
+          const folderName = h3.textContent?.trim() || '未命名文件夹';
+          const mapKey = `${parentCategoryId || 'root'}|${folderName}`;
+
+          let categoryId = categoryMap.get(mapKey);
+
+          if (!categoryId) {
+            try {
+              const newCategory = await bookmarkStorage.createCategory(folderName, parentCategoryId);
+              categoryId = newCategory.id;
+              categoryMap.set(mapKey, categoryId);
+              categoriesCreated++;
+              allCategories = [...allCategories, newCategory];
+            } catch {
+              const existing = allCategories.find((c) => c.name === folderName && c.parentId === parentCategoryId);
+              if (existing) {
+                categoryId = existing.id;
                 categoryMap.set(mapKey, categoryId);
-                categoriesCreated++;
-                allCategories = [...allCategories, newCategory];
-              } catch {
-                const existing = allCategories.find(c => c.name === folderName && c.parentId === parentCategoryId);
-                if (existing) {
-                  categoryId = existing.id;
-                  categoryMap.set(mapKey, categoryId);
-                }
               }
-            }
-            
-            await collectBookmarks(nestedDl, categoryId || null);
-          } else {
-            const link = child.querySelector(':scope > A');
-            if (link) {
-              const url = link.getAttribute('href');
-              const title = link.textContent?.trim();
-              
-              if (url && title && url.startsWith('http')) {
-                bookmarksToImport.push({
-                  url,
-                  title,
-                  parentCategoryId: preserveFolders ? parentCategoryId : null,
-                });
-              }
-            }
-            
-            if (!preserveFolders && nestedDl) {
-              await collectBookmarks(nestedDl, null);
             }
           }
+
+          await collectBookmarks(nestedDl, categoryId || null);
+          continue;
+        }
+
+        const link = child.querySelector(':scope > A');
+        if (link) {
+          const url = link.getAttribute('href');
+          const title = link.textContent?.trim();
+
+          if (url && title && url.startsWith('http')) {
+            bookmarksToImport.push({
+              url,
+              title,
+              parentCategoryId: options.preserveFolders ? parentCategoryId : null,
+            });
+          }
+        }
+
+        if (!options.preserveFolders && nestedDl) {
+          await collectBookmarks(nestedDl, null);
         }
       }
     };
 
-    // 收集书签
     const rootDl = doc.querySelector('DL');
     if (rootDl) {
       await collectBookmarks(rootDl, null);
     }
 
-    // 设置进度
-    const total = bookmarksToImport.length;
-    setImportProgress({ current: 0, total });
+    return { bookmarksToImport, categoriesCreated };
+  };
 
-    // 导入书签
-    for (let i = 0; i < bookmarksToImport.length; i++) {
-      const bm = bookmarksToImport[i];
-      setImportProgress({ current: i + 1, total });
+  const runHtmlImportTask = async (task: HtmlImportTask) => {
+    const options = task.payload.options;
+    const total = task.payload.total;
+
+    let currentIndex = task.progress.currentIndex;
+    let imported = task.progress.imported;
+    let skipped = task.progress.skipped;
+    let duplicateSkipped = task.progress.duplicateSkipped;
+    let categoriesCreated = task.progress.categoriesCreated;
+    let aiProcessed = task.progress.aiProcessed;
+    const importedBookmarkIds = [...task.progress.importedBookmarkIds];
+
+    let allCategories = await bookmarkStorage.getCategories();
+    let existingTags = await bookmarkStorage.getAllTags();
+
+    if (total > 0) {
+      setImportProgress({ current: currentIndex, total });
+    } else {
+      setImportProgress(null);
+    }
+
+    const persistProgress = async () => {
+      try {
+        await importTaskStorage.updateHtmlProgress((progress) => ({
+          ...progress,
+          currentIndex,
+          imported,
+          skipped,
+          duplicateSkipped,
+          categoriesCreated,
+          aiProcessed,
+          importedBookmarkIds: [...importedBookmarkIds],
+        }));
+      } catch (error) {
+        console.warn('[ImportExport] Failed to persist import progress:', error);
+      }
+    };
+
+    type BookmarkImportResult = {
+      status: 'imported' | 'duplicate' | 'skipped';
+      bookmarkId?: string;
+      aiProcessed: number;
+      newCategories: LocalCategory[];
+      newTags: string[];
+      error?: unknown;
+    };
+
+    const processBookmark = async (
+      bm: BookmarkToImport,
+      categoriesSnapshot: LocalCategory[],
+      tagsSnapshot: string[]
+    ): Promise<BookmarkImportResult> => {
+      let aiResult: Awaited<ReturnType<typeof analyzeBookmarkWithAI>> | null = null;
 
       try {
-        // 规范化 URL 用于去重检查
-        const normalizedUrl = bm.url.replace(/\/$/, '').toLowerCase();
-        
-        // 检查是否在本次导入中已处理过
-        if (importedUrls.has(normalizedUrl)) {
-          duplicateSkipped++;
-          continue;
-        }
-
         // 检查 URL 是否已存在于存储中
         const existingBookmark = await bookmarkStorage.getBookmarkByUrl(bm.url);
         if (existingBookmark) {
-          duplicateSkipped++;
-          importedUrls.add(normalizedUrl); // 标记为已处理
-          continue;
+          return {
+            status: 'duplicate',
+            aiProcessed: 0,
+            newCategories: [],
+            newTags: [],
+          };
         }
 
         let description = '';
@@ -573,32 +716,22 @@ export function ImportExportPage() {
         let tags: string[] = [];
 
         // AI 分析（如果启用且不保留目录）
-        if (enableAIAnalysis && !preserveFolders) {
-          const aiResult = await analyzeBookmarkWithAI(bm.url, bm.title, allCategories, existingTags);
+        if (options.enableAIAnalysis && !options.preserveFolders) {
+          aiResult = await analyzeBookmarkWithAI(
+            bm.url,
+            bm.title,
+            categoriesSnapshot,
+            tagsSnapshot,
+            options.fetchPageContent
+          );
           description = aiResult.description;
           categoryId = aiResult.categoryId;
           tags = aiResult.tags;
-          
-          // 如果 AI 创建了新分类，更新分类列表和计数
-          if (aiResult.newCategories.length > 0) {
-            allCategories = [...allCategories, ...aiResult.newCategories];
-            categoriesCreated += aiResult.newCategories.length;
-          }
-          
-          // 更新已有标签列表（包含新生成的标签）
-          existingTags = [...new Set([...existingTags, ...tags])];
-          
-          aiProcessed++;
-
-          // 限速：每个请求间隔 500ms，避免 API 限流
-          if (i < bookmarksToImport.length - 1) {
-            await new Promise(resolve => setTimeout(resolve, 500));
-          }
         }
 
         // 安全获取 hostname，避免无效 URL 导致异常
         const hostname = safeGetHostname(bm.url);
-        const favicon = hostname 
+        const favicon = hostname
           ? `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`
           : '';
 
@@ -611,18 +744,83 @@ export function ImportExportPage() {
           favicon,
           hasSnapshot: false,
         });
-        importedBookmarkIds.push(bookmark.id);
-        imported++;
-        importedUrls.add(normalizedUrl); // 标记为已导入
+
+        return {
+          status: 'imported',
+          bookmarkId: bookmark.id,
+          aiProcessed: aiResult ? 1 : 0,
+          newCategories: aiResult?.newCategories ?? [],
+          newTags: tags,
+        };
       } catch (err) {
         // 区分重复错误和其他错误
         if (err instanceof Error && err.message.includes('已收藏')) {
-          duplicateSkipped++;
-        } else {
-          console.error('[ImportExport] Failed to import bookmark:', bm.url, err);
-          skipped++;
+          return {
+            status: 'duplicate',
+            aiProcessed: aiResult ? 1 : 0,
+            newCategories: aiResult?.newCategories ?? [],
+            newTags: aiResult?.tags ?? [],
+          };
         }
+
+        return {
+          status: 'skipped',
+          aiProcessed: aiResult ? 1 : 0,
+          newCategories: aiResult?.newCategories ?? [],
+          newTags: aiResult?.tags ?? [],
+          error: err,
+        };
       }
+    };
+
+    for (let batchStart = currentIndex; batchStart < task.payload.bookmarksToImport.length; batchStart += MAX_IMPORT_CONCURRENCY) {
+      const batch = task.payload.bookmarksToImport.slice(batchStart, batchStart + MAX_IMPORT_CONCURRENCY);
+      const categoriesSnapshot = [...allCategories];
+      const tagsSnapshot = [...existingTags];
+
+      const results = await Promise.all(
+        batch.map((bm) => processBookmark(bm, categoriesSnapshot, tagsSnapshot))
+      );
+
+      const knownCategoryIds = new Set(allCategories.map((c) => c.id));
+      const knownTags = new Set(existingTags);
+
+      results.forEach((result, index) => {
+        aiProcessed += result.aiProcessed;
+
+        for (const category of result.newCategories) {
+          if (!knownCategoryIds.has(category.id)) {
+            knownCategoryIds.add(category.id);
+            allCategories = [...allCategories, category];
+            categoriesCreated++;
+          }
+        }
+
+        for (const tag of result.newTags) {
+          knownTags.add(tag);
+        }
+
+        if (result.status === 'imported' && result.bookmarkId) {
+          importedBookmarkIds.push(result.bookmarkId);
+          imported++;
+          return;
+        }
+
+        if (result.status === 'duplicate') {
+          duplicateSkipped++;
+          return;
+        }
+
+        const failedBookmark = batch[index];
+        console.error('[ImportExport] Failed to import bookmark:', failedBookmark.url, result.error);
+        skipped++;
+      });
+
+      existingTags = Array.from(knownTags);
+      currentIndex = batchStart + batch.length;
+      setImportProgress({ current: currentIndex, total });
+
+      await persistProgress();
     }
 
     setImportProgress(null);
@@ -637,34 +835,48 @@ export function ImportExportPage() {
       }
     }
 
-    // 合并跳过计数用于显示
-    const totalSkipped = skipped + duplicateSkipped;
-    
-    // 构建结果详情
-    let details: string;
-    if (preserveFolders && categoriesCreated > 0) {
-      details = t('settings.importExport.importDetailsWithCategories', { imported, skipped: totalSkipped, categoriesCreated, ns: 'settings' });
-    } else if (enableAIAnalysis && aiProcessed > 0) {
-      // AI 分析模式，显示处理数量和创建的分类数量
-      if (categoriesCreated > 0) {
-        details = t('settings.importExport.importDetailsWithAIAndCategories', { imported, skipped: totalSkipped, aiProcessed, categoriesCreated, ns: 'settings' });
-      } else {
-        details = t('settings.importExport.importDetailsWithAI', { imported, skipped: totalSkipped, aiProcessed, ns: 'settings' });
-      }
-    } else {
-      details = t('settings.importExport.importDetails', { imported, skipped: totalSkipped, ns: 'settings' });
-    }
-    
-    // 如果有错误跳过，添加提示
-    if (skipped > 0) {
-      details += ` (${t('settings.importExport.importErrorSkipped', { count: skipped, ns: 'settings' })})`;
-    }
+    await importTaskStorage.clearHtmlTask();
 
     setImportResult({
       success: true,
       message: t('settings.importExport.importSuccess', { ns: 'settings' }),
-      details,
+      details: buildHTMLImportDetails(
+        { imported, skipped, duplicateSkipped, categoriesCreated, aiProcessed },
+        options
+      ),
     });
+  };
+
+  // 从 HTML 导入（浏览器书签格式）
+  const importFromHTML = async (content: string, source: 'file' | 'browser') => {
+    const options: ImportTaskOptions = {
+      preserveFolders,
+      enableAIAnalysis,
+      fetchPageContent,
+    };
+
+    const parser = new DOMParser();
+    const doc = parser.parseFromString(content, 'text/html');
+    const { bookmarksToImport, categoriesCreated } = await collectHTMLBookmarks(doc, options);
+
+    // 新任务开始前清理旧任务，避免跨任务污染
+    await importTaskStorage.clearHtmlTask();
+    const task = await importTaskStorage.createHtmlTask({
+      source,
+      options,
+      bookmarksToImport,
+      categoriesCreated,
+    });
+
+    try {
+      await runHtmlImportTask(task);
+    } catch (error) {
+      const errorMessage = error instanceof Error
+        ? error.message
+        : t('settings.importExport.errors.unknown', { ns: 'settings' });
+      await importTaskStorage.markHtmlTaskFailed(errorMessage);
+      throw error;
+    }
   };
 
   return (
@@ -878,7 +1090,7 @@ export function ImportExportPage() {
 
           {/* 导入进度 */}
           {importing && importProgress && (
-            <div className="p-4 rounded-lg bg-muted">
+            <div className="mt-4 p-4 rounded-lg bg-muted">
               <div className="flex items-center gap-3 mb-3">
                 <Loader2 className="h-5 w-5 text-primary animate-spin" />
                 <span className="text-sm font-medium">{t('settings.importExport.import.importing', { ns: 'settings' })}</span>
@@ -935,4 +1147,3 @@ export function ImportExportPage() {
     </div>
   );
 }
-

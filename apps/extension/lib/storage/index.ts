@@ -6,5 +6,5 @@ export { snapshotStorage } from './snapshot-storage';
 export { configStorage, DEFAULT_AI_CONFIG, DEFAULT_SETTINGS, DEFAULT_EMBEDDING_CONFIG } from './config-storage';
 export { aiCacheStorage } from './ai-cache-storage';
 export { vectorStore } from './vector-store';
+export { importTaskStorage } from './import-task-storage';
 export type { VectorStoreStats } from './vector-store';
-

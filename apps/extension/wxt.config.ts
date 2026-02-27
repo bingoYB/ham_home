@@ -26,6 +26,7 @@ export default defineConfig({
     version: "1.1.0",
     permissions: [
       "storage",
+      "unlimitedStorage",
       "activeTab",
       "scripting",
       "downloads",
