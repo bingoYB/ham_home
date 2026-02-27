@@ -2,18 +2,25 @@
  * BookmarkListItem - 书签列表项组件
  * 显示单个书签，支持点击打开
  */
+import { useContext } from 'react';
 import { Link2, ExternalLink } from 'lucide-react';
 import { cn, HoverCard, HoverCardTrigger, HoverCardPrimitive, buttonVariants } from '@hamhome/ui';
-import { useContentUI } from '@/utils/ContentUIContext';
+import { ContentUIContext } from '@/utils/ContentUIContext';
 import type { LocalBookmark } from '@/types';
 
 export interface BookmarkListItemProps {
   bookmark: LocalBookmark;
   isHighlighted?: boolean;
+  portalContainer?: HTMLElement;
 }
 
-export function BookmarkListItem({ bookmark, isHighlighted = false }: BookmarkListItemProps) {
-  const { container: portalContainer } = useContentUI();
+export function BookmarkListItem({
+  bookmark,
+  isHighlighted = false,
+  portalContainer,
+}: BookmarkListItemProps) {
+  const contentUIContext = useContext(ContentUIContext);
+  const resolvedPortalContainer = portalContainer ?? contentUIContext?.container;
 
   return (
     <HoverCard>
@@ -55,7 +62,7 @@ export function BookmarkListItem({ bookmark, isHighlighted = false }: BookmarkLi
           <ExternalLink className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity shrink-0" />
         </a>
       </HoverCardTrigger>
-      <HoverCardPrimitive.Portal container={portalContainer}>
+      <HoverCardPrimitive.Portal container={resolvedPortalContainer}>
         <HoverCardPrimitive.Content
           side="right"
           align="start"

@@ -29,7 +29,6 @@ import {
   SidebarProvider,
   SidebarInset,
   SidebarTrigger,
-  Progress,
   Button,
   Avatar,
   AvatarFallback,
@@ -249,12 +248,6 @@ function AppContent() {
   const isDarkTheme = getCurrentActualTheme() === 'dark';
   const isSystemTheme = appSettings.theme === 'system';
 
-  // 存储百分比
-  const storagePercent = Math.min(
-    (parseFloat(storageInfo.storageSize) / 5000) * 100,
-    100
-  );
-
   // 侧边栏底部内容
   const sidebarFooter = (
     <div className="space-y-3 p-2">
@@ -264,9 +257,8 @@ function AppContent() {
           <Database className="w-4 h-4 text-muted-foreground" />
           <span className="text-xs font-medium text-foreground">{t('common:common.storage')}</span>
         </div>
-        <Progress value={storagePercent} className="h-1.5 mb-1" />
         <p className="text-xs text-muted-foreground">
-          {storageInfo.storageSize} / 5 MB
+          {storageInfo.storageSize}
         </p>
       </div>
 

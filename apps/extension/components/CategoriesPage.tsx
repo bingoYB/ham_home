@@ -55,6 +55,7 @@ import {
   TabsTrigger,
   Textarea,
   Checkbox,
+  ScrollArea,
   cn,
 } from '@hamhome/ui';
 import { useBookmarks } from '@/contexts/BookmarkContext';
@@ -304,9 +305,9 @@ export function CategoriesPage() {
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-6">
+    <div className="w-full max-w-4xl mx-auto p-6 h-full flex flex-col">
       {/* 页面头部操作 */}
-      <div className="flex items-center justify-end mb-6">
+      <div className="flex items-center justify-end mb-6 shrink-0">
         <div className="flex gap-2">
           {isBatchMode ? (
             <>
@@ -361,33 +362,35 @@ export function CategoriesPage() {
       </div>
 
       {/* 分类树形列表 */}
-      <Card>
-        <CardContent className="p-0">
-          {categoryTree.length > 0 ? (
-            <div className="divide-y">
-              {categoryTree.map((node) => (
-                <CategoryTreeItem
-                  key={node.id}
-                  node={node}
-                  level={0}
-                  expandedIds={expandedIds}
-                  selectedIds={selectedIds}
-                  isBatchMode={isBatchMode}
-                  onToggleExpand={toggleExpand}
-                  onToggleSelect={toggleSelect}
-                  onEdit={openEditDialog}
-                  onDelete={openDeleteDialog}
-                  onAddSub={openAddDialog}
-                  t={t}
-                />
-              ))}
-            </div>
-          ) : (
-            <div className="text-center py-16 text-muted-foreground">
-              <FolderOpen className="h-12 w-12 mx-auto mb-4 opacity-30" />
-              <p>{t('settings:settings.categories.noCategories')}</p>
-            </div>
-          )}
+      <Card className="flex-1 min-h-0">
+        <CardContent className="p-0 h-full">
+          <ScrollArea className="w-full h-full">
+            {categoryTree.length > 0 ? (
+              <div className="divide-y pr-2">
+                {categoryTree.map((node) => (
+                  <CategoryTreeItem
+                    key={node.id}
+                    node={node}
+                    level={0}
+                    expandedIds={expandedIds}
+                    selectedIds={selectedIds}
+                    isBatchMode={isBatchMode}
+                    onToggleExpand={toggleExpand}
+                    onToggleSelect={toggleSelect}
+                    onEdit={openEditDialog}
+                    onDelete={openDeleteDialog}
+                    onAddSub={openAddDialog}
+                    t={t}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-16 text-muted-foreground">
+                <FolderOpen className="h-12 w-12 mx-auto mb-4 opacity-30" />
+                <p>{t('settings:settings.categories.noCategories')}</p>
+              </div>
+            )}
+          </ScrollArea>
         </CardContent>
       </Card>
 
@@ -516,10 +519,10 @@ export function CategoriesPage() {
             
             {/* 预设分类 Tab - 左右布局 */}
             <TabsContent value="preset" className="mt-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
                 {/* 方案一：通用型 */}
-                <Card className="flex flex-col">
-                  <CardHeader className="pb-2">
+                <Card className="flex flex-col overflow-hidden">
+                  <CardHeader className="pb-3">
                     <CardTitle className="text-base flex items-center gap-2">
                       <span>📁</span>
                       {t('settings:settings.categories.preset.general')}
@@ -529,11 +532,13 @@ export function CategoriesPage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="flex-1 pt-0">
-                    <div className="bg-muted/30 rounded-lg p-3 max-h-[320px] overflow-y-auto">
-                      <PresetCategoryTree 
-                        categories={presetCategoriesGeneral} 
-                      />
-                    </div>
+                    <ScrollArea className="h-80 rounded-lg border border-border/60 bg-muted/30">
+                      <div className="p-3 pr-4">
+                        <PresetCategoryTree 
+                          categories={presetCategoriesGeneral} 
+                        />
+                      </div>
+                    </ScrollArea>
                   </CardContent>
                   <div className="p-4 pt-0">
                     <Button 
@@ -548,8 +553,8 @@ export function CategoriesPage() {
                 </Card>
                 
                 {/* 方案二：专业型 */}
-                <Card className="flex flex-col">
-                  <CardHeader className="pb-2">
+                <Card className="flex flex-col overflow-hidden">
+                  <CardHeader className="pb-3">
                     <CardTitle className="text-base flex items-center gap-2">
                       <span>💼</span>
                       {t('settings:settings.categories.preset.professional')}
@@ -559,11 +564,13 @@ export function CategoriesPage() {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="flex-1 pt-0">
-                    <div className="bg-muted/30 rounded-lg p-3 max-h-[320px] overflow-y-auto">
-                      <PresetCategoryTree 
-                        categories={presetCategoriesProfessional} 
-                      />
-                    </div>
+                    <ScrollArea className="h-80 rounded-lg border border-border/60 bg-muted/30">
+                      <div className="p-3 pr-4">
+                        <PresetCategoryTree 
+                          categories={presetCategoriesProfessional} 
+                        />
+                      </div>
+                    </ScrollArea>
                   </CardContent>
                   <div className="p-4 pt-0">
                     <Button 
