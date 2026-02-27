@@ -5,33 +5,7 @@
 import i18n from "i18next";
 import { initReactI18next } from "react-i18next";
 import LanguageDetector from "i18next-browser-languagedetector";
-
-// 导入英文翻译
-import enCommon from "@/locales/en/common.json";
-import enBookmark from "@/locales/en/bookmark.json";
-import enSettings from "@/locales/en/settings.json";
-import enAi from "@/locales/en/ai.json";
-
-// 导入中文翻译
-import zhCommon from "@/locales/zh/common.json";
-import zhBookmark from "@/locales/zh/bookmark.json";
-import zhSettings from "@/locales/zh/settings.json";
-import zhAi from "@/locales/zh/ai.json";
-
-const resources = {
-  en: {
-    common: enCommon,
-    bookmark: enBookmark,
-    settings: enSettings,
-    ai: enAi,
-  },
-  zh: {
-    common: zhCommon,
-    bookmark: zhBookmark,
-    settings: zhSettings,
-    ai: zhAi,
-  },
-};
+import { i18nResources } from "./resources";
 
 // localStorage key
 const I18N_STORAGE_KEY = "i18nextLng";
@@ -60,7 +34,7 @@ i18n
   .use(languageDetector)
   .use(initReactI18next)
   .init({
-    resources,
+    resources: i18nResources,
     fallbackLng: "en",
     defaultNS: "common",
     ns: ["common", "bookmark", "settings", "ai"],
