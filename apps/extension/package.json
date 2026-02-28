@@ -15,7 +15,9 @@
     "zip:firefox": "wxt zip -b firefox",
     "zip:edge": "wxt zip -b edge",
     "zip:all": "pnpm zip && pnpm zip:firefox && pnpm zip:edge",
-    "clean": "rm -rf .wxt .output dist"
+    "clean": "rm -rf .wxt .output dist",
+    "submit:init": "wxt submit init",
+    "submit:all": "node scripts/submit.js"
   },
   "dependencies": {
     "@hamhome/ai": "workspace:*",

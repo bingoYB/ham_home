@@ -26,6 +26,7 @@ Thumbs.db
 .env
 .env.local
 .env.*.local
+.env.submit
 
 # Logs
 *.log
