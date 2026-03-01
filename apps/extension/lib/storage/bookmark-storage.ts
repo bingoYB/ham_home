@@ -146,13 +146,10 @@ class BookmarkStorage {
   }
 
   /**
-   * 根据 URL 获取书签
+   * 根据 URL 获取书签（不加载内容数据，节省内存）
    */
   async getBookmarkByUrl(url: string): Promise<LocalBookmark | null> {
-    const [metaList, contentsMap]: [BookmarkMeta[], BookmarkContentsMap] = await Promise.all([
-      bookmarkMetaItem.getValue(),
-      bookmarkContentsItem.getValue(),
-    ]);
+    const metaList: BookmarkMeta[] = await bookmarkMetaItem.getValue();
 
     const normalizedUrl = this.normalizeUrl(url);
     const meta = metaList.find(
@@ -160,7 +157,7 @@ class BookmarkStorage {
     );
 
     if (!meta) return null;
-    return this.assembleBookmark(meta, contentsMap);
+    return { ...meta, content: undefined };
   }
 
   /**
@@ -367,15 +364,93 @@ class BookmarkStorage {
 
   /**
    * 获取所有已使用的标签
+   * @param bookmarks 可选，传入已加载的书签列表以避免重复读取存储
    */
-  async getAllTags(): Promise<string[]> {
-    const bookmarks = await this.getBookmarks();
+  async getAllTags(bookmarks?: LocalBookmark[]): Promise<string[]> {
+    const bms = bookmarks ?? await this.getBookmarks();
     const tagSet = new Set<string>();
-    bookmarks.forEach((b) => b.tags.forEach((t) => tagSet.add(t)));
+    bms.forEach((b) => b.tags.forEach((t) => tagSet.add(t)));
     return Array.from(tagSet).sort();
   }
 
   // ============ 批量操作 ============
+
+  /**
+   * 批量创建书签（一次性读写存储，避免 O(N²) 的逐条读写）
+   * 返回成功创建的书签列表，跳过已存在的 URL
+   */
+  async createBookmarks(items: CreateBookmarkInput[]): Promise<LocalBookmark[]> {
+    if (items.length === 0) return [];
+
+    const metaList: BookmarkMeta[] = await bookmarkMetaItem.getValue();
+
+    // 构建已有 URL 索引，用于去重
+    const existingUrls = new Set(
+      metaList.filter((b) => !b.isDeleted).map((b) => this.normalizeUrl(b.url))
+    );
+
+    const now = Date.now();
+    const newMetas: BookmarkMeta[] = [];
+    const newContents: Record<string, string> = {};
+    const results: LocalBookmark[] = [];
+
+    for (const data of items) {
+      const normalizedUrl = this.normalizeUrl(data.url);
+      if (existingUrls.has(normalizedUrl)) {
+        continue; // 跳过重复
+      }
+      existingUrls.add(normalizedUrl);
+
+      const id = nanoid();
+      const { content, ...metaData } = data;
+
+      const meta: BookmarkMeta = {
+        ...metaData,
+        id,
+        createdAt: now,
+        updatedAt: now,
+      };
+
+      newMetas.push(meta);
+      if (content) {
+        newContents[id] = content;
+      }
+      results.push({ ...meta, content });
+    }
+
+    if (newMetas.length === 0) return [];
+
+    // 一次性追加所有元数据
+    metaList.push(...newMetas);
+    await bookmarkMetaItem.setValue(metaList);
+
+    // 一次性写入所有内容
+    if (Object.keys(newContents).length > 0) {
+      const contentsMap = await bookmarkContentsItem.getValue();
+      Object.assign(contentsMap, newContents);
+      await bookmarkContentsItem.setValue(contentsMap);
+    }
+
+    return results;
+  }
+
+  /**
+   * 批量检查 URL 是否已存在，返回已存在的 normalized URL 集合
+   * 调用方应使用 normalizeUrl 后的 URL 进行 has() 判断
+   */
+  async getExistingUrls(_urls?: string[]): Promise<Set<string>> {
+    const metaList: BookmarkMeta[] = await bookmarkMetaItem.getValue();
+    return new Set(
+      metaList.filter((b) => !b.isDeleted).map((b) => this.normalizeUrl(b.url))
+    );
+  }
+
+  /**
+   * 规范化 URL（公开方法，供外部调用方统一去重键）
+   */
+  normalizeUrlPublic(url: string): string {
+    return this.normalizeUrl(url);
+  }
 
   /**
    * 批量删除书签

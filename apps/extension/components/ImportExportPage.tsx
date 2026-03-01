@@ -28,7 +28,7 @@ const MAX_IMPORT_CONCURRENCY = 5;
 
 export function ImportExportPage() {
   const { t } = useTranslation(['common', 'settings']);
-  const { bookmarks, categories, exportData, refreshBookmarks, refreshCategories } = useBookmarks();
+  const { bookmarks, categories, exportData, refreshBookmarks, refreshCategories, pauseWatchers, resumeWatchers } = useBookmarks();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { getBookmarks: getChromeBookmarks, loading: loadingBrowserBookmarks } = useChromeBookmarks();
   
@@ -101,10 +101,11 @@ export function ImportExportPage() {
       setImporting(true);
       setImportResult(null);
 
+      // 暂停 watcher，避免每条写入都触发全量刷新
+      pauseWatchers();
+
       try {
         await runHtmlImportTask(task);
-        await refreshBookmarks();
-        await refreshCategories();
       } catch (error) {
         const errorMessage = error instanceof Error
           ? error.message
@@ -117,6 +118,10 @@ export function ImportExportPage() {
           details: errorMessage,
         });
       } finally {
+        // 恢复 watcher 并统一刷新一次
+        resumeWatchers();
+        await refreshBookmarks();
+        await refreshCategories();
         setImporting(false);
       }
     };
@@ -132,9 +137,12 @@ export function ImportExportPage() {
     setImporting(true);
     setImportResult(null);
 
+    // 暂停 watcher，避免每条写入都触发全量刷新
+    pauseWatchers();
+
     try {
       const content = await file.text();
-      
+
       if (file.name.endsWith('.json')) {
         await importFromJSON(content);
       } else if (file.name.endsWith('.html') || file.name.endsWith('.htm')) {
@@ -143,9 +151,6 @@ export function ImportExportPage() {
         throw new Error(t('settings.importExport.errors.unsupportedFormat', { ns: 'settings' }));
       }
 
-      await refreshBookmarks();
-      await refreshCategories();
-      
     } catch (error) {
       setImportResult({
         success: false,
@@ -153,6 +158,10 @@ export function ImportExportPage() {
         details: error instanceof Error ? error.message : t('settings.importExport.errors.unknown', { ns: 'settings' }),
       });
     } finally {
+      // 恢复 watcher 并统一刷新一次
+      resumeWatchers();
+      await refreshBookmarks();
+      await refreshCategories();
       setImporting(false);
       // 清空文件输入
       if (fileInputRef.current) {
@@ -166,15 +175,15 @@ export function ImportExportPage() {
     setImporting(true);
     setImportResult(null);
 
+    // 暂停 watcher，避免每条写入都触发全量刷新
+    pauseWatchers();
+
     try {
       const { html } = await getChromeBookmarks();
-      
+
       // 使用现有的 HTML 导入逻辑
       await importFromHTML(html, 'browser');
 
-      await refreshBookmarks();
-      await refreshCategories();
-      
     } catch (error) {
       setImportResult({
         success: false,
@@ -182,6 +191,10 @@ export function ImportExportPage() {
         details: error instanceof Error ? error.message : t('settings.importExport.errors.unknown', { ns: 'settings' }),
       });
     } finally {
+      // 恢复 watcher 并统一刷新一次
+      resumeWatchers();
+      await refreshBookmarks();
+      await refreshCategories();
       setImporting(false);
     }
   };
@@ -189,33 +202,28 @@ export function ImportExportPage() {
   // 从 JSON 导入
   const importFromJSON = async (content: string) => {
     const data = JSON.parse(content);
-    
-    let imported = 0;
-    let skipped = 0;
+
     let categoriesCreated = 0;
 
     // 原始 ID -> 新 ID 的映射表
     const categoryIdMap = new Map<string, string>();
 
-    // 获取现有分类，用于检查已存在的分类
-    const existingCategories = await bookmarkStorage.getCategories();
-    for (const cat of existingCategories) {
-      // 将现有分类也加入映射（以防导入数据引用的是已存在的分类）
+    // 获取现有分类（只读一次，后续用内存缓存）
+    let allCategories = await bookmarkStorage.getCategories();
+    for (const cat of allCategories) {
       categoryIdMap.set(cat.id, cat.id);
     }
 
     // 导入分类（需要按层级顺序处理，先处理根分类再处理子分类）
     if (data.categories && Array.isArray(data.categories)) {
-      // 按层级排序：parentId 为 null 的先处理
       const sortedCategories = [...data.categories].sort((a, b) => {
         if (a.parentId === null && b.parentId !== null) return -1;
         if (a.parentId !== null && b.parentId === null) return 1;
         return 0;
       });
 
-      // 多轮处理，确保父分类先创建
       const pending = [...sortedCategories];
-      const maxRounds = 10; // 防止死循环
+      const maxRounds = 10;
       let round = 0;
 
       while (pending.length > 0 && round < maxRounds) {
@@ -224,34 +232,29 @@ export function ImportExportPage() {
 
         for (const cat of pending) {
           try {
-            // 转换 parentId：使用映射表获取新的父分类 ID
             const newParentId = cat.parentId ? (categoryIdMap.get(cat.parentId) ?? null) : null;
-            
-            // 如果父分类还没有被创建（不在映射表中），延迟处理
+
             if (cat.parentId && !categoryIdMap.has(cat.parentId)) {
               stillPending.push(cat);
               continue;
             }
 
-            // 检查是否已存在同名同父级的分类
-            const allCategories = await bookmarkStorage.getCategories();
+            // 使用内存中的 allCategories 检查，不再每次读取存储
             const existing = allCategories.find(
               c => c.name === cat.name && c.parentId === newParentId
             );
 
             if (existing) {
-              // 分类已存在，记录映射关系
               categoryIdMap.set(cat.id, existing.id);
             } else {
-              // 创建新分类
               const newCategory = await bookmarkStorage.createCategory(cat.name, newParentId);
-              // 记录原始 ID 到新 ID 的映射
               categoryIdMap.set(cat.id, newCategory.id);
+              allCategories = [...allCategories, newCategory];
               categoriesCreated++;
             }
           } catch {
-            // 创建失败，尝试查找已存在的分类
-            const allCategories = await bookmarkStorage.getCategories();
+            // 创建失败，刷新分类缓存后重试查找
+            allCategories = await bookmarkStorage.getCategories();
             const newParentId = cat.parentId ? (categoryIdMap.get(cat.parentId) ?? null) : null;
             const existing = allCategories.find(
               c => c.name === cat.name && c.parentId === newParentId
@@ -267,29 +270,29 @@ export function ImportExportPage() {
       }
     }
 
-    // 导入书签
+    // 使用批量 API 导入书签（一次性读写，避免 O(N²)）
+    let imported = 0;
+    let skipped = 0;
     const importedBookmarkIds: string[] = [];
-    if (data.bookmarks && Array.isArray(data.bookmarks)) {
-      for (const bm of data.bookmarks) {
-        try {
-          // 转换 categoryId：使用映射表获取新的分类 ID
-          const newCategoryId = bm.categoryId ? (categoryIdMap.get(bm.categoryId) ?? null) : null;
 
-          const bookmark = await bookmarkStorage.createBookmark({
-            url: bm.url,
-            title: bm.title,
-            description: bm.description || bm.summary || '',
-            categoryId: newCategoryId,
-            tags: bm.tags || [],
-            favicon: bm.favicon || '',
-            hasSnapshot: false,
-          });
-          importedBookmarkIds.push(bookmark.id);
-          imported++;
-        } catch {
-          skipped++;
-        }
-      }
+    if (data.bookmarks && Array.isArray(data.bookmarks)) {
+      const bookmarkInputs = data.bookmarks.map((bm: { url: string; title: string; description?: string; summary?: string; categoryId?: string; tags?: string[]; favicon?: string }) => {
+        const newCategoryId = bm.categoryId ? (categoryIdMap.get(bm.categoryId) ?? null) : null;
+        return {
+          url: bm.url,
+          title: bm.title,
+          description: bm.description || bm.summary || '',
+          categoryId: newCategoryId,
+          tags: bm.tags || [],
+          favicon: bm.favicon || '',
+          hasSnapshot: false,
+        };
+      });
+
+      const created = await bookmarkStorage.createBookmarks(bookmarkInputs);
+      imported = created.length;
+      skipped = data.bookmarks.length - created.length;
+      importedBookmarkIds.push(...created.map(b => b.id));
     }
 
     // 批量添加 embedding 任务（在 background 中执行）
@@ -660,6 +663,9 @@ export function ImportExportPage() {
     let allCategories = await bookmarkStorage.getCategories();
     let existingTags = await bookmarkStorage.getAllTags();
 
+    // 预加载已有 normalized URL 集合，避免每条书签都调用 getBookmarkByUrl 读取全量数据
+    const existingNormalizedUrls = await bookmarkStorage.getExistingUrls();
+
     if (total > 0) {
       setImportProgress({ current: currentIndex, total });
     } else {
@@ -683,112 +689,110 @@ export function ImportExportPage() {
       }
     };
 
-    type BookmarkImportResult = {
-      status: 'imported' | 'duplicate' | 'skipped';
-      bookmarkId?: string;
-      aiProcessed: number;
-      newCategories: LocalCategory[];
-      newTags: string[];
-      error?: unknown;
-    };
+    // 使用较大的批次进行批量写入，避免并发 createBookmark 导致写覆盖丢数据
+    const BATCH_SIZE = options.enableAIAnalysis ? MAX_IMPORT_CONCURRENCY : 200;
 
-    const processBookmark = async (
-      bm: BookmarkToImport,
-      categoriesSnapshot: LocalCategory[],
-      tagsSnapshot: string[]
-    ): Promise<BookmarkImportResult> => {
-      let aiResult: Awaited<ReturnType<typeof analyzeBookmarkWithAI>> | null = null;
+    for (let batchStart = currentIndex; batchStart < task.payload.bookmarksToImport.length; batchStart += BATCH_SIZE) {
+      const batch = task.payload.bookmarksToImport.slice(batchStart, batchStart + BATCH_SIZE);
+      const categoriesSnapshot = [...allCategories];
+      const tagsSnapshot = [...existingTags];
 
-      try {
-        // 检查 URL 是否已存在于存储中
-        const existingBookmark = await bookmarkStorage.getBookmarkByUrl(bm.url);
-        if (existingBookmark) {
-          return {
-            status: 'duplicate',
-            aiProcessed: 0,
-            newCategories: [],
-            newTags: [],
-          };
+      // 第一步：预处理每条书签（AI 分析可并发，但不写存储）
+      type PreprocessedBookmark = {
+        bm: BookmarkToImport;
+        status: 'ready' | 'duplicate';
+        description: string;
+        categoryId: string | null;
+        tags: string[];
+        aiProcessed: number;
+        newCategories: LocalCategory[];
+        error?: unknown;
+      };
+
+      const preprocessOne = async (bm: BookmarkToImport): Promise<PreprocessedBookmark> => {
+        // 用 normalized URL 去重
+        const normalizedUrl = bookmarkStorage.normalizeUrlPublic(bm.url);
+        if (existingNormalizedUrls.has(normalizedUrl)) {
+          return { bm, status: 'duplicate', description: '', categoryId: null, tags: [], aiProcessed: 0, newCategories: [] };
         }
 
         let description = '';
         let categoryId = bm.parentCategoryId;
         let tags: string[] = [];
+        let aiProcessedCount = 0;
+        let newCategories: LocalCategory[] = [];
 
-        // AI 分析（如果启用且不保留目录）
         if (options.enableAIAnalysis && !options.preserveFolders) {
-          aiResult = await analyzeBookmarkWithAI(
-            bm.url,
-            bm.title,
-            categoriesSnapshot,
-            tagsSnapshot,
-            options.fetchPageContent
-          );
-          description = aiResult.description;
-          categoryId = aiResult.categoryId;
-          tags = aiResult.tags;
+          try {
+            const aiResult = await analyzeBookmarkWithAI(
+              bm.url, bm.title, categoriesSnapshot, tagsSnapshot, options.fetchPageContent
+            );
+            description = aiResult.description;
+            categoryId = aiResult.categoryId;
+            tags = aiResult.tags;
+            newCategories = aiResult.newCategories;
+            aiProcessedCount = 1;
+          } catch {
+            // AI 分析失败不阻断导入
+          }
         }
 
-        // 安全获取 hostname，避免无效 URL 导致异常
-        const hostname = safeGetHostname(bm.url);
-        const favicon = hostname
-          ? `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`
-          : '';
+        return { bm, status: 'ready', description, categoryId, tags, aiProcessed: aiProcessedCount, newCategories };
+      };
 
-        const bookmark = await bookmarkStorage.createBookmark({
-          url: bm.url,
-          title: bm.title,
-          description,
-          categoryId,
-          tags,
+      // AI 模式下并发预处理，非 AI 模式下直接同步准备
+      let preprocessed: PreprocessedBookmark[];
+      if (options.enableAIAnalysis && !options.preserveFolders) {
+        preprocessed = await Promise.all(batch.map(preprocessOne));
+      } else {
+        preprocessed = batch.map((bm) => {
+          const normalizedUrl = bookmarkStorage.normalizeUrlPublic(bm.url);
+          if (existingNormalizedUrls.has(normalizedUrl)) {
+            return { bm, status: 'duplicate' as const, description: '', categoryId: null, tags: [], aiProcessed: 0, newCategories: [] };
+          }
+          return { bm, status: 'ready' as const, description: '', categoryId: bm.parentCategoryId, tags: [], aiProcessed: 0, newCategories: [] };
+        });
+      }
+
+      // 第二步：收集需要写入的书签，一次性批量创建
+      const readyItems = preprocessed.filter((p) => p.status === 'ready');
+      const bookmarkInputs = readyItems.map((p) => {
+        const hostname = safeGetHostname(p.bm.url);
+        const favicon = hostname ? `https://www.google.com/s2/favicons?domain=${hostname}&sz=32` : '';
+        return {
+          url: p.bm.url,
+          title: p.bm.title,
+          description: p.description,
+          categoryId: p.categoryId,
+          tags: p.tags,
           favicon,
           hasSnapshot: false,
-        });
-
-        return {
-          status: 'imported',
-          bookmarkId: bookmark.id,
-          aiProcessed: aiResult ? 1 : 0,
-          newCategories: aiResult?.newCategories ?? [],
-          newTags: tags,
         };
-      } catch (err) {
-        // 区分重复错误和其他错误
-        if (err instanceof Error && err.message.includes('已收藏')) {
-          return {
-            status: 'duplicate',
-            aiProcessed: aiResult ? 1 : 0,
-            newCategories: aiResult?.newCategories ?? [],
-            newTags: aiResult?.tags ?? [],
-          };
-        }
+      });
 
-        return {
-          status: 'skipped',
-          aiProcessed: aiResult ? 1 : 0,
-          newCategories: aiResult?.newCategories ?? [],
-          newTags: aiResult?.tags ?? [],
-          error: err,
-        };
-      }
-    };
+      const created = await bookmarkStorage.createBookmarks(bookmarkInputs);
 
-    for (let batchStart = currentIndex; batchStart < task.payload.bookmarksToImport.length; batchStart += MAX_IMPORT_CONCURRENCY) {
-      const batch = task.payload.bookmarksToImport.slice(batchStart, batchStart + MAX_IMPORT_CONCURRENCY);
-      const categoriesSnapshot = [...allCategories];
-      const tagsSnapshot = [...existingTags];
-
-      const results = await Promise.all(
-        batch.map((bm) => processBookmark(bm, categoriesSnapshot, tagsSnapshot))
-      );
-
+      // 第三步：统计结果
       const knownCategoryIds = new Set(allCategories.map((c) => c.id));
       const knownTags = new Set(existingTags);
 
-      results.forEach((result, index) => {
-        aiProcessed += result.aiProcessed;
+      // 将已创建的 URL 加入去重集合（使用 normalized URL）
+      for (const bm of created) {
+        existingNormalizedUrls.add(bookmarkStorage.normalizeUrlPublic(bm.url));
+        importedBookmarkIds.push(bm.id);
+      }
+      imported += created.length;
+      // readyItems 中未成功创建的（被 createBookmarks 的内部去重跳过）
+      skipped += readyItems.length - created.length;
 
-        for (const category of result.newCategories) {
+      for (const p of preprocessed) {
+        aiProcessed += p.aiProcessed;
+
+        if (p.status === 'duplicate') {
+          duplicateSkipped++;
+        }
+
+        for (const category of p.newCategories) {
           if (!knownCategoryIds.has(category.id)) {
             knownCategoryIds.add(category.id);
             allCategories = [...allCategories, category];
@@ -796,25 +800,10 @@ export function ImportExportPage() {
           }
         }
 
-        for (const tag of result.newTags) {
+        for (const tag of p.tags) {
           knownTags.add(tag);
         }
-
-        if (result.status === 'imported' && result.bookmarkId) {
-          importedBookmarkIds.push(result.bookmarkId);
-          imported++;
-          return;
-        }
-
-        if (result.status === 'duplicate') {
-          duplicateSkipped++;
-          return;
-        }
-
-        const failedBookmark = batch[index];
-        console.error('[ImportExport] Failed to import bookmark:', failedBookmark.url, result.error);
-        skipped++;
-      });
+      }
 
       existingTags = Array.from(knownTags);
       currentIndex = batchStart + batch.length;

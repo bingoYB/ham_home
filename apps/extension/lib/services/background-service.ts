@@ -251,13 +251,9 @@ class BackgroundServiceImpl implements IBackgroundService {
       return;
     }
 
-    // 获取所有书签
-    const allBookmarks = await bookmarkStorage.getBookmarks({ isDeleted: false });
-    const bookmarkMap = new Map(allBookmarks.map(b => [b.id, b]));
-
-    // 添加到队列
+    // 逐个按 ID 获取书签并添加到队列，避免加载全量书签
     for (const id of bookmarkIds) {
-      const bookmark = bookmarkMap.get(id);
+      const bookmark = await bookmarkStorage.getBookmarkById(id);
       if (bookmark) {
         await embeddingQueue.addBookmark(bookmark);
       }

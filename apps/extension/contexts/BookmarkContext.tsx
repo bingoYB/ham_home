@@ -2,7 +2,7 @@
  * BookmarkContext - 书签数据上下文
  * 提供全局的书签数据管理，适配现有 storage API
  */
-import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { bookmarkStorage } from '@/lib/storage/bookmark-storage';
 import { configStorage, DEFAULT_AI_CONFIG, DEFAULT_SETTINGS } from '@/lib/storage/config-storage';
 import type { 
@@ -52,6 +52,10 @@ interface BookmarkContextType {
   // 数据管理
   clearAllData: () => Promise<void>;
   exportData: (format: 'json' | 'html') => void;
+
+  // 批量导入辅助：暂停/恢复 storage watcher，避免每条写入都触发全量刷新
+  pauseWatchers: () => void;
+  resumeWatchers: () => void;
 }
 
 const BookmarkContext = createContext<BookmarkContextType | undefined>(undefined);
@@ -71,22 +75,27 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
   });
   const [loading, setLoading] = useState(true);
 
-  // 刷新书签数据
+  // 暂停 watcher 的引用计数，> 0 时 watcher 回调不执行
+  const watcherPausedRef = useRef(0);
+  const categoriesRef = useRef<LocalCategory[]>([]);
+  categoriesRef.current = categories;
+
+  // 刷新书签数据（复用已加载的书签列表给 getAllTags，避免二次读取）
   const refreshBookmarks = useCallback(async () => {
     try {
       const data = await bookmarkStorage.getBookmarks();
       setBookmarks(data);
-      
-      // 更新标签
-      const tags = await bookmarkStorage.getAllTags();
+
+      // 复用已加载的书签提取标签，不再内部重新加载
+      const tags = await bookmarkStorage.getAllTags(data);
       setAllTags(tags);
 
       // 更新存储信息
-      updateStorageInfo(data, categories);
+      updateStorageInfo(data, categoriesRef.current);
     } catch (error) {
       console.error('[BookmarkContext] Failed to refresh bookmarks:', error);
     }
-  }, [categories]);
+  }, []);
 
   // 刷新分类数据
   const refreshCategories = useCallback(async () => {
@@ -98,15 +107,14 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // 更新存储信息
+  // 更新存储信息（轻量级估算，不使用 JSON.stringify + Blob）
   const updateStorageInfo = (bms: LocalBookmark[], cats: LocalCategory[]) => {
     const tagSet = new Set<string>();
     bms.forEach(b => b.tags.forEach(t => tagSet.add(t)));
-    
-    // 估算存储大小
-    const dataStr = JSON.stringify({ bookmarks: bms, categories: cats });
-    const sizeInBytes = new Blob([dataStr]).size;
-    const sizeInKB = (sizeInBytes / 1024).toFixed(2);
+
+    // 轻量级估算：每条书签按平均字段长度估算约 500 字节
+    const estimatedBytes = bms.length * 500 + cats.length * 100;
+    const sizeInKB = (estimatedBytes / 1024).toFixed(2);
 
     setStorageInfo({
       bookmarkCount: bms.length,
@@ -116,19 +124,20 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
     });
   };
 
-  // 初始化加载
+  // 初始化加载（避免 getAllTags 内部二次加载 getBookmarks）
   useEffect(() => {
     const loadData = async () => {
       setLoading(true);
       try {
-        // 并行加载数据
-        const [bms, cats, tags, config, settings] = await Promise.all([
+        const [bms, cats, config, settings] = await Promise.all([
           bookmarkStorage.getBookmarks(),
           bookmarkStorage.getCategories(),
-          bookmarkStorage.getAllTags(),
           configStorage.getAIConfig(),
           configStorage.getSettings(),
         ]);
+
+        // 复用已加载的 bms 提取标签
+        const tags = await bookmarkStorage.getAllTags(bms);
 
         setBookmarks(bms);
         setCategories(cats);
@@ -147,14 +156,17 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // 监听 storage 变化（使用 WXT Storage watch）
+  // 当 watcherPausedRef > 0 时，跳过回调（批量导入期间暂停）
   useEffect(() => {
     const unwatchBookmarks = bookmarkStorage.watchBookmarks(() => {
+      if (watcherPausedRef.current > 0) return;
       refreshBookmarks();
     });
     const unwatchCategories = bookmarkStorage.watchCategories(() => {
+      if (watcherPausedRef.current > 0) return;
       refreshCategories();
     });
-    
+
     return () => {
       unwatchBookmarks();
       unwatchCategories();
@@ -260,6 +272,15 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
     setAppSettings(updated);
   };
 
+  // 批量导入辅助：暂停/恢复 storage watcher
+  const pauseWatchers = useCallback(() => {
+    watcherPausedRef.current++;
+  }, []);
+
+  const resumeWatchers = useCallback(() => {
+    watcherPausedRef.current = Math.max(0, watcherPausedRef.current - 1);
+  }, []);
+
   // 清除所有数据（使用 WXT Storage）
   const clearAllData = async () => {
     // 清除 sync 和 local 存储
@@ -329,6 +350,8 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
         updateAppSettings,
         clearAllData,
         exportData,
+        pauseWatchers,
+        resumeWatchers,
       }}
     >
       {children}
