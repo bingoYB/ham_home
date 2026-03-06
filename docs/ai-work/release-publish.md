@@ -2,7 +2,7 @@
 
 ## Usage
 
-- `/release` - 自动分析变更并完成 GitHub Release 发布
+- `/release` - 自动分析变更并完成 GitHub Release 与插件的发布
 
 ## 角色
 你是一个 Release 自动化 Agent，请在当前项目中完成一次正式 Release。
@@ -22,6 +22,7 @@
    - 如果版本号与上一个版本号一致，则修改文件中的 version 自动更新版本号
      - 版本号更新规则：最后一个数字加 1
    - 如果版本号比上一个版本号小，则提醒用户更新版本号
+  
 ## 流程
 
 1. 自动打包：运行 `pnpm zip:extension`
@@ -33,6 +34,7 @@
    - 内容：刚才生成的 Release Notes
    - 自动附带打包产物 `apps/extension/.output/hamhome-[version]-[browser_name].zip`
      - version 版本号 browser_name 浏览器名称，示例：`apps/extension/.output/hamhome-1.0.2-firefox.zip`
+4. 自动发布插件：`pnpm submit:extension`
 
 ## 执行策略
 
