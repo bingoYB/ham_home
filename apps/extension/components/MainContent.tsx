@@ -176,8 +176,22 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
   const {
     isProcessing: isBatchAIProcessing,
     progress: batchAIProgress,
+    lastResult: batchAIResult,
     startTask: startBatchAITask,
   } = useBatchAITask();
+
+  // 批量 AI 任务完成时显示错误提示
+  useEffect(() => {
+    if (!isBatchAIProcessing && batchAIResult && batchAIResult.failed > 0) {
+      toast.error(t('ai:batchOrganizeFailed', { 
+        failed: batchAIResult.failed,
+        success: batchAIResult.success 
+      }), {
+        position: 'top-center',
+        duration: 5000,
+      });
+    }
+  }, [isBatchAIProcessing, batchAIResult, t]);
 
   // 瀑布流布局
   const { containerRef: masonryContainerRef, config: masonryConfig } = useMasonryLayout();
