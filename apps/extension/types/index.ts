@@ -525,3 +525,6 @@ export interface EmbeddingJob {
   /** 更新时间 */
   updatedAt: number;
 }
+
+// ============ WebDAV 同步相关 ============
+export * from './sync';

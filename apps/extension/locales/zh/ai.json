@@ -95,5 +95,6 @@
   },
   "batchOrganize": "批量 AI 整理",
   "batchOrganizeProgress": "AI 正在重新整理书签...",
+  "batchOrganizeFailed": "AI 整理完成：成功 {{success}} 个，失败 {{failed}} 个。部分书签未能成功处理，请检查网络后重试。",
   "reanalyze": "AI 重新分析"
 }

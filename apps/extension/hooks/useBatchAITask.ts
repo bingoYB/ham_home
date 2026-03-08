@@ -8,6 +8,7 @@ import { useBookmarks } from '@/contexts/BookmarkContext';
 export function useBatchAITask() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState<BatchAITaskProgress | null>(null);
+  const [lastResult, setLastResult] = useState<{ success: number; failed: number } | null>(null);
   const { bookmarks, refreshBookmarks, refreshCategories, pauseWatchers, resumeWatchers } = useBookmarks();
   const isResuming = useRef(false);
 
@@ -52,6 +53,12 @@ export function useBatchAITask() {
               true // 获取分析内容
             );
             
+            // 检测 AI 是否真正返回了有效结果（空结果表示失败）
+            const hasValidResult = aiResult.description || aiResult.categoryId || (aiResult.tags && aiResult.tags.length > 0);
+            if (!hasValidResult) {
+              return { status: 'failed' };
+            }
+
             // Build updates safely
             const updates: any = {};
             if (aiResult.description) updates.description = aiResult.description;
@@ -102,6 +109,7 @@ export function useBatchAITask() {
 
       await aiTaskStorage.clearTask();
       setProgress(null);
+      setLastResult({ success, failed });
     } catch (error) {
       console.error('[BatchAITask] error:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -151,6 +159,7 @@ export function useBatchAITask() {
   return {
     isProcessing,
     progress,
+    lastResult,
     startTask,
     cancelTask
   };

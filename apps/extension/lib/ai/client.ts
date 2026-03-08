@@ -135,12 +135,13 @@ class ExtensionAIClient {
         existingTags: input.existingTags,
       };
 
+      // 直接抛出错误，让调用方决定如何处理（不静默吞掉）
       const result = await client.analyzeBookmark(enhancedInput);
       return result;
     } catch (error) {
       console.error("[ExtensionAIClient] Analysis failed:", error);
-      // AI 调用失败，返回降级结果
-      return this.getFallbackResult(input.pageContent);
+      // 重新抛出，让调用方感知 AI 错误
+      throw error;
     }
   }
 

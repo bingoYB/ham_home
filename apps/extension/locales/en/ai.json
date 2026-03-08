@@ -95,5 +95,6 @@
   },
   "batchOrganize": "Batch AI Organize",
   "batchOrganizeProgress": "AI is organizing bookmarks...",
+  "batchOrganizeFailed": "AI organization completed: {{success}} succeeded, {{failed}} failed. Some bookmarks could not be processed. Please check your network and retry.",
   "reanalyze": "AI Re-analyze"
 }

@@ -768,7 +768,8 @@ export function createAIClient(config: AIClientConfig): AIClient {
       return result;
     } catch (error) {
       logger.error("AI analysis failed:", error);
-      return getFallbackResult(input);
+      // 抛出错误而不是返回降级结果，让调用方决定如何处理
+      throw error;
     }
   }
 

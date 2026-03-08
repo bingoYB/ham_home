@@ -31,6 +31,7 @@ export interface HtmlImportTaskProgress {
   categoriesCreated: number;
   aiProcessed: number;
   importedBookmarkIds: string[];
+  aiError?: string;
   error?: string;
   updatedAt: number;
 }

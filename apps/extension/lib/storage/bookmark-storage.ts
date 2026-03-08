@@ -339,7 +339,7 @@ class BookmarkStorage {
   }
 
   /**
-   * 删除分类（将该分类下的书签移至"未分类"）
+   * 删除分类（将该分类及子分类下的书签移至"未分类"）
    */
   async deleteCategory(id: string): Promise<void> {
     const [categories, metaList]: [LocalCategory[], BookmarkMeta[]] = await Promise.all([
@@ -347,15 +347,27 @@ class BookmarkStorage {
       bookmarkMetaItem.getValue(),
     ]);
 
-    // 将该分类下的书签移至"未分类"
+    // 递归获取所有子分类 ID
+    const getDescendantIds = (parentId: string): string[] => {
+      const children = categories.filter(c => c.parentId === parentId);
+      let ids = children.map(c => c.id);
+      for (const child of children) {
+        ids = [...ids, ...getDescendantIds(child.id)];
+      }
+      return ids;
+    };
+
+    const idsToDelete = new Set([id, ...getDescendantIds(id)]);
+
+    // 将该分类及子分类下的书签移至"未分类"
     const updatedMetaList = metaList.map((b: BookmarkMeta) =>
-      b.categoryId === id
+      b.categoryId && idsToDelete.has(b.categoryId)
         ? { ...b, categoryId: null, updatedAt: Date.now() }
         : b
     );
 
     await Promise.all([
-      categoriesItem.setValue(categories.filter((c: LocalCategory) => c.id !== id)),
+      categoriesItem.setValue(categories.filter((c: LocalCategory) => !idsToDelete.has(c.id))),
       bookmarkMetaItem.setValue(updatedMetaList),
     ]);
   }
@@ -582,17 +594,96 @@ class BookmarkStorage {
         success: bookmarkIds.length,
         failed: 0,
       };
-    } catch (error) {
-      console.error('[BookmarkStorage] Batch operation failed:', error);
-      return {
-        success: 0,
-        failed: bookmarkIds.length,
-        errors: [error instanceof Error ? error.message : '批量操作失败'],
-      };
+    } catch (e) {
+      return { success: 0, failed: bookmarkIds.length, errors: [e instanceof Error ? e.message : 'Unknown error'] };
     }
   }
 
-  // ============ 监听变化 ============
+  // ============ 同步辅助操作 ============
+
+  /**
+   * 按映射表合并重复分类
+   * 删除旧分类并将对应书签全量迁移至新分类
+   */
+  async mergeCategories(mapping: Record<string, string>): Promise<void> {
+    if (Object.keys(mapping).length === 0) return;
+
+    let [categories, metaList]: [LocalCategory[], BookmarkMeta[]] = await Promise.all([
+      categoriesItem.getValue(),
+      bookmarkMetaItem.getValue(),
+    ]);
+
+    const oldIds = new Set(Object.keys(mapping));
+    
+    // 过滤掉被合并的废弃分类
+    categories = categories.filter((c: LocalCategory) => !oldIds.has(c.id));
+
+    // 迁移对应书签或子分类的 parentId 和 categoryId
+    const now = Date.now();
+    let hasMetaChanges = false;
+    metaList = metaList.map((b: BookmarkMeta) => {
+      if (b.categoryId && mapping[b.categoryId]) {
+        hasMetaChanges = true;
+        return { ...b, categoryId: mapping[b.categoryId], updatedAt: now };
+      }
+      return b;
+    });
+
+    let hasCategoryChanges = false;
+    categories = categories.map((c: LocalCategory) => {
+      if (c.parentId && mapping[c.parentId]) {
+        hasCategoryChanges = true;
+        return { ...c, parentId: mapping[c.parentId] };
+      }
+      return c;
+    });
+
+    if (hasCategoryChanges || oldIds.size > 0) {
+      await categoriesItem.setValue(categories);
+    }
+    
+    if (hasMetaChanges) {
+      await bookmarkMetaItem.setValue(metaList);
+    }
+  }
+
+  /**
+   * 导入原始分类（用于应用远端同步的数据，保留精确的 ID 和 createdAt）
+   */
+  async importRawCategory(category: LocalCategory): Promise<void> {
+    const categories: LocalCategory[] = await categoriesItem.getValue();
+    const index = categories.findIndex((c: LocalCategory) => c.id === category.id);
+    if (index !== -1) {
+      categories[index] = { ...categories[index], ...category };
+    } else {
+      categories.push(category);
+    }
+    await categoriesItem.setValue(categories);
+  }
+
+  /**
+   * 导入原始书签（用于应用远端同步的数据，保留精确的 ID、createdAt 和 updatedAt）
+   */
+  async importRawBookmark(bookmark: LocalBookmark): Promise<void> {
+    const metaList: BookmarkMeta[] = await bookmarkMetaItem.getValue();
+    const { content, ...meta } = bookmark;
+
+    const index = metaList.findIndex((b: BookmarkMeta) => b.id === meta.id);
+    if (index !== -1) {
+      metaList[index] = { ...metaList[index], ...meta };
+    } else {
+      metaList.push(meta);
+    }
+    await bookmarkMetaItem.setValue(metaList);
+
+    if (content !== undefined) {
+      const contentsMap = await bookmarkContentsItem.getValue();
+      contentsMap[meta.id] = content;
+      await bookmarkContentsItem.setValue(contentsMap);
+    }
+  }
+
+  // ============ 监听器 ============
 
   /**
    * 监听书签变化（仅监听元数据变化）
