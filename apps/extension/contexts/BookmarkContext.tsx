@@ -2,16 +2,32 @@
  * BookmarkContext - 书签数据上下文
  * 提供全局的书签数据管理，适配现有 storage API
  */
-import React, { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
-import { bookmarkStorage } from '@/lib/storage/bookmark-storage';
-import { configStorage, DEFAULT_AI_CONFIG, DEFAULT_SETTINGS } from '@/lib/storage/config-storage';
-import type { 
-  LocalBookmark, 
-  LocalCategory, 
-  AIConfig, 
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useRef,
+  ReactNode,
+} from "react";
+import { bookmarkStorage } from "@/lib/storage/bookmark-storage";
+import {
+  configStorage,
+  DEFAULT_AI_CONFIG,
+  DEFAULT_SETTINGS,
+} from "@/lib/storage/config-storage";
+import type {
+  LocalBookmark,
+  LocalCategory,
+  AIConfig,
   LocalSettings,
-  CreateBookmarkInput 
-} from '@/types';
+  CreateBookmarkInput,
+  WebDAVConfig,
+  SyncStatus,
+} from "@/types";
+import { syncConfigStorage } from "@/lib/sync/sync-config-storage";
+import { syncEngine } from "@/lib/sync/sync-engine";
 
 // 存储信息类型
 interface StorageInfo {
@@ -29,6 +45,8 @@ interface BookmarkContextType {
   allTags: string[];
   aiConfig: AIConfig;
   appSettings: LocalSettings;
+  syncConfig: WebDAVConfig;
+  syncStatus: SyncStatus;
   storageInfo: StorageInfo;
   loading: boolean;
 
@@ -39,26 +57,35 @@ interface BookmarkContextType {
   refreshBookmarks: () => Promise<void>;
 
   // 分类操作
-  addCategory: (name: string, parentId?: string | null) => Promise<LocalCategory>;
+  addCategory: (
+    name: string,
+    parentId?: string | null,
+  ) => Promise<LocalCategory>;
   updateCategory: (id: string, data: Partial<LocalCategory>) => Promise<void>;
   deleteCategory: (id: string) => Promise<void>;
   refreshCategories: () => Promise<void>;
-  bulkAddCategories: (categories: Array<{ id?: string; name: string; parentId: string | null }>) => Promise<void>;
+  bulkAddCategories: (
+    categories: Array<{ id?: string; name: string; parentId: string | null }>,
+  ) => Promise<void>;
 
   // 配置操作
   updateAIConfig: (config: Partial<AIConfig>) => Promise<void>;
   updateAppSettings: (settings: Partial<LocalSettings>) => Promise<void>;
+  updateSyncConfig: (config: Partial<WebDAVConfig>) => Promise<void>;
 
   // 数据管理
   clearAllData: () => Promise<void>;
-  exportData: (format: 'json' | 'html') => void;
+  clearBookmarkData: () => Promise<void>;
+  exportData: (format: "json" | "html") => void;
 
   // 批量导入辅助：暂停/恢复 storage watcher，避免每条写入都触发全量刷新
   pauseWatchers: () => void;
   resumeWatchers: () => void;
 }
 
-const BookmarkContext = createContext<BookmarkContextType | undefined>(undefined);
+const BookmarkContext = createContext<BookmarkContextType | undefined>(
+  undefined,
+);
 
 export function BookmarkProvider({ children }: { children: ReactNode }) {
   // 数据状态
@@ -66,12 +93,23 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
   const [categories, setCategories] = useState<LocalCategory[]>([]);
   const [allTags, setAllTags] = useState<string[]>([]);
   const [aiConfig, setAIConfig] = useState<AIConfig>(DEFAULT_AI_CONFIG);
-  const [appSettings, setAppSettings] = useState<LocalSettings>(DEFAULT_SETTINGS);
+  const [appSettings, setAppSettings] =
+    useState<LocalSettings>(DEFAULT_SETTINGS);
+  const [syncConfig, setSyncConfig] = useState<WebDAVConfig>({
+    enabled: false,
+    url: "",
+    username: "",
+  });
+  const [syncStatus, setSyncStatus] = useState<SyncStatus>({
+    lastSyncTime: 0,
+    syncVersion: "",
+    status: "idle",
+  });
   const [storageInfo, setStorageInfo] = useState<StorageInfo>({
     bookmarkCount: 0,
     categoryCount: 0,
     tagCount: 0,
-    storageSize: '0 KB',
+    storageSize: "0 KB",
   });
   const [loading, setLoading] = useState(true);
 
@@ -93,7 +131,7 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
       // 更新存储信息
       updateStorageInfo(data, categoriesRef.current);
     } catch (error) {
-      console.error('[BookmarkContext] Failed to refresh bookmarks:', error);
+      console.error("[BookmarkContext] Failed to refresh bookmarks:", error);
     }
   }, []);
 
@@ -103,14 +141,14 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
       const data = await bookmarkStorage.getCategories();
       setCategories(data);
     } catch (error) {
-      console.error('[BookmarkContext] Failed to refresh categories:', error);
+      console.error("[BookmarkContext] Failed to refresh categories:", error);
     }
   }, []);
 
   // 更新存储信息（轻量级估算，不使用 JSON.stringify + Blob）
   const updateStorageInfo = (bms: LocalBookmark[], cats: LocalCategory[]) => {
     const tagSet = new Set<string>();
-    bms.forEach(b => b.tags.forEach(t => tagSet.add(t)));
+    bms.forEach((b) => b.tags.forEach((t) => tagSet.add(t)));
 
     // 轻量级估算：每条书签按平均字段长度估算约 500 字节
     const estimatedBytes = bms.length * 500 + cats.length * 100;
@@ -129,12 +167,15 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
     const loadData = async () => {
       setLoading(true);
       try {
-        const [bms, cats, config, settings] = await Promise.all([
-          bookmarkStorage.getBookmarks(),
-          bookmarkStorage.getCategories(),
-          configStorage.getAIConfig(),
-          configStorage.getSettings(),
-        ]);
+        const [bms, cats, config, settings, sConfig, sStatus] =
+          await Promise.all([
+            bookmarkStorage.getBookmarks(),
+            bookmarkStorage.getCategories(),
+            configStorage.getAIConfig(),
+            configStorage.getSettings(),
+            syncConfigStorage.getConfig(),
+            syncConfigStorage.getStatus(),
+          ]);
 
         // 复用已加载的 bms 提取标签
         const tags = await bookmarkStorage.getAllTags(bms);
@@ -144,9 +185,11 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
         setAllTags(tags);
         setAIConfig(config);
         setAppSettings(settings);
+        setSyncConfig(sConfig);
+        setSyncStatus(sStatus);
         updateStorageInfo(bms, cats);
       } catch (error) {
-        console.error('[BookmarkContext] Failed to load data:', error);
+        console.error("[BookmarkContext] Failed to load data:", error);
       } finally {
         setLoading(false);
       }
@@ -166,15 +209,25 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
       if (watcherPausedRef.current > 0) return;
       refreshCategories();
     });
+    const unwatchSyncConfig = syncConfigStorage.watchConfig((newConfig) => {
+      setSyncConfig(newConfig!);
+    });
+    const unwatchSyncStatus = syncConfigStorage.watchStatus((newStatus) => {
+      setSyncStatus(newStatus!);
+    });
 
     return () => {
       unwatchBookmarks();
       unwatchCategories();
+      unwatchSyncConfig();
+      unwatchSyncStatus();
     };
   }, [refreshBookmarks, refreshCategories]);
 
   // 书签操作
-  const addBookmark = async (data: CreateBookmarkInput): Promise<LocalBookmark> => {
+  const addBookmark = async (
+    data: CreateBookmarkInput,
+  ): Promise<LocalBookmark> => {
     const bookmark = await bookmarkStorage.createBookmark(data);
     await refreshBookmarks();
     return bookmark;
@@ -210,13 +263,17 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
 
   // 批量添加分类
   const bulkAddCategories = async (
-    newCategories: Array<{ id?: string; name: string; parentId: string | null }>
+    newCategories: Array<{
+      id?: string;
+      name: string;
+      parentId: string | null;
+    }>,
   ) => {
     // 创建 ID 映射表（用于处理层级关系）
     const idMap = new Map<string, string>();
-    
+
     // 先添加根分类
-    const rootCategories = newCategories.filter(c => !c.parentId);
+    const rootCategories = newCategories.filter((c) => !c.parentId);
     for (const cat of rootCategories) {
       try {
         const created = await bookmarkStorage.createCategory(cat.name, null);
@@ -225,39 +282,45 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
         }
       } catch (error) {
         // 忽略重复分类错误
-        console.warn('[BookmarkContext] Skip duplicate category:', cat.name);
+        console.warn("[BookmarkContext] Skip duplicate category:", cat.name);
       }
     }
-    
+
     // 再添加子分类（可能需要多轮处理嵌套结构）
-    let remaining = newCategories.filter(c => c.parentId);
+    let remaining = newCategories.filter((c) => c.parentId);
     let maxIterations = 10; // 防止无限循环
-    
+
     while (remaining.length > 0 && maxIterations > 0) {
       const stillRemaining: typeof remaining = [];
-      
+
       for (const cat of remaining) {
         const mappedParentId = cat.parentId ? idMap.get(cat.parentId) : null;
-        
+
         if (mappedParentId || !cat.parentId) {
           try {
-            const created = await bookmarkStorage.createCategory(cat.name, mappedParentId || null);
+            const created = await bookmarkStorage.createCategory(
+              cat.name,
+              mappedParentId || null,
+            );
             if (cat.id) {
               idMap.set(cat.id, created.id);
             }
           } catch (error) {
-            console.warn('[BookmarkContext] Skip duplicate category:', cat.name);
+            console.warn(
+              "[BookmarkContext] Skip duplicate category:",
+              cat.name,
+            );
           }
         } else {
           // 父分类还未创建，稍后重试
           stillRemaining.push(cat);
         }
       }
-      
+
       remaining = stillRemaining;
       maxIterations--;
     }
-    
+
     await refreshCategories();
   };
 
@@ -272,6 +335,10 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
     setAppSettings(updated);
   };
 
+  const updateSyncConfig = async (config: Partial<WebDAVConfig>) => {
+    await syncConfigStorage.setConfig(config);
+  };
+
   // 批量导入辅助：暂停/恢复 storage watcher
   const pauseWatchers = useCallback(() => {
     watcherPausedRef.current++;
@@ -281,48 +348,49 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
     watcherPausedRef.current = Math.max(0, watcherPausedRef.current - 1);
   }, []);
 
-  // 清除所有数据（使用 WXT Storage）
-  const clearAllData = async () => {
-    // 清除 sync 和 local 存储
+  // 清除书签和分类数据（保留配置类数据）
+  const clearBookmarkData = async () => {
     await Promise.all([
-      storage.removeItem('sync:bookmarks'),
-      storage.removeItem('sync:categories'),
-      storage.removeItem('sync:aiConfig'),
-      storage.removeItem('sync:settings'),
-      storage.removeItem('sync:customFilters'),
-      storage.removeItem('local:bookmarkContents'),
+      storage.removeItem("local:bookmarks"),
+      storage.removeItem("local:bookmarkContents"),
+      storage.removeItem("sync:categories"),
     ]);
     setBookmarks([]);
     setCategories([]);
     setAllTags([]);
-    setAIConfig(DEFAULT_AI_CONFIG);
-    setAppSettings(DEFAULT_SETTINGS);
     setStorageInfo({
       bookmarkCount: 0,
       categoryCount: 0,
       tagCount: 0,
-      storageSize: '0 KB',
+      storageSize: "0 KB",
     });
   };
 
+  // 清除所有数据（不删除配置类数据：AI配置、应用设置、筛选器、WebDAV配置）
+  const clearAllData = async () => {
+    await clearBookmarkData();
+  };
+
   // 导出数据
-  const exportData = (format: 'json' | 'html') => {
+  const exportData = (format: "json" | "html") => {
     const data = {
-      version: '1.0.0',
+      version: "1.0.0",
       exportedAt: Date.now(),
       bookmarks,
       categories,
     };
 
-    if (format === 'json') {
+    if (format === "json") {
       const dataStr = JSON.stringify(data, null, 2);
-      const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
-      const filename = `hamhome_bookmarks_${new Date().toISOString().split('T')[0]}.json`;
+      const dataUri =
+        "data:application/json;charset=utf-8," + encodeURIComponent(dataStr);
+      const filename = `hamhome_bookmarks_${new Date().toISOString().split("T")[0]}.json`;
       downloadFile(dataUri, filename);
     } else {
       const htmlContent = generateHtmlExport(bookmarks, categories);
-      const dataUri = 'data:text/html;charset=utf-8,' + encodeURIComponent(htmlContent);
-      const filename = `hamhome_bookmarks_${new Date().toISOString().split('T')[0]}.html`;
+      const dataUri =
+        "data:text/html;charset=utf-8," + encodeURIComponent(htmlContent);
+      const filename = `hamhome_bookmarks_${new Date().toISOString().split("T")[0]}.html`;
       downloadFile(dataUri, filename);
     }
   };
@@ -335,6 +403,8 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
         allTags,
         aiConfig,
         appSettings,
+        syncConfig,
+        syncStatus,
         storageInfo,
         loading,
         addBookmark,
@@ -348,7 +418,9 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
         bulkAddCategories,
         updateAIConfig,
         updateAppSettings,
+        updateSyncConfig,
         clearAllData,
+        clearBookmarkData,
         exportData,
         pauseWatchers,
         resumeWatchers,
@@ -363,22 +435,25 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
 export function useBookmarks() {
   const context = useContext(BookmarkContext);
   if (context === undefined) {
-    throw new Error('useBookmarks must be used within a BookmarkProvider');
+    throw new Error("useBookmarks must be used within a BookmarkProvider");
   }
   return context;
 }
 
 // 辅助函数：下载文件
 function downloadFile(dataUri: string, filename: string) {
-  const link = document.createElement('a');
-  link.setAttribute('href', dataUri);
-  link.setAttribute('download', filename);
+  const link = document.createElement("a");
+  link.setAttribute("href", dataUri);
+  link.setAttribute("download", filename);
   link.click();
 }
 
 // 辅助函数：生成 HTML 导出
-function generateHtmlExport(bookmarks: LocalBookmark[], categories: LocalCategory[]): string {
-  const categoryMap = new Map(categories.map(c => [c.id, c.name]));
+function generateHtmlExport(
+  bookmarks: LocalBookmark[],
+  categories: LocalCategory[],
+): string {
+  const categoryMap = new Map(categories.map((c) => [c.id, c.name]));
 
   return `<!DOCTYPE html>
 <html>
@@ -401,25 +476,28 @@ function generateHtmlExport(bookmarks: LocalBookmark[], categories: LocalCategor
 </head>
 <body>
   <h1>🐹 HamHome 书签导出</h1>
-  ${bookmarks.map(b => `
+  ${bookmarks
+    .map(
+      (b) => `
   <div class="bookmark">
     <div class="title"><a href="${b.url}" target="_blank">${escapeHtml(b.title)}</a></div>
     <div class="url">${escapeHtml(b.url)}</div>
-    ${b.description ? `<div class="description">${escapeHtml(b.description)}</div>` : ''}
+    ${b.description ? `<div class="description">${escapeHtml(b.description)}</div>` : ""}
     <div class="meta">
-      ${b.categoryId ? `<span class="category">${escapeHtml(categoryMap.get(b.categoryId) || '未分类')}</span>` : ''}
-      ${b.tags.map(t => `<span class="tag">${escapeHtml(t)}</span>`).join('')}
+      ${b.categoryId ? `<span class="category">${escapeHtml(categoryMap.get(b.categoryId) || "未分类")}</span>` : ""}
+      ${b.tags.map((t) => `<span class="tag">${escapeHtml(t)}</span>`).join("")}
     </div>
   </div>
-  `).join('')}
+  `,
+    )
+    .join("")}
 </body>
 </html>`;
 }
 
 // 辅助函数：HTML 转义
 function escapeHtml(text: string): string {
-  const div = document.createElement('div');
+  const div = document.createElement("div");
   div.textContent = text;
   return div.innerHTML;
 }
-

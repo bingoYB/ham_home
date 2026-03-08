@@ -2,18 +2,19 @@
  * BookmarkHeader - 书签面板头部组件
  * 包含搜索框、筛选器和设置入口
  */
-import { useState } from 'react';
-import { Bookmark, Tag, Filter } from 'lucide-react';
-import { useTranslation } from 'react-i18next';
-import { Button, cn } from '@hamhome/ui';
-import { TagFilterDropdown } from './TagFilterDropdown';
-import { FilterDropdownMenu } from './FilterPopover';
-import { CustomFilterDialog } from './CustomFilterDialog';
-import { QuickActions } from '@/components/common/QuickActions';
-import { SearchInputArea } from '@/components/aiSearch';
-import { useContentUI } from '@/utils/ContentUIContext';
-import type { TimeRange } from '@/hooks/useBookmarkSearch';
-import type { FilterCondition, CustomFilter } from '@/types';
+import { useState } from "react";
+import { Bookmark, Tag, Filter } from "lucide-react";
+import { useTranslation } from "react-i18next";
+import { Button, cn } from "@hamhome/ui";
+import { TagFilterDropdown } from "./TagFilterDropdown";
+import { FilterDropdownMenu } from "./FilterPopover";
+import { CustomFilterDialog } from "./CustomFilterDialog";
+import { QuickActions } from "@/components/common/QuickActions";
+import { SyncStatusWidget } from "@/components/common/SyncStatusWidget";
+import { SearchInputArea } from "@/components/aiSearch";
+import { useContentUI } from "@/utils/ContentUIContext";
+import type { TimeRange } from "@/hooks/useBookmarkSearch";
+import type { FilterCondition, CustomFilter } from "@/types";
 
 export interface BookmarkHeaderProps {
   searchQuery: string;
@@ -55,15 +56,18 @@ export function BookmarkHeader({
   onSaveCustomFilter,
   className,
 }: BookmarkHeaderProps) {
-  const { t } = useTranslation('bookmark');
+  const { t } = useTranslation("bookmark");
   const [customFilterDialogOpen, setCustomFilterDialogOpen] = useState(false);
   const { container: portalContainer } = useContentUI();
 
   const showFilteredCount = filteredCount !== bookmarkCount;
   const hasTagFilter = selectedTags.length > 0;
-  const hasFilter = timeRange.type !== 'all' || !!selectedCustomFilterId; // 是否有筛选器（时间筛选或自定义筛选器）
+  const hasFilter = timeRange.type !== "all" || !!selectedCustomFilterId; // 是否有筛选器（时间筛选或自定义筛选器）
 
-  const handleSaveCustomFilter = (name: string, conditions: FilterCondition[]) => {
+  const handleSaveCustomFilter = (
+    name: string,
+    conditions: FilterCondition[],
+  ) => {
     onSaveCustomFilter?.(name, conditions);
   };
 
@@ -75,17 +79,29 @@ export function BookmarkHeader({
   };
 
   return (
-    <div className={cn('px-4 py-3 border-b border-border bg-background/95 backdrop-blur-sm', className)}>
+    <div
+      className={cn(
+        "px-4 py-3 border-b border-border bg-background/95 backdrop-blur-sm",
+        className,
+      )}
+    >
       {/* 标题行 */}
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Bookmark className="h-5 w-5 text-primary" />
-          <h2 className="text-base font-semibold text-foreground">{t('bookmark:bookmark.title')}</h2>
+          <h2 className="text-base font-semibold text-foreground">
+            {t("bookmark:bookmark.title")}
+          </h2>
           <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
-            {showFilteredCount ? `${filteredCount}/${bookmarkCount}` : bookmarkCount}
+            {showFilteredCount
+              ? `${filteredCount}/${bookmarkCount}`
+              : bookmarkCount}
           </span>
         </div>
-        <QuickActions portalContainer={portalContainer} />
+        <div className="flex items-center gap-1">
+          <SyncStatusWidget portalContainer={portalContainer} />
+          <QuickActions portalContainer={portalContainer} />
+        </div>
       </div>
 
       {/* 搜索框和筛选器 */}
@@ -110,15 +126,15 @@ export function BookmarkHeader({
               variant="ghost"
               size="icon"
               className={cn(
-                'h-8 w-8',
-                hasTagFilter && 'text-primary bg-primary/10'
+                "h-8 w-8",
+                hasTagFilter && "text-primary bg-primary/10",
               )}
-              title={t('bookmark:contentPanel.tagFilter')}
+              title={t("bookmark:contentPanel.tagFilter")}
             >
               <Tag className="h-4 w-4" />
             </Button>
           </TagFilterDropdown>
-          
+
           {/* 筛选器下拉菜单 */}
           <FilterDropdownMenu
             timeRange={timeRange}
@@ -133,10 +149,10 @@ export function BookmarkHeader({
               variant="ghost"
               size="icon"
               className={cn(
-                'h-8 w-8',
-                hasFilter && 'text-primary bg-primary/10'
+                "h-8 w-8",
+                hasFilter && "text-primary bg-primary/10",
               )}
-              title={t('bookmark:contentPanel.filter')}
+              title={t("bookmark:contentPanel.filter")}
             >
               <Filter className="h-4 w-4" />
             </Button>

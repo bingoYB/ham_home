@@ -152,19 +152,44 @@
     },
     "storage": {
       "title": "存储管理",
-      "description": "管理你的书签数据和快照",
-      "bookmarkCount": "书签数量",
-      "categoryCount": "分类数量",
-      "snapshotCount": "快照数量",
-      "vectorCount": "向量数量",
-      "storageUsed": "书签数据占用",
-      "snapshotSize": "快照占用空间",
-      "vectorSize": "向量占用空间",
+      "description": "管理你的书签数据、快照和向量索引",
+      "dataOverview": "数据概览",
+      "bookmarkData": {
+        "title": "书签 & 分类",
+        "count": "{{bookmarks}} 个书签 / {{categories}} 个分类",
+        "size": "约 {{size}} (估算)",
+        "clear": "清除书签数据",
+        "clearDesc": "删除所有书签和分类数据，保留 AI 配置、标签等设置",
+        "confirmTitle": "确认清除书签数据",
+        "confirmWarning": "此操作将删除所有书签和分类数据，AI 配置和应用设置将被保留。此操作无法撤销！"
+      },
+      "snapshotData": {
+        "title": "网页快照",
+        "count": "{{count}} 个快照",
+        "size": "{{size}}",
+        "clear": "清除快照",
+        "clearDesc": "删除本地保存的所有网页快照以释放存储空间",
+        "confirmTitle": "确认清除快照",
+        "confirmWarning": "此操作将删除所有本地保存的网页快照，书签本身不受影响。此操作无法撤销！"
+      },
+      "vectorData": {
+        "title": "语义向量索引",
+        "count": "{{count}} 个向量",
+        "size": "{{size}}",
+        "clear": "清除向量数据",
+        "clearDesc": "清除语义搜索的向量索引，可随时重建",
+        "confirmTitle": "确认清除向量数据",
+        "confirmWarning": "此操作将清除所有向量索引，语义搜索将暂时不可用，可在 AI 配置页重建。"
+      },
       "dataExport": "数据导出",
       "exportJSON": "导出为 JSON",
       "exportHTML": "导出为 HTML",
       "dangerZone": "危险操作",
-      "clearAllData": "清除所有数据"
+      "clearAllData": "清除所有业务数据",
+      "clearAllDesc": "清除书签、分类、快照及向量数据（AI 配置和应用设置将被保留）",
+      "confirmClearAll": "确认清除所有数据",
+      "clearAllWarning": "此操作将删除所有书签、分类、网页快照和向量索引。AI 配置、标签设置、WebDAV 配置等个人设置将被保留。此操作无法撤销！",
+      "notEnabled": "未启用"
     },
     "about": {
       "title": "关于",
@@ -176,7 +201,7 @@
     },
     "dialogs": {
       "confirmClear": "确认清除所有数据",
-      "clearWarning": "此操作将删除所有书签、分类和设置数据。此操作无法撤销，请谨慎操作。",
+      "clearWarning": "此操作将删除所有书签、分类、快照和向量数据。AI 配置和应用设置将被保留。此操作无法撤销！",
       "cancel": "取消",
       "confirm": "确认清除"
     },
@@ -211,6 +236,8 @@
       "importDetailsWithAI": "成功导入 {{imported}} 个书签，AI 处理 {{aiProcessed}} 个，跳过 {{skipped}} 个重复项",
       "importDetailsWithAIAndCategories": "成功导入 {{imported}} 个书签，AI 处理 {{aiProcessed}} 个，创建 {{categoriesCreated}} 个分类，跳过 {{skipped}} 个重复项",
       "importErrorSkipped": "{{count}} 个因错误跳过",
+      "aiErrorTitle": "部分书签 AI 分析出错",
+      "aiErrorDesc": "AI 接口调用失败，书签已作为「未分类」导入，且未生成摘要。请检查 AI 配置或网络状态后再试。",
       "export": {
         "title": "导出书签",
         "description": "将你的书签数据导出为文件备份",
@@ -396,6 +423,41 @@
             "resources-automation": "自动化"
           }
         }
+      }
+    },
+    "sync": {
+      "status": {
+        "disabled": "未开启",
+        "unconfigured": "未配置",
+        "syncing": "同步中...",
+        "error": "出错了",
+        "enabled": "已开启"
+      },
+      "widget": {
+        "title": "WebDAV 同步",
+        "tooltipTitle": "私有云数据同步",
+        "tooltipDesc": "支持 WebDAV 协议，将你的数据同步至个人 NAS 或私有云盘，保护数据隐私（非第三方公共服务）。",
+        "goConfig": "点击前往配置页"
+      },
+      "config": {
+        "title": "WebDAV 数据同步",
+        "description": "配置 WebDAV 服务以实现在多个设备间同步你的书签、分类和设置。如果你不慎填错同步配置并造成锁死，可以在下方直接清除所有本地数据切断同步连接。",
+        "enabled": "启用 WebDAV 同步",
+        "enabledDesc": "开启后将自动在后台进行双向同步",
+        "url": "WebDAV 服务器地址 (URL)",
+        "username": "用户名 / 账号",
+        "password": "密码 / 应用授权码",
+        "e2ePassword": "端到端加密密码 (可选)",
+        "e2ePasswordDesc": "配置后，云端数据将被加密，暂不开放",
+        "syncBtn": "立即同步",
+        "syncingBtn": "同步中...",
+        "statusLabel": "当前状态:",
+        "lastSyncLabel": "最后同步时间:",
+        "remoteVersionLabel": "远端云载版本:",
+        "neverSynced": "从未同步",
+        "statusError": "同步失败",
+        "statusSyncing": "正在同步",
+        "statusIdle": "空闲 / 已同步"
       }
     }
   }

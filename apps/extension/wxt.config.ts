@@ -32,6 +32,7 @@ export default defineConfig({
       "downloads",
       "contextMenus",
       "bookmarks",
+      "alarms",
     ],
     host_permissions: ["<all_urls>"],
     commands: {

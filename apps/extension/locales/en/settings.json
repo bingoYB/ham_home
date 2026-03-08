@@ -152,19 +152,44 @@
     },
     "storage": {
       "title": "Storage Management",
-      "description": "Manage your bookmark data and snapshots",
-      "bookmarkCount": "Bookmark Count",
-      "categoryCount": "Category Count",
-      "snapshotCount": "Snapshot Count",
-      "vectorCount": "Vector Count",
-      "storageUsed": "Metadata Size",
-      "snapshotSize": "Snapshot Size",
-      "vectorSize": "Vector Size",
+      "description": "Manage your bookmark data, snapshots, and vector index",
+      "dataOverview": "Data Overview",
+      "bookmarkData": {
+        "title": "Bookmarks & Categories",
+        "count": "{{bookmarks}} bookmarks / {{categories}} categories",
+        "size": "~{{size}} (estimated)",
+        "clear": "Clear Bookmark Data",
+        "clearDesc": "Delete all bookmarks and categories, keeping AI config and settings",
+        "confirmTitle": "Confirm Clear Bookmark Data",
+        "confirmWarning": "This will delete all bookmarks and categories. AI config and app settings will be kept. This action cannot be undone!"
+      },
+      "snapshotData": {
+        "title": "Web Snapshots",
+        "count": "{{count}} snapshots",
+        "size": "{{size}}",
+        "clear": "Clear Snapshots",
+        "clearDesc": "Delete all locally saved web snapshots to free up storage",
+        "confirmTitle": "Confirm Clear Snapshots",
+        "confirmWarning": "This will delete all locally saved web snapshots. Your bookmarks will not be affected. This action cannot be undone!"
+      },
+      "vectorData": {
+        "title": "Semantic Vector Index",
+        "count": "{{count}} vectors",
+        "size": "{{size}}",
+        "clear": "Clear Vector Data",
+        "clearDesc": "Clear the semantic search vector index (can be rebuilt anytime)",
+        "confirmTitle": "Confirm Clear Vector Data",
+        "confirmWarning": "This will clear all vector indexes. Semantic search will be temporarily unavailable and can be rebuilt in AI settings."
+      },
       "dataExport": "Data Export",
       "exportJSON": "Export as JSON",
       "exportHTML": "Export as HTML",
       "dangerZone": "Danger Zone",
-      "clearAllData": "Clear All Data"
+      "clearAllData": "Clear All Business Data",
+      "clearAllDesc": "Clear bookmarks, categories, snapshots, and vectors (AI config and settings will be kept)",
+      "confirmClearAll": "Confirm Clear All Data",
+      "clearAllWarning": "This will delete all bookmarks, categories, snapshots, and vector indexes. AI config, tag settings, and WebDAV config will be kept. This action cannot be undone!",
+      "notEnabled": "Not enabled"
     },
     "about": {
       "title": "About",
@@ -176,7 +201,7 @@
     },
     "dialogs": {
       "confirmClear": "Confirm Clear All Data",
-      "clearWarning": "This action will delete all bookmarks, categories, and settings data. This action cannot be undone, please proceed with caution.",
+      "clearWarning": "This will delete all bookmarks, categories, snapshots, and vector data. AI config and app settings will be kept. This action cannot be undone!",
       "cancel": "Cancel",
       "confirm": "Confirm Clear"
     },
@@ -211,6 +236,8 @@
       "importDetailsWithAI": "Successfully imported {{imported}} bookmarks, AI processed {{aiProcessed}}, skipped {{skipped}} duplicates",
       "importDetailsWithAIAndCategories": "Successfully imported {{imported}} bookmarks, AI processed {{aiProcessed}}, created {{categoriesCreated}} categories, skipped {{skipped}} duplicates",
       "importErrorSkipped": "{{count}} skipped due to errors",
+      "aiErrorTitle": "AI Analysis Failed for Some Bookmarks",
+      "aiErrorDesc": "AI API calls failed. Bookmarks were imported as 'Uncategorized' without summaries. Please check your AI config or network status.",
       "export": {
         "title": "Export Bookmarks",
         "description": "Export your bookmark data as a backup file",
@@ -396,6 +423,41 @@
             "resources-automation": "Automation"
           }
         }
+      }
+    },
+    "sync": {
+      "status": {
+        "disabled": "Disabled",
+        "unconfigured": "Not Configured",
+        "syncing": "Syncing...",
+        "error": "Error",
+        "enabled": "Enabled"
+      },
+      "widget": {
+        "title": "WebDAV Sync",
+        "tooltipTitle": "Private Cloud Sync",
+        "tooltipDesc": "Supports WebDAV protocol, syncs your data to your personal NAS or private cloud, protecting data privacy (not a 3rd party public service).",
+        "goConfig": "Click to go to settings"
+      },
+      "config": {
+        "title": "WebDAV Data Sync",
+        "description": "Configure WebDAV service to sync your bookmarks, categories, and settings across multiple devices. If you accidentally enter the wrong sync configuration and cause a lock, you can directly clear all local data below to cut off the sync connection.",
+        "enabled": "Enable WebDAV Sync",
+        "enabledDesc": "When enabled, two-way sync will automatically run in the background",
+        "url": "WebDAV Server URL",
+        "username": "Username / Account",
+        "password": "Password / App Token",
+        "e2ePassword": "End-to-End Encryption Password (Optional)",
+        "e2ePasswordDesc": "Once configured, cloud data will be encrypted (feature not yet available)",
+        "syncBtn": "Sync Now",
+        "syncingBtn": "Syncing...",
+        "statusLabel": "Current Status:",
+        "lastSyncLabel": "Last Sync Time:",
+        "remoteVersionLabel": "Remote Cloud Version:",
+        "neverSynced": "Never Synced",
+        "statusError": "Sync Failed",
+        "statusSyncing": "Syncing...",
+        "statusIdle": "Idle / Synced"
       }
     }
   }
