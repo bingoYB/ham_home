@@ -13,7 +13,7 @@ import {
   Camera,
   ExternalLink,
   Sparkles,
-} from 'lucide-react';
+} from "lucide-react";
 import {
   Badge,
   Checkbox,
@@ -23,9 +23,10 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@hamhome/ui';
-import { CATEGORY_COLOR } from '@/utils/bookmark-utils';
-import type { LocalBookmark } from '@/types';
+} from "@hamhome/ui";
+import { CATEGORY_COLOR } from "@/utils/bookmark-utils";
+import { useSafeFavicon } from "@/hooks/useSafeFavicon";
+import type { LocalBookmark } from "@/types";
 
 export interface BookmarkCardProps {
   bookmark: LocalBookmark;
@@ -61,6 +62,7 @@ export function BookmarkCard({
   t,
 }: BookmarkCardProps) {
   const hostname = new URL(bookmark.url).hostname;
+  const safeFavicon = useSafeFavicon(bookmark.url, bookmark.favicon);
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(bookmark.url);
@@ -82,10 +84,10 @@ export function BookmarkCard({
       style={{ width: columnSize }}
       className={`group bg-card rounded-2xl border transition-all hover:shadow-lg ${
         isHighlighted
-          ? 'border-indigo-500 ring-2 ring-indigo-500/50 animate-pulse'
+          ? "border-indigo-500 ring-2 ring-indigo-500/50 animate-pulse"
           : isSelected
-            ? 'border-primary ring-2 ring-primary/20'
-            : 'border-border hover:border-border/80'
+            ? "border-primary ring-2 ring-primary/20"
+            : "border-border hover:border-border/80"
       }`}
     >
       <div className="p-4">
@@ -136,38 +138,38 @@ export function BookmarkCard({
               <DropdownMenuContent align="end" className="w-40">
                 <DropdownMenuItem onClick={onOpen}>
                   <ExternalLink className="h-4 w-4 mr-2" />
-                  {t('bookmark:bookmark.open')}
+                  {t("bookmark:bookmark.open")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={onEdit}>
                   <Edit className="h-4 w-4 mr-2" />
-                  {t('bookmark:bookmark.edit')}
+                  {t("bookmark:bookmark.edit")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleCopyLink}>
                   <Copy className="h-4 w-4 mr-2" />
-                  {t('bookmark:bookmark.copyLink')}
+                  {t("bookmark:bookmark.copyLink")}
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={handleShare}>
                   <Share2 className="h-4 w-4 mr-2" />
-                  {t('bookmark:bookmark.share')}
+                  {t("bookmark:bookmark.share")}
                 </DropdownMenuItem>
                 {bookmark.hasSnapshot && onViewSnapshot && (
                   <>
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={onViewSnapshot}>
                       <Camera className="h-4 w-4 mr-2" />
-                      {t('bookmark:bookmark.viewSnapshot')}
+                      {t("bookmark:bookmark.viewSnapshot")}
                     </DropdownMenuItem>
                   </>
                 )}
                 {onReanalyzeAI && (
                   <>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem 
+                    <DropdownMenuItem
                       onClick={onReanalyzeAI}
                       disabled={isProcessingAI}
                     >
                       <Sparkles className="h-4 w-4 mr-2" />
-                      {t('ai:reanalyze')}
+                      {t("ai:reanalyze")}
                     </DropdownMenuItem>
                   </>
                 )}
@@ -177,7 +179,7 @@ export function BookmarkCard({
                   className="text-destructive focus:text-destructive"
                 >
                   <Trash2 className="h-4 w-4 mr-2" />
-                  {t('bookmark:bookmark.delete')}
+                  {t("bookmark:bookmark.delete")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -185,18 +187,23 @@ export function BookmarkCard({
         </div>
 
         {/* 主体内容：点击打开链接 */}
-        <a href={bookmark.url} target="_blank" rel="noopener noreferrer" className="block">
+        <a
+          href={bookmark.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block"
+        >
           {/* 图标 + 标题描述 */}
           <div className="flex gap-3">
             {/* 左侧图标 */}
             <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
-              {bookmark.favicon ? (
+              {safeFavicon ? (
                 <img
-                  src={bookmark.favicon}
+                  src={safeFavicon}
                   alt=""
                   className="w-6 h-6 rounded"
                   onError={(e) => {
-                    (e.target as HTMLImageElement).style.display = 'none';
+                    (e.target as HTMLImageElement).style.display = "none";
                   }}
                 />
               ) : (
@@ -220,7 +227,11 @@ export function BookmarkCard({
         {bookmark.tags.length > 0 && (
           <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-border/50">
             {bookmark.tags.map((tag) => (
-              <Badge key={tag} variant="secondary" className="text-xs px-2 py-0.5">
+              <Badge
+                key={tag}
+                variant="secondary"
+                className="text-xs px-2 py-0.5"
+              >
                 {tag}
               </Badge>
             ))}

@@ -11,7 +11,7 @@ import {
   Trash2,
   Camera,
   Sparkles,
-} from 'lucide-react';
+} from "lucide-react";
 import {
   Badge,
   Checkbox,
@@ -21,8 +21,9 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from '@hamhome/ui';
-import type { LocalBookmark } from '@/types';
+} from "@hamhome/ui";
+import { useSafeFavicon } from "@/hooks/useSafeFavicon";
+import type { LocalBookmark } from "@/types";
 
 export interface BookmarkListItemProps {
   bookmark: LocalBookmark;
@@ -56,6 +57,7 @@ export function BookmarkListItem({
   t,
 }: BookmarkListItemProps) {
   const hostname = new URL(bookmark.url).hostname;
+  const safeFavicon = useSafeFavicon(bookmark.url, bookmark.favicon);
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(bookmark.url);
@@ -76,10 +78,10 @@ export function BookmarkListItem({
     <div
       className={`group flex items-center gap-4 p-4 rounded-xl border transition-all hover:shadow-md ${
         isHighlighted
-          ? 'border-indigo-500 ring-2 ring-indigo-500/50 bg-indigo-50/50 dark:bg-indigo-950/20 animate-pulse'
+          ? "border-indigo-500 ring-2 ring-indigo-500/50 bg-indigo-50/50 dark:bg-indigo-950/20 animate-pulse"
           : isSelected
-            ? 'border-primary bg-primary/5'
-            : 'border-border bg-card hover:bg-muted/50'
+            ? "border-primary bg-primary/5"
+            : "border-border bg-card hover:bg-muted/50"
       }`}
     >
       {/* 选择框 */}
@@ -89,13 +91,13 @@ export function BookmarkListItem({
 
       {/* 图标 */}
       <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
-        {bookmark.favicon ? (
+        {safeFavicon ? (
           <img
-            src={bookmark.favicon}
+            src={safeFavicon}
             alt=""
             className="w-5 h-5 rounded"
             onError={(e) => {
-              (e.target as HTMLImageElement).style.display = 'none';
+              (e.target as HTMLImageElement).style.display = "none";
             }}
           />
         ) : (
@@ -110,18 +112,26 @@ export function BookmarkListItem({
         rel="noopener noreferrer"
         className="w-0 grow min-w-0"
       >
-        <h3 className="font-medium text-foreground truncate" title={bookmark.title}>
+        <h3
+          className="font-medium text-foreground truncate"
+          title={bookmark.title}
+        >
           {bookmark.title}
         </h3>
         {bookmark.description && (
-          <p className="text-xs text-muted-foreground truncate mt-1" title={bookmark.description}>
+          <p
+            className="text-xs text-muted-foreground truncate mt-1"
+            title={bookmark.description}
+          >
             {bookmark.description}
           </p>
         )}
         <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
           <span className="truncate max-w-[200px]">{hostname}</span>
           <span className="shrink-0">•</span>
-          <span className="shrink-0 truncate max-w-[100px]">{categoryName}</span>
+          <span className="shrink-0 truncate max-w-[100px]">
+            {categoryName}
+          </span>
           <span className="shrink-0">•</span>
           <span className="shrink-0 whitespace-nowrap">{formattedDate}</span>
         </div>
@@ -154,45 +164,48 @@ export function BookmarkListItem({
           <DropdownMenuContent align="end" className="w-40">
             <DropdownMenuItem onClick={onOpen}>
               <ExternalLink className="h-4 w-4 mr-2" />
-              {t('bookmark:bookmark.open')}
+              {t("bookmark:bookmark.open")}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={onEdit}>
               <Edit className="h-4 w-4 mr-2" />
-              {t('bookmark:bookmark.edit')}
+              {t("bookmark:bookmark.edit")}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={handleCopyLink}>
               <Copy className="h-4 w-4 mr-2" />
-              {t('bookmark:bookmark.copyLink')}
+              {t("bookmark:bookmark.copyLink")}
             </DropdownMenuItem>
             <DropdownMenuItem onClick={handleShare}>
               <Share2 className="h-4 w-4 mr-2" />
-              {t('bookmark:bookmark.share')}
+              {t("bookmark:bookmark.share")}
             </DropdownMenuItem>
             {bookmark.hasSnapshot && onViewSnapshot && (
               <>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={onViewSnapshot}>
                   <Camera className="h-4 w-4 mr-2" />
-                  {t('bookmark:bookmark.viewSnapshot')}
+                  {t("bookmark:bookmark.viewSnapshot")}
                 </DropdownMenuItem>
               </>
             )}
             {onReanalyzeAI && (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem 
+                <DropdownMenuItem
                   onClick={onReanalyzeAI}
                   disabled={isProcessingAI}
                 >
                   <Sparkles className="h-4 w-4 mr-2" />
-                  {t('ai:reanalyze')}
+                  {t("ai:reanalyze")}
                 </DropdownMenuItem>
               </>
             )}
             <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={onDelete} className="text-destructive focus:text-destructive">
+            <DropdownMenuItem
+              onClick={onDelete}
+              className="text-destructive focus:text-destructive"
+            >
               <Trash2 className="h-4 w-4 mr-2" />
-              {t('bookmark:bookmark.delete')}
+              {t("bookmark:bookmark.delete")}
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
