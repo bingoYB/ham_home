@@ -125,8 +125,7 @@ class BackgroundServiceImpl implements IBackgroundService {
   }
 
   async openOptionsPage(view: string = 'settings'): Promise<void> {
-    const hash = view.includes('?') ? view : `${view}`;
-    await browser.tabs.create({ url: getExtensionURL(`app.html#${hash}`) });
+    await browser.tabs.create({ url: getExtensionURL(`app.html#${view}`) });
   }
 
   async openTab(url: string): Promise<void> {

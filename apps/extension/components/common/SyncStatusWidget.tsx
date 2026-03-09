@@ -66,17 +66,28 @@ export function SyncStatusWidget({
                 "h-8 w-8 text-muted-foreground/50 hover:text-muted-foreground",
                 className,
               )}
-              onClick={() => getBackgroundService().openOptionsPage("storage")}
+              onClick={() =>
+                getBackgroundService().openOptionsPage("settings?tab=storage")
+              }
             >
               <Cloud className="h-4 w-4" />
             </Button>
           </TooltipTrigger>
-          <TooltipContent side="bottom" className="z-9999">
+          <TooltipContent
+            side="bottom"
+            className="z-9999"
+            container={portalContainer}
+          >
             <p>{t("settings:settings.sync.widget.tooltipTitle")}</p>
             <p className="text-xs text-muted-foreground mt-1 max-w-[200px] leading-relaxed">
               {t("settings:settings.sync.widget.tooltipDesc")}
             </p>
-            <p className="text-xs mt-2 font-medium text-primary">
+            <p
+              className="text-xs mt-2 font-medium text-primary"
+              onClick={() =>
+                getBackgroundService().openOptionsPage("settings?tab=storage")
+              }
+            >
               {t("settings:settings.sync.widget.goConfig")}
             </p>
           </TooltipContent>
@@ -105,7 +116,9 @@ export function SyncStatusWidget({
                   : "text-green-600",
               className,
             )}
-            onClick={() => getBackgroundService().openOptionsPage("storage")}
+            onClick={() =>
+              getBackgroundService().openOptionsPage("settings?tab=storage")
+            }
           >
             {isSyncing ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -116,7 +129,11 @@ export function SyncStatusWidget({
             )}
           </Button>
         </TooltipTrigger>
-        <TooltipContent side="bottom" className="p-3 z-[9999]">
+        <TooltipContent
+          side="bottom"
+          className="p-3 z-[9999]"
+          container={portalContainer}
+        >
           <div className="flex flex-col gap-1">
             <span className="text-sm font-medium">
               {isSyncing
@@ -130,7 +147,12 @@ export function SyncStatusWidget({
                 ? `${t("settings:settings.sync.config.lastSyncLabel")} ${relativeSyncTime}`
                 : t("settings:settings.sync.config.neverSynced")}
             </span>
-            <span className="text-xs text-primary mt-1 border-t border-border/50 pt-1">
+            <span
+              onClick={() =>
+                getBackgroundService().openOptionsPage("settings?tab=storage")
+              }
+              className="text-xs text-primary mt-1 border-t border-border/50 pt-1"
+            >
               {t("settings:settings.sync.widget.goConfig")}
             </span>
           </div>

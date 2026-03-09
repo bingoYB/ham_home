@@ -368,7 +368,10 @@ function AppContent() {
             <p className="text-xs text-muted-foreground mt-1">
               {t("settings:settings.sync.widget.tooltipDesc")}
             </p>
-            <p className="text-xs text-primary mt-2 flex items-center gap-1">
+            <p
+              className="text-xs text-primary mt-2 flex items-center gap-1"
+              onClick={() => handleViewChange("settings?tab=storage")}
+            >
               <Settings className="w-3 h-3" />{" "}
               {t("settings:settings.sync.widget.goConfig")}
             </p>

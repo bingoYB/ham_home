@@ -535,8 +535,14 @@ export function ImportExportPage() {
     tags: string[];
     newCategories: LocalCategory[];
   }> => {
+    const aiStart = performance.now();
     try {
+      let t0 = performance.now();
       await aiClient.loadConfig();
+      console.log(
+        `[ImportExport][Perf] loadConfig: ${(performance.now() - t0).toFixed(1)}ms`,
+      );
+
       if (!aiClient.isConfigured()) {
         return {
           description: "",
@@ -549,9 +555,14 @@ export function ImportExportPage() {
       // 构建页面内容
       let content = "";
       if (shouldFetchPageContent) {
+        t0 = performance.now();
         content = await fetchPageContentForAI(url);
+        console.log(
+          `[ImportExport][Perf] fetchPageContent(${url}): ${(performance.now() - t0).toFixed(1)}ms, length=${content.length}`,
+        );
       }
 
+      t0 = performance.now();
       const result = await aiClient.analyzeComplete({
         pageContent: {
           url,
@@ -566,6 +577,9 @@ export function ImportExportPage() {
         userCategories: currentCategories,
         existingTags,
       });
+      console.log(
+        `[ImportExport][Perf] analyzeComplete(${url}): ${(performance.now() - t0).toFixed(1)}ms`,
+      );
 
       // 匹配或创建分类
       let categoryId: string | null = null;
@@ -573,23 +587,36 @@ export function ImportExportPage() {
 
       if (result.category) {
         // 先尝试匹配现有分类
+        t0 = performance.now();
         const matchResult = matchCategoryByName(
           result.category,
           currentCategories,
         );
+        const matchTime = performance.now() - t0;
+
         if (matchResult.matched) {
           categoryId = matchResult.categoryId;
+          console.log(
+            `[ImportExport][Perf] matchCategory("${result.category}"): ${matchTime.toFixed(1)}ms -> matched`,
+          );
         } else {
           // 如果没有匹配到，创建新分类
+          t0 = performance.now();
           const createResult = await createAIRecommendedCategory(
             result.category,
             currentCategories,
           );
           categoryId = createResult.categoryId;
           newCategories = createResult.newCategories;
+          console.log(
+            `[ImportExport][Perf] createCategory("${result.category}"): ${(performance.now() - t0).toFixed(1)}ms -> created ${newCategories.length} new`,
+          );
         }
       }
 
+      console.log(
+        `[ImportExport][Perf] analyzeBookmarkWithAI total(${url}): ${(performance.now() - aiStart).toFixed(1)}ms`,
+      );
       return {
         description: result.summary || "",
         categoryId,
@@ -598,6 +625,9 @@ export function ImportExportPage() {
       };
     } catch (err) {
       console.error("[ImportExport] AI analysis failed:", err);
+      console.log(
+        `[ImportExport][Perf] analyzeBookmarkWithAI FAILED(${url}): ${(performance.now() - aiStart).toFixed(1)}ms`,
+      );
       // 重新抛出，让 runHtmlImportTask 捕获
       throw err;
     }
@@ -762,6 +792,12 @@ export function ImportExportPage() {
   };
 
   const runHtmlImportTask = async (task: HtmlImportTask) => {
+    const taskStart = performance.now();
+    console.log(
+      `[ImportExport][Perf] === Import task started === total: ${task.payload.total}, options:`,
+      task.payload.options,
+    );
+
     const options = task.payload.options;
     const total = task.payload.total;
 
@@ -774,11 +810,24 @@ export function ImportExportPage() {
     const importedBookmarkIds = [...task.progress.importedBookmarkIds];
     let firstAiError: string | null = null;
 
+    let tInit = performance.now();
     let allCategories = await bookmarkStorage.getCategories();
+    console.log(
+      `[ImportExport][Perf] getCategories: ${(performance.now() - tInit).toFixed(1)}ms, count=${allCategories.length}`,
+    );
+
+    tInit = performance.now();
     let existingTags = await bookmarkStorage.getAllTags();
+    console.log(
+      `[ImportExport][Perf] getAllTags: ${(performance.now() - tInit).toFixed(1)}ms, count=${existingTags.length}`,
+    );
 
     // 预加载已有 normalized URL 集合，避免每条书签都调用 getBookmarkByUrl 读取全量数据
+    tInit = performance.now();
     const existingNormalizedUrls = await bookmarkStorage.getExistingUrls();
+    console.log(
+      `[ImportExport][Perf] getExistingUrls: ${(performance.now() - tInit).toFixed(1)}ms, count=${existingNormalizedUrls.size}`,
+    );
 
     if (total > 0) {
       setImportProgress({ current: currentIndex, total });
@@ -810,11 +859,14 @@ export function ImportExportPage() {
     // 使用较大的批次进行批量写入，避免并发 createBookmark 导致写覆盖丢数据
     const BATCH_SIZE = options.enableAIAnalysis ? MAX_IMPORT_CONCURRENCY : 200;
 
+    let batchIndex = 0;
     for (
       let batchStart = currentIndex;
       batchStart < task.payload.bookmarksToImport.length;
       batchStart += BATCH_SIZE
     ) {
+      batchIndex++;
+      const batchLoopStart = performance.now();
       const batch = task.payload.bookmarksToImport.slice(
         batchStart,
         batchStart + BATCH_SIZE,
@@ -837,6 +889,7 @@ export function ImportExportPage() {
       // 确保下一条书签的 AI 分析能感知到已创建的分类，避免并发竞态导致重复
       // 创建失败后 categoryId=null 的问题。
       let preprocessed: PreprocessedBookmark[];
+      const preprocessStart = performance.now();
       if (options.enableAIAnalysis && !options.preserveFolders) {
         preprocessed = [];
         for (const bm of batch) {
@@ -927,6 +980,16 @@ export function ImportExportPage() {
           };
         });
       }
+      const preprocessTime = performance.now() - preprocessStart;
+      const readyCount = preprocessed.filter(
+        (p) => p.status === "ready",
+      ).length;
+      const dupCount = preprocessed.filter(
+        (p) => p.status === "duplicate",
+      ).length;
+      console.log(
+        `[ImportExport][Perf] Batch#${batchIndex} preprocess: ${preprocessTime.toFixed(1)}ms, ready=${readyCount}, duplicate=${dupCount}`,
+      );
 
       // 第二步：收集需要写入的书签，一次性批量创建
       const readyItems = preprocessed.filter((p) => p.status === "ready");
@@ -946,7 +1009,11 @@ export function ImportExportPage() {
         };
       });
 
+      const tWrite = performance.now();
       const created = await bookmarkStorage.createBookmarks(bookmarkInputs);
+      console.log(
+        `[ImportExport][Perf] Batch#${batchIndex} createBookmarks: ${(performance.now() - tWrite).toFixed(1)}ms, input=${bookmarkInputs.length}, created=${created.length}`,
+      );
 
       // 第三步：统计结果
       const knownCategoryIds = new Set(allCategories.map((c) => c.id));
@@ -985,7 +1052,14 @@ export function ImportExportPage() {
       currentIndex = batchStart + batch.length;
       setImportProgress({ current: currentIndex, total });
 
+      const tPersist = performance.now();
       await persistProgress();
+      console.log(
+        `[ImportExport][Perf] Batch#${batchIndex} persistProgress: ${(performance.now() - tPersist).toFixed(1)}ms`,
+      );
+      console.log(
+        `[ImportExport][Perf] Batch#${batchIndex} total: ${(performance.now() - batchLoopStart).toFixed(1)}ms`,
+      );
     }
 
     setImportProgress(null);
@@ -993,14 +1067,25 @@ export function ImportExportPage() {
     // 批量添加 embedding 任务（在 background 中执行）
     if (importedBookmarkIds.length > 0) {
       try {
+        const tEmbed = performance.now();
         const bgService = getBackgroundService();
         await bgService.queueBookmarksEmbedding(importedBookmarkIds);
+        console.log(
+          `[ImportExport][Perf] queueBookmarksEmbedding: ${(performance.now() - tEmbed).toFixed(1)}ms, count=${importedBookmarkIds.length}`,
+        );
       } catch (e) {
         console.warn("[ImportExport] Failed to queue embeddings:", e);
       }
     }
 
+    const tClear = performance.now();
     await importTaskStorage.clearHtmlTask();
+    console.log(
+      `[ImportExport][Perf] clearHtmlTask: ${(performance.now() - tClear).toFixed(1)}ms`,
+    );
+    console.log(
+      `[ImportExport][Perf] === Import task completed === total time: ${(performance.now() - taskStart).toFixed(1)}ms, imported=${imported}, skipped=${skipped}, duplicateSkipped=${duplicateSkipped}`,
+    );
 
     setImportResult({
       success: true,
