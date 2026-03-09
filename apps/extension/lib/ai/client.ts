@@ -1,15 +1,20 @@
 /**
  * 插件 AI 客户端封装
  * 从本地配置加载 AI 设置，提供统一的 AI 分析接口
- * 基于 @hamhome/ai 包（使用 Vercel AI SDK）
+ * 基于 @hamhome/ai 包（使用 LangChain）
  *
  * 优化：参考 SmartBookmark 的实现
  * - 传递完整的页面元数据给 AI
  * - 一次调用同时获取标题、摘要、分类、标签
  * - 提供上下文（已有标签和分类）提高推荐准确性
  */
-import { createExtendedAIClient, getDefaultModel } from "@hamhome/ai";
-import type { AnalyzeBookmarkInput, GeneratedCategory } from "@hamhome/ai";
+import { createBookmarkAnalysisFallback } from "@hamhome/ai/fallback";
+import { getDefaultModel } from "@hamhome/ai/providers";
+import type {
+  AnalyzeBookmarkInput,
+  ExtendedAIClient,
+  GeneratedCategory,
+} from "@hamhome/ai";
 import { configStorage } from "@/lib/storage";
 import type {
   AIConfig,
@@ -25,8 +30,6 @@ import {
   buildCategoryTree,
 } from "@/lib/preset-categories";
 
-type ExtendedAIClient = ReturnType<typeof createExtendedAIClient>;
-
 /**
  * 增强的分析输入（包含页面完整信息）
  */
@@ -39,6 +42,7 @@ export interface EnhancedAnalyzeInput {
 class ExtensionAIClient {
   private config: AIConfig | null = null;
   private client: ExtendedAIClient | null = null;
+  private clientPromise: Promise<ExtendedAIClient> | null = null;
 
   /**
    * 加载配置
@@ -67,20 +71,34 @@ class ExtensionAIClient {
   /**
    * 获取或创建客户端
    */
-  private getOrCreateClient(): ExtendedAIClient {
-    if (!this.client && this.config) {
-      this.client = createExtendedAIClient({
-        provider: this.config.provider,
-        apiKey: this.config.apiKey,
-        baseUrl: this.config.baseUrl,
-        model: this.config.model || getDefaultModel(this.config.provider),
-        temperature: this.config.temperature,
-        maxTokens: this.config.maxTokens,
-        debug: true,
-        language: this.config.language,
-      });
+  private async getOrCreateClient(): Promise<ExtendedAIClient> {
+    if (this.client) {
+      return this.client;
     }
-    return this.client!;
+
+    if (!this.clientPromise && this.config) {
+      const config = this.config;
+      this.clientPromise = import("@hamhome/ai/clients")
+        .then(({ createExtendedAIClient }) =>
+          createExtendedAIClient({
+            provider: config.provider,
+            apiKey: config.apiKey,
+            baseUrl: config.baseUrl,
+            model: config.model || getDefaultModel(config.provider),
+            temperature: config.temperature,
+            maxTokens: config.maxTokens,
+            debug: true,
+            language: config.language,
+          }),
+        )
+        .catch((error) => {
+          this.clientPromise = null;
+          throw error;
+        });
+    }
+
+    this.client = await this.clientPromise!;
+    return this.client;
   }
 
   /**
@@ -98,7 +116,7 @@ class ExtensionAIClient {
     }
 
     try {
-      const client = this.getOrCreateClient();
+      const client = await this.getOrCreateClient();
 
       console.log("this.config?.presetTags", this.config?.presetTags);
 
@@ -149,69 +167,23 @@ class ExtensionAIClient {
    * AI 失败时的降级策略
    */
   private getFallbackResult(pageContent: PageContent): AnalysisResult {
-    const tags: string[] = [];
-    const stopWords = new Set([
-      "的",
-      "了",
-      "和",
-      "与",
-      "或",
-      "在",
-      "是",
-      "到",
-      "the",
-      "a",
-      "an",
-      "and",
-      "or",
-      "in",
-      "on",
-      "at",
-      "to",
-      "for",
-      "of",
-      "with",
-    ]);
-
-    // 1. 尝试从 keywords 提取
-    if (pageContent.metadata?.keywords) {
-      const keywordTags = pageContent.metadata.keywords
-        .split(/[,，;；]/)
-        .map((t) => t.trim())
-        .filter(
-          (t) =>
-            t.length >= 1 && t.length <= 20 && !stopWords.has(t.toLowerCase()),
-        )
-        .slice(0, 3);
-      tags.push(...keywordTags);
-    }
-
-    // 2. 从标题提取关键词
-    if (tags.length < 3 && pageContent.title) {
-      const titleWords = pageContent.title
-        .split(/[\s\-\_\,\.\。\，\|\:：]+/)
-        .map((w) => w.trim())
-        .filter(
-          (w) =>
-            w.length >= 2 && w.length <= 20 && !stopWords.has(w.toLowerCase()),
-        );
-      tags.push(...titleWords.slice(0, 3 - tags.length));
-    }
-
-    // 3. 从 URL 提取域名相关信息
-    try {
-      const url = new URL(pageContent.url);
-      const domain = url.hostname.replace("www.", "").split(".")[0];
-      if (domain && domain.length >= 2 && !tags.includes(domain)) {
-        tags.push(domain);
-      }
-    } catch {}
+    const fallbackResult = createBookmarkAnalysisFallback({
+      url: pageContent.url,
+      title: pageContent.title,
+      excerpt: pageContent.excerpt,
+      metadata: pageContent.metadata
+        ? {
+            description: pageContent.metadata.description,
+            keywords: pageContent.metadata.keywords,
+            author: pageContent.metadata.author,
+            siteName: pageContent.metadata.siteName,
+          }
+        : undefined,
+    });
 
     return {
-      title: pageContent.title || "未命名书签",
-      summary: pageContent.excerpt || pageContent.metadata?.description || "",
-      category: "", // 留空，让用户选择
-      tags: [...new Set(tags)].slice(0, 5),
+      ...fallbackResult,
+      category: "",
     };
   }
 
@@ -232,7 +204,7 @@ class ExtensionAIClient {
     }
 
     try {
-      const client = this.getOrCreateClient();
+      const client = await this.getOrCreateClient();
       // 使用 generateRaw 测试，它会在失败时抛出错误（不像 analyzeBookmark 有 fallback）
       await client.generateRaw("Reply with 'ok'");
       return { success: true, message: "连接成功" };
@@ -258,7 +230,7 @@ class ExtensionAIClient {
     }
 
     try {
-      const client = this.getOrCreateClient();
+      const client = await this.getOrCreateClient();
       return await client.translate(text, targetLang);
     } catch (error) {
       console.error("[ExtensionAIClient] Translation failed:", error);
@@ -267,112 +239,12 @@ class ExtensionAIClient {
   }
 
   /**
-   * 基于规则的标签推荐（备用方案）
-   */
-  private getRuleBasedTagSuggestions(input: {
-    url: string;
-    title: string;
-    content: string;
-    existingTags: string[];
-  }): TagSuggestion[] {
-    const suggestions: TagSuggestion[] = [];
-    const text = `${input.url} ${input.title} ${input.content}`.toLowerCase();
-
-    // 根据 URL 域名推荐
-    const domainTags: Record<string, string[]> = {
-      "github.com": ["开发", "代码", "GitHub"],
-      "stackoverflow.com": ["开发", "问答", "技术"],
-      "medium.com": ["文章", "博客"],
-      "youtube.com": ["视频"],
-      "bilibili.com": ["视频", "B站"],
-      "twitter.com": ["社交", "Twitter"],
-      "reddit.com": ["社交", "Reddit"],
-    };
-
-    for (const [domain, tags] of Object.entries(domainTags)) {
-      if (text.includes(domain)) {
-        tags.forEach((tag) => {
-          if (!input.existingTags.includes(tag)) {
-            suggestions.push({
-              tag,
-              confidence: 0.7,
-              reason: `来自 ${domain}`,
-            });
-          }
-        });
-      }
-    }
-
-    // 根据关键词推荐
-    const keywordTags: Record<string, string> = {
-      tutorial: "教程",
-      guide: "指南",
-      documentation: "文档",
-      api: "API",
-      react: "React",
-      vue: "Vue",
-      javascript: "JavaScript",
-      python: "Python",
-      design: "设计",
-      ai: "AI",
-    };
-
-    for (const [keyword, tag] of Object.entries(keywordTags)) {
-      if (text.includes(keyword) && !input.existingTags.includes(tag)) {
-        suggestions.push({
-          tag,
-          confidence: 0.6,
-          reason: `包含关键词: ${keyword}`,
-        });
-      }
-    }
-
-    return suggestions.slice(0, 5);
-  }
-
-  /**
-   * 基于规则的分类推荐（备用方案）
-   */
-  private getRuleBasedCategorySuggestions(
-    text: string,
-    userCategories: LocalCategory[],
-  ): CategorySuggestion[] {
-    const suggestions: CategorySuggestion[] = [];
-
-    // 先尝试匹配用户已有分类
-    for (const category of userCategories) {
-      if (text.includes(category.name.toLowerCase())) {
-        suggestions.push({
-          categoryId: category.id,
-          categoryName: category.name,
-          confidence: 0.8,
-          reason: "内容包含分类名称",
-        });
-      }
-    }
-
-    // 如果没有匹配到用户分类，使用预设分类匹配
-    if (suggestions.length === 0) {
-      const matches = matchCategories(text, 0.2);
-      suggestions.push(
-        ...matches.slice(0, 3).map((m) => ({
-          categoryId: m.category.id,
-          categoryName: m.category.name,
-          confidence: m.confidence,
-          reason: "基于内容关键词匹配",
-        })),
-      );
-    }
-
-    return suggestions;
-  }
-
-  /**
    * 重置客户端（配置更新后调用）
    */
   reset(): void {
     this.config = null;
     this.client = null;
+    this.clientPromise = null;
   }
 
   /**
@@ -388,7 +260,7 @@ class ExtensionAIClient {
     }
 
     try {
-      const client = this.getOrCreateClient();
+      const client = await this.getOrCreateClient();
       return await client.generateCategories(description);
     } catch (error) {
       console.error("[ExtensionAIClient] Category generation failed:", error);

@@ -138,6 +138,7 @@ export type CategorySuggestionResult = z.infer<typeof CategorySuggestionSchema>;
  */
 export const GeneratedCategorySchema: z.ZodType<any> = z.object({
   name: z.string().min(2).max(20).describe("分类名称，2-8个字"),
+  icon: z.string().max(4).optional().describe("分类图标，使用1个emoji表情符号，例如：📚、💻"),
   children: z
     .lazy(() => z.array(GeneratedCategorySchema))
     .optional()
@@ -155,5 +156,6 @@ export const GeneratedCategoriesSchema = z.object({
 
 export interface GeneratedCategory {
   name: string;
+  icon?: string;
   children?: GeneratedCategory[];
 }

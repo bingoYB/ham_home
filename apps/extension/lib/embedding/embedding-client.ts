@@ -3,11 +3,10 @@
  * 基于 @hamhome/ai 包的 embedding 能力
  */
 import {
-  createEmbeddingClient as createClient,
-  isEmbeddingSupported as checkSupported,
   getDefaultEmbeddingModel,
   getEmbeddingModelKey,
-} from '@hamhome/ai';
+  isEmbeddingSupported as checkSupported,
+} from '@hamhome/ai/providers';
 import type { EmbeddingClient, EmbeddingClientConfig } from '@hamhome/ai';
 import type { EmbeddingConfig } from '@/types';
 import { configStorage } from '@/lib/storage';
@@ -42,6 +41,7 @@ export class EmbeddingRateLimitError extends Error {
 class ExtensionEmbeddingClient {
   private config: EmbeddingConfig | null = null;
   private client: EmbeddingClient | null = null;
+  private clientPromise: Promise<EmbeddingClient> | null = null;
 
   /**
    * 加载配置
@@ -49,6 +49,7 @@ class ExtensionEmbeddingClient {
   async loadConfig(): Promise<EmbeddingConfig> {
     this.config = await configStorage.getEmbeddingConfig();
     this.client = null; // 重置客户端
+    this.clientPromise = null;
     return this.config;
   }
 
@@ -84,8 +85,12 @@ class ExtensionEmbeddingClient {
   /**
    * 获取或创建客户端
    */
-  private getOrCreateClient(): EmbeddingClient {
-    if (!this.client && this.config) {
+  private async getOrCreateClient(): Promise<EmbeddingClient> {
+    if (this.client) {
+      return this.client;
+    }
+
+    if (!this.clientPromise && this.config) {
       const clientConfig: EmbeddingClientConfig = {
         provider: this.config.provider,
         apiKey: this.config.apiKey,
@@ -93,9 +98,17 @@ class ExtensionEmbeddingClient {
         model: this.config.model || getDefaultEmbeddingModel(this.config.provider),
         dimensions: this.config.dimensions,
       };
-      this.client = createClient(clientConfig);
+
+      this.clientPromise = import('@hamhome/ai/embeddings')
+        .then(({ createEmbeddingClient }) => createEmbeddingClient(clientConfig))
+        .catch((error) => {
+          this.clientPromise = null;
+          throw error;
+        });
     }
-    return this.client!;
+
+    this.client = await this.clientPromise!;
+    return this.client;
   }
 
   /**
@@ -127,7 +140,7 @@ class ExtensionEmbeddingClient {
     }
 
     try {
-      const client = this.getOrCreateClient();
+      const client = await this.getOrCreateClient();
       const result = await client.embed(text);
       return result.embedding;
     } catch (error) {
@@ -156,7 +169,7 @@ class ExtensionEmbeddingClient {
     }
 
     try {
-      const client = this.getOrCreateClient();
+      const client = await this.getOrCreateClient();
       const result = await client.embedMany(texts);
       return result.embeddings;
     } catch (error) {
@@ -185,7 +198,7 @@ class ExtensionEmbeddingClient {
     }
 
     try {
-      const client = this.getOrCreateClient();
+      const client = await this.getOrCreateClient();
       return await client.testConnection();
     } catch (error) {
       return {
