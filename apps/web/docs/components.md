@@ -61,7 +61,7 @@ app/components/
 
 ## Footer
 
-页脚组件，显示品牌标语。
+页脚组件，显示品牌标语，并提供首页、隐私权政策和 GitHub 入口。
 
 ### Props
 
@@ -74,6 +74,13 @@ app/components/
 ```tsx
 <Footer isEn={isEn} />
 ```
+
+### 行为说明
+
+- 始终显示品牌标语
+- 提供首页链接 `/`
+- 提供隐私权政策链接 `/privacy-policy`
+- 提供 GitHub 外链入口
 
 ---
 
