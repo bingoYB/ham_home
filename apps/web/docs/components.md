@@ -6,6 +6,7 @@
 app/components/
 ├── Header.tsx          # 导航栏组件
 ├── Footer.tsx          # 页脚组件
+├── PrivacyPolicyContent.tsx # 隐私权政策内容组件
 ├── FeatureShowcase.tsx # 功能展示区 (Tab 切换)
 ├── index.ts            # 导出入口
 └── demos/              # Demo 展示组件
@@ -119,6 +120,30 @@ app/components/
 5. **导入导出** - ImportExportDemo
 
 > AI 对话搜索不再单独占用 Tab，已集成到 **书签面板** 和 **书签管理** 两个演示中。
+
+---
+
+## PrivacyPolicyContent
+
+隐私权政策页面内容组件，根据当前语言偏好只显示中文或英文版本。
+
+### Props
+
+无
+
+### Usage
+
+```tsx
+<PrivacyPolicyContent />
+```
+
+### 行为说明
+
+- 复用站点语言偏好逻辑，优先读取本地语言设置，否则根据浏览器语言判断
+- 复用首页顶部导航，支持主题切换、语言切换、下载入口和 GitHub 入口
+- 页面只展示当前语言对应的隐私政策内容
+- 渲染返回首页入口、最后更新时间和 GitHub 外链
+- 页脚语言与当前页面语言保持一致
 
 ---
 

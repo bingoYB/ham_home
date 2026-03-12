@@ -1,6 +1,5 @@
 'use client';
 
-import { useState, useEffect } from 'react';
 import { Button, cn } from '@hamhome/ui';
 import { Github, Star } from 'lucide-react';
 import { Header } from './components/Header';
@@ -17,119 +16,12 @@ import {
   mockPageContentEn,
   mockAllTagsEn,
 } from '@/data/mock-bookmarks';
+import { useWebPreferences } from '@/app/hooks/useWebPreferences';
 
 const GITHUB_REPO_URL = 'https://github.com/bingoYB/ham_home';
-const LANGUAGE_STORAGE_KEY = 'hamhome.web.language';
-
-type SupportedLanguage = 'zh' | 'en';
-
-function resolveInitialLanguage(): SupportedLanguage {
-  if (typeof window === 'undefined') {
-    return 'zh';
-  }
-
-  try {
-    const storedLanguage = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
-    if (storedLanguage === 'zh' || storedLanguage === 'en') {
-      return storedLanguage;
-    }
-  } catch {
-    // Ignore storage access errors and fallback to browser language.
-  }
-
-  const browserLanguages = navigator.languages?.length
-    ? navigator.languages
-    : [navigator.language];
-  const prefersEnglish = browserLanguages.some((lang) =>
-    lang?.toLowerCase().startsWith('en')
-  );
-
-  return prefersEnglish ? 'en' : 'zh';
-}
-
-function persistLanguagePreference(language: SupportedLanguage) {
-  try {
-    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, language);
-  } catch {
-    // Ignore storage access errors.
-  }
-}
 
 export default function HomePage() {
-  const [isDark, setIsDark] = useState(false);
-  const [language, setLanguage] = useState<SupportedLanguage>('zh');
-  const [isLanguageReady, setIsLanguageReady] = useState(false);
-  const isEn = language === 'en';
-
-  // 初始化主题
-  useEffect(() => {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    setIsDark(prefersDark);
-    if (prefersDark) {
-      document.documentElement.classList.add('dark');
-    }
-  }, []);
-
-  // 初始化语言（优先本地缓存，否则根据浏览器语言自动适配）
-  useEffect(() => {
-    const initialLanguage = resolveInitialLanguage();
-    setLanguage(initialLanguage);
-    setIsLanguageReady(true);
-  }, []);
-
-  // 语言持久化 + 同步 html lang
-  useEffect(() => {
-    if (!isLanguageReady) {
-      return;
-    }
-
-    persistLanguagePreference(language);
-    document.documentElement.lang = language === 'en' ? 'en' : 'zh-CN';
-  }, [language, isLanguageReady]);
-
-  // 切换主题（带动画效果）
-  const toggleTheme = (e?: React.MouseEvent) => {
-    const newIsDark = !isDark;
-    const root = document.documentElement;
-
-    // 如果不支持 View Transitions API，直接切换
-    if (!document.startViewTransition) {
-      setIsDark(newIsDark);
-      root.classList.toggle('dark', newIsDark);
-      return;
-    }
-
-    // 计算圆形动画的最大半径（从点击点到最远角落的距离）
-    const clickX = e?.clientX ?? window.innerWidth / 2;
-    const clickY = e?.clientY ?? window.innerHeight / 2;
-    const maxRadius = Math.hypot(
-      Math.max(clickX, window.innerWidth - clickX),
-      Math.max(clickY, window.innerHeight - clickY)
-    );
-
-    // 设置 CSS 变量用于动画
-    root.style.setProperty('--theme-transition-x', `${clickX}px`);
-    root.style.setProperty('--theme-transition-y', `${clickY}px`);
-    root.style.setProperty('--theme-transition-radius', `${maxRadius}px`);
-
-    // 使用 View Transitions API
-    const transition = document.startViewTransition(() => {
-      setIsDark(newIsDark);
-      root.classList.toggle('dark', newIsDark);
-    });
-
-    // 等待动画完成后清理 CSS 变量
-    transition.finished.then(() => {
-      root.style.removeProperty('--theme-transition-x');
-      root.style.removeProperty('--theme-transition-y');
-      root.style.removeProperty('--theme-transition-radius');
-    });
-  };
-
-  // 切换语言
-  const toggleLanguage = () => {
-    setLanguage((prev) => (prev === 'en' ? 'zh' : 'en'));
-  };
+  const { isDark, isEn, toggleTheme, toggleLanguage } = useWebPreferences();
 
   // 根据语言选择数据
   const bookmarks = isEn ? mockBookmarksEn : mockBookmarks;
