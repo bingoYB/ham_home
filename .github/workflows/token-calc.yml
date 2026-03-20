@@ -1,4 +1,7 @@
-name: Deploy Next.js site to Pages
+name: Token Calculation
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 on:
   # Runs on pushes targeting the default branch
