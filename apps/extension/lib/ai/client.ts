@@ -9,7 +9,11 @@
  * - 提供上下文（已有标签和分类）提高推荐准确性
  */
 import { createBookmarkAnalysisFallback } from "@hamhome/ai/fallback";
-import { getDefaultModel } from "@hamhome/ai/providers";
+import {
+  getDefaultModel,
+  PROVIDER_DEFAULTS,
+  requiresApiKey,
+} from "@hamhome/ai/providers";
 import type {
   AnalyzeBookmarkInput,
   ExtendedAIClient,
@@ -39,6 +43,11 @@ export interface EnhancedAnalyzeInput {
   existingTags?: string[]; // 用户已有的标签（避免生成语义相近的重复标签）
 }
 
+export interface AvailableModelsResult {
+  models: string[];
+  endpoint: string;
+}
+
 class ExtensionAIClient {
   private config: AIConfig | null = null;
   private client: ExtendedAIClient | null = null;
@@ -52,6 +61,142 @@ class ExtensionAIClient {
     const settings = await configStorage.getSettings();
     this.config.language = settings.language;
     return this.config;
+  }
+
+  private async getResolvedConfig(
+    configOverride?: Partial<AIConfig>,
+  ): Promise<AIConfig> {
+    const baseConfig = this.config ?? (await this.loadConfig());
+
+    return {
+      ...baseConfig,
+      ...configOverride,
+    };
+  }
+
+  private resolveModelsEndpoint(config: AIConfig): string {
+    const baseUrl =
+      config.baseUrl?.trim() || PROVIDER_DEFAULTS[config.provider]?.baseUrl;
+
+    if (!baseUrl) {
+      throw new Error("请先配置 Base URL");
+    }
+
+    const normalizedBaseUrl = baseUrl.replace(/\/+$/, "");
+
+    if (config.provider === "anthropic") {
+      return normalizedBaseUrl.endsWith("/v1")
+        ? `${normalizedBaseUrl}/models`
+        : `${normalizedBaseUrl}/v1/models`;
+    }
+
+    return normalizedBaseUrl.endsWith("/models")
+      ? normalizedBaseUrl
+      : `${normalizedBaseUrl}/models`;
+  }
+
+  private getModelsRequestHeaders(config: AIConfig): HeadersInit {
+    const headers: HeadersInit = {
+      Accept: "application/json",
+    };
+
+    if (config.provider === "anthropic") {
+      if (!config.apiKey) {
+        throw new Error("请先配置 API Key");
+      }
+
+      headers["x-api-key"] = config.apiKey;
+      headers["anthropic-version"] = "2023-06-01";
+      return headers;
+    }
+
+    if (requiresApiKey(config.provider) && !config.apiKey) {
+      throw new Error("请先配置 API Key");
+    }
+
+    if (config.apiKey) {
+      headers.Authorization = `Bearer ${config.apiKey}`;
+    }
+
+    return headers;
+  }
+
+  private extractModelIds(payload: unknown): string[] {
+    const getModelId = (item: unknown): string | null => {
+      if (typeof item === "string") {
+        return item;
+      }
+
+      if (!item || typeof item !== "object") {
+        return null;
+      }
+
+      const model = item as Record<string, unknown>;
+      const candidate =
+        typeof model.id === "string"
+          ? model.id
+          : typeof model.name === "string"
+            ? model.name
+            : typeof model.model === "string"
+              ? model.model
+              : null;
+
+      return candidate?.trim() || null;
+    };
+
+    if (!payload || typeof payload !== "object") {
+      return [];
+    }
+
+    const response = payload as Record<string, unknown>;
+    const list = Array.isArray(response.data)
+      ? response.data
+      : Array.isArray(response.models)
+        ? response.models
+        : [];
+
+    return [...new Set(list.map(getModelId).filter((item): item is string => !!item))];
+  }
+
+  async listAvailableModels(
+    configOverride?: Partial<AIConfig>,
+  ): Promise<AvailableModelsResult> {
+    const config = await this.getResolvedConfig(configOverride);
+    const endpoint = this.resolveModelsEndpoint(config);
+    const headers = this.getModelsRequestHeaders(config);
+
+    const response = await fetch(endpoint, {
+      method: "GET",
+      headers,
+    });
+
+    if (!response.ok) {
+      let message = `请求失败 (${response.status})`;
+
+      try {
+        const errorBody = (await response.json()) as
+          | { error?: { message?: string }; message?: string }
+          | undefined;
+        message =
+          errorBody?.error?.message ||
+          errorBody?.message ||
+          response.statusText ||
+          message;
+      } catch {
+        message = response.statusText || message;
+      }
+
+      throw new Error(message);
+    }
+
+    const payload = (await response.json()) as unknown;
+    const models = this.extractModelIds(payload);
+
+    if (!models.length) {
+      throw new Error("未从 /models 返回可用模型");
+    }
+
+    return { models, endpoint };
   }
 
   /**

@@ -32,7 +32,7 @@ export default defineConfig({
   dev: {
     server: {
       // 固定开发服务器运行的端口，防止与本地存在的其他项目自增冲突
-      port: 3123,
+      port: 3124,
     },
   },
 
@@ -49,20 +49,24 @@ export default defineConfig({
     version: "1.1.4",
 
     // 声明扩展所需要的浏览器 API 权限
+    // 下面的注释同时对应 Chrome Web Store 提交时可填写的权限用途说明
     permissions: [
-      "storage",           // 读写本地/同步存储，用于保存用户配置
-      "unlimitedStorage",  // 解除存储容量限制，通常配合存储大量数据使用（例如离线快照或大型数据结构等）
-      "activeTab",         // 临时获取当前激活标签页的权限和执行脚本的能力
-      "scripting",         // 允许动态向网页注入内容脚本或 CSS
-      "downloads",         // 用于管理文件下载导出
-      "contextMenus",      // 允许向浏览器右键菜单添加自定义选项
-      "bookmarks",         // 提供读取、修改系统书签的权限
-      "alarms",            // 提供定时任务运行能力，例如定期进行后台同步任务
-      "favicon",           // 允许通过 _favicon API 获取网站安全、无报错的回退图标
+      "storage",           // 保存用户书签数据、分类、标签、设置、AI 配置等本地/同步数据
+      "unlimitedStorage",  // 本地保存网页快照、页面内容和向量索引，避免数据量增大后触发默认存储配额限制
+      "activeTab",         // 仅在用户主动操作当前标签页时，读取当前页面信息并执行保存、快照、面板切换等操作
+      "scripting",         // 在当前活动页面按需执行脚本，用于提取页面 HTML/正文内容，保存书签快照或分析页面内容
+      // "downloads",         // 当前代码未直接调用 browser.downloads API；若仅通过 <a download> 导出文件，可考虑移除此权限
+      "contextMenus",      // 在网页右键菜单中提供“收藏到 HamHome”入口，方便用户快速保存当前页面或链接
+      "bookmarks",         // 读取浏览器原生书签树，用于导入用户已有书签到 HamHome
+      "alarms",            // 创建后台定时任务，定期执行 WebDAV 同步，并在本地书签变更后延迟触发同步
+      "favicon",           // 使用 Chromium 的 _favicon 能力为书签获取站点图标，并在失败时安全回退
     ],
 
-    // 声明扩展在哪些域名下可以无缝跨域发起请求或读取状态
-    // <all_urls> 表示由于需要分析或管理任意网页的书签数据，所以允许匹配所有网址
+    // 声明扩展在哪些域名下可运行内容脚本/访问页面
+    // <all_urls> 的原因：
+    // 1. 用户可能在任意网页上触发“保存到 HamHome”
+    // 2. 需要在当前网页提取标题、正文、元信息、HTML 快照
+    // 3. 书签侧边面板需要在任意网页中注入显示
     host_permissions: ["<all_urls>"],
 
     // 定义扩展的全局/页面级的快捷键
@@ -108,4 +112,3 @@ export default defineConfig({
     }),
   }),
 });
-

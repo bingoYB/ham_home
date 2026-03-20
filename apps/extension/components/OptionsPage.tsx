@@ -56,9 +56,12 @@ import {
   PopoverContent,
   PopoverTrigger,
   Command,
+  CommandEmpty,
   CommandGroup,
+  CommandInput,
   CommandItem,
   CommandList,
+  CommandSeparator,
   cn,
 } from "@hamhome/ui";
 import { useBookmarks } from "@/contexts/BookmarkContext";
@@ -184,6 +187,12 @@ export function OptionsPage() {
   const [localBaseUrl, setLocalBaseUrl] = useState("");
   const [localModel, setLocalModel] = useState("");
   const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
+  const [remoteModels, setRemoteModels] = useState<string[]>([]);
+  const [isFetchingModels, setIsFetchingModels] = useState(false);
+  const [modelFetchResult, setModelFetchResult] = useState<{
+    status: "success" | "error";
+    message: string;
+  } | null>(null);
 
   // Embedding 配置状态
   const [embeddingConfig, setEmbeddingConfig] = useState<EmbeddingConfig>({
@@ -236,6 +245,11 @@ export function OptionsPage() {
     setLocalBaseUrl(aiConfig.baseUrl || "");
     setLocalModel(aiConfig.model || "");
   }, [aiConfig.apiKey, aiConfig.baseUrl, aiConfig.model]);
+
+  useEffect(() => {
+    setRemoteModels([]);
+    setModelFetchResult(null);
+  }, [aiConfig.provider, localApiKey, localBaseUrl]);
 
   // 同步 WebDAVConfig 到本地状态
   useEffect(() => {
@@ -370,6 +384,65 @@ export function OptionsPage() {
       setIsTesting(false);
     }
   };
+
+  const handleFetchModels = async () => {
+    setIsFetchingModels(true);
+    setModelFetchResult(null);
+    setModelSelectorOpen(true);
+
+    try {
+      const result = await aiClient.listAvailableModels({
+        provider: aiConfig.provider,
+        apiKey: localApiKey.trim(),
+        baseUrl: localBaseUrl.trim(),
+      });
+
+      setRemoteModels(result.models);
+      setModelFetchResult({
+        status: "success",
+        message: t("settings:settings.ai.fetchModelsSuccess", {
+          count: result.models.length,
+        }),
+      });
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : t("common:common.error");
+
+      setRemoteModels([]);
+      setModelFetchResult({
+        status: "error",
+        message: t("settings:settings.ai.fetchModelsFailed", {
+          error: message,
+        }),
+      });
+    } finally {
+      setIsFetchingModels(false);
+    }
+  };
+
+  const recommendedModels = getProviderModels(aiConfig.provider).filter(
+    (model) => !remoteModels.includes(model),
+  );
+
+  const renderModelOption = (model: string) => (
+    <CommandItem
+      key={model}
+      value={model}
+      onSelect={(value) => {
+        setLocalModel(value);
+        updateAIConfig({ model: value });
+        setModelSelectorOpen(false);
+      }}
+    >
+      <Check
+        className={cn(
+          "mr-2 h-4 w-4",
+          localModel === model ? "opacity-100" : "opacity-0",
+        )}
+      />
+      {model}
+    </CommandItem>
+  );
 
   const handleClearData = async () => {
     setShowClearDialog(false);
@@ -758,9 +831,30 @@ export function OptionsPage() {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="model" onClick={(e) => e.preventDefault()}>
-                  {t("settings:settings.ai.model")}
-                </Label>
+                <div className="flex items-center justify-between gap-3">
+                  <Label htmlFor="model" onClick={(e) => e.preventDefault()}>
+                    {t("settings:settings.ai.model")}
+                  </Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={handleFetchModels}
+                    disabled={isFetchingModels}
+                  >
+                    {isFetchingModels ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        {t("settings:settings.ai.fetchingModels")}
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="mr-2 h-4 w-4" />
+                        {t("settings:settings.ai.fetchModels")}
+                      </>
+                    )}
+                  </Button>
+                </div>
                 <Popover
                   open={modelSelectorOpen}
                   onOpenChange={setModelSelectorOpen}
@@ -789,34 +883,57 @@ export function OptionsPage() {
                     onOpenAutoFocus={(e) => e.preventDefault()}
                   >
                     <Command>
+                      <CommandInput
+                        placeholder={t(
+                          "settings:settings.ai.searchModelsPlaceholder",
+                        )}
+                      />
                       <CommandList>
-                        <CommandGroup>
-                          {getProviderModels(aiConfig.provider).map((model) => (
-                            <CommandItem
-                              key={model}
-                              value={model}
-                              onSelect={(value) => {
-                                setLocalModel(value);
-                                updateAIConfig({ model: value });
-                                setModelSelectorOpen(false);
-                              }}
-                            >
-                              <Check
-                                className={cn(
-                                  "mr-2 h-4 w-4",
-                                  localModel === model
-                                    ? "opacity-100"
-                                    : "opacity-0",
-                                )}
-                              />
-                              {model}
+                        <CommandEmpty>
+                          {t("settings:settings.ai.modelListEmpty")}
+                        </CommandEmpty>
+                        {isFetchingModels && (
+                          <CommandGroup>
+                            <CommandItem disabled>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              {t("settings:settings.ai.fetchingModels")}
                             </CommandItem>
-                          ))}
-                        </CommandGroup>
+                          </CommandGroup>
+                        )}
+                        {remoteModels.length > 0 && (
+                          <CommandGroup
+                            heading={t("settings:settings.ai.remoteModels")}
+                          >
+                            {remoteModels.map(renderModelOption)}
+                          </CommandGroup>
+                        )}
+                        {remoteModels.length > 0 &&
+                          recommendedModels.length > 0 && <CommandSeparator />}
+                        {recommendedModels.length > 0 && (
+                          <CommandGroup
+                            heading={t(
+                              "settings:settings.ai.recommendedModels",
+                            )}
+                          >
+                            {recommendedModels.map(renderModelOption)}
+                          </CommandGroup>
+                        )}
                       </CommandList>
                     </Command>
                   </PopoverContent>
                 </Popover>
+                {modelFetchResult && (
+                  <p
+                    className={cn(
+                      "text-xs",
+                      modelFetchResult.status === "success"
+                        ? "text-muted-foreground"
+                        : "text-destructive",
+                    )}
+                  >
+                    {modelFetchResult.message}
+                  </p>
+                )}
               </div>
 
               {/* 测试连接 */}
