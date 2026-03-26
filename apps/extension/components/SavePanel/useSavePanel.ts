@@ -2,17 +2,19 @@
  * useSavePanel Hook
  * 保存面板的业务逻辑层
  */
-import { useState, useEffect, useCallback } from 'react';
-import { aiClient } from '@/lib/ai/client';
-import { bookmarkStorage, snapshotStorage, configStorage, aiCacheStorage } from '@/lib/storage';
-import { getBackgroundService } from '@/lib/services';
-import type {
-  PageContent,
-  LocalBookmark,
-  LocalCategory,
-} from '@/types';
-import type { AIStatusType } from './AIStatus';
-import { parseCategoryPath } from '../common/CategoryTree';
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { aiClient } from "@/lib/ai/client";
+import {
+  bookmarkStorage,
+  snapshotStorage,
+  configStorage,
+  aiCacheStorage,
+} from "@/lib/storage";
+import { getBackgroundService } from "@/lib/services";
+import { createMarkdownContent } from "defuddle/full";
+import type { PageContent, LocalBookmark, LocalCategory } from "@/types";
+import type { AIStatusType } from "./AIStatus";
+import { parseCategoryPath } from "../common/CategoryTree";
 
 interface UseSavePanelProps {
   pageContent: PageContent;
@@ -60,10 +62,17 @@ export function useSavePanel({
   existingBookmark,
   onSaved,
 }: UseSavePanelProps): UseSavePanelResult {
+  // 将 content.ts 传来的 HTML 正文转为 Markdown
+  // 提升性能，仅在 UI 层按需处理
+  const markdown = useMemo(() => {
+    if (!pageContent.content) return "";
+    return createMarkdownContent(pageContent.htmlContent, pageContent.url);
+  }, [pageContent.content, pageContent.url]);
+
   // 表单状态
   const [url, setUrl] = useState(pageContent.url);
   const [title, setTitle] = useState(pageContent.title);
-  const [description, setDescription] = useState('');
+  const [description, setDescription] = useState("");
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [tags, setTags] = useState<string[]>([]);
 
@@ -73,11 +82,13 @@ export function useSavePanel({
   const [dataLoaded, setDataLoaded] = useState(false);
 
   // AI 状态
-  const [aiStatus, setAIStatus] = useState<AIStatusType>('idle');
+  const [aiStatus, setAIStatus] = useState<AIStatusType>("idle");
   const [aiError, setAIError] = useState<string | null>(null);
 
   // AI 推荐的新分类（不在用户已有分类中）
-  const [aiRecommendedCategory, setAiRecommendedCategory] = useState<string | null>(null);
+  const [aiRecommendedCategory, setAiRecommendedCategory] = useState<
+    string | null
+  >(null);
 
   // 操作状态
   const [saving, setSaving] = useState(false);
@@ -113,7 +124,7 @@ export function useSavePanel({
     if (!dataLoaded) {
       return;
     }
-    if (!existingBookmark && (pageContent.content || pageContent.textContent)) {
+    if (!existingBookmark && (markdown || pageContent.textContent)) {
       runAIAnalysis();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -123,84 +134,91 @@ export function useSavePanel({
    * 执行 AI 分析的公共逻辑
    * @param skipCache 是否跳过缓存检查
    */
-  const performAIAnalysis = useCallback(async (skipCache: boolean = false) => {
-    const config = await configStorage.getAIConfig();
-    const settings = await configStorage.getSettings();
+  const performAIAnalysis = useCallback(
+    async (skipCache: boolean = false) => {
+      const config = await configStorage.getAIConfig();
+      const settings = await configStorage.getSettings();
 
-    // 检查 AI 是否已配置
-    const isAIConfigured = config.provider === 'ollama' 
-      ? !!config.baseUrl 
-      : !!config.apiKey;
-    
-    if (!isAIConfigured) {
-      setAIStatus('disabled');
-      return;
-    }
+      // 检查 AI 是否已配置
+      const isAIConfigured =
+        config.provider === "ollama" ? !!config.baseUrl : !!config.apiKey;
 
-    setAIStatus('loading');
-    setAIError(null);
-
-    try {
-      // 1. 检查缓存（如果未跳过）
-      if (!skipCache) {
-        const cachedResult = await aiCacheStorage.getCachedAnalysis(pageContent.url);
-        if (cachedResult) {
-          console.log('[useSavePanel] Using cached AI analysis result');
-          await applyAnalysisResultWithSetters(
-            cachedResult,
-            config,
-            categories,
-            setTitle,
-            setDescription,
-            setTags,
-            setCategoryId,
-            setAiRecommendedCategory,
-            existingBookmark,
-            settings.language
-          );
-          setAIStatus('success');
-          return;
-        }
-      }
-
-      // 2. 加载配置并检查
-      await aiClient.loadConfig();
-      if (!aiClient.isConfigured()) {
-        setAIStatus('disabled');
+      if (!isAIConfigured) {
+        setAIStatus("disabled");
         return;
       }
 
-      // 3. 执行新的分析（传递已有标签避免生成语义相近的重复标签）
-      const existingTags = await bookmarkStorage.getAllTags();
-      const result = await aiClient.analyzeComplete({
-        pageContent,
-        userCategories: categories,
-        existingTags,
-      });
+      setAIStatus("loading");
+      setAIError(null);
 
-      // 4. 将结果保存到缓存
-      await aiCacheStorage.cacheAnalysis(pageContent, result);
+      try {
+        // 1. 检查缓存（如果未跳过）
+        if (!skipCache) {
+          const cachedResult = await aiCacheStorage.getCachedAnalysis(
+            pageContent.url,
+          );
+          if (cachedResult) {
+            console.log("[useSavePanel] Using cached AI analysis result");
+            await applyAnalysisResultWithSetters(
+              cachedResult,
+              config,
+              categories,
+              setTitle,
+              setDescription,
+              setTags,
+              setCategoryId,
+              setAiRecommendedCategory,
+              existingBookmark,
+              settings.language,
+            );
+            setAIStatus("success");
+            return;
+          }
+        }
 
-      // 5. 应用分析结果
-      await applyAnalysisResultWithSetters(
-        result,
-        config,
-        categories,
-        setTitle,
-        setDescription,
-        setTags,
-        setCategoryId,
-        setAiRecommendedCategory,
-        existingBookmark,
-        settings.language
-      );
+        // 2. 加载配置并检查
+        await aiClient.loadConfig();
+        if (!aiClient.isConfigured()) {
+          setAIStatus("disabled");
+          return;
+        }
 
-      setAIStatus('success');
-    } catch (err: unknown) {
-      setAIStatus('error');
-      setAIError(err instanceof Error ? err.message : '分析失败');
-    }
-  }, [pageContent, categories, existingBookmark]);
+        // 3. 执行新的分析（传递已有标签避免生成语义相近的重复标签）
+        const existingTags = await bookmarkStorage.getAllTags();
+        const result = await aiClient.analyzeComplete({
+          pageContent: { ...pageContent, content: markdown },
+          userCategories: categories,
+          existingTags,
+        });
+
+        // 4. 将结果保存到缓存
+        await aiCacheStorage.cacheAnalysis(
+          { ...pageContent, content: markdown },
+          result,
+        );
+
+        // 5. 应用分析结果
+        await applyAnalysisResultWithSetters(
+          result,
+          config,
+          categories,
+          setTitle,
+          setDescription,
+          setTags,
+          setCategoryId,
+          setAiRecommendedCategory,
+          existingBookmark,
+          settings.language,
+        );
+
+        setAIStatus("success");
+      } catch (err: unknown) {
+        setAIStatus("error");
+        setAIError(err instanceof Error ? err.message : "分析失败");
+      }
+    },
+    [pageContent, categories, existingBookmark],
+  );
 
   /**
    * AI 分析 - 一次调用完成标题、摘要、分类、标签生成
@@ -226,11 +244,11 @@ export function useSavePanel({
    */
   const applyAIRecommendedCategory = useCallback(async () => {
     if (!aiRecommendedCategory) return;
-    
+
     try {
       // 解析层级路径（支持 " > " 分隔符）
       const parts = parseCategoryPath(aiRecommendedCategory);
-      
+
       // 获取最新分类列表
       let allCategories = await bookmarkStorage.getCategories();
       let parentId: string | null = null;
@@ -244,7 +262,9 @@ export function useSavePanel({
 
         // 在当前层级查找是否已存在
         const existing = allCategories.find(
-          (c) => c.name.toLowerCase() === trimmedName.toLowerCase() && c.parentId === parentId
+          (c) =>
+            c.name.toLowerCase() === trimmedName.toLowerCase() &&
+            c.parentId === parentId,
         );
 
         if (existing) {
@@ -252,7 +272,10 @@ export function useSavePanel({
           finalCategory = existing;
         } else {
           // 创建新分类
-          const newCat = await bookmarkStorage.createCategory(trimmedName, parentId);
+          const newCat = await bookmarkStorage.createCategory(
+            trimmedName,
+            parentId,
+          );
           newCategories.push(newCat);
           parentId = newCat.id;
           finalCategory = newCat;
@@ -269,7 +292,10 @@ export function useSavePanel({
         setAiRecommendedCategory(null);
       }
     } catch (err) {
-      console.error('[useSavePanel] Failed to apply AI recommended category:', err);
+      console.error(
+        "[useSavePanel] Failed to apply AI recommended category:",
+        err,
+      );
     }
   }, [aiRecommendedCategory]);
 
@@ -277,7 +303,7 @@ export function useSavePanel({
    * 保存书签
    */
   const save = useCallback(async () => {
-    if (!title.trim() || !url.trim()) return;
+    if (!title?.trim() || !url.trim()) return;
 
     setSaving(true);
 
@@ -288,7 +314,7 @@ export function useSavePanel({
         url: url.trim(),
         title: title.trim(),
         description: description.trim(),
-        content: pageContent.content,
+        content: markdown,
         categoryId,
         tags,
         favicon: pageContent.favicon,
@@ -301,7 +327,7 @@ export function useSavePanel({
         // 更新现有书签
         bookmark = await bookmarkStorage.updateBookmark(
           existingBookmark.id,
-          data
+          data,
         );
       } else {
         // 创建新书签
@@ -309,19 +335,22 @@ export function useSavePanel({
       }
 
       // 自动保存快照
-      if (settings.autoSaveSnapshot && pageContent.content) {
+      // 交由 Background Worker 异步执行，防止当前 UI (Popup) 关闭导致 Promise 死亡而中断保存
+      if (settings.autoSaveSnapshot) {
         try {
-          // 获取页面 HTML (通过 proxy-service)
           const backgroundService = getBackgroundService();
-          const html = await backgroundService.getPageHtml();
-          if (html) {
-            await snapshotStorage.saveSnapshot(bookmark.id, html);
-            await bookmarkStorage.updateBookmark(bookmark.id, {
-              hasSnapshot: true,
-            });
-          }
+          // 如果页面可读并且成功解析出了 markdown，把 markdown 传递给后台直接保存
+          // 否则传递 undefined，后台会自动执行 SingleFile HTML 兜底捕获并保存
+          const snapshotMarkdown = (pageContent.isReaderable && markdown) ? markdown : undefined;
+          
+          backgroundService.saveSnapshotBackground(
+            bookmark.id,
+            snapshotMarkdown
+          ).catch((e) => {
+            console.warn("[useSavePanel] Failed to trigger background snapshot:", e);
+          });
         } catch (e) {
-          console.warn('[useSavePanel] Failed to save snapshot:', e);
+          console.warn("[useSavePanel] Failed to save snapshot asynchronously:", e);
         }
       }
 
@@ -330,13 +359,13 @@ export function useSavePanel({
         const backgroundService = getBackgroundService();
         await backgroundService.queueBookmarkEmbedding(bookmark.id);
       } catch (e) {
-        console.warn('[useSavePanel] Failed to queue embedding:', e);
+        console.warn("[useSavePanel] Failed to queue embedding:", e);
       }
 
       onSaved?.();
     } catch (err: unknown) {
-      console.error('[useSavePanel] Save failed:', err);
-      alert(err instanceof Error ? err.message : '保存失败');
+      console.error("[useSavePanel] Save failed:", err);
+      alert(err instanceof Error ? err.message : "保存失败");
     } finally {
       setSaving(false);
     }
@@ -367,12 +396,12 @@ export function useSavePanel({
     try {
       // 软删除书签
       await bookmarkStorage.deleteBookmark(existingBookmark.id);
-      
+
       // 通知外层组件已删除
       onSaved?.();
     } catch (err: unknown) {
-      console.error('[useSavePanel] Delete failed:', err);
-      alert(err instanceof Error ? err.message : '删除失败');
+      console.error("[useSavePanel] Delete failed:", err);
+      alert(err instanceof Error ? err.message : "删除失败");
     } finally {
       setSaving(false);
     }
@@ -411,17 +440,17 @@ export function useSavePanel({
  */
 function matchCategoryByName(
   categoryName: string,
-  categories: LocalCategory[]
+  categories: LocalCategory[],
 ): { matched: boolean; categoryId: string | null } {
   const searchName = categoryName.toLowerCase();
-  
+
   // 判断是否为叶子节点（没有子分类）
-  const parentIds = new Set(categories.map(c => c.parentId).filter(Boolean));
+  const parentIds = new Set(categories.map((c) => c.parentId).filter(Boolean));
   const isLeaf = (c: LocalCategory) => !parentIds.has(c.id);
-  
+
   // 精确匹配 - 优先叶子节点
   const exactMatches = categories.filter(
-    (c) => c.name.toLowerCase() === searchName
+    (c) => c.name.toLowerCase() === searchName,
   );
   if (exactMatches.length > 0) {
     const leafMatch = exactMatches.find(isLeaf);
@@ -430,8 +459,9 @@ function matchCategoryByName(
 
   // 模糊匹配 - 优先叶子节点
   const fuzzyMatches = categories.filter(
-    (c) => c.name.toLowerCase().includes(searchName) ||
-           searchName.includes(c.name.toLowerCase())
+    (c) =>
+      c.name.toLowerCase().includes(searchName) ||
+      searchName.includes(c.name.toLowerCase()),
   );
   if (fuzzyMatches.length > 0) {
     const leafMatch = fuzzyMatches.find(isLeaf);
@@ -455,7 +485,7 @@ async function applyAnalysisResultWithSetters(
   setCategoryId: React.Dispatch<React.SetStateAction<string | null>>,
   setAiRecommendedCategory: React.Dispatch<React.SetStateAction<string | null>>,
   existingBookmark: any,
-  targetLang: 'zh' | 'en' = 'zh'
+  targetLang: "zh" | "en" = "zh",
 ): Promise<void> {
   // 更新表单（仅非空值）
   if (result.title && !existingBookmark) {
@@ -465,7 +495,10 @@ async function applyAnalysisResultWithSetters(
   // 处理描述（翻译功能）
   if (result.summary) {
     if (config.enableTranslation) {
-      const translatedSummary = await aiClient.translate(result.summary, targetLang);
+      const translatedSummary = await aiClient.translate(
+        result.summary,
+        targetLang,
+      );
       setDescription(translatedSummary);
     } else {
       setDescription(result.summary);
@@ -476,7 +509,7 @@ async function applyAnalysisResultWithSetters(
   if (config.enableTagSuggestion && result.tags.length > 0) {
     if (config.enableTranslation) {
       const translatedTags = await Promise.all(
-        result.tags.map((tag: string) => aiClient.translate(tag, targetLang))
+        result.tags.map((tag: string) => aiClient.translate(tag, targetLang)),
       );
       setTags(translatedTags);
     } else {
@@ -497,5 +530,3 @@ async function applyAnalysisResultWithSetters(
     }
   }
 }
-
-
