@@ -30,6 +30,7 @@ const DEFAULT_EMBEDDING_CONFIG: EmbeddingConfig = {
 // 默认设置
 const DEFAULT_SETTINGS: LocalSettings = {
   autoSaveSnapshot: true,
+  enableOmniboxSearch: true,
   defaultCategory: null,
   theme: 'system',
   language: 'zh',

@@ -45,6 +45,8 @@
       "description": "Customize your experience",
       "autoSaveSnapshot": "Auto Save Snapshots",
       "autoSaveSnapshotDesc": "Automatically save page snapshots when saving bookmarks",
+      "enableOmniboxSearch": "Omnibox Search Enhancement",
+      "enableOmniboxSearchDesc": "Type 'ham' in browser address bar and press space to search and open bookmarks via keyword or semantic matching",
       "shortcut": "Shortcut Key",
       "shortcutButton": "Open Browser Shortcut Settings",
       "shortcutDesc": "Configure extension shortcuts in browser settings",
@@ -277,9 +279,29 @@
         "fromBrowserDesc": "Directly read bookmarks from current browser",
         "browserBookmarkCount": "Total {{count}} bookmarks in browser"
       },
+      "syncBrowser": {
+        "title": "Sync to Browser Bookmarks",
+        "description": "Reverse-sync your HamHome categories and bookmarks to the browser's native bookmark bar, automatically creating folders based on your category hierarchy",
+        "action": "Sync to Browser Bookmark Bar Now",
+        "syncing": "Syncing...",
+        "subtitle": "Write {{bookmarkCount}} bookmarks and {{categoryCount}} categories to the browser bookmark bar",
+        "syncSuccess": "Sync completed",
+        "syncFailed": "Sync failed",
+        "syncDetails": "Successfully wrote {{created}} bookmarks, skipped {{skipped}} already existing",
+        "useRootFolder": "Wrap inside a top-level HamHome folder",
+        "useRootFolderDesc": "When enabled, all content is placed inside a \"HamHome\" folder on the bookmark bar; when disabled, top-level categories expand directly on the bookmark bar",
+        "clearFirst": "Clear existing content before writing (overwrite mode)",
+        "clearFirstDesc": "When enabled, all existing content in the target folder is deleted before re-writing for a full overwrite; when disabled, incremental merge is used (skipping already-existing URLs)",
+        "skipDuplicates": "Automatically skip global duplicates",
+        "skipDuplicatesDesc": "When enabled, all browser bookmarks are scanned to ensure that the synced bookmarks' URLs do not duplicate existing ones anywhere in the browser",
+        "exampleBarLabel": "Bookmark Bar",
+        "exampleCat1": "Tech",
+        "exampleCat2": "Reading"
+      },
       "errors": {
         "unsupportedFormat": "Unsupported file format, please select a JSON or HTML file",
-        "unknown": "Unknown error"
+        "unknown": "Unknown error",
+        "bookmarksApiNotSupported": "The current browser does not support the Bookmarks API. Please use Chrome, Edge, or Firefox."
       }
     },
     "privacy": {

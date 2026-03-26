@@ -43,8 +43,10 @@
     "general": {
       "title": "通用设置",
       "description": "自定义你的使用体验",
-      "autoSaveSnapshot": "自动保存快照",
+      "autoSaveSnapshot": "自动保存快快照",
       "autoSaveSnapshotDesc": "保存书签时自动保存页面快照",
+      "enableOmniboxSearch": "地址栏搜索增强",
+      "enableOmniboxSearchDesc": "在浏览器地址栏输入 'ham' 后按空格，即可通过关键词或语义搜索并打开书签",
       "shortcut": "快捷键",
       "shortcutButton": "打开浏览器快捷键设置",
       "shortcutDesc": "在浏览器设置中配置扩展快捷键",
@@ -277,9 +279,29 @@
         "fromBrowserDesc": "直接读取当前浏览器的书签数据",
         "browserBookmarkCount": "浏览器中共有 {{count}} 个书签"
       },
+      "syncBrowser": {
+        "title": "同步到浏览器书签栏",
+        "description": "将 HamHome 中的分类和书签反向同步到浏览器原生书签栏，按分类层级自动创建文件夹",
+        "action": "立即同步到浏览器书签栏",
+        "syncing": "正在同步...",
+        "subtitle": "将 {{bookmarkCount}} 个书签、{{categoryCount}} 个分类写入浏览器书签栏",
+        "syncSuccess": "同步完成",
+        "syncFailed": "同步失败",
+        "syncDetails": "成功写入 {{created}} 个书签，跳过 {{skipped}} 个已存在",
+        "useRootFolder": "使用顶层 HamHome 文件夹",
+        "useRootFolderDesc": "开启后，所有内容在书签栏内被包裹在 \"HamHome\" 文件夹中；关闭同层级分类直接展开在书签栏顶层",
+        "clearFirst": "先清空已有内容再写入（覆盖模式）",
+        "clearFirstDesc": "开启后将删除目标文件夹中的所有现有内容再重新写入，实现全量覆盖；关闭则增量吸并（跳过已存在 URL）",
+        "skipDuplicates": "自动全局跳过重复书签",
+        "skipDuplicatesDesc": "开启后将扫描浏览器所有书签，确保本次同步的书签在浏览器中不会出现重复的 URL",
+        "exampleBarLabel": "书签栏",
+        "exampleCat1": "技术",
+        "exampleCat2": "阅读"
+      },
       "errors": {
         "unsupportedFormat": "不支持的文件格式，请选择 JSON 或 HTML 文件",
-        "unknown": "未知错误"
+        "unknown": "未知错误",
+        "bookmarksApiNotSupported": "当前浏览器不支持书签 API，请在 Chrome / Edge / Firefox 中使用"
       }
     },
     "privacy": {

@@ -4,8 +4,8 @@
  */
 
 // AI 对话式搜索类型
-export * from './ai-search';
-import type { Suggestion } from './ai-search';
+export * from "./ai-search";
+import type { Suggestion } from "./ai-search";
 
 // ============ 书签相关 ============
 
@@ -153,6 +153,7 @@ export type PanelPosition = "left" | "right";
  */
 export interface LocalSettings {
   autoSaveSnapshot: boolean; // 自动保存快照
+  enableOmniboxSearch: boolean; // 是否启用地址栏搜索支持
   defaultCategory: string | null;
   theme: ThemeMode;
   language: Language;
@@ -196,7 +197,8 @@ export interface PageMetadata {
 export interface PageContent {
   url: string;
   title: string;
-  content: string; // Markdown 格式
+  content: string;
+  htmlContent: string;
   textContent: string; // 纯文本
   excerpt: string; // 摘要
   favicon: string;
@@ -400,7 +402,12 @@ export type ConversationIntent = "query" | "statistics" | "help";
  * - semantic: 语义化查询
  * - compound: 复合查询（包含多个条件）
  */
-export type QuerySubtype = "time" | "category" | "tag" | "semantic" | "compound";
+export type QuerySubtype =
+  | "time"
+  | "category"
+  | "tag"
+  | "semantic"
+  | "compound";
 
 /**
  * 检索过滤条件
@@ -503,12 +510,16 @@ export interface ChatSearchResponse {
 }
 
 // Re-export Suggestion from ai-search
-export type { Suggestion, SuggestionActionType } from './ai-search';
+export type { Suggestion, SuggestionActionType } from "./ai-search";
 
 /**
  * Embedding 任务状态
  */
-export type EmbeddingJobStatus = "pending" | "processing" | "completed" | "failed";
+export type EmbeddingJobStatus =
+  | "pending"
+  | "processing"
+  | "completed"
+  | "failed";
 
 /**
  * Embedding 任务
@@ -529,4 +540,4 @@ export interface EmbeddingJob {
 }
 
 // ============ WebDAV 同步相关 ============
-export * from './sync';
+export * from "./sync";
