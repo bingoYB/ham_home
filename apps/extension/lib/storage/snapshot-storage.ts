@@ -42,9 +42,9 @@ class SnapshotStorage {
   /**
    * 保存快照
    */
-  async saveSnapshot(bookmarkId: string, html: string): Promise<Snapshot> {
+  async saveSnapshot(bookmarkId: string, content: string, type: string = 'text/html'): Promise<Snapshot> {
     const db = await this.getDB();
-    const blob = new Blob([html], { type: 'text/html' });
+    const blob = new Blob([content], { type });
 
     const snapshot: Snapshot = {
       id: crypto.randomUUID(),
