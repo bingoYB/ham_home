@@ -56,7 +56,7 @@ export default defineConfig({
     // 设置扩展的默认语言区域为简体中文
     default_locale: "zh_CN",
     // 扩展的版本号
-    version: "1.1.4",
+    version: "1.1.5",
 
     // 声明扩展所需要的浏览器 API 权限
     // 下面的注释同时对应 Chrome Web Store 提交时可填写的权限用途说明
