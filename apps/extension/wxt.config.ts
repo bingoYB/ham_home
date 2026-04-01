@@ -70,7 +70,6 @@ export default defineConfig({
       "bookmarks", // 读取浏览器原生书签树，用于导入用户已有书签到 HamHome
       "alarms", // 创建后台定时任务，定期执行 WebDAV 同步，并在本地书签变更后延迟触发同步
       "favicon", // 使用 Chromium 的 _favicon 能力为书签获取站点图标，并在失败时安全回退,
-      "pageCapture",
     ],
 
     // 声明需要在页面上下文中可访问的资源
