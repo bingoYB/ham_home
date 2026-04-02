@@ -204,10 +204,21 @@
     "about": {
       "title": "About",
       "description": "About HamHome",
-      "version": "HamHome v1.0.0",
       "subtitle": "Intelligent Bookmark Management Tool",
-      "intro": "HamHome is a powerful browser extension that helps you manage and organize bookmarks, using AI technology to automatically categorize and tag bookmarks.",
-      "copyright": "© 2024-2025 HamHome. All rights reserved."
+      "intro": "HamHome is a local-first intelligent bookmark manager that helps you save, organize, search, and curate web content, with AI features that improve classification and retrieval.",
+      "versionLabel": "Version",
+      "versionValue": "HamHome v{{version}}",
+      "versionHint": "Shows the version of the extension currently installed",
+      "websiteLabel": "Official Website",
+      "websiteHint": "Visit the website for product updates, downloads, and privacy details",
+      "websiteButton": "Open Website",
+      "githubLabel": "GitHub Repository",
+      "githubHint": "Browse the source code, releases, issues, and contribution workflow",
+      "githubButton": "View Repository",
+      "starTitle": "Enjoying HamHome? Please give it a Star",
+      "starHint": "If HamHome is helpful to you, a GitHub Star would mean a lot. Your support helps the project keep improving and reach more users.",
+      "starButton": "Star on GitHub",
+      "copyright": "© 2024-2026 HamHome. All rights reserved."
     },
     "dialogs": {
       "confirmClear": "Confirm Clear All Data",

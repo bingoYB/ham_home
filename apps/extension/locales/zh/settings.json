@@ -204,10 +204,21 @@
     "about": {
       "title": "关于",
       "description": "关于 HamHome",
-      "version": "HamHome v1.0.0",
       "subtitle": "智能书签管理工具",
-      "intro": "HamHome 是一个强大的浏览器扩展，帮助你管理和组织书签，使用 AI 技术自动分类和标记书签。",
-      "copyright": "© 2024-2025 HamHome. 保留所有权利。"
+      "intro": "HamHome 是一款本地优先的智能书签管理工具，帮助你保存、分类、检索和整理网页内容，并通过 AI 能力提升归档与搜索效率。",
+      "versionLabel": "当前版本",
+      "versionValue": "HamHome v{{version}}",
+      "versionHint": "显示当前已安装的扩展版本号",
+      "websiteLabel": "官网",
+      "websiteHint": "访问官网查看产品介绍、下载方式与隐私说明",
+      "websiteButton": "访问官网",
+      "githubLabel": "GitHub 仓库",
+      "githubHint": "查看源码、发布版本、提交 Issue 或参与贡献",
+      "githubButton": "查看仓库",
+      "starTitle": "喜欢 HamHome？欢迎点个 Star",
+      "starHint": "如果 HamHome 对你有帮助，欢迎到 GitHub 点个 Star。你的支持会帮助项目持续迭代，也让更多用户发现它。",
+      "starButton": "前往 GitHub 点 Star",
+      "copyright": "© 2024-2026 HamHome. 保留所有权利。"
     },
     "dialogs": {
       "confirmClear": "确认清除所有数据",
