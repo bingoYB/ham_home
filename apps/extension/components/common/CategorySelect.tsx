@@ -16,7 +16,7 @@ import {
   filterCategoryTree,
   matchCategoryByPath,
 } from './CategoryTree';
-import { TreeSelect, type PrependOption, type TriggerRenderParams } from './TreeSelect';
+import { TreeSelect, type TriggerRenderParams } from './TreeSelect';
 
 interface CategorySelectProps {
   value: string | null;

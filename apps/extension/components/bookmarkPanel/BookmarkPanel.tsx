@@ -63,6 +63,7 @@ export function BookmarkPanel({
     highlightedBookmarkId,
     setHighlightedBookmarkId,
     handleSearch: handleAISearch,
+    handleSuggestion: handleAISuggestion,
     closeChat: closeAIChat,
     isChatOpen: isAIChatOpen,
     resultBookmarkIds: aiResultBookmarkIds,
@@ -209,7 +210,7 @@ export function BookmarkPanel({
   // 处理 AI 建议点击
   const handleAISuggestionClick = useCallback(
     async (suggestion: Suggestion) => {
-      const { action, payload, label } = suggestion;
+      const { action, payload } = suggestion;
 
       switch (action) {
         case "navigate": {
@@ -252,8 +253,7 @@ export function BookmarkPanel({
         case "findDuplicates":
         case "text":
         default: {
-          setAIQuery(label);
-          handleAISearch();
+          await handleAISuggestion(suggestion);
           break;
         }
       }
@@ -261,8 +261,7 @@ export function BookmarkPanel({
     [
       aiResultBookmarkIds,
       bookmarks,
-      setAIQuery,
-      handleAISearch,
+      handleAISuggestion,
       onOpenSettings,
       t,
     ],

@@ -5,7 +5,7 @@
 
 // AI 对话式搜索类型
 export * from "./ai-search";
-import type { Suggestion } from "./ai-search";
+import type { Suggestion, SuggestionActionType } from "./ai-search";
 
 // ============ 书签相关 ============
 
@@ -410,6 +410,14 @@ export type QuerySubtype =
   | "compound";
 
 /**
+ * 检索模式
+ * - hybrid: 关键词 + 语义混合检索
+ * - semantic: 仅语义检索
+ * - keyword: 仅关键词检索
+ */
+export type RetrievalMode = "hybrid" | "semantic" | "keyword";
+
+/**
  * 检索过滤条件
  */
 export interface SearchFilters {
@@ -423,8 +431,41 @@ export interface SearchFilters {
   timeRangeDays?: number | null;
   /** 是否允许加载全文片段 */
   includeContent?: boolean;
+  /** 检索模式 */
+  retrievalMode?: RetrievalMode;
   /** 是否启用语义检索 */
   semantic?: boolean;
+}
+
+/**
+ * 对话回合输入
+ */
+export interface ConversationalSearchTurnInput {
+  type: "message" | "suggestion";
+  text?: string;
+  suggestion?: {
+    label: string;
+    action: SuggestionActionType;
+    payload?: Record<string, unknown>;
+  };
+}
+
+/**
+ * 持久化对话会话状态
+ */
+export interface ConversationalSearchSession {
+  /** 持续生效的结构化过滤条件 */
+  filters: SearchFilters;
+  /** 已展示过的书签 ID */
+  seenBookmarkIds: string[];
+  /** 最近一轮选中的书签 ID */
+  lastSelectedBookmarkIds: string[];
+  /** 最近一轮意图 */
+  lastIntent?: ConversationIntent;
+  /** 最近一轮查询 */
+  lastQuery?: string;
+  /** 最近多轮对话历史 */
+  history: Array<{ role: "user" | "assistant"; text: string }>;
 }
 
 /**

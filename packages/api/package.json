@@ -12,8 +12,8 @@
   },
   "dependencies": {
     "hono": "^4.0.0",
-    "@hono/zod-validator": "^0.2.0",
-    "zod": "^3.22.0",
+    "@hono/zod-validator": "^0.7.6",
+    "zod": "^4.3.6",
     "nanoid": "^5.0.0",
     "drizzle-orm": "^0.30.0",
     "@hamhome/db": "workspace:*",
@@ -25,4 +25,3 @@
     "typescript": "^5.3.0"
   }
 }
-

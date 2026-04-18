@@ -1,13 +1,14 @@
 /**
  * Embedding 客户端封装
- * 基于 @hamhome/ai 包的 embedding 能力
+ * 基于 OpenAI-compatible Embedding 能力
  */
+import { OpenAIEmbeddings } from "@langchain/openai";
 import {
+  EMBEDDING_PROVIDER_DEFAULTS,
   getDefaultEmbeddingModel,
   getEmbeddingModelKey,
   isEmbeddingSupported as checkSupported,
-} from '@hamhome/ai/providers';
-import type { EmbeddingClient, EmbeddingClientConfig } from '@hamhome/ai';
+} from "@/lib/agent";
 import type { EmbeddingConfig } from '@/types';
 import { configStorage } from '@/lib/storage';
 import { createLogger } from '@hamhome/utils';
@@ -38,6 +39,59 @@ export class EmbeddingRateLimitError extends Error {
  * Extension Embedding 客户端
  * 封装配置加载和错误处理
  */
+interface EmbeddingClientConfig {
+  provider: EmbeddingConfig["provider"];
+  apiKey?: string;
+  baseUrl?: string;
+  model: string;
+  dimensions?: number;
+}
+
+interface EmbeddingClient {
+  embed(text: string): Promise<{ embedding: number[] }>;
+  embedMany(texts: string[]): Promise<{ embeddings: number[][] }>;
+  testConnection(): Promise<{ success: boolean; error?: string; dimensions?: number }>;
+}
+
+function createEmbeddingClient(config: EmbeddingClientConfig): EmbeddingClient {
+  const baseURL =
+    config.baseUrl || EMBEDDING_PROVIDER_DEFAULTS[config.provider]?.baseUrl;
+
+  const model = new OpenAIEmbeddings({
+    apiKey: config.provider === "ollama" ? "ollama" : config.apiKey || "",
+    model: config.model || getDefaultEmbeddingModel(config.provider),
+    dimensions: config.dimensions,
+    configuration: baseURL ? { baseURL } : undefined,
+  });
+
+  return {
+    async embed(text: string) {
+      const embedding = await model.embedQuery(text);
+      return { embedding };
+    },
+
+    async embedMany(texts: string[]) {
+      const embeddings = await model.embedDocuments(texts);
+      return { embeddings };
+    },
+
+    async testConnection() {
+      try {
+        const embedding = await model.embedQuery("test");
+        return {
+          success: true,
+          dimensions: embedding.length,
+        };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      }
+    },
+  };
+}
+
 class ExtensionEmbeddingClient {
   private config: EmbeddingConfig | null = null;
   private client: EmbeddingClient | null = null;
@@ -99,8 +153,8 @@ class ExtensionEmbeddingClient {
         dimensions: this.config.dimensions,
       };
 
-      this.clientPromise = import('@hamhome/ai/embeddings')
-        .then(({ createEmbeddingClient }) => createEmbeddingClient(clientConfig))
+      this.clientPromise = Promise.resolve()
+        .then(() => createEmbeddingClient(clientConfig))
         .catch((error) => {
           this.clientPromise = null;
           throw error;

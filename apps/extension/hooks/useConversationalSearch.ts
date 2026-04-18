@@ -1,17 +1,17 @@
 /**
  * useConversationalSearch - AI 对话式搜索 Hook
- * 封装 AI 对话状态机与检索逻辑
+ * 封装 AI 对话状态与统一回合执行逻辑
  */
-import { useState, useCallback, useRef } from 'react';
+import { useState, useCallback, useRef } from "react";
 import type {
   AISearchStatus,
-  Source,
-  ConversationState,
   ChatMessage,
+  ConversationalSearchSession,
+  ConversationalSearchTurnInput,
+  Source,
   Suggestion,
   SuggestionActionType,
-} from '@/types';
-import { chatSearchAgent, createInitialState } from '@/lib/search';
+} from "@/types";
 
 /**
  * 建议操作处理器类型
@@ -48,6 +48,8 @@ export interface UseConversationalSearchReturn {
   setHighlightedBookmarkId: (id: string | null) => void;
   /** 执行搜索 */
   handleSearch: () => Promise<void>;
+  /** 执行建议动作 */
+  handleSuggestion: (suggestion: Suggestion) => Promise<void>;
   /** 清除对话 */
   clearConversation: () => void;
   /** 关闭对话窗口 */
@@ -63,9 +65,9 @@ export interface UseConversationalSearchReturn {
  */
 async function simulateStreamingOutput(
   text: string,
-  setAnswer: (answer: string) => void
+  setAnswer: (answer: string) => void,
 ): Promise<void> {
-  const charsPerFrame = 3; // 每帧输出的字符数
+  const charsPerFrame = 3;
   let index = 0;
 
   return new Promise((resolve) => {
@@ -80,76 +82,80 @@ async function simulateStreamingOutput(
         resolve();
       }
     }
+
     requestAnimationFrame(tick);
   });
+}
+
+function createInitialSessionState(): ConversationalSearchSession {
+  return {
+    filters: {},
+    seenBookmarkIds: [],
+    lastSelectedBookmarkIds: [],
+    history: [],
+  };
 }
 
 /**
  * AI 对话式搜索 Hook
  */
 export function useConversationalSearch(): UseConversationalSearchReturn {
-  // 查询文本
-  const [query, setQuery] = useState('');
-  
-  // AI 状态
-  const [status, setStatus] = useState<AISearchStatus>('idle');
+  const [query, setQuery] = useState("");
+  const [status, setStatus] = useState<AISearchStatus>("idle");
   const [error, setError] = useState<string | null>(null);
-  
-  // 对话历史
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  
-  // 当前正在生成的回答
-  const [currentAnswer, setCurrentAnswer] = useState('');
-  
-  // 当前回答的引用源
+  const [currentAnswer, setCurrentAnswer] = useState("");
   const [results, setResults] = useState<Source[]>([]);
-  
-  // 后续建议
   const [suggestions, setSuggestions] = useState<Suggestion[]>([]);
-  
-  // 高亮的书签 ID
-  const [highlightedBookmarkId, setHighlightedBookmarkId] = useState<string | null>(null);
-  
-  // 对话窗口是否打开
+  const [highlightedBookmarkId, setHighlightedBookmarkId] = useState<string | null>(
+    null,
+  );
   const [isChatOpen, setIsChatOpen] = useState(false);
-  
-  // 当前结果的书签 ID 列表
   const [resultBookmarkIds, setResultBookmarkIds] = useState<string[]>([]);
-  
-  // 对话状态（用于多轮对话）
-  const conversationStateRef = useRef<ConversationState>(createInitialState());
 
-  // 执行搜索
-  const handleSearch = useCallback(async () => {
-    if (!query.trim()) return;
+  const conversationSessionRef = useRef<ConversationalSearchSession>(
+    createInitialSessionState(),
+  );
 
-    // 添加用户消息到历史
+  const applyTurn = useCallback(async (input: ConversationalSearchTurnInput) => {
+    const displayText =
+      input.type === "message"
+        ? input.text?.trim() || ""
+        : input.suggestion?.label?.trim() || "";
+
+    if (!displayText) {
+      return;
+    }
+
     const userMessage: ChatMessage = {
-      role: 'user',
-      content: query,
+      role: "user",
+      content: displayText,
       timestamp: Date.now(),
     };
+
     setMessages((prev) => [...prev, userMessage]);
-    
-    // 打开对话窗口并开始搜索
     setIsChatOpen(true);
-    setStatus('thinking');
+    setStatus("thinking");
     setError(null);
-    setCurrentAnswer('');
-    
+    setCurrentAnswer("");
+
     try {
-      // 调用 chatSearchAgent 执行完整的对话式搜索
-      setStatus('searching');
-      
-      const { response, bookmarks: resultBookmarks, searchResult, newState } = await chatSearchAgent.search(
-        query,
-        conversationStateRef.current
+      setStatus("searching");
+
+      const { chatSearchAgent } = await import("@/lib/search/chat-search-agent");
+
+      const {
+        response,
+        bookmarks: resultBookmarks,
+        searchResult,
+        newState,
+      } = await chatSearchAgent.runTurn(
+        input,
+        conversationSessionRef.current,
       );
-      
-      // 更新对话状态
-      conversationStateRef.current = newState;
-      
-      // 构建 searchResult 分数映射
+
+      conversationSessionRef.current = newState;
+
       const scoreMap = new Map(
         searchResult.items.map((item) => [
           item.bookmarkId,
@@ -159,10 +165,9 @@ export function useConversationalSearch(): UseConversationalSearchReturn {
             semanticScore: item.semanticScore,
             matchReason: item.matchReason,
           },
-        ])
+        ]),
       );
-      
-      // 将 bookmarkId 列表转换为 Source 列表（包含分数信息）
+
       const sources: Source[] = resultBookmarks.map((bookmark, index) => {
         const scoreInfo = scoreMap.get(bookmark.id);
         return {
@@ -176,58 +181,70 @@ export function useConversationalSearch(): UseConversationalSearchReturn {
           matchReason: scoreInfo?.matchReason,
         };
       });
-      
+
       setResults(sources);
-      
-      // 设置结果书签 ID 列表（用于批量操作）
-      setResultBookmarkIds(resultBookmarks.map((b) => b.id));
-      
-      // 设置 AI 回答（模拟流式输出效果）
-      setStatus('writing');
+      setResultBookmarkIds(resultBookmarks.map((bookmark) => bookmark.id));
+
+      setStatus("writing");
       await simulateStreamingOutput(response.answer, setCurrentAnswer);
-      
-      // 将 AI 回答添加到历史
+
       const assistantMessage: ChatMessage = {
-        role: 'assistant',
+        role: "assistant",
         content: response.answer,
         timestamp: Date.now(),
         sources,
       };
-      setMessages((prev) => [...prev, assistantMessage]);
-      
-      // 设置后续建议
-      setSuggestions(response.nextSuggestions);
-      
-      // 清空当前回答（已添加到历史）
-      setCurrentAnswer('');
-      
-      // 清空查询输入
-      setQuery('');
-      
-      setStatus('done');
-    } catch (err) {
-      console.error('[useConversationalSearch] Search failed:', err);
-      setError(err instanceof Error ? err.message : 'Search failed');
-      setStatus('error');
-    }
-  }, [query]);
 
-  // 清除对话
+      setMessages((prev) => [...prev, assistantMessage]);
+      setSuggestions(response.nextSuggestions);
+      setCurrentAnswer("");
+      setQuery("");
+      setStatus("done");
+    } catch (err) {
+      console.error("[useConversationalSearch] Search failed:", err);
+      setError(err instanceof Error ? err.message : "Search failed");
+      setStatus("error");
+    }
+  }, []);
+
+  const handleSearch = useCallback(async () => {
+    if (!query.trim()) {
+      return;
+    }
+
+    await applyTurn({
+      type: "message",
+      text: query,
+    });
+  }, [applyTurn, query]);
+
+  const handleSuggestion = useCallback(
+    async (suggestion: Suggestion) => {
+      await applyTurn({
+        type: "suggestion",
+        suggestion: {
+          label: suggestion.label,
+          action: suggestion.action,
+          payload: suggestion.payload,
+        },
+      });
+    },
+    [applyTurn],
+  );
+
   const clearConversation = useCallback(() => {
     setMessages([]);
-    setCurrentAnswer('');
+    setCurrentAnswer("");
     setResults([]);
     setSuggestions([]);
     setResultBookmarkIds([]);
-    setStatus('idle');
+    setStatus("idle");
     setError(null);
     setHighlightedBookmarkId(null);
-    setQuery('');
-    // 重置对话状态
-    conversationStateRef.current = createInitialState();
+    setQuery("");
+    conversationSessionRef.current = createInitialSessionState();
   }, []);
 
-  // 关闭对话窗口
   const closeChat = useCallback(() => {
     setIsChatOpen(false);
     clearConversation();
@@ -245,6 +262,7 @@ export function useConversationalSearch(): UseConversationalSearchReturn {
     highlightedBookmarkId,
     setHighlightedBookmarkId,
     handleSearch,
+    handleSuggestion,
     clearConversation,
     closeChat,
     isChatOpen,

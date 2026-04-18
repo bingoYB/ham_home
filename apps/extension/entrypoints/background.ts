@@ -3,7 +3,7 @@
  * 处理快捷键、消息通信、安装事件
  */
 import { browser } from "wxt/browser";
-import { registerBackgroundService } from "@/lib/services";
+import { registerBackgroundService } from "@/lib/services/background-service-server";
 import { configStorage } from "@/lib/storage";
 import { bookmarkStorage } from "@/lib/storage/bookmark-storage";
 import {

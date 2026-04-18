@@ -3,13 +3,17 @@
  * 保存面板的业务逻辑层
  */
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { aiClient } from "@/lib/ai/client";
 import {
   bookmarkStorage,
   snapshotStorage,
   configStorage,
   aiCacheStorage,
 } from "@/lib/storage";
+import {
+  bookmarkAnalysisService,
+  matchCategoryByName,
+  translationService,
+} from "@/lib/agent";
 import { getBackgroundService } from "@/lib/services";
 import { createMarkdownContent } from "defuddle/full";
 import type { PageContent, LocalBookmark, LocalCategory } from "@/types";
@@ -176,16 +180,9 @@ export function useSavePanel({
           }
         }
 
-        // 2. 加载配置并检查
-        await aiClient.loadConfig();
-        if (!aiClient.isConfigured()) {
-          setAIStatus("disabled");
-          return;
-        }
-
-        // 3. 执行新的分析（传递已有标签避免生成语义相近的重复标签）
+        // 2. 执行分析（传递已有标签避免生成语义相近的重复标签）
         const existingTags = await bookmarkStorage.getAllTags();
-        const result = await aiClient.analyzeComplete({
+        const result = await bookmarkAnalysisService.analyzeBookmark({
           pageContent: { ...pageContent, content: markdown },
           userCategories: categories,
           existingTags,
@@ -438,39 +435,6 @@ export function useSavePanel({
  * 简单匹配分类名称（精确 + 模糊）
  * 优先匹配叶子节点（子分类），避免只匹配到父节点
  */
-function matchCategoryByName(
-  categoryName: string,
-  categories: LocalCategory[],
-): { matched: boolean; categoryId: string | null } {
-  const searchName = categoryName.toLowerCase();
-
-  // 判断是否为叶子节点（没有子分类）
-  const parentIds = new Set(categories.map((c) => c.parentId).filter(Boolean));
-  const isLeaf = (c: LocalCategory) => !parentIds.has(c.id);
-
-  // 精确匹配 - 优先叶子节点
-  const exactMatches = categories.filter(
-    (c) => c.name.toLowerCase() === searchName,
-  );
-  if (exactMatches.length > 0) {
-    const leafMatch = exactMatches.find(isLeaf);
-    return { matched: true, categoryId: (leafMatch || exactMatches[0]).id };
-  }
-
-  // 模糊匹配 - 优先叶子节点
-  const fuzzyMatches = categories.filter(
-    (c) =>
-      c.name.toLowerCase().includes(searchName) ||
-      searchName.includes(c.name.toLowerCase()),
-  );
-  if (fuzzyMatches.length > 0) {
-    const leafMatch = fuzzyMatches.find(isLeaf);
-    return { matched: true, categoryId: (leafMatch || fuzzyMatches[0]).id };
-  }
-
-  return { matched: false, categoryId: null };
-}
-
 /**
  * 应用分析结果到表单（带有 setter 函数）
  * 返回 AI 推荐的新分类名称（如果不在用户已有分类中）
@@ -495,7 +459,7 @@ async function applyAnalysisResultWithSetters(
   // 处理描述（翻译功能）
   if (result.summary) {
     if (config.enableTranslation) {
-      const translatedSummary = await aiClient.translate(
+      const translatedSummary = await translationService.translate(
         result.summary,
         targetLang,
       );
@@ -509,7 +473,9 @@ async function applyAnalysisResultWithSetters(
   if (config.enableTagSuggestion && result.tags.length > 0) {
     if (config.enableTranslation) {
       const translatedTags = await Promise.all(
-        result.tags.map((tag: string) => aiClient.translate(tag, targetLang)),
+        result.tags.map((tag: string) =>
+          translationService.translate(tag, targetLang),
+        ),
       );
       setTags(translatedTags);
     } else {

@@ -41,6 +41,7 @@ export function EditBookmarkDialog({ bookmark, onSaved, onClose }: EditBookmarkD
     url: bookmark.url,
     title: bookmark.title,
     content: bookmark.content || '',
+    htmlContent: '',
     textContent: bookmark.description || '',
     excerpt: bookmark.description || '',
     favicon: bookmark.favicon || '',

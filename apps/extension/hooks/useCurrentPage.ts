@@ -65,6 +65,7 @@ export function useCurrentPage(): UseCurrentPageResult {
           url: tab.url,
           title: tab.title || '',
           content: '',
+          htmlContent: '',
           textContent: '',
           excerpt: '',
           favicon: tab.favIconUrl || '',
@@ -91,6 +92,7 @@ export function useCurrentPage(): UseCurrentPageResult {
           url: tab.url,
           title: tab.title || '',
           content: '',
+          htmlContent: '',
           textContent: '',
           excerpt: '',
           favicon: tab.favIconUrl || '',
@@ -117,6 +119,7 @@ export function useCurrentPage(): UseCurrentPageResult {
             url: tab.url,
             title: tab.title || '',
             content: '',
+            htmlContent: '',
             textContent: '',
             excerpt: '',
             favicon: tab.favIconUrl || '',
@@ -147,4 +150,3 @@ export function useCurrentPage(): UseCurrentPageResult {
     refresh: fetchContent,
   };
 }
-

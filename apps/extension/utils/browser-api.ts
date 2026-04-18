@@ -300,7 +300,9 @@ export async function getExtensionShortcuts(): Promise<ShortcutCommand[]> {
   // 在 content script 中需要通过 background service 获取
   try {
     // 动态导入避免循环依赖
-    const { getBackgroundService } = await import("@/lib/services/background-service");
+    const { getBackgroundService } = await import(
+      "@/lib/services/background-service-client"
+    );
     const service = getBackgroundService();
     return await service.getShortcuts();
   } catch (error) {

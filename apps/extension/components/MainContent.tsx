@@ -103,6 +103,7 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
     highlightedBookmarkId,
     setHighlightedBookmarkId,
     handleSearch: handleAISearch,
+    handleSuggestion: handleAISuggestion,
     closeChat: closeAIChat,
     isChatOpen: isAIChatOpen,
     resultBookmarkIds: aiResultBookmarkIds,
@@ -251,7 +252,7 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
   // 处理 AI 建议点击
   const handleAISuggestionClick = useCallback(
     async (suggestion: Suggestion) => {
-      const { action, payload, label } = suggestion;
+      const { action, payload } = suggestion;
 
       switch (action) {
         case "navigate": {
@@ -308,9 +309,7 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
         case "findDuplicates":
         case "text":
         default: {
-          // 文本类建议 - 放入输入框并搜索
-          setAIQuery(label);
-          handleAISearch();
+          await handleAISuggestion(suggestion);
           break;
         }
       }
@@ -320,8 +319,7 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
       bookmarks,
       selectedIds,
       toggleSelect,
-      setAIQuery,
-      handleAISearch,
+      handleAISuggestion,
       toast,
       t,
     ],

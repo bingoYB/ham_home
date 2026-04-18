@@ -1,5 +1,8 @@
 # 对话式搜索系统架构文档 (V2)
 
+> 当前实现已切换到 `apps/extension/lib/agent/services/chat-search-service.ts` 的 agent tool loop 版本。
+> 本文档中的 `QueryPlanner` / 手写编排流程主要保留为历史设计说明，实际运行时以统一 agent 接入层为准。
+
 ## 概述
 
 对话式搜索（Conversational Search）是一个基于 AI 的多轮对话书签检索系统，支持自然语言查询、语义检索、上下文理解与智能回答生成。

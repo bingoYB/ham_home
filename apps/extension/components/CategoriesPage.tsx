@@ -62,7 +62,7 @@ import {
   cn,
 } from "@hamhome/ui";
 import { useBookmarks } from "@/contexts/BookmarkContext";
-import { aiClient } from "@/lib/ai/client";
+import { categoryGenerationService } from "@/lib/agent";
 import {
   getPresetCategoriesGeneral,
   getPresetCategoriesProfessional,
@@ -386,17 +386,9 @@ export function CategoriesPage() {
     setAiGeneratedCategories(null);
 
     try {
-      await aiClient.loadConfig();
-      if (!aiClient.isConfigured()) {
-        throw new Error(
-          t(
-            "settings:settings.categories.preset.aiConfigError",
-            "Please configure AI service in settings first",
-          ),
-        );
-      }
-
-      const result = await aiClient.generateCategories(aiDescription);
+      const result = await categoryGenerationService.generateCategories(
+        aiDescription,
+      );
       setAiGeneratedCategories(result);
     } catch (error) {
       setAiError(

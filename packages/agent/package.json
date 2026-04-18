@@ -1,0 +1,51 @@
+{
+  "name": "@hamhome/agent",
+  "version": "1.0.0",
+  "private": true,
+  "description": "HamHome Agent runtime",
+  "type": "module",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./mcp/node": {
+      "types": "./src/mcp/node.ts",
+      "default": "./src/mcp/node.ts"
+    }
+  },
+  "scripts": {
+    "test": "vitest run",
+    "typecheck": "pnpm typecheck:src && pnpm typecheck:test",
+    "typecheck:src": "tsc --noEmit -p tsconfig.json",
+    "typecheck:test": "tsc --noEmit -p tsconfig.vitest.json"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "packageManager": "pnpm@9.0.0",
+  "dependencies": {
+    "@ai-sdk/anthropic": "3.0.64",
+    "@ai-sdk/azure": "3.0.50",
+    "@ai-sdk/deepseek": "2.0.26",
+    "@ai-sdk/google": "3.0.55",
+    "@ai-sdk/groq": "3.0.32",
+    "@ai-sdk/mistral": "3.0.27",
+    "@ai-sdk/openai": "3.0.49",
+    "@ai-sdk/openai-compatible": "2.0.37",
+    "@modelcontextprotocol/sdk": "^1.28.0",
+    "ai": "^6.0.116",
+    "dotenv": "^17.3.1",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "tsup": "^8.0.0",
+    "tsup-preset-solid": "^2.2.0",
+    "typescript": "^5.9.2",
+    "vitest": "^4.1.0"
+  }
+}

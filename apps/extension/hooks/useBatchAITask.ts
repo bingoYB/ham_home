@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { aiTaskStorage } from '@/lib/storage/ai-task-storage';
 import { bookmarkStorage } from '@/lib/storage/bookmark-storage';
-import { analyzeBookmarkWithAI } from '@/lib/ai/ai-batch-utils';
+import { bookmarkAnalysisService } from '@/lib/agent';
 import type { BatchAITask, BatchAITaskProgress } from '@/lib/storage/ai-task-storage';
 import { useBookmarks } from '@/contexts/BookmarkContext';
 
@@ -45,13 +45,13 @@ export function useBatchAITask() {
         const promises = batchBookmarks.map(async (bm) => {
           if (!bm) return { status: 'failed' };
           try {
-            const aiResult = await analyzeBookmarkWithAI(
-              bm.url, 
-              bm.title, 
-              currentCategories, 
-              currentTags, 
-              true // 获取分析内容
-            );
+            const aiResult = await bookmarkAnalysisService.analyzeBookmarkForLibrary({
+              url: bm.url,
+              title: bm.title,
+              currentCategories,
+              existingTags: currentTags,
+              shouldFetchPageContent: true,
+            });
             
             // 检测 AI 是否真正返回了有效结果（空结果表示失败）
             const hasValidResult = aiResult.description || aiResult.categoryId || (aiResult.tags && aiResult.tags.length > 0);
