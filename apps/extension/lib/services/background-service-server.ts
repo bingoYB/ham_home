@@ -16,7 +16,11 @@ import { vectorStore } from "@/lib/storage/vector-store";
 import { embeddingClient, embeddingQueue } from "@/lib/embedding";
 import { semanticRetriever } from "@/lib/search/semantic-retriever";
 import { getExtensionURL, type ShortcutCommand } from "@/utils/browser-api";
-import type { BookmarkEmbedding } from "@/types";
+import type {
+  BookmarkEmbedding,
+  SaveSnapshotBackgroundOptions,
+  SnapshotSaveResult,
+} from "@/types";
 import type { VectorStoreStats } from "@/lib/storage/vector-store";
 import type {
   SemanticSearchOptions,
@@ -154,20 +158,27 @@ class BackgroundServiceImpl implements IBackgroundService {
 
   async saveSnapshotBackground(
     bookmarkId: string,
-    markdown?: string,
-  ): Promise<void> {
+    options: SaveSnapshotBackgroundOptions = {},
+  ): Promise<SnapshotSaveResult> {
     try {
-      if (markdown) {
+      const mode = options.mode ?? (options.markdown ? "markdown" : "html");
+
+      if (mode === "none") {
+        return { ok: true, skipped: true };
+      }
+
+      if ((mode === "auto" || mode === "markdown") && options.markdown) {
         await snapshotStorage.saveSnapshot(
           bookmarkId,
-          markdown,
+          options.markdown,
           "text/markdown;charset=utf-8",
         );
       } else {
         const html = await this.getPageSingleFileHtml();
-        if (html) {
-          await snapshotStorage.saveSnapshot(bookmarkId, html);
+        if (!html) {
+          return { ok: false, error: "无法获取页面内容" };
         }
+        await snapshotStorage.saveSnapshot(bookmarkId, html);
       }
 
       await bookmarkStorage.updateBookmark(bookmarkId, {
@@ -176,11 +187,22 @@ class BackgroundServiceImpl implements IBackgroundService {
       console.log(
         `[BackgroundService] Snapshot saved successfully for ${bookmarkId}`,
       );
+      return {
+        ok: true,
+        type:
+          (mode === "auto" || mode === "markdown") && options.markdown
+            ? "text/markdown;charset=utf-8"
+            : "text/html",
+      };
     } catch (error) {
       console.warn(
         "[BackgroundService] Failed to save snapshot in background:",
         error,
       );
+      return {
+        ok: false,
+        error: error instanceof Error ? error.message : "快照保存失败",
+      };
     }
   }
 

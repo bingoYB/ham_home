@@ -153,6 +153,7 @@ export type PanelPosition = "left" | "right";
  */
 export interface LocalSettings {
   autoSaveSnapshot: boolean; // 自动保存快照
+  defaultSnapshotType: DefaultSnapshotType; // 默认快照类型
   enableOmniboxSearch: boolean; // 是否启用地址栏搜索支持
   defaultCategory: string | null;
   theme: ThemeMode;
@@ -164,6 +165,22 @@ export interface LocalSettings {
 
 // ============ 快照相关 ============
 
+export type DefaultSnapshotType = "auto" | "markdown" | "html" | "none";
+
+export type SnapshotContentType = "text/html" | "text/markdown;charset=utf-8";
+
+export interface SaveSnapshotBackgroundOptions {
+  markdown?: string;
+  mode?: DefaultSnapshotType;
+}
+
+export interface SnapshotSaveResult {
+  ok: boolean;
+  skipped?: boolean;
+  type?: SnapshotContentType;
+  error?: string;
+}
+
 /**
  * 网页快照数据结构 (IndexedDB)
  */
@@ -171,6 +188,7 @@ export interface Snapshot {
   id: string;
   bookmarkId: string;
   html: Blob;
+  type: SnapshotContentType;
   size: number;
   createdAt: number; // 时间戳
 }

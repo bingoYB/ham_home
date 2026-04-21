@@ -10,6 +10,8 @@ import type {
   LocalBookmark,
   LocalCategory,
   LocalSettings,
+  SaveSnapshotBackgroundOptions,
+  SnapshotSaveResult,
 } from "@/types";
 import type { ShortcutCommand } from "@/utils/browser-api";
 
@@ -22,7 +24,10 @@ export interface IBackgroundService {
   getPageSingleFileHtml(): Promise<string | null>;
   openOptionsPage(view?: string): Promise<void>;
   openTab(url: string): Promise<void>;
-  saveSnapshotBackground(bookmarkId: string, markdown?: string): Promise<void>;
+  saveSnapshotBackground(
+    bookmarkId: string,
+    options?: SaveSnapshotBackgroundOptions,
+  ): Promise<SnapshotSaveResult>;
   getVectorStats(): Promise<VectorStoreStats>;
   clearVectorStore(): Promise<void>;
   getEmbeddingQueueStatus(): Promise<QueueStatus>;

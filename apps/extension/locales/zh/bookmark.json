@@ -75,9 +75,13 @@
       "openInNewTab": "在新标签页中打开",
       "download": "下载快照",
       "delete": "删除快照",
+      "save": "保存快照",
+      "update": "更新快照",
       "deleteConfirm": "确定要删除此快照吗？此操作无法撤销。",
       "saveSuccess": "快照保存成功",
       "saveFailed": "快照保存失败",
+      "deleteSuccess": "快照已删除",
+      "deleteFailed": "删除快照失败",
       "noSnapshot": "暂无快照"
     }
   },
@@ -150,7 +154,27 @@
     "cancel": "取消",
     "updateBookmark": "更新书签",
     "saveBookmark": "保存书签",
-    "saving": "保存中..."
+    "saving": "保存中...",
+    "snapshot": {
+      "title": "保存快照",
+      "enabledDesc": "保存离线内容，便于后续回看",
+      "disabledDesc": "仅保存书签信息，减少空间占用",
+      "typeLabel": "快照类型",
+      "types": {
+        "auto": "自动",
+        "markdown": "Markdown 优先",
+        "html": "完整 HTML",
+        "none": "默认不保存"
+      },
+      "status": {
+        "savingBookmark": "正在保存书签",
+        "bookmarkSaved": "书签已保存",
+        "savingSnapshot": "正在保存快照",
+        "skipped": "书签已保存，未保存快照",
+        "saved": "快照已保存",
+        "failed": "快照保存失败，可稍后重试"
+      }
+    }
   },
   "contentPanel": {
     "openPanel": "打开书签面板",

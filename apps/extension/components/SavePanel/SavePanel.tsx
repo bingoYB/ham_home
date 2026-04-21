@@ -33,10 +33,16 @@ export function SavePanel({
     aiError,
     aiRecommendedCategory,
     saving,
+    saveSnapshot,
+    defaultSnapshotType,
+    snapshotStatus,
+    snapshotError,
     setTitle,
     setDescription,
     setCategoryId,
     setTags,
+    setSaveSnapshot,
+    setDefaultSnapshotType,
     runAIAnalysis,
     retryAnalysis,
     applyAIRecommendedCategory,
@@ -61,10 +67,16 @@ export function SavePanel({
       aiStatus={aiStatus}
       aiError={aiError}
       saving={saving}
+      saveSnapshot={saveSnapshot}
+      defaultSnapshotType={defaultSnapshotType}
+      snapshotStatus={snapshotStatus}
+      snapshotError={snapshotError}
       onTitleChange={setTitle}
       onDescriptionChange={setDescription}
       onCategoryChange={setCategoryId}
       onTagsChange={setTags}
+      onSaveSnapshotChange={setSaveSnapshot}
+      onDefaultSnapshotTypeChange={setDefaultSnapshotType}
       onLoadSuggestions={runAIAnalysis}
       onApplyAICategory={applyAIRecommendedCategory}
       onRetry={retryAnalysis}

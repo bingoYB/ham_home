@@ -1,5 +1,83 @@
 # Extension 组件文档
 
+## SavePanel
+
+保存当前页面为 HamHome 书签的弹出面板，负责书签表单、AI 推荐入口和页面快照保存策略。
+
+### SavePanelView
+
+保存面板展示组件。业务状态由 `useSavePanel` 注入，组件只负责渲染表单、快照开关和操作按钮。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| title | `string` | ✓ | - | 书签标题 |
+| description | `string` | ✓ | - | 书签摘要 |
+| categoryId | `string \| null` | ✓ | - | 当前分类 ID |
+| tags | `string[]` | ✓ | - | 当前标签列表 |
+| categories | `LocalCategory[]` | ✓ | - | 可选分类列表 |
+| allTags | `string[]` | ✓ | - | 标签建议列表 |
+| existingBookmark | `LocalBookmark \| null` | ✓ | - | 当前 URL 已存在的书签 |
+| aiRecommendedCategory | `string \| null` | ✓ | - | AI 推荐但未创建的分类 |
+| aiStatus | `AIStatusType` | ✓ | - | AI 推荐状态 |
+| aiError | `string \| null` | ✓ | - | AI 错误信息 |
+| saving | `boolean` | ✓ | - | 是否正在保存 |
+| saveSnapshot | `boolean` | ✓ | - | 本次保存是否保存快照 |
+| defaultSnapshotType | `DefaultSnapshotType` | ✓ | - | 本次保存使用的快照类型策略 |
+| snapshotStatus | `SavePanelSnapshotStatus` | ✓ | - | 书签与快照保存状态 |
+| snapshotError | `string \| null` | ✓ | - | 快照保存错误信息 |
+| onTitleChange | `(value: string) => void` | ✓ | - | 标题变更回调 |
+| onDescriptionChange | `(value: string) => void` | ✓ | - | 摘要变更回调 |
+| onCategoryChange | `(value: string \| null) => void` | ✓ | - | 分类变更回调 |
+| onTagsChange | `(value: string[]) => void` | ✓ | - | 标签变更回调 |
+| onSaveSnapshotChange | `(value: boolean) => void` | ✓ | - | 快照开关变更回调 |
+| onDefaultSnapshotTypeChange | `(value: DefaultSnapshotType) => void` | ✓ | - | 快照类型策略变更回调 |
+| onLoadSuggestions | `() => void` | ✓ | - | 触发 AI 推荐 |
+| onApplyAICategory | `() => void` | ✓ | - | 应用 AI 推荐分类 |
+| onRetry | `() => void` | ✓ | - | 重试 AI 推荐 |
+| onConfigureAI | `() => void` | - | - | 打开 AI 设置 |
+| onSave | `() => void` | ✓ | - | 保存书签 |
+| onCancel | `() => void` | - | - | 取消保存 |
+| onDelete | `() => void` | - | - | 删除现有书签 |
+
+**用法示例：**
+
+```tsx
+<SavePanelView
+  title={title}
+  description={description}
+  categoryId={categoryId}
+  tags={tags}
+  categories={categories}
+  allTags={allTags}
+  existingBookmark={existingBookmark}
+  aiRecommendedCategory={aiRecommendedCategory}
+  aiStatus={aiStatus}
+  aiError={aiError}
+  saving={saving}
+  saveSnapshot={saveSnapshot}
+  defaultSnapshotType={defaultSnapshotType}
+  snapshotStatus={snapshotStatus}
+  snapshotError={snapshotError}
+  onTitleChange={setTitle}
+  onDescriptionChange={setDescription}
+  onCategoryChange={setCategoryId}
+  onTagsChange={setTags}
+  onSaveSnapshotChange={setSaveSnapshot}
+  onDefaultSnapshotTypeChange={setDefaultSnapshotType}
+  onLoadSuggestions={runAIAnalysis}
+  onApplyAICategory={applyAIRecommendedCategory}
+  onRetry={retryAnalysis}
+  onSave={save}
+/>
+```
+
+**行为说明：**
+
+- `saveSnapshot` 初始值跟随设置页的默认保存快照策略。
+- 保存面板内调整快照开关只影响本次保存，不反写设置页默认值。
+- `defaultSnapshotType` 为 `none` 时会关闭本次快照保存。
+- 快照保存失败不会回滚已保存书签，面板会保留错误状态，用户可稍后通过书签管理页重试。
+
 ## bookmarkPanel
 
 书签面板相关组件，用于 Content UI 侧边书签浏览。
@@ -217,6 +295,105 @@ const { container: portalContainer } = useContentUI();
 ```tsx
 <BookmarkListItem bookmark={bookmark} />
 ```
+
+---
+
+## bookmarkListMng
+
+书签管理页面组件，用于主应用中的网格/列表展示、编辑和快照操作。
+
+### BookmarkCard
+
+网格视图书签卡片，展示书签摘要、分类、标签和更多操作菜单。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| bookmark | `LocalBookmark` | ✓ | - | 书签数据 |
+| categoryName | `string` | ✓ | - | 展示用分类路径 |
+| formattedDate | `string` | ✓ | - | 格式化后的创建时间 |
+| isSelected | `boolean` | ✓ | - | 是否被批量选中 |
+| isHighlighted | `boolean` | - | `false` | 是否高亮 |
+| columnSize | `number` | - | `356` | 瀑布流列宽 |
+| onToggleSelect | `() => void` | ✓ | - | 切换选中状态 |
+| onOpen | `() => void` | ✓ | - | 打开书签 |
+| onEdit | `() => void` | ✓ | - | 编辑书签 |
+| onDelete | `() => void` | ✓ | - | 删除书签 |
+| onViewSnapshot | `() => void` | - | - | 查看快照 |
+| onSaveSnapshot | `() => void` | - | - | 保存或更新快照 |
+| onDeleteSnapshot | `() => void` | - | - | 删除快照 |
+| onReanalyzeAI | `() => void` | - | - | 重新执行 AI 分析 |
+| isProcessingAI | `boolean` | - | - | AI 批处理是否运行中 |
+| t | `(key: string, options?: Record<string, unknown>) => string` | ✓ | - | i18n 翻译函数 |
+
+**用法示例：**
+
+```tsx
+<BookmarkCard
+  bookmark={bookmark}
+  categoryName={categoryName}
+  formattedDate={formattedDate}
+  isSelected={false}
+  onToggleSelect={toggleSelect}
+  onOpen={openBookmark}
+  onEdit={editBookmark}
+  onDelete={deleteBookmark}
+  onViewSnapshot={bookmark.hasSnapshot ? viewSnapshot : undefined}
+  onSaveSnapshot={saveSnapshot}
+  onDeleteSnapshot={bookmark.hasSnapshot ? deleteSnapshot : undefined}
+  t={t}
+/>
+```
+
+**行为说明：**
+
+- 有快照时展示 `查看快照` 和 `删除快照`。
+- 始终可通过更多菜单触发 `保存快照` 或 `更新快照`。
+- 快照操作由父组件注入，组件不直接访问存储或浏览器 API。
+
+### BookmarkListItem（管理列表）
+
+列表视图书签行，展示书签标题、域名、分类、时间、标签和更多操作菜单。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| bookmark | `LocalBookmark` | ✓ | - | 书签数据 |
+| categoryName | `string` | ✓ | - | 展示用分类路径 |
+| formattedDate | `string` | ✓ | - | 格式化后的创建时间 |
+| isSelected | `boolean` | ✓ | - | 是否被批量选中 |
+| isHighlighted | `boolean` | - | `false` | 是否高亮 |
+| onToggleSelect | `() => void` | ✓ | - | 切换选中状态 |
+| onOpen | `() => void` | ✓ | - | 打开书签 |
+| onEdit | `() => void` | ✓ | - | 编辑书签 |
+| onDelete | `() => void` | ✓ | - | 删除书签 |
+| onViewSnapshot | `() => void` | - | - | 查看快照 |
+| onSaveSnapshot | `() => void` | - | - | 保存或更新快照 |
+| onDeleteSnapshot | `() => void` | - | - | 删除快照 |
+| onReanalyzeAI | `() => void` | - | - | 重新执行 AI 分析 |
+| isProcessingAI | `boolean` | - | - | AI 批处理是否运行中 |
+| t | `(key: string, options?: Record<string, unknown>) => string` | ✓ | - | i18n 翻译函数 |
+
+**用法示例：**
+
+```tsx
+<BookmarkListItem
+  bookmark={bookmark}
+  categoryName={categoryName}
+  formattedDate={formattedDate}
+  isSelected={false}
+  onToggleSelect={toggleSelect}
+  onOpen={openBookmark}
+  onEdit={editBookmark}
+  onDelete={deleteBookmark}
+  onSaveSnapshot={saveSnapshot}
+  t={t}
+/>
+```
+
+**行为说明：**
+
+- 快照菜单项与网格视图一致。
+- 快照状态来自 `bookmark.hasSnapshot`，删除快照后父组件需要刷新书签列表。
+- 组件保持展示职责，不直接执行快照存储逻辑。
 
 ---
 

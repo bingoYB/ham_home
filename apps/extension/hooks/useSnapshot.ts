@@ -5,7 +5,7 @@
 import { useState, useCallback } from 'react';
 import { snapshotStorage, bookmarkStorage } from '@/lib/storage';
 import { getBackgroundService } from '@/lib/services';
-import type { Snapshot } from '@/types';
+import type { Snapshot, SnapshotContentType } from '@/types';
 
 interface UseSnapshotResult {
   /** 当前查看的快照 URL */
@@ -21,7 +21,11 @@ interface UseSnapshotResult {
   /** 检查书签是否有快照 */
   hasSnapshot: (bookmarkId: string) => Promise<boolean>;
   /** 手动保存当前页面快照 */
-  saveSnapshot: (bookmarkId: string) => Promise<boolean>;
+  saveSnapshot: (
+    bookmarkId: string,
+    content?: string,
+    type?: SnapshotContentType,
+  ) => Promise<boolean>;
   /** 删除快照 */
   deleteSnapshot: (bookmarkId: string) => Promise<void>;
   /** 获取存储使用情况 */
@@ -81,21 +85,30 @@ export function useSnapshot(): UseSnapshotResult {
   /**
    * 手动保存当前页面快照
    */
-  const saveSnapshot = useCallback(async (bookmarkId: string): Promise<boolean> => {
+  const saveSnapshot = useCallback(async (
+    bookmarkId: string,
+    content?: string,
+    type: SnapshotContentType = 'text/html',
+  ): Promise<boolean> => {
     setLoading(true);
     setError(null);
 
     try {
-      // 获取页面 HTML (通过 proxy-service)
-      const backgroundService = getBackgroundService();
-      const html = await backgroundService.getPageHtml();
+      let snapshotContent = content;
+      let snapshotType = type;
 
-      if (!html) {
+      if (!snapshotContent) {
+        const backgroundService = getBackgroundService();
+        snapshotContent = await backgroundService.getPageHtml() || undefined;
+        snapshotType = 'text/html';
+      }
+
+      if (!snapshotContent) {
         setError('无法获取页面内容');
         return false;
       }
 
-      await snapshotStorage.saveSnapshot(bookmarkId, html);
+      await snapshotStorage.saveSnapshot(bookmarkId, snapshotContent, snapshotType);
       await bookmarkStorage.updateBookmark(bookmarkId, {
         hasSnapshot: true,
       });

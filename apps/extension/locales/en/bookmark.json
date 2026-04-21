@@ -75,9 +75,13 @@
       "openInNewTab": "Open in new tab",
       "download": "Download snapshot",
       "delete": "Delete snapshot",
+      "save": "Save snapshot",
+      "update": "Update snapshot",
       "deleteConfirm": "Are you sure you want to delete this snapshot? This action cannot be undone.",
       "saveSuccess": "Snapshot saved successfully",
       "saveFailed": "Failed to save snapshot",
+      "deleteSuccess": "Snapshot deleted",
+      "deleteFailed": "Failed to delete snapshot",
       "noSnapshot": "No snapshot available"
     }
   },
@@ -150,7 +154,27 @@
     "cancel": "Cancel",
     "updateBookmark": "Update Bookmark",
     "saveBookmark": "Save Bookmark",
-    "saving": "Saving..."
+    "saving": "Saving...",
+    "snapshot": {
+      "title": "Save Snapshot",
+      "enabledDesc": "Save offline content for later review",
+      "disabledDesc": "Save bookmark info only to reduce storage usage",
+      "typeLabel": "Snapshot type",
+      "types": {
+        "auto": "Auto",
+        "markdown": "Markdown first",
+        "html": "Full HTML",
+        "none": "Do not save by default"
+      },
+      "status": {
+        "savingBookmark": "Saving bookmark",
+        "bookmarkSaved": "Bookmark saved",
+        "savingSnapshot": "Saving snapshot",
+        "skipped": "Bookmark saved without snapshot",
+        "saved": "Snapshot saved",
+        "failed": "Snapshot failed, you can retry later"
+      }
+    }
   },
   "contentPanel": {
     "openPanel": "Open Bookmark Panel",

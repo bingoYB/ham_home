@@ -5,7 +5,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import {
   bookmarkStorage,
-  snapshotStorage,
   configStorage,
   aiCacheStorage,
 } from "@/lib/storage";
@@ -16,9 +15,23 @@ import {
 } from "@/lib/agent";
 import { getBackgroundService } from "@/lib/services";
 import { createMarkdownContent } from "defuddle/full";
-import type { PageContent, LocalBookmark, LocalCategory } from "@/types";
+import type {
+  DefaultSnapshotType,
+  PageContent,
+  LocalBookmark,
+  LocalCategory,
+} from "@/types";
 import type { AIStatusType } from "./AIStatus";
 import { parseCategoryPath } from "../common/CategoryTree";
+
+export type SavePanelSnapshotStatus =
+  | "idle"
+  | "savingBookmark"
+  | "savingSnapshot"
+  | "bookmarkSaved"
+  | "skipped"
+  | "saved"
+  | "failed";
 
 interface UseSavePanelProps {
   pageContent: PageContent;
@@ -45,6 +58,10 @@ interface UseSavePanelResult {
 
   // 操作状态
   saving: boolean;
+  saveSnapshot: boolean;
+  defaultSnapshotType: DefaultSnapshotType;
+  snapshotStatus: SavePanelSnapshotStatus;
+  snapshotError: string | null;
 
   // 表单操作
   setUrl: (value: string) => void;
@@ -52,6 +69,8 @@ interface UseSavePanelResult {
   setDescription: (value: string) => void;
   setCategoryId: (value: string | null) => void;
   setTags: (value: string[]) => void;
+  setSaveSnapshot: (value: boolean) => void;
+  setDefaultSnapshotType: (value: DefaultSnapshotType) => void;
 
   // 业务操作
   runAIAnalysis: () => Promise<void>;
@@ -71,7 +90,7 @@ export function useSavePanel({
   const markdown = useMemo(() => {
     if (!pageContent.content) return "";
     return createMarkdownContent(pageContent.htmlContent, pageContent.url);
-  }, [pageContent.content, pageContent.url]);
+  }, [pageContent.content, pageContent.htmlContent, pageContent.url]);
 
   // 表单状态
   const [url, setUrl] = useState(pageContent.url);
@@ -96,19 +115,53 @@ export function useSavePanel({
 
   // 操作状态
   const [saving, setSaving] = useState(false);
+  const [saveSnapshot, setSaveSnapshotState] = useState(false);
+  const [defaultSnapshotType, setDefaultSnapshotTypeState] =
+    useState<DefaultSnapshotType>("auto");
+  const [snapshotStatus, setSnapshotStatus] =
+    useState<SavePanelSnapshotStatus>("idle");
+  const [snapshotError, setSnapshotError] = useState<string | null>(null);
 
   // 加载分类和标签列表
   useEffect(() => {
     const loadData = async () => {
-      const [cats, existingTags] = await Promise.all([
+      const [cats, existingTags, settings] = await Promise.all([
         bookmarkStorage.getCategories(),
         bookmarkStorage.getAllTags(),
+        configStorage.getSettings(),
       ]);
+      const snapshotType = normalizeDefaultSnapshotType(
+        settings.defaultSnapshotType,
+      );
       setCategories(cats);
       setAllTags(existingTags);
+      setDefaultSnapshotTypeState(snapshotType);
+      setSaveSnapshotState(
+        settings.autoSaveSnapshot && snapshotType !== "none",
+      );
       setDataLoaded(true);
     };
     loadData();
+  }, []);
+
+  const setSaveSnapshot = useCallback(
+    (value: boolean) => {
+      setSaveSnapshotState(value);
+      setSnapshotStatus("idle");
+      setSnapshotError(null);
+      if (value && defaultSnapshotType === "none") {
+        setDefaultSnapshotTypeState("auto");
+      }
+    },
+    [defaultSnapshotType],
+  );
+
+  const setDefaultSnapshotType = useCallback((value: DefaultSnapshotType) => {
+    const snapshotType = normalizeDefaultSnapshotType(value);
+    setDefaultSnapshotTypeState(snapshotType);
+    setSnapshotStatus("idle");
+    setSnapshotError(null);
+    setSaveSnapshotState(snapshotType !== "none");
   }, []);
 
   // 如果已存在书签，填充现有数据
@@ -303,10 +356,10 @@ export function useSavePanel({
     if (!title?.trim() || !url.trim()) return;
 
     setSaving(true);
+    setSnapshotStatus("savingBookmark");
+    setSnapshotError(null);
 
     try {
-      const settings = await configStorage.getSettings();
-
       const data = {
         url: url.trim(),
         title: title.trim(),
@@ -315,7 +368,7 @@ export function useSavePanel({
         categoryId,
         tags,
         favicon: pageContent.favicon,
-        hasSnapshot: false,
+        hasSnapshot: existingBookmark?.hasSnapshot ?? false,
       };
 
       let bookmark: LocalBookmark;
@@ -330,26 +383,7 @@ export function useSavePanel({
         // 创建新书签
         bookmark = await bookmarkStorage.createBookmark(data);
       }
-
-      // 自动保存快照
-      // 交由 Background Worker 异步执行，防止当前 UI (Popup) 关闭导致 Promise 死亡而中断保存
-      if (settings.autoSaveSnapshot) {
-        try {
-          const backgroundService = getBackgroundService();
-          // 如果页面可读并且成功解析出了 markdown，把 markdown 传递给后台直接保存
-          // 否则传递 undefined，后台会自动执行 SingleFile HTML 兜底捕获并保存
-          const snapshotMarkdown = (pageContent.isReaderable && markdown) ? markdown : undefined;
-          
-          backgroundService.saveSnapshotBackground(
-            bookmark.id,
-            snapshotMarkdown
-          ).catch((e) => {
-            console.warn("[useSavePanel] Failed to trigger background snapshot:", e);
-          });
-        } catch (e) {
-          console.warn("[useSavePanel] Failed to save snapshot asynchronously:", e);
-        }
-      }
+      setSnapshotStatus("bookmarkSaved");
 
       // 添加 embedding 生成任务（在 background 中执行）
       try {
@@ -359,9 +393,52 @@ export function useSavePanel({
         console.warn("[useSavePanel] Failed to queue embedding:", e);
       }
 
+      if (saveSnapshot) {
+        setSnapshotStatus("savingSnapshot");
+        try {
+          const backgroundService = getBackgroundService();
+          const snapshotMarkdown = shouldUseMarkdownSnapshot(
+            defaultSnapshotType,
+            pageContent,
+            markdown,
+          )
+            ? markdown
+            : undefined;
+
+          const result = await backgroundService.saveSnapshotBackground(
+            bookmark.id,
+            {
+              markdown: snapshotMarkdown,
+              mode: defaultSnapshotType,
+            },
+          );
+
+          if (!result.ok) {
+            setSnapshotStatus("failed");
+            setSnapshotError(result.error ?? "快照保存失败，可稍后重试");
+            return;
+          }
+
+          setSnapshotStatus(result.skipped ? "skipped" : "saved");
+        } catch (e) {
+          console.warn(
+            "[useSavePanel] Failed to save snapshot asynchronously:",
+            e,
+          );
+          setSnapshotStatus("failed");
+          setSnapshotError(
+            e instanceof Error ? e.message : "快照保存失败，可稍后重试",
+          );
+          return;
+        }
+      } else {
+        setSnapshotStatus("skipped");
+      }
+
       onSaved?.();
     } catch (err: unknown) {
       console.error("[useSavePanel] Save failed:", err);
+      setSnapshotStatus("failed");
       alert(err instanceof Error ? err.message : "保存失败");
     } finally {
       setSaving(false);
@@ -373,7 +450,10 @@ export function useSavePanel({
     categoryId,
     tags,
     pageContent,
+    markdown,
     existingBookmark,
+    saveSnapshot,
+    defaultSnapshotType,
     onSaved,
   ]);
 
@@ -415,11 +495,17 @@ export function useSavePanel({
     aiStatus,
     aiError,
     saving,
+    saveSnapshot,
+    defaultSnapshotType,
+    snapshotStatus,
+    snapshotError,
     setUrl,
     setTitle,
     setDescription,
     setCategoryId,
     setTags,
+    setSaveSnapshot,
+    setDefaultSnapshotType,
     runAIAnalysis,
     retryAnalysis,
     applyAIRecommendedCategory,
@@ -430,6 +516,30 @@ export function useSavePanel({
 }
 
 // ========== 辅助函数 ==========
+
+function normalizeDefaultSnapshotType(
+  value?: DefaultSnapshotType,
+): DefaultSnapshotType {
+  if (
+    value === "auto" ||
+    value === "markdown" ||
+    value === "html" ||
+    value === "none"
+  ) {
+    return value;
+  }
+  return "auto";
+}
+
+function shouldUseMarkdownSnapshot(
+  type: DefaultSnapshotType,
+  pageContent: PageContent,
+  markdown: string,
+): boolean {
+  if (!markdown) return false;
+  if (type === "markdown") return true;
+  return type === "auto" && !!pageContent.isReaderable;
+}
 
 /**
  * 简单匹配分类名称（精确 + 模糊）

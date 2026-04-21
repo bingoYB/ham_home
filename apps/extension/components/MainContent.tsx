@@ -346,6 +346,7 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
     error: snapshotError,
     openSnapshot,
     closeSnapshot,
+    saveSnapshot,
     deleteSnapshot,
   } = useSnapshot();
 
@@ -425,6 +426,21 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
     openSnapshot(bookmark.id);
   };
 
+  const handleSaveSnapshot = async (bookmark: LocalBookmark) => {
+    const content = bookmark.content || bookmark.description || bookmark.title;
+    const ok = await saveSnapshot(
+      bookmark.id,
+      content,
+      "text/markdown;charset=utf-8",
+    );
+    if (ok) {
+      toast.success(t("bookmark:bookmark.snapshot.saveSuccess"));
+      refreshBookmarks();
+    } else {
+      toast.error(t("bookmark:bookmark.snapshot.saveFailed"));
+    }
+  };
+
   // 关闭快照查看器
   const handleCloseSnapshot = () => {
     setSnapshotBookmark(null);
@@ -449,6 +465,26 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
       handleCloseSnapshot();
     } catch (err) {
       console.error("[MainContent] Failed to delete snapshot:", err);
+    }
+  };
+
+  const handleDeleteBookmarkSnapshot = async (bookmark: LocalBookmark) => {
+    const confirmed = await confirm({
+      title: t("bookmark:bookmark.snapshot.deleteConfirm"),
+      description: t("bookmark:bookmark.snapshot.deleteConfirm"),
+      confirmText: t("common:common.delete"),
+      cancelText: t("common:common.cancel"),
+      variant: "destructive",
+    });
+    if (!confirmed) return;
+
+    try {
+      await deleteSnapshot(bookmark.id);
+      toast.success(t("bookmark:bookmark.snapshot.deleteSuccess"));
+      refreshBookmarks();
+    } catch (err) {
+      console.error("[MainContent] Failed to delete snapshot:", err);
+      toast.error(t("bookmark:bookmark.snapshot.deleteFailed"));
     }
   };
 
@@ -936,6 +972,12 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
                     onViewSnapshot={
                       bm.hasSnapshot ? () => handleViewSnapshot(bm) : undefined
                     }
+                    onSaveSnapshot={() => handleSaveSnapshot(bm)}
+                    onDeleteSnapshot={
+                      bm.hasSnapshot
+                        ? () => handleDeleteBookmarkSnapshot(bm)
+                        : undefined
+                    }
                     onReanalyzeAI={() => startBatchAITask([bm.id])}
                     isProcessingAI={isBatchAIProcessing}
                     columnSize={masonryConfig.columnSize}
@@ -979,6 +1021,12 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
                     onViewSnapshot={
                       bookmark.hasSnapshot
                         ? () => handleViewSnapshot(bookmark)
+                        : undefined
+                    }
+                    onSaveSnapshot={() => handleSaveSnapshot(bookmark)}
+                    onDeleteSnapshot={
+                      bookmark.hasSnapshot
+                        ? () => handleDeleteBookmarkSnapshot(bookmark)
                         : undefined
                     }
                     onReanalyzeAI={() => startBatchAITask([bookmark.id])}

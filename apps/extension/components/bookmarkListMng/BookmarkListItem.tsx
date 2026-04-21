@@ -36,6 +36,8 @@ export interface BookmarkListItemProps {
   onEdit: () => void;
   onDelete: () => void;
   onViewSnapshot?: () => void;
+  onSaveSnapshot?: () => void;
+  onDeleteSnapshot?: () => void;
   onReanalyzeAI?: () => void;
   isProcessingAI?: boolean;
   t: (key: string, options?: Record<string, unknown>) => string;
@@ -52,6 +54,8 @@ export function BookmarkListItem({
   onEdit,
   onDelete,
   onViewSnapshot,
+  onSaveSnapshot,
+  onDeleteSnapshot,
   onReanalyzeAI,
   isProcessingAI,
   t,
@@ -178,13 +182,29 @@ export function BookmarkListItem({
               <Share2 className="h-4 w-4 mr-2" />
               {t("bookmark:bookmark.share")}
             </DropdownMenuItem>
-            {bookmark.hasSnapshot && onViewSnapshot && (
+            {(onViewSnapshot || onSaveSnapshot || onDeleteSnapshot) && (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={onViewSnapshot}>
-                  <Camera className="h-4 w-4 mr-2" />
-                  {t("bookmark:bookmark.viewSnapshot")}
-                </DropdownMenuItem>
+                {bookmark.hasSnapshot && onViewSnapshot && (
+                  <DropdownMenuItem onClick={onViewSnapshot}>
+                    <Camera className="h-4 w-4 mr-2" />
+                    {t("bookmark:bookmark.viewSnapshot")}
+                  </DropdownMenuItem>
+                )}
+                {onSaveSnapshot && (
+                  <DropdownMenuItem onClick={onSaveSnapshot}>
+                    <Camera className="h-4 w-4 mr-2" />
+                    {bookmark.hasSnapshot
+                      ? t("bookmark:bookmark.snapshot.update")
+                      : t("bookmark:bookmark.snapshot.save")}
+                  </DropdownMenuItem>
+                )}
+                {bookmark.hasSnapshot && onDeleteSnapshot && (
+                  <DropdownMenuItem onClick={onDeleteSnapshot}>
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    {t("bookmark:bookmark.snapshot.delete")}
+                  </DropdownMenuItem>
+                )}
               </>
             )}
             {onReanalyzeAI && (

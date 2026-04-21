@@ -90,6 +90,7 @@ import type { QueueProgress } from "@/lib/embedding/embedding-queue";
 import type { VectorStoreStats } from "@/lib/storage/vector-store";
 import type {
   CustomFilter,
+  DefaultSnapshotType,
   FilterCondition,
   AIProvider,
   EmbeddingConfig,
@@ -222,6 +223,23 @@ export function OptionsPage() {
     count: number;
     totalSize: number;
   } | null>(null);
+
+  const handleAutoSaveSnapshotChange = (checked: boolean) => {
+    updateAppSettings({
+      autoSaveSnapshot: checked,
+      defaultSnapshotType:
+        checked && (appSettings.defaultSnapshotType ?? "auto") === "none"
+          ? "auto"
+          : (appSettings.defaultSnapshotType ?? "auto"),
+    });
+  };
+
+  const handleDefaultSnapshotTypeChange = (value: DefaultSnapshotType) => {
+    updateAppSettings({
+      defaultSnapshotType: value,
+      autoSaveSnapshot: value !== "none",
+    });
+  };
 
   // 辅助函数：格式化字节大小
   const formatBytes = (bytes: number) => {
@@ -1584,10 +1602,45 @@ export function OptionsPage() {
                 </div>
                 <Switch
                   checked={appSettings.autoSaveSnapshot}
-                  onCheckedChange={(checked) =>
-                    updateAppSettings({ autoSaveSnapshot: checked })
-                  }
+                  onCheckedChange={handleAutoSaveSnapshotChange}
                 />
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>
+                    {t("settings:settings.general.defaultSnapshotType")}
+                  </Label>
+                  <p className="text-sm text-muted-foreground">
+                    {t("settings:settings.general.defaultSnapshotTypeDesc")}
+                  </p>
+                </div>
+                <Select
+                  value={appSettings.defaultSnapshotType ?? "auto"}
+                  onValueChange={(value) =>
+                    handleDefaultSnapshotTypeChange(
+                      value as DefaultSnapshotType,
+                    )
+                  }
+                >
+                  <SelectTrigger className="w-40">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="auto">
+                      {t("settings:settings.general.snapshotTypes.auto")}
+                    </SelectItem>
+                    <SelectItem value="markdown">
+                      {t("settings:settings.general.snapshotTypes.markdown")}
+                    </SelectItem>
+                    <SelectItem value="html">
+                      {t("settings:settings.general.snapshotTypes.html")}
+                    </SelectItem>
+                    <SelectItem value="none">
+                      {t("settings:settings.general.snapshotTypes.none")}
+                    </SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="flex items-center justify-between">

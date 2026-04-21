@@ -43,8 +43,16 @@
     "general": {
       "title": "通用设置",
       "description": "自定义你的使用体验",
-      "autoSaveSnapshot": "自动保存快快照",
+      "autoSaveSnapshot": "默认保存快照",
       "autoSaveSnapshotDesc": "保存书签时自动保存页面快照",
+      "defaultSnapshotType": "默认快照类型",
+      "defaultSnapshotTypeDesc": "决定保存面板中快照选项的默认策略",
+      "snapshotTypes": {
+        "auto": "自动",
+        "markdown": "Markdown 优先",
+        "html": "完整 HTML",
+        "none": "默认不保存"
+      },
       "enableOmniboxSearch": "地址栏搜索增强",
       "enableOmniboxSearchDesc": "在浏览器地址栏输入 'ham' 后按空格，即可通过关键词或语义搜索并打开书签",
       "shortcut": "快捷键",

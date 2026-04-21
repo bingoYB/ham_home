@@ -6,16 +6,29 @@ import {
   Loader2,
   Bookmark,
   FileText,
+  Camera,
   FolderOpen,
   Tag as TagIcon,
   AlignLeft,
 } from "lucide-react";
 import { useTranslation } from "react-i18next";
-import { Button, Input, Textarea, Label } from "@hamhome/ui";
+import {
+  Button,
+  Input,
+  Textarea,
+  Label,
+  Switch,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@hamhome/ui";
 import { TagInput } from "@/components/common/TagInput";
 import { CategorySelect } from "@/components/common/CategorySelect";
 import { AIStatus, type AIStatusType } from "./AIStatus";
-import type { LocalBookmark, LocalCategory } from "@/types";
+import type { DefaultSnapshotType, LocalBookmark, LocalCategory } from "@/types";
+import type { SavePanelSnapshotStatus } from "./useSavePanel";
 
 export interface SavePanelViewProps {
   title: string;
@@ -29,10 +42,16 @@ export interface SavePanelViewProps {
   aiStatus: AIStatusType;
   aiError: string | null;
   saving: boolean;
+  saveSnapshot: boolean;
+  defaultSnapshotType: DefaultSnapshotType;
+  snapshotStatus: SavePanelSnapshotStatus;
+  snapshotError: string | null;
   onTitleChange: (value: string) => void;
   onDescriptionChange: (value: string) => void;
   onCategoryChange: (value: string | null) => void;
   onTagsChange: (value: string[]) => void;
+  onSaveSnapshotChange: (value: boolean) => void;
+  onDefaultSnapshotTypeChange: (value: DefaultSnapshotType) => void;
   onLoadSuggestions: () => void;
   onApplyAICategory: () => void;
   onRetry: () => void;
@@ -54,10 +73,16 @@ export function SavePanelView({
   aiStatus,
   aiError,
   saving,
+  saveSnapshot,
+  defaultSnapshotType,
+  snapshotStatus,
+  snapshotError,
   onTitleChange,
   onDescriptionChange,
   onCategoryChange,
   onTagsChange,
+  onSaveSnapshotChange,
+  onDefaultSnapshotTypeChange,
   onLoadSuggestions,
   onApplyAICategory,
   onRetry,
@@ -90,6 +115,16 @@ export function SavePanelView({
         onApplyAICategory={onApplyAICategory}
         onRetry={onRetry}
         onConfigureAI={onConfigureAI}
+      />
+
+      <SnapshotOptions
+        saveSnapshot={saveSnapshot}
+        defaultSnapshotType={defaultSnapshotType}
+        snapshotStatus={snapshotStatus}
+        snapshotError={snapshotError}
+        disabled={saving}
+        onSaveSnapshotChange={onSaveSnapshotChange}
+        onDefaultSnapshotTypeChange={onDefaultSnapshotTypeChange}
       />
 
       <div className="flex gap-2 pt-2">
@@ -137,6 +172,104 @@ export function SavePanelView({
       </div>
     </div>
   );
+}
+
+interface SnapshotOptionsProps {
+  saveSnapshot: boolean;
+  defaultSnapshotType: DefaultSnapshotType;
+  snapshotStatus: SavePanelSnapshotStatus;
+  snapshotError: string | null;
+  disabled: boolean;
+  onSaveSnapshotChange: (value: boolean) => void;
+  onDefaultSnapshotTypeChange: (value: DefaultSnapshotType) => void;
+}
+
+function SnapshotOptions({
+  saveSnapshot,
+  defaultSnapshotType,
+  snapshotStatus,
+  snapshotError,
+  disabled,
+  onSaveSnapshotChange,
+  onDefaultSnapshotTypeChange,
+}: SnapshotOptionsProps) {
+  const { t } = useTranslation();
+  const statusKey = getSnapshotStatusKey(snapshotStatus);
+
+  return (
+    <div className="space-y-3 rounded-md border p-3">
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0 space-y-1">
+          <Label
+            htmlFor="save-snapshot"
+            className="flex items-center gap-2 text-sm font-medium"
+          >
+            <Camera className="h-4 w-4 text-indigo-500" />
+            {t("bookmark:savePanel.snapshot.title")}
+          </Label>
+          <p className="text-xs text-muted-foreground">
+            {saveSnapshot
+              ? t("bookmark:savePanel.snapshot.enabledDesc")
+              : t("bookmark:savePanel.snapshot.disabledDesc")}
+          </p>
+        </div>
+        <Switch
+          id="save-snapshot"
+          checked={saveSnapshot}
+          disabled={disabled}
+          onCheckedChange={onSaveSnapshotChange}
+        />
+      </div>
+
+      <div className="flex items-center justify-between gap-3">
+        <Label className="text-xs text-muted-foreground">
+          {t("bookmark:savePanel.snapshot.typeLabel")}
+        </Label>
+        <Select
+          value={defaultSnapshotType}
+          disabled={disabled}
+          onValueChange={(value) =>
+            onDefaultSnapshotTypeChange(value as DefaultSnapshotType)
+          }
+        >
+          <SelectTrigger className="h-8 w-40 text-xs shadow-none">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="auto">
+              {t("bookmark:savePanel.snapshot.types.auto")}
+            </SelectItem>
+            <SelectItem value="markdown">
+              {t("bookmark:savePanel.snapshot.types.markdown")}
+            </SelectItem>
+            <SelectItem value="html">
+              {t("bookmark:savePanel.snapshot.types.html")}
+            </SelectItem>
+            <SelectItem value="none">
+              {t("bookmark:savePanel.snapshot.types.none")}
+            </SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
+
+      {statusKey && (
+        <p
+          className={`text-xs ${
+            snapshotStatus === "failed"
+              ? "text-destructive"
+              : "text-muted-foreground"
+          }`}
+        >
+          {snapshotError || t(statusKey)}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function getSnapshotStatusKey(status: SavePanelSnapshotStatus): string | null {
+  if (status === "idle") return null;
+  return `bookmark:savePanel.snapshot.status.${status}`;
 }
 
 interface BookmarkFormProps {

@@ -30,6 +30,7 @@ const DEFAULT_EMBEDDING_CONFIG: EmbeddingConfig = {
 // 默认设置
 const DEFAULT_SETTINGS: LocalSettings = {
   autoSaveSnapshot: true,
+  defaultSnapshotType: 'auto',
   enableOmniboxSearch: true,
   defaultCategory: null,
   theme: 'system',
@@ -79,7 +80,8 @@ class ConfigStorage {
    * 获取用户设置
    */
   async getSettings(): Promise<LocalSettings> {
-    return settingsItem.getValue();
+    const settings = await settingsItem.getValue();
+    return { ...DEFAULT_SETTINGS, ...settings };
   }
 
   /**
@@ -195,7 +197,7 @@ class ConfigStorage {
    */
   watchSettings(callback: (settings: LocalSettings) => void): () => void {
     return settingsItem.watch((newValue: LocalSettings | null) => {
-      callback(newValue ?? DEFAULT_SETTINGS);
+      callback({ ...DEFAULT_SETTINGS, ...(newValue ?? {}) });
     });
   }
 
