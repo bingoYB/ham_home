@@ -77,11 +77,17 @@
       "delete": "Delete snapshot",
       "save": "Save snapshot",
       "update": "Update snapshot",
+      "syncToObsidian": "Sync to Obsidian",
+      "syncSelectedToObsidian": "Sync selected snapshots",
       "deleteConfirm": "Are you sure you want to delete this snapshot? This action cannot be undone.",
       "saveSuccess": "Snapshot saved successfully",
       "saveFailed": "Failed to save snapshot",
       "deleteSuccess": "Snapshot deleted",
       "deleteFailed": "Failed to delete snapshot",
+      "obsidianSyncSuccess": "Synced to Obsidian",
+      "obsidianSyncSkipped": "Snapshot unchanged, sync skipped",
+      "obsidianSyncFailed": "Failed to sync to Obsidian",
+      "obsidianBatchResult": "Obsidian sync completed: {{success}} succeeded, {{failed}} failed, {{skipped}} skipped",
       "noSnapshot": "No snapshot available"
     }
   },
@@ -160,6 +166,7 @@
       "enabledDesc": "Save offline content for later review",
       "disabledDesc": "Save bookmark info only to reduce storage usage",
       "typeLabel": "Snapshot type",
+      "syncToObsidian": "Sync to Obsidian after saving",
       "types": {
         "auto": "Auto",
         "markdown": "Markdown first",
@@ -173,6 +180,12 @@
         "skipped": "Bookmark saved without snapshot",
         "saved": "Snapshot saved",
         "failed": "Snapshot failed, you can retry later"
+      },
+      "obsidianStatus": {
+        "syncing": "Syncing to Obsidian",
+        "synced": "Synced to Obsidian",
+        "skipped": "Obsidian sync skipped",
+        "failed": "Failed to sync to Obsidian"
       }
     }
   },

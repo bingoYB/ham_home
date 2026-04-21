@@ -25,12 +25,17 @@
 | defaultSnapshotType | `DefaultSnapshotType` | ✓ | - | 本次保存使用的快照类型策略 |
 | snapshotStatus | `SavePanelSnapshotStatus` | ✓ | - | 书签与快照保存状态 |
 | snapshotError | `string \| null` | ✓ | - | 快照保存错误信息 |
+| syncToObsidian | `boolean` | ✓ | - | 本次保存后是否同步 Markdown 快照到 Obsidian |
+| obsidianEnabled | `boolean` | ✓ | - | Obsidian 保存是否已启用 |
+| obsidianStatus | `SavePanelObsidianStatus` | ✓ | - | Obsidian 同步状态 |
+| obsidianError | `string \| null` | ✓ | - | Obsidian 同步错误信息 |
 | onTitleChange | `(value: string) => void` | ✓ | - | 标题变更回调 |
 | onDescriptionChange | `(value: string) => void` | ✓ | - | 摘要变更回调 |
 | onCategoryChange | `(value: string \| null) => void` | ✓ | - | 分类变更回调 |
 | onTagsChange | `(value: string[]) => void` | ✓ | - | 标签变更回调 |
 | onSaveSnapshotChange | `(value: boolean) => void` | ✓ | - | 快照开关变更回调 |
 | onDefaultSnapshotTypeChange | `(value: DefaultSnapshotType) => void` | ✓ | - | 快照类型策略变更回调 |
+| onSyncToObsidianChange | `(value: boolean) => void` | ✓ | - | Obsidian 同步开关变更回调 |
 | onLoadSuggestions | `() => void` | ✓ | - | 触发 AI 推荐 |
 | onApplyAICategory | `() => void` | ✓ | - | 应用 AI 推荐分类 |
 | onRetry | `() => void` | ✓ | - | 重试 AI 推荐 |
@@ -58,12 +63,17 @@
   defaultSnapshotType={defaultSnapshotType}
   snapshotStatus={snapshotStatus}
   snapshotError={snapshotError}
+  syncToObsidian={syncToObsidian}
+  obsidianEnabled={obsidianEnabled}
+  obsidianStatus={obsidianStatus}
+  obsidianError={obsidianError}
   onTitleChange={setTitle}
   onDescriptionChange={setDescription}
   onCategoryChange={setCategoryId}
   onTagsChange={setTags}
   onSaveSnapshotChange={setSaveSnapshot}
   onDefaultSnapshotTypeChange={setDefaultSnapshotType}
+  onSyncToObsidianChange={setSyncToObsidian}
   onLoadSuggestions={runAIAnalysis}
   onApplyAICategory={applyAIRecommendedCategory}
   onRetry={retryAnalysis}
@@ -76,6 +86,7 @@
 - `saveSnapshot` 初始值跟随设置页的默认保存快照策略。
 - 保存面板内调整快照开关只影响本次保存，不反写设置页默认值。
 - `defaultSnapshotType` 为 `none` 时会关闭本次快照保存。
+- 启用 Obsidian 保存后，面板会显示 `保存后同步到 Obsidian` 开关；只同步 Markdown 快照。
 - 快照保存失败不会回滚已保存书签，面板会保留错误状态，用户可稍后通过书签管理页重试。
 
 ## bookmarkPanel
@@ -321,6 +332,7 @@ const { container: portalContainer } = useContentUI();
 | onViewSnapshot | `() => void` | - | - | 查看快照 |
 | onSaveSnapshot | `() => void` | - | - | 保存或更新快照 |
 | onDeleteSnapshot | `() => void` | - | - | 删除快照 |
+| onSyncToObsidian | `() => void` | - | - | 同步 Markdown 快照到 Obsidian |
 | onReanalyzeAI | `() => void` | - | - | 重新执行 AI 分析 |
 | isProcessingAI | `boolean` | - | - | AI 批处理是否运行中 |
 | t | `(key: string, options?: Record<string, unknown>) => string` | ✓ | - | i18n 翻译函数 |
@@ -340,6 +352,7 @@ const { container: portalContainer } = useContentUI();
   onViewSnapshot={bookmark.hasSnapshot ? viewSnapshot : undefined}
   onSaveSnapshot={saveSnapshot}
   onDeleteSnapshot={bookmark.hasSnapshot ? deleteSnapshot : undefined}
+  onSyncToObsidian={syncToObsidian}
   t={t}
 />
 ```
@@ -348,6 +361,7 @@ const { container: portalContainer } = useContentUI();
 
 - 有快照时展示 `查看快照` 和 `删除快照`。
 - 始终可通过更多菜单触发 `保存快照` 或 `更新快照`。
+- 可通过更多菜单触发 `同步到 Obsidian`，同步行为由父组件注入。
 - 快照操作由父组件注入，组件不直接访问存储或浏览器 API。
 
 ### BookmarkListItem（管理列表）
@@ -368,6 +382,7 @@ const { container: portalContainer } = useContentUI();
 | onViewSnapshot | `() => void` | - | - | 查看快照 |
 | onSaveSnapshot | `() => void` | - | - | 保存或更新快照 |
 | onDeleteSnapshot | `() => void` | - | - | 删除快照 |
+| onSyncToObsidian | `() => void` | - | - | 同步 Markdown 快照到 Obsidian |
 | onReanalyzeAI | `() => void` | - | - | 重新执行 AI 分析 |
 | isProcessingAI | `boolean` | - | - | AI 批处理是否运行中 |
 | t | `(key: string, options?: Record<string, unknown>) => string` | ✓ | - | i18n 翻译函数 |
@@ -385,6 +400,7 @@ const { container: portalContainer } = useContentUI();
   onEdit={editBookmark}
   onDelete={deleteBookmark}
   onSaveSnapshot={saveSnapshot}
+  onSyncToObsidian={syncToObsidian}
   t={t}
 />
 ```
@@ -392,6 +408,7 @@ const { container: portalContainer } = useContentUI();
 **行为说明：**
 
 - 快照菜单项与网格视图一致。
+- Obsidian 同步菜单项始终由父组件控制是否可用。
 - 快照状态来自 `bookmark.hasSnapshot`，删除快照后父组件需要刷新书签列表。
 - 组件保持展示职责，不直接执行快照存储逻辑。
 

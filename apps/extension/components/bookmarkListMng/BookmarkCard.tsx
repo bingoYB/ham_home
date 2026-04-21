@@ -11,6 +11,7 @@ import {
   Share2,
   Trash2,
   Camera,
+  Download,
   ExternalLink,
   Sparkles,
 } from "lucide-react";
@@ -42,6 +43,7 @@ export interface BookmarkCardProps {
   onViewSnapshot?: () => void;
   onSaveSnapshot?: () => void;
   onDeleteSnapshot?: () => void;
+  onSyncToObsidian?: () => void;
   onReanalyzeAI?: () => void;
   isProcessingAI?: boolean;
   t: (key: string, options?: Record<string, unknown>) => string;
@@ -61,6 +63,7 @@ export function BookmarkCard({
   onViewSnapshot,
   onSaveSnapshot,
   onDeleteSnapshot,
+  onSyncToObsidian,
   onReanalyzeAI,
   isProcessingAI,
   t,
@@ -156,7 +159,10 @@ export function BookmarkCard({
                   <Share2 className="h-4 w-4 mr-2" />
                   {t("bookmark:bookmark.share")}
                 </DropdownMenuItem>
-                {(onViewSnapshot || onSaveSnapshot || onDeleteSnapshot) && (
+                {(onViewSnapshot ||
+                  onSaveSnapshot ||
+                  onDeleteSnapshot ||
+                  onSyncToObsidian) && (
                   <>
                     <DropdownMenuSeparator />
                     {bookmark.hasSnapshot && onViewSnapshot && (
@@ -177,6 +183,12 @@ export function BookmarkCard({
                       <DropdownMenuItem onClick={onDeleteSnapshot}>
                         <Trash2 className="h-4 w-4 mr-2" />
                         {t("bookmark:bookmark.snapshot.delete")}
+                      </DropdownMenuItem>
+                    )}
+                    {onSyncToObsidian && (
+                      <DropdownMenuItem onClick={onSyncToObsidian}>
+                        <Download className="h-4 w-4 mr-2" />
+                        {t("bookmark:bookmark.snapshot.syncToObsidian")}
                       </DropdownMenuItem>
                     )}
                   </>

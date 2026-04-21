@@ -77,11 +77,17 @@
       "delete": "删除快照",
       "save": "保存快照",
       "update": "更新快照",
+      "syncToObsidian": "同步到 Obsidian",
+      "syncSelectedToObsidian": "同步选中快照",
       "deleteConfirm": "确定要删除此快照吗？此操作无法撤销。",
       "saveSuccess": "快照保存成功",
       "saveFailed": "快照保存失败",
       "deleteSuccess": "快照已删除",
       "deleteFailed": "删除快照失败",
+      "obsidianSyncSuccess": "已同步到 Obsidian",
+      "obsidianSyncSkipped": "快照未变化，已跳过同步",
+      "obsidianSyncFailed": "同步到 Obsidian 失败",
+      "obsidianBatchResult": "Obsidian 同步完成：成功 {{success}}，失败 {{failed}}，跳过 {{skipped}}",
       "noSnapshot": "暂无快照"
     }
   },
@@ -160,6 +166,7 @@
       "enabledDesc": "保存离线内容，便于后续回看",
       "disabledDesc": "仅保存书签信息，减少空间占用",
       "typeLabel": "快照类型",
+      "syncToObsidian": "保存后同步到 Obsidian",
       "types": {
         "auto": "自动",
         "markdown": "Markdown 优先",
@@ -173,6 +180,12 @@
         "skipped": "书签已保存，未保存快照",
         "saved": "快照已保存",
         "failed": "快照保存失败，可稍后重试"
+      },
+      "obsidianStatus": {
+        "syncing": "正在同步到 Obsidian",
+        "synced": "已同步到 Obsidian",
+        "skipped": "已跳过 Obsidian 同步",
+        "failed": "同步到 Obsidian 失败"
       }
     }
   },

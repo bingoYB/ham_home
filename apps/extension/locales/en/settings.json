@@ -53,6 +53,14 @@
         "html": "Full HTML",
         "none": "Do not save by default"
       },
+      "obsidian": {
+        "title": "Snapshot Sync",
+        "description": "Save Markdown snapshots to an Obsidian folder",
+        "folderPath": "Obsidian save location",
+        "folderPathDesc": "Path relative to the browser downloads directory, for example Obsidian/HamHome",
+        "autoSync": "Auto-sync Markdown snapshots after saving bookmarks",
+        "autoSyncDesc": "Only Markdown snapshots are synced; HTML snapshots are skipped"
+      },
       "enableOmniboxSearch": "Omnibox Search Enhancement",
       "enableOmniboxSearchDesc": "Type 'ham' in browser address bar and press space to search and open bookmarks via keyword or semantic matching",
       "shortcut": "Shortcut Key",

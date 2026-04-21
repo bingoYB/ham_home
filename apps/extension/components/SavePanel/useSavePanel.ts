@@ -14,6 +14,7 @@ import {
   translationService,
 } from "@/lib/agent";
 import { getBackgroundService } from "@/lib/services";
+import { obsidianSyncService } from "@/lib/services/obsidian-sync-service";
 import { createMarkdownContent } from "defuddle/full";
 import type {
   DefaultSnapshotType,
@@ -31,6 +32,13 @@ export type SavePanelSnapshotStatus =
   | "bookmarkSaved"
   | "skipped"
   | "saved"
+  | "failed";
+
+export type SavePanelObsidianStatus =
+  | "idle"
+  | "syncing"
+  | "synced"
+  | "skipped"
   | "failed";
 
 interface UseSavePanelProps {
@@ -62,6 +70,10 @@ interface UseSavePanelResult {
   defaultSnapshotType: DefaultSnapshotType;
   snapshotStatus: SavePanelSnapshotStatus;
   snapshotError: string | null;
+  syncToObsidian: boolean;
+  obsidianEnabled: boolean;
+  obsidianStatus: SavePanelObsidianStatus;
+  obsidianError: string | null;
 
   // 表单操作
   setUrl: (value: string) => void;
@@ -71,6 +83,7 @@ interface UseSavePanelResult {
   setTags: (value: string[]) => void;
   setSaveSnapshot: (value: boolean) => void;
   setDefaultSnapshotType: (value: DefaultSnapshotType) => void;
+  setSyncToObsidian: (value: boolean) => void;
 
   // 业务操作
   runAIAnalysis: () => Promise<void>;
@@ -121,14 +134,20 @@ export function useSavePanel({
   const [snapshotStatus, setSnapshotStatus] =
     useState<SavePanelSnapshotStatus>("idle");
   const [snapshotError, setSnapshotError] = useState<string | null>(null);
+  const [syncToObsidian, setSyncToObsidian] = useState(false);
+  const [obsidianEnabled, setObsidianEnabled] = useState(false);
+  const [obsidianStatus, setObsidianStatus] =
+    useState<SavePanelObsidianStatus>("idle");
+  const [obsidianError, setObsidianError] = useState<string | null>(null);
 
   // 加载分类和标签列表
   useEffect(() => {
     const loadData = async () => {
-      const [cats, existingTags, settings] = await Promise.all([
+      const [cats, existingTags, settings, obsidianConfig] = await Promise.all([
         bookmarkStorage.getCategories(),
         bookmarkStorage.getAllTags(),
         configStorage.getSettings(),
+        obsidianSyncService.getConfig(),
       ]);
       const snapshotType = normalizeDefaultSnapshotType(
         settings.defaultSnapshotType,
@@ -138,6 +157,10 @@ export function useSavePanel({
       setDefaultSnapshotTypeState(snapshotType);
       setSaveSnapshotState(
         settings.autoSaveSnapshot && snapshotType !== "none",
+      );
+      setObsidianEnabled(obsidianConfig.enabled);
+      setSyncToObsidian(
+        obsidianConfig.enabled && obsidianConfig.autoSyncOnSave,
       );
       setDataLoaded(true);
     };
@@ -149,6 +172,8 @@ export function useSavePanel({
       setSaveSnapshotState(value);
       setSnapshotStatus("idle");
       setSnapshotError(null);
+      setObsidianStatus("idle");
+      setObsidianError(null);
       if (value && defaultSnapshotType === "none") {
         setDefaultSnapshotTypeState("auto");
       }
@@ -358,6 +383,8 @@ export function useSavePanel({
     setSaving(true);
     setSnapshotStatus("savingBookmark");
     setSnapshotError(null);
+    setObsidianStatus("idle");
+    setObsidianError(null);
 
     try {
       const data = {
@@ -420,6 +447,22 @@ export function useSavePanel({
           }
 
           setSnapshotStatus(result.skipped ? "skipped" : "saved");
+
+          if (!result.skipped && syncToObsidian) {
+            setObsidianStatus("syncing");
+            const obsidianResult = await obsidianSyncService.syncBookmark(
+              bookmark.id,
+              { skipUnchanged: false },
+            );
+            if (obsidianResult.status === "failed") {
+              setObsidianStatus("failed");
+              setObsidianError(obsidianResult.error ?? "同步到 Obsidian 失败");
+            } else {
+              setObsidianStatus(
+                obsidianResult.status === "success" ? "synced" : "skipped",
+              );
+            }
+          }
         } catch (e) {
           console.warn(
             "[useSavePanel] Failed to save snapshot asynchronously:",
@@ -454,6 +497,7 @@ export function useSavePanel({
     existingBookmark,
     saveSnapshot,
     defaultSnapshotType,
+    syncToObsidian,
     onSaved,
   ]);
 
@@ -499,6 +543,10 @@ export function useSavePanel({
     defaultSnapshotType,
     snapshotStatus,
     snapshotError,
+    syncToObsidian,
+    obsidianEnabled,
+    obsidianStatus,
+    obsidianError,
     setUrl,
     setTitle,
     setDescription,
@@ -506,6 +554,7 @@ export function useSavePanel({
     setTags,
     setSaveSnapshot,
     setDefaultSnapshotType,
+    setSyncToObsidian,
     runAIAnalysis,
     retryAnalysis,
     applyAIRecommendedCategory,

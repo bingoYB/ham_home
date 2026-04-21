@@ -28,7 +28,10 @@ import { TagInput } from "@/components/common/TagInput";
 import { CategorySelect } from "@/components/common/CategorySelect";
 import { AIStatus, type AIStatusType } from "./AIStatus";
 import type { DefaultSnapshotType, LocalBookmark, LocalCategory } from "@/types";
-import type { SavePanelSnapshotStatus } from "./useSavePanel";
+import type {
+  SavePanelObsidianStatus,
+  SavePanelSnapshotStatus,
+} from "./useSavePanel";
 
 export interface SavePanelViewProps {
   title: string;
@@ -46,12 +49,17 @@ export interface SavePanelViewProps {
   defaultSnapshotType: DefaultSnapshotType;
   snapshotStatus: SavePanelSnapshotStatus;
   snapshotError: string | null;
+  syncToObsidian: boolean;
+  obsidianEnabled: boolean;
+  obsidianStatus: SavePanelObsidianStatus;
+  obsidianError: string | null;
   onTitleChange: (value: string) => void;
   onDescriptionChange: (value: string) => void;
   onCategoryChange: (value: string | null) => void;
   onTagsChange: (value: string[]) => void;
   onSaveSnapshotChange: (value: boolean) => void;
   onDefaultSnapshotTypeChange: (value: DefaultSnapshotType) => void;
+  onSyncToObsidianChange: (value: boolean) => void;
   onLoadSuggestions: () => void;
   onApplyAICategory: () => void;
   onRetry: () => void;
@@ -77,12 +85,17 @@ export function SavePanelView({
   defaultSnapshotType,
   snapshotStatus,
   snapshotError,
+  syncToObsidian,
+  obsidianEnabled,
+  obsidianStatus,
+  obsidianError,
   onTitleChange,
   onDescriptionChange,
   onCategoryChange,
   onTagsChange,
   onSaveSnapshotChange,
   onDefaultSnapshotTypeChange,
+  onSyncToObsidianChange,
   onLoadSuggestions,
   onApplyAICategory,
   onRetry,
@@ -122,9 +135,14 @@ export function SavePanelView({
         defaultSnapshotType={defaultSnapshotType}
         snapshotStatus={snapshotStatus}
         snapshotError={snapshotError}
+        syncToObsidian={syncToObsidian}
+        obsidianEnabled={obsidianEnabled}
+        obsidianStatus={obsidianStatus}
+        obsidianError={obsidianError}
         disabled={saving}
         onSaveSnapshotChange={onSaveSnapshotChange}
         onDefaultSnapshotTypeChange={onDefaultSnapshotTypeChange}
+        onSyncToObsidianChange={onSyncToObsidianChange}
       />
 
       <div className="flex gap-2 pt-2">
@@ -179,9 +197,14 @@ interface SnapshotOptionsProps {
   defaultSnapshotType: DefaultSnapshotType;
   snapshotStatus: SavePanelSnapshotStatus;
   snapshotError: string | null;
+  syncToObsidian: boolean;
+  obsidianEnabled: boolean;
+  obsidianStatus: SavePanelObsidianStatus;
+  obsidianError: string | null;
   disabled: boolean;
   onSaveSnapshotChange: (value: boolean) => void;
   onDefaultSnapshotTypeChange: (value: DefaultSnapshotType) => void;
+  onSyncToObsidianChange: (value: boolean) => void;
 }
 
 function SnapshotOptions({
@@ -189,12 +212,18 @@ function SnapshotOptions({
   defaultSnapshotType,
   snapshotStatus,
   snapshotError,
+  syncToObsidian,
+  obsidianEnabled,
+  obsidianStatus,
+  obsidianError,
   disabled,
   onSaveSnapshotChange,
   onDefaultSnapshotTypeChange,
+  onSyncToObsidianChange,
 }: SnapshotOptionsProps) {
   const { t } = useTranslation();
   const statusKey = getSnapshotStatusKey(snapshotStatus);
+  const obsidianStatusKey = getObsidianStatusKey(obsidianStatus);
 
   return (
     <div className="space-y-3 rounded-md border p-3">
@@ -263,6 +292,32 @@ function SnapshotOptions({
           {snapshotError || t(statusKey)}
         </p>
       )}
+
+      {obsidianEnabled && saveSnapshot && (
+        <div className="flex items-center justify-between gap-3 border-t pt-3">
+          <div className="min-w-0">
+            <Label className="text-xs font-medium">
+              {t("bookmark:savePanel.snapshot.syncToObsidian")}
+            </Label>
+            {obsidianStatusKey && (
+              <p
+                className={`mt-1 text-xs ${
+                  obsidianStatus === "failed"
+                    ? "text-destructive"
+                    : "text-muted-foreground"
+                }`}
+              >
+                {obsidianError || t(obsidianStatusKey)}
+              </p>
+            )}
+          </div>
+          <Switch
+            checked={syncToObsidian}
+            disabled={disabled}
+            onCheckedChange={onSyncToObsidianChange}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -270,6 +325,11 @@ function SnapshotOptions({
 function getSnapshotStatusKey(status: SavePanelSnapshotStatus): string | null {
   if (status === "idle") return null;
   return `bookmark:savePanel.snapshot.status.${status}`;
+}
+
+function getObsidianStatusKey(status: SavePanelObsidianStatus): string | null {
+  if (status === "idle") return null;
+  return `bookmark:savePanel.snapshot.obsidianStatus.${status}`;
 }
 
 interface BookmarkFormProps {

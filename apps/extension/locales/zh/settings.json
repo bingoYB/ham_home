@@ -53,6 +53,14 @@
         "html": "完整 HTML",
         "none": "默认不保存"
       },
+      "obsidian": {
+        "title": "快照同步",
+        "description": "将 Markdown 快照保存到 Obsidian 目录",
+        "folderPath": "Obsidian 保存位置",
+        "folderPathDesc": "相对于浏览器下载目录的路径，例如 Obsidian/HamHome",
+        "autoSync": "保存书签后自动同步 Markdown 快照",
+        "autoSyncDesc": "仅同步 Markdown 快照，HTML 快照会跳过"
+      },
       "enableOmniboxSearch": "地址栏搜索增强",
       "enableOmniboxSearchDesc": "在浏览器地址栏输入 'ham' 后按空格，即可通过关键词或语义搜索并打开书签",
       "shortcut": "快捷键",

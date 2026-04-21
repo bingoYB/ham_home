@@ -58,6 +58,7 @@ import { useVirtualBookmarkList } from "@/hooks/useVirtualBookmarkList";
 import { useBatchAITask } from "@/hooks/useBatchAITask";
 import { getCategoryPath, formatDate } from "@/utils/bookmark-utils";
 import { configStorage } from "@/lib/storage/config-storage";
+import { obsidianSyncService } from "@/lib/services/obsidian-sync-service";
 import type {
   LocalBookmark,
   CustomFilter,
@@ -441,6 +442,19 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
     }
   };
 
+  const handleSyncToObsidian = async (bookmark: LocalBookmark) => {
+    const result = await obsidianSyncService.syncBookmark(bookmark.id);
+    if (result.status === "success") {
+      toast.success(t("bookmark:bookmark.snapshot.obsidianSyncSuccess"));
+    } else if (result.status === "skipped") {
+      toast.info(t("bookmark:bookmark.snapshot.obsidianSyncSkipped"));
+    } else {
+      toast.error(
+        result.error || t("bookmark:bookmark.snapshot.obsidianSyncFailed"),
+      );
+    }
+  };
+
   // 关闭快照查看器
   const handleCloseSnapshot = () => {
     setSnapshotBookmark(null);
@@ -564,6 +578,20 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
       console.error("[MainContent] Failed to batch move category:", error);
       throw error;
     }
+  };
+
+  const handleBatchSyncToObsidian = async () => {
+    if (selectedIds.size === 0) return;
+    const result = await obsidianSyncService.syncBookmarks(
+      Array.from(selectedIds),
+    );
+    toast.info(
+      t("bookmark:bookmark.snapshot.obsidianBatchResult", {
+        success: result.success,
+        failed: result.failed,
+        skipped: result.skipped,
+      }),
+    );
   };
 
   return (
@@ -813,6 +841,14 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
                   <Button
                     variant="secondary"
                     size="sm"
+                    onClick={handleBatchSyncToObsidian}
+                  >
+                    <Download className="h-4 w-4 mr-1" />
+                    {t("bookmark:bookmark.snapshot.syncSelectedToObsidian")}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    size="sm"
                     onClick={() => startBatchAITask(Array.from(selectedIds))}
                     disabled={isBatchAIProcessing}
                   >
@@ -978,6 +1014,7 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
                         ? () => handleDeleteBookmarkSnapshot(bm)
                         : undefined
                     }
+                    onSyncToObsidian={() => handleSyncToObsidian(bm)}
                     onReanalyzeAI={() => startBatchAITask([bm.id])}
                     isProcessingAI={isBatchAIProcessing}
                     columnSize={masonryConfig.columnSize}
@@ -1029,6 +1066,7 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
                         ? () => handleDeleteBookmarkSnapshot(bookmark)
                         : undefined
                     }
+                    onSyncToObsidian={() => handleSyncToObsidian(bookmark)}
                     onReanalyzeAI={() => startBatchAITask([bookmark.id])}
                     isProcessingAI={isBatchAIProcessing}
                     t={t}

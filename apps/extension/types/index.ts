@@ -181,6 +181,43 @@ export interface SnapshotSaveResult {
   error?: string;
 }
 
+export interface ObsidianSyncConfig {
+  enabled: boolean;
+  folderPath: string;
+  autoSyncOnSave: boolean;
+}
+
+export type ObsidianSyncStatus =
+  | "not_synced"
+  | "pending"
+  | "syncing"
+  | "synced"
+  | "failed";
+
+export interface ObsidianBookmarkSyncState {
+  bookmarkId: string;
+  status: ObsidianSyncStatus;
+  lastSyncedAt?: number;
+  snapshotUpdatedAt?: number;
+  contentHash?: string;
+  error?: string;
+}
+
+export interface ObsidianSyncResult {
+  bookmarkId: string;
+  status: "success" | "failed" | "skipped";
+  filePath?: string;
+  error?: string;
+}
+
+export interface ObsidianBatchSyncResult {
+  total: number;
+  success: number;
+  failed: number;
+  skipped: number;
+  results: ObsidianSyncResult[];
+}
+
 /**
  * 网页快照数据结构 (IndexedDB)
  */
