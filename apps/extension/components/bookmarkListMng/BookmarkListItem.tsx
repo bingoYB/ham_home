@@ -11,6 +11,7 @@ import {
   Trash2,
   Camera,
   Download,
+  Pin,
   Sparkles,
 } from "lucide-react";
 import {
@@ -40,6 +41,8 @@ export interface BookmarkListItemProps {
   onSaveSnapshot?: () => void;
   onDeleteSnapshot?: () => void;
   onSyncToObsidian?: () => void;
+  onTogglePin?: () => void;
+  isPinned?: boolean;
   onReanalyzeAI?: () => void;
   isProcessingAI?: boolean;
   t: (key: string, options?: Record<string, unknown>) => string;
@@ -59,6 +62,8 @@ export function BookmarkListItem({
   onSaveSnapshot,
   onDeleteSnapshot,
   onSyncToObsidian,
+  onTogglePin,
+  isPinned = false,
   onReanalyzeAI,
   isProcessingAI,
   t,
@@ -185,6 +190,14 @@ export function BookmarkListItem({
               <Share2 className="h-4 w-4 mr-2" />
               {t("bookmark:bookmark.share")}
             </DropdownMenuItem>
+            {onTogglePin && (
+              <DropdownMenuItem onClick={onTogglePin}>
+                <Pin className="h-4 w-4 mr-2" />
+                {isPinned
+                  ? t("bookmark:bookmark.unpin")
+                  : t("bookmark:bookmark.pin")}
+              </DropdownMenuItem>
+            )}
             {(onViewSnapshot ||
               onSaveSnapshot ||
               onDeleteSnapshot ||

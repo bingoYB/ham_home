@@ -113,6 +113,41 @@
 - 监听 `settings.panelPosition` 变化，内容页无需刷新即可在左/右侧间切换
 - 面板关闭时禁用 pointer events，避免隐藏态遮挡页面交互
 - 当前页面不可见或失去活跃状态时，content UI 不响应打开指令并自动收起面板
+- 侧边栏头部下方展示 `PinnedSection`，用于快速访问置顶分类和置顶书签
+
+---
+
+### PinnedSection
+
+侧边栏置顶区组件，展示用户置顶的分类和书签，并支持展开/折叠和手动排序。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| bookmarks | `LocalBookmark[]` | ✓ | - | 当前书签列表 |
+| categories | `LocalCategory[]` | ✓ | - | 当前分类列表 |
+| onOpenBookmark | `(url: string) => void` | ✓ | - | 点击置顶书签时打开 URL |
+| onSelectCategory | `(categoryId: string) => void` | ✓ | - | 点击置顶分类时筛选该分类 |
+| t | `(key: string, options?: Record<string, unknown>) => string` | ✓ | - | i18n 翻译函数 |
+
+**用法示例：**
+
+```tsx
+<PinnedSection
+  bookmarks={bookmarks}
+  categories={categories}
+  onOpenBookmark={handleOpenBookmark}
+  onSelectCategory={handleSelectPinnedCategory}
+  t={t}
+/>
+```
+
+**行为说明：**
+
+- 无置顶内容时不渲染。
+- 默认展示前 5 条置顶内容，超过 5 条时可展开。
+- 点击置顶分类会清空搜索关键词，并将列表筛选到该分类。
+- 点击置顶书签会直接打开网页。
+- 鼠标悬停置顶项时展示上移/下移按钮，排序结果写入 `pinStorage`。
 
 ---
 
@@ -333,6 +368,8 @@ const { container: portalContainer } = useContentUI();
 | onSaveSnapshot | `() => void` | - | - | 保存或更新快照 |
 | onDeleteSnapshot | `() => void` | - | - | 删除快照 |
 | onSyncToObsidian | `() => void` | - | - | 同步 Markdown 快照到 Obsidian |
+| onTogglePin | `() => void` | - | - | 置顶或取消置顶书签 |
+| isPinned | `boolean` | - | `false` | 当前书签是否已置顶 |
 | onReanalyzeAI | `() => void` | - | - | 重新执行 AI 分析 |
 | isProcessingAI | `boolean` | - | - | AI 批处理是否运行中 |
 | t | `(key: string, options?: Record<string, unknown>) => string` | ✓ | - | i18n 翻译函数 |
@@ -353,6 +390,8 @@ const { container: portalContainer } = useContentUI();
   onSaveSnapshot={saveSnapshot}
   onDeleteSnapshot={bookmark.hasSnapshot ? deleteSnapshot : undefined}
   onSyncToObsidian={syncToObsidian}
+  onTogglePin={togglePin}
+  isPinned={isPinned}
   t={t}
 />
 ```
@@ -362,6 +401,7 @@ const { container: portalContainer } = useContentUI();
 - 有快照时展示 `查看快照` 和 `删除快照`。
 - 始终可通过更多菜单触发 `保存快照` 或 `更新快照`。
 - 可通过更多菜单触发 `同步到 Obsidian`，同步行为由父组件注入。
+- 可通过更多菜单触发 `置顶` / `取消置顶`，置顶状态由父组件传入。
 - 快照操作由父组件注入，组件不直接访问存储或浏览器 API。
 
 ### BookmarkListItem（管理列表）
@@ -383,6 +423,8 @@ const { container: portalContainer } = useContentUI();
 | onSaveSnapshot | `() => void` | - | - | 保存或更新快照 |
 | onDeleteSnapshot | `() => void` | - | - | 删除快照 |
 | onSyncToObsidian | `() => void` | - | - | 同步 Markdown 快照到 Obsidian |
+| onTogglePin | `() => void` | - | - | 置顶或取消置顶书签 |
+| isPinned | `boolean` | - | `false` | 当前书签是否已置顶 |
 | onReanalyzeAI | `() => void` | - | - | 重新执行 AI 分析 |
 | isProcessingAI | `boolean` | - | - | AI 批处理是否运行中 |
 | t | `(key: string, options?: Record<string, unknown>) => string` | ✓ | - | i18n 翻译函数 |
@@ -401,6 +443,8 @@ const { container: portalContainer } = useContentUI();
   onDelete={deleteBookmark}
   onSaveSnapshot={saveSnapshot}
   onSyncToObsidian={syncToObsidian}
+  onTogglePin={togglePin}
+  isPinned={isPinned}
   t={t}
 />
 ```
@@ -409,6 +453,7 @@ const { container: portalContainer } = useContentUI();
 
 - 快照菜单项与网格视图一致。
 - Obsidian 同步菜单项始终由父组件控制是否可用。
+- 置顶菜单项与网格视图一致。
 - 快照状态来自 `bookmark.hasSnapshot`，删除快照后父组件需要刷新书签列表。
 - 组件保持展示职责，不直接执行快照存储逻辑。
 

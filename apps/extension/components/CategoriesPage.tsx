@@ -2,7 +2,7 @@
  * CategoriesPage 分类管理页面
  * 支持树形展示、预设分类方案选择、AI 生成分类、批量删除
  */
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import {
   Plus,
@@ -21,6 +21,7 @@ import {
   X,
   Square,
   CheckSquare,
+  Pin,
 } from "lucide-react";
 import {
   Button,
@@ -62,6 +63,7 @@ import {
   cn,
 } from "@hamhome/ui";
 import { useBookmarks } from "@/contexts/BookmarkContext";
+import { pinStorage } from "@/lib/storage";
 import { categoryGenerationService } from "@/lib/agent";
 import {
   getPresetCategoriesGeneral,
@@ -207,6 +209,9 @@ export function CategoriesPage() {
   // 批量选择状态
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isBatchMode, setIsBatchMode] = useState(false);
+  const [pinnedCategoryIds, setPinnedCategoryIds] = useState<Set<string>>(
+    new Set(),
+  );
 
   // AI 生成分类状态
   const [aiDescription, setAiDescription] = useState("");
@@ -235,6 +240,29 @@ export function CategoriesPage() {
 
     return buildTree(null);
   }, [categories, bookmarks]);
+
+  useEffect(() => {
+    const loadPinnedItems = async () => {
+      const items = await pinStorage.getPinnedItems();
+      setPinnedCategoryIds(
+        new Set(
+          items
+            .filter((item) => item.type === "category")
+            .map((item) => item.targetId),
+        ),
+      );
+    };
+    loadPinnedItems();
+    return pinStorage.watch((items) => {
+      setPinnedCategoryIds(
+        new Set(
+          items
+            .filter((item) => item.type === "category")
+            .map((item) => item.targetId),
+        ),
+      );
+    });
+  }, []);
 
   // 切换展开状态
   const toggleExpand = useCallback((id: string) => {
@@ -352,6 +380,10 @@ export function CategoriesPage() {
   const openDeleteDialog = (category: LocalCategory) => {
     setSelectedCategory(category);
     setShowDeleteDialog(true);
+  };
+
+  const handleToggleCategoryPin = async (category: LocalCategory) => {
+    await pinStorage.togglePin("category", category.id);
   };
 
   // 应用预设分类方案
@@ -510,6 +542,8 @@ export function CategoriesPage() {
                     onEdit={openEditDialog}
                     onDelete={openDeleteDialog}
                     onAddSub={openAddDialog}
+                    onTogglePin={handleToggleCategoryPin}
+                    pinnedCategoryIds={pinnedCategoryIds}
                     t={t}
                   />
                 ))}
@@ -895,6 +929,8 @@ interface CategoryTreeItemProps {
   onEdit: (category: LocalCategory) => void;
   onDelete: (category: LocalCategory) => void;
   onAddSub: (parentId: string) => void;
+  onTogglePin: (category: LocalCategory) => void;
+  pinnedCategoryIds: Set<string>;
   t: (key: string, options?: any) => string;
 }
 
@@ -909,11 +945,14 @@ function CategoryTreeItem({
   onEdit,
   onDelete,
   onAddSub,
+  onTogglePin,
+  pinnedCategoryIds,
   t,
 }: CategoryTreeItemProps) {
   const hasChildren = node.children.length > 0;
   const isExpanded = expandedIds.has(node.id);
   const isSelected = selectedIds.has(node.id);
+  const isPinned = pinnedCategoryIds.has(node.id);
   const paddingLeft = level * 24 + 12;
 
   return (
@@ -996,6 +1035,12 @@ function CategoryTreeItem({
                 <Plus className="h-4 w-4 mr-2" />
                 {t("settings:settings.categories.addSubcategory")}
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onTogglePin(node)}>
+                <Pin className="h-4 w-4 mr-2" />
+                {isPinned
+                  ? t("settings:settings.categories.unpin")
+                  : t("settings:settings.categories.pin")}
+              </DropdownMenuItem>
               <DropdownMenuItem
                 onClick={() => onDelete(node)}
                 className="text-destructive focus:text-destructive"
@@ -1024,6 +1069,8 @@ function CategoryTreeItem({
               onEdit={onEdit}
               onDelete={onDelete}
               onAddSub={onAddSub}
+              onTogglePin={onTogglePin}
+              pinnedCategoryIds={pinnedCategoryIds}
               t={t}
             />
           ))}

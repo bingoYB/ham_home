@@ -58,6 +58,7 @@ import { useVirtualBookmarkList } from "@/hooks/useVirtualBookmarkList";
 import { useBatchAITask } from "@/hooks/useBatchAITask";
 import { getCategoryPath, formatDate } from "@/utils/bookmark-utils";
 import { configStorage } from "@/lib/storage/config-storage";
+import { pinStorage } from "@/lib/storage";
 import { obsidianSyncService } from "@/lib/services/obsidian-sync-service";
 import type {
   LocalBookmark,
@@ -84,6 +85,9 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
     string | undefined
   >();
   const [customFilterDialogOpen, setCustomFilterDialogOpen] = useState(false);
+  const [pinnedBookmarkIds, setPinnedBookmarkIds] = useState<Set<string>>(
+    new Set(),
+  );
 
   // 书签卡片引用（用于滚动定位）- grid 视图使用
   const bookmarkRefsForGrid = useRef<Map<string, HTMLElement>>(new Map());
@@ -121,6 +125,29 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
       }
     };
     loadCustomFilters();
+  }, []);
+
+  useEffect(() => {
+    const loadPinnedItems = async () => {
+      const items = await pinStorage.getPinnedItems();
+      setPinnedBookmarkIds(
+        new Set(
+          items
+            .filter((item) => item.type === "bookmark")
+            .map((item) => item.targetId),
+        ),
+      );
+    };
+    loadPinnedItems();
+    return pinStorage.watch((items) => {
+      setPinnedBookmarkIds(
+        new Set(
+          items
+            .filter((item) => item.type === "bookmark")
+            .map((item) => item.targetId),
+        ),
+      );
+    });
   }, []);
 
   // 选中的自定义筛选器
@@ -453,6 +480,15 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
         result.error || t("bookmark:bookmark.snapshot.obsidianSyncFailed"),
       );
     }
+  };
+
+  const handleToggleBookmarkPin = async (bookmark: LocalBookmark) => {
+    const pinned = await pinStorage.togglePin("bookmark", bookmark.id);
+    toast.success(
+      pinned
+        ? t("bookmark:bookmark.pinSuccess")
+        : t("bookmark:bookmark.unpinSuccess"),
+    );
   };
 
   // 关闭快照查看器
@@ -1015,6 +1051,8 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
                         : undefined
                     }
                     onSyncToObsidian={() => handleSyncToObsidian(bm)}
+                    onTogglePin={() => handleToggleBookmarkPin(bm)}
+                    isPinned={pinnedBookmarkIds.has(bm.id)}
                     onReanalyzeAI={() => startBatchAITask([bm.id])}
                     isProcessingAI={isBatchAIProcessing}
                     columnSize={masonryConfig.columnSize}
@@ -1067,6 +1105,8 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
                         : undefined
                     }
                     onSyncToObsidian={() => handleSyncToObsidian(bookmark)}
+                    onTogglePin={() => handleToggleBookmarkPin(bookmark)}
+                    isPinned={pinnedBookmarkIds.has(bookmark.id)}
                     onReanalyzeAI={() => startBatchAITask([bookmark.id])}
                     isProcessingAI={isBatchAIProcessing}
                     t={t}

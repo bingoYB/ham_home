@@ -7,6 +7,7 @@ import { useTranslation } from "react-i18next";
 import { cn, toast } from "@hamhome/ui";
 import { BookmarkHeader } from "./BookmarkHeader";
 import { BookmarkListView } from "./BookmarkListView";
+import { PinnedSection } from "./PinnedSection";
 import { AIChatPanel } from "@/components/aiSearch";
 import { useBookmarkSearch } from "@/hooks/useBookmarkSearch";
 import { useConversationalSearch } from "@/hooks/useConversationalSearch";
@@ -98,6 +99,7 @@ export function BookmarkPanel({
     selectedTags,
     toggleTagSelection,
     clearTagFilters,
+    setSelectedCategory,
     timeRange,
     setTimeRange,
     clearTimeFilter,
@@ -164,6 +166,14 @@ export function BookmarkPanel({
       }
     },
     [onOpenBookmark],
+  );
+
+  const handleSelectPinnedCategory = useCallback(
+    (categoryId: string) => {
+      setSearchQuery("");
+      setSelectedCategory(categoryId);
+    },
+    [setSearchQuery, setSelectedCategory],
   );
 
   // 处理遮罩点击 - 阻止事件冒泡到面板
@@ -316,6 +326,14 @@ export function BookmarkPanel({
           selectedCustomFilterId={selectedCustomFilterId}
           onSelectCustomFilter={handleSelectCustomFilter}
           onSaveCustomFilter={handleSaveCustomFilter}
+        />
+
+        <PinnedSection
+          bookmarks={bookmarks}
+          categories={categories}
+          onOpenBookmark={handleOpenBookmark}
+          onSelectCategory={handleSelectPinnedCategory}
+          t={t}
         />
 
         {/* 列表 - 确保有明确高度限制以启用滚动 */}

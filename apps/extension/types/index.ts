@@ -218,6 +218,16 @@ export interface ObsidianBatchSyncResult {
   results: ObsidianSyncResult[];
 }
 
+export type PinnedTargetType = "category" | "bookmark";
+
+export interface PinnedItem {
+  id: string;
+  type: PinnedTargetType;
+  targetId: string;
+  pinnedAt: number;
+  order: number;
+}
+
 /**
  * 网页快照数据结构 (IndexedDB)
  */

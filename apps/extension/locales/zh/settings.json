@@ -384,6 +384,8 @@
       "noCategories": "还没有分类，点击「新建分类」或「使用预设分类」开始",
       "edit": "编辑",
       "delete": "删除",
+      "pin": "置顶",
+      "unpin": "取消置顶",
       "expand": "展开",
       "collapse": "折叠",
       "addSubcategory": "添加子分类",

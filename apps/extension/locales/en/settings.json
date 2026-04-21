@@ -384,6 +384,8 @@
       "noCategories": "No categories yet, click \"New Category\" or \"Use Preset\" to start",
       "edit": "Edit",
       "delete": "Delete",
+      "pin": "Pin",
+      "unpin": "Unpin",
       "expand": "Expand",
       "collapse": "Collapse",
       "addSubcategory": "Add Subcategory",
