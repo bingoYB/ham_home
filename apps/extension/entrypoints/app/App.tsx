@@ -22,6 +22,7 @@ import {
   Loader2,
   AlertTriangle,
   RefreshCw,
+  Briefcase,
 } from "lucide-react";
 import {
   Toaster,
@@ -58,6 +59,7 @@ import { MainContent } from "@/components/MainContent";
 import { OptionsPage } from "@/components/OptionsPage";
 import { CategoriesPage } from "@/components/CategoriesPage";
 import { TagsPage } from "@/components/TagsPage";
+import { WorkspacesPage } from "@/components/WorkspacesPage";
 import { PrivacyPage } from "@/components/PrivacyPage";
 import { ImportExportPage } from "@/components/ImportExportPage";
 import { AboutPage } from "@/components/AboutPage";
@@ -86,6 +88,10 @@ const PAGE_TITLES: Record<string, { title: string; description?: string }> = {
   tags: {
     title: "bookmark:tags.title",
     description: "bookmark:tags.description",
+  },
+  workspaces: {
+    title: "bookmark:workspace.title",
+    description: "bookmark:workspace.description",
   },
   "import-export": {
     title: "settings:settings.importExport.title",
@@ -269,6 +275,12 @@ function AppContent() {
         badge: allTags.length,
       },
       {
+        title: t("bookmark:workspace.title"),
+        url: "#workspaces",
+        icon: Briefcase,
+        isActive: currentViewBase === "workspaces",
+      },
+      {
         title: t("bookmark:bookmark.privacy"),
         url: "#privacy",
         icon: Shield,
@@ -440,6 +452,8 @@ function AppContent() {
         return <CategoriesPage />;
       case "tags":
         return <TagsPage />;
+      case "workspaces":
+        return <WorkspacesPage />;
       case "import-export":
         return <ImportExportPage />;
       case "about":

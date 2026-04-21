@@ -227,6 +227,71 @@ export interface PinnedItem {
   order: number;
 }
 
+// ============ 工作空间相关 ============
+
+export interface WorkspaceTabPage {
+  id: string;
+  title: string;
+  url: string;
+  domain: string;
+  favicon?: string;
+  pinned?: boolean;
+  windowId?: number;
+  index: number;
+}
+
+export interface Workspace {
+  id: string;
+  name: string;
+  description: string;
+  categoryId: string | null;
+  tags: string[];
+  pages: WorkspaceTabPage[];
+  analysis?: Record<string, unknown>;
+  isRestored: boolean;
+  restoredAt?: number;
+  convertedToBookmarks: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export type CreateWorkspaceInput = Omit<
+  Workspace,
+  | "id"
+  | "createdAt"
+  | "updatedAt"
+  | "isRestored"
+  | "restoredAt"
+  | "convertedToBookmarks"
+>;
+
+export type UpdateWorkspaceInput = Partial<
+  Omit<Workspace, "id" | "createdAt" | "updatedAt">
+>;
+
+export interface WorkspaceQuery {
+  categoryId?: string | null;
+  tags?: string[];
+  search?: string;
+  sortBy?: "createdAt" | "updatedAt" | "restoredAt" | "name";
+  sortOrder?: "asc" | "desc";
+  limit?: number;
+  offset?: number;
+}
+
+export type WorkspaceRestoreMode = "newWindow" | "currentWindow";
+
+export interface WorkspaceRestoreOptions {
+  mode: WorkspaceRestoreMode;
+  pageIds?: string[];
+  skipDuplicateUrls?: boolean;
+}
+
+export interface WorkspaceRestoreResult {
+  restoredCount: number;
+  skippedDuplicateCount: number;
+}
+
 /**
  * 网页快照数据结构 (IndexedDB)
  */

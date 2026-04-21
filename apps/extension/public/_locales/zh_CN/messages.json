@@ -11,6 +11,10 @@
     "message": "快速收藏当前页面",
     "description": "保存书签命令描述"
   },
+  "commandSaveWorkspace": {
+    "message": "保存当前窗口为工作空间",
+    "description": "保存工作空间命令描述"
+  },
   "commandTogglePanel": {
     "message": "切换书签面板",
     "description": "切换面板命令描述"

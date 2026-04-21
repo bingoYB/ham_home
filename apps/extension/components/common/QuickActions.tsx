@@ -4,7 +4,7 @@
  * 可复用于 BookmarkHeader 和 Popup
  */
 import { useState } from 'react';
-import { Sun, Moon, Languages, MoreHorizontal, List, Keyboard, Settings } from 'lucide-react';
+import { Sun, Moon, Languages, MoreHorizontal, List, Keyboard, Settings, Briefcase } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import {
   Button,
@@ -16,6 +16,7 @@ import {
   TooltipContent,
   TooltipProvider,
   TooltipTrigger,
+  toast,
   cn,
 } from '@hamhome/ui';
 import { useTheme } from '@/hooks/useTheme';
@@ -92,6 +93,21 @@ export function QuickActions({
     backgroundService.openTab(getExtensionURL('app.html')).catch((error: unknown) => {
       console.error('[QuickActions] Failed to open bookmark list:', error);
     });
+  };
+
+  // 保存当前窗口为工作空间
+  const handleSaveWorkspace = () => {
+    setIsMenuOpen(false);
+    const backgroundService = getBackgroundService();
+    backgroundService
+      .saveCurrentWindowWorkspace()
+      .then(() => {
+        toast.success(t('bookmark:workspace.saveSuccess'));
+      })
+      .catch((error: unknown) => {
+        console.error('[QuickActions] Failed to save workspace:', error);
+        toast.error(t('bookmark:workspace.saveFailed'));
+      });
   };
 
   // 打开快捷键设置
@@ -188,6 +204,10 @@ export function QuickActions({
               {formatShortcutDisplay(togglePanelShortcut)}
             </span>
           )}
+        </DropdownMenuItem>
+        <DropdownMenuItem onClick={handleSaveWorkspace}>
+          <Briefcase className="h-4 w-4 mr-2" />
+          {t('bookmark:workspace.saveCurrentWindow')}
         </DropdownMenuItem>
         <DropdownMenuItem onClick={handleOpenShortcuts}>
           <Keyboard className="h-4 w-4 mr-2" />

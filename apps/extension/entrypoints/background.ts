@@ -6,6 +6,8 @@ import { browser } from "wxt/browser";
 import { registerBackgroundService } from "@/lib/services/background-service-server";
 import { configStorage } from "@/lib/storage";
 import { bookmarkStorage } from "@/lib/storage/bookmark-storage";
+import { workspaceStorage } from "@/lib/storage/workspace-storage";
+import { workspaceService } from "@/lib/services/workspace-service";
 import {
   safeOpenPopup,
   safeSendMessageToActiveTab,
@@ -16,6 +18,7 @@ import type { Language } from "@/types";
 
 // 右键菜单 ID
 const CONTEXT_MENU_ID = "save-to-hamhome";
+const WORKSPACE_CONTEXT_MENU_ID = "save-window-workspace";
 
 /**
  * SingleFile 后台资源获取（匹配官方 bg/fetch.js 的 fetchResource）
@@ -73,15 +76,27 @@ const MENU_TITLES: Record<Language, string> = {
   zh: "收藏到 HamHome",
 };
 
+const WORKSPACE_MENU_TITLES: Record<Language, string> = {
+  en: "Save current window as workspace",
+  zh: "保存当前窗口为工作空间",
+};
+
 /**
  * 获取右键菜单标题（根据用户语言设置）
  */
-async function getContextMenuTitle(): Promise<string> {
+async function getContextMenuTitles(): Promise<{
+  bookmark: string;
+  workspace: string;
+}> {
   try {
     // 优先从用户设置中获取语言
     const settings = await configStorage.getSettings();
     if (settings?.language && ["en", "zh"].includes(settings.language)) {
-      return MENU_TITLES[settings.language as Language];
+      const language = settings.language as Language;
+      return {
+        bookmark: MENU_TITLES[language],
+        workspace: WORKSPACE_MENU_TITLES[language],
+      };
     }
   } catch (error) {
     console.warn("[HamHome Background] 获取语言设置失败:", error);
@@ -91,11 +106,17 @@ async function getContextMenuTitle(): Promise<string> {
   const browserLang =
     browser.i18n?.getUILanguage?.() || navigator.language || "en";
   if (browserLang.startsWith("zh")) {
-    return MENU_TITLES.zh;
+    return {
+      bookmark: MENU_TITLES.zh,
+      workspace: WORKSPACE_MENU_TITLES.zh,
+    };
   }
 
   // 默认英文
-  return MENU_TITLES.en;
+  return {
+    bookmark: MENU_TITLES.en,
+    workspace: WORKSPACE_MENU_TITLES.en,
+  };
 }
 
 /**
@@ -103,7 +124,7 @@ async function getContextMenuTitle(): Promise<string> {
  */
 async function createContextMenu() {
   try {
-    const title = await getContextMenuTitle();
+    const titles = await getContextMenuTitles();
 
     // 先删除所有菜单（避免重复 ID 错误）
     await browser.contextMenus.removeAll();
@@ -111,11 +132,16 @@ async function createContextMenu() {
     // 创建新的右键菜单
     await browser.contextMenus.create({
       id: CONTEXT_MENU_ID,
-      title,
+      title: titles.bookmark,
       contexts: ["page", "selection", "link", "image"],
     });
+    await browser.contextMenus.create({
+      id: WORKSPACE_CONTEXT_MENU_ID,
+      title: titles.workspace,
+      contexts: ["page"],
+    });
 
-    console.log("[HamHome Background] 右键菜单已创建:", title);
+    console.log("[HamHome Background] 右键菜单已创建:", titles);
   } catch (error) {
     console.error("[HamHome Background] 创建右键菜单失败:", error);
   }
@@ -126,12 +152,35 @@ async function createContextMenu() {
  */
 async function updateContextMenuTitle() {
   try {
-    const title = await getContextMenuTitle();
-    await browser.contextMenus.update(CONTEXT_MENU_ID, { title });
-    console.log("[HamHome Background] 右键菜单标题已更新:", title);
+    const titles = await getContextMenuTitles();
+    await browser.contextMenus.update(CONTEXT_MENU_ID, {
+      title: titles.bookmark,
+    });
+    await browser.contextMenus.update(WORKSPACE_CONTEXT_MENU_ID, {
+      title: titles.workspace,
+    });
+    console.log("[HamHome Background] 右键菜单标题已更新:", titles);
   } catch (error) {
     console.warn("[HamHome Background] 更新右键菜单标题失败:", error);
   }
+}
+
+async function saveCurrentWindowWorkspaceFromBackground() {
+  try {
+    const workspace = await workspaceService.saveCurrentWindow();
+    console.log("[HamHome Background] 工作空间已保存:", workspace.id);
+  } catch (error) {
+    console.error("[HamHome Background] 保存工作空间失败:", error);
+  }
+}
+
+function escapeXml(unsafe: string) {
+  return unsafe
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&apos;");
 }
 
 export default defineBackground(() => {
@@ -194,6 +243,8 @@ export default defineBackground(() => {
     if (command === "save-bookmark") {
       // 打开 Popup（兼容不同浏览器）
       await safeOpenPopup();
+    } else if (command === "save-workspace") {
+      await saveCurrentWindowWorkspaceFromBackground();
     } else if (command === "toggle-bookmark-panel") {
       // 仅切换当前活动 tab 的书签面板
       await safeSendMessageToActiveTab({ type: "TOGGLE_BOOKMARK_PANEL" });
@@ -206,6 +257,8 @@ export default defineBackground(() => {
     if (info.menuItemId === CONTEXT_MENU_ID) {
       // 打开 Popup（兼容不同浏览器）
       await safeOpenPopup();
+    } else if (info.menuItemId === WORKSPACE_CONTEXT_MENU_ID) {
+      await saveCurrentWindowWorkspaceFromBackground();
     }
   });
 
@@ -302,7 +355,7 @@ export default defineBackground(() => {
 
   // ========== 地址栏搜索 (Omnibox) ==========
   browser.omnibox.setDefaultSuggestion({
-    description: "HamHome: 输入关键词搜索书签...",
+    description: "HamHome: 输入关键词搜索书签和工作空间...",
   });
 
   browser.omnibox.onInputChanged.addListener(async (text, suggest) => {
@@ -316,11 +369,10 @@ export default defineBackground(() => {
         return;
       }
 
-      // 获取所有未删除的书签
-      const allBookmarks = await bookmarkStorage.getBookmarks({
-        isDeleted: false,
-      });
-      if (!allBookmarks || allBookmarks.length === 0) return;
+      const [allBookmarks, matchedWorkspaces] = await Promise.all([
+        bookmarkStorage.getBookmarks({ isDeleted: false }),
+        workspaceStorage.searchWorkspaces(query, 3),
+      ]);
 
       // 1. 关键词粗筛
       const keywordLower = query.toLowerCase();
@@ -370,20 +422,10 @@ export default defineBackground(() => {
       }
 
       // 按评分排序，取前 5 项展示
-      const finalResults = Array.from(scoredResults.values())
+      const bookmarkResults = Array.from(scoredResults.values())
         .sort((a, b) => b.score - a.score)
-        .slice(0, 5)
+        .slice(0, Math.max(0, 5 - matchedWorkspaces.length))
         .map(({ bookmark }) => {
-          // 对特殊字符进行转义，避免触发 XML 解析错误
-          const escapeXml = (unsafe: string) => {
-            return unsafe
-              .replace(/&/g, "&amp;")
-              .replace(/</g, "&lt;")
-              .replace(/>/g, "&gt;")
-              .replace(/"/g, "&quot;")
-              .replace(/'/g, "&apos;");
-          };
-
           const safeTitle = escapeXml(bookmark.title || "未知内容");
           const safeUrl = escapeXml(bookmark.url);
           // 使用 <url> 和 <match> XML 标签增强显示效果（仅部分浏览器支持，但通常会向前兼容处理）
@@ -393,7 +435,23 @@ export default defineBackground(() => {
           };
         });
 
-      suggest(finalResults);
+      const workspaceResults = matchedWorkspaces.map((workspace) => {
+        const safeName = escapeXml(workspace.name);
+        const domains = Array.from(
+          new Set(workspace.pages.map((page) => page.domain).filter(Boolean)),
+        )
+          .slice(0, 2)
+          .join(", ");
+        const safeMeta = escapeXml(
+          `${workspace.pages.length} pages${domains ? ` · ${domains}` : ""}`,
+        );
+        return {
+          content: `workspace:${workspace.id}`,
+          description: `<match>${safeName}</match> <dim>Workspace · ${safeMeta}</dim>`,
+        };
+      });
+
+      suggest([...workspaceResults, ...bookmarkResults].slice(0, 5));
     } catch (error) {
       console.error("[HamHome Background] Omnibox 搜索失败:", error);
     }
@@ -408,13 +466,29 @@ export default defineBackground(() => {
       return;
     }
 
+    if (text.startsWith("workspace:")) {
+      try {
+        await workspaceService.restoreWorkspaceById(
+          text.replace("workspace:", ""),
+          {
+            mode: "newWindow",
+            skipDuplicateUrls: false,
+          },
+        );
+      } catch (error) {
+        console.error("[HamHome Background] Omnibox 恢复工作空间失败:", error);
+      }
+      return;
+    }
+
     let url = text;
     // 如果输入的不是 URL（即没有选择下拉项，而是直接回车了搜索词），我们可以尝试搜索并打开第一个
     if (!text.startsWith("http://") && !text.startsWith("https://")) {
       try {
-        const allBookmarks = await bookmarkStorage.getBookmarks({
-          isDeleted: false,
-        });
+        const [allBookmarks, matchedWorkspaces] = await Promise.all([
+          bookmarkStorage.getBookmarks({ isDeleted: false }),
+          workspaceStorage.searchWorkspaces(text, 1),
+        ]);
         const keywordLower = text.toLowerCase();
         const matched = allBookmarks.find(
           (b) =>
@@ -423,6 +497,12 @@ export default defineBackground(() => {
         );
         if (matched) {
           url = matched.url;
+        } else if (matchedWorkspaces[0]) {
+          await workspaceService.restoreWorkspace(matchedWorkspaces[0], {
+            mode: "newWindow",
+            skipDuplicateUrls: false,
+          });
+          return;
         } else {
           // 没有匹配则打开 HamHome 搜索页面
           url = getExtensionURL(`app.html?search=${encodeURIComponent(text)}`);

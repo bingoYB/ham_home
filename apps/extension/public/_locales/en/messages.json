@@ -11,6 +11,10 @@
     "message": "Quick save current page",
     "description": "Command description for save bookmark"
   },
+  "commandSaveWorkspace": {
+    "message": "Save current window as workspace",
+    "description": "Command description for save workspace"
+  },
   "commandTogglePanel": {
     "message": "Toggle bookmark panel",
     "description": "Command description for toggle panel"

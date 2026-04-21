@@ -13,6 +13,7 @@ import { bookmarkStorage } from "@/lib/storage/bookmark-storage";
 import { configStorage } from "@/lib/storage/config-storage";
 import { snapshotStorage } from "@/lib/storage/snapshot-storage";
 import { vectorStore } from "@/lib/storage/vector-store";
+import { workspaceService } from "@/lib/services/workspace-service";
 import { embeddingClient, embeddingQueue } from "@/lib/embedding";
 import { semanticRetriever } from "@/lib/search/semantic-retriever";
 import { getExtensionURL, type ShortcutCommand } from "@/utils/browser-api";
@@ -212,6 +213,11 @@ class BackgroundServiceImpl implements IBackgroundService {
 
   async openTab(url: string): Promise<void> {
     await browser.tabs.create({ url });
+  }
+
+  async saveCurrentWindowWorkspace(): Promise<string> {
+    const workspace = await workspaceService.saveCurrentWindow();
+    return workspace.id;
   }
 
   async getVectorStats(): Promise<VectorStoreStats> {

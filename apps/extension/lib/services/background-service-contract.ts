@@ -24,6 +24,7 @@ export interface IBackgroundService {
   getPageSingleFileHtml(): Promise<string | null>;
   openOptionsPage(view?: string): Promise<void>;
   openTab(url: string): Promise<void>;
+  saveCurrentWindowWorkspace(): Promise<string>;
   saveSnapshotBackground(
     bookmarkId: string,
     options?: SaveSnapshotBackgroundOptions,
