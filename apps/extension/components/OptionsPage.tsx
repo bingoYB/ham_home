@@ -20,7 +20,6 @@ import {
   Search,
   RefreshCw,
   AlertTriangle,
-  Cloud,
 } from "lucide-react";
 import {
   Button,
@@ -86,16 +85,13 @@ import {
   EMBEDDING_PROVIDER_DEFAULTS,
 } from "@/lib/agent";
 import { getBackgroundService } from "@/lib/services";
-import { obsidianSyncService } from "@/lib/services/obsidian-sync-service";
 import type { QueueProgress } from "@/lib/embedding/embedding-queue";
 import type { VectorStoreStats } from "@/lib/storage/vector-store";
 import type {
   CustomFilter,
-  DefaultSnapshotType,
   FilterCondition,
   AIProvider,
   EmbeddingConfig,
-  ObsidianSyncConfig,
 } from "@/types";
 import { browser } from "wxt/browser";
 import { syncEngine } from "@/lib/sync/sync-engine";
@@ -225,37 +221,11 @@ export function OptionsPage() {
     count: number;
     totalSize: number;
   } | null>(null);
-  const [obsidianConfig, setObsidianConfig] = useState<ObsidianSyncConfig>({
-    enabled: false,
-    folderPath: "Obsidian/HamHome",
-    autoSyncOnSave: false,
-  });
-  const [localObsidianFolderPath, setLocalObsidianFolderPath] =
-    useState("Obsidian/HamHome");
 
   const handleAutoSaveSnapshotChange = (checked: boolean) => {
     updateAppSettings({
       autoSaveSnapshot: checked,
-      defaultSnapshotType:
-        checked && (appSettings.defaultSnapshotType ?? "auto") === "none"
-          ? "auto"
-          : (appSettings.defaultSnapshotType ?? "auto"),
     });
-  };
-
-  const handleDefaultSnapshotTypeChange = (value: DefaultSnapshotType) => {
-    updateAppSettings({
-      defaultSnapshotType: value,
-      autoSaveSnapshot: value !== "none",
-    });
-  };
-
-  const updateObsidianConfig = async (
-    config: Partial<ObsidianSyncConfig>,
-  ) => {
-    const updated = await obsidianSyncService.setConfig(config);
-    setObsidianConfig(updated);
-    setLocalObsidianFolderPath(updated.folderPath);
   };
 
   // 辅助函数：格式化字节大小
@@ -326,19 +296,6 @@ export function OptionsPage() {
       }
     };
     loadEmbeddingConfig();
-  }, []);
-
-  useEffect(() => {
-    const loadObsidianConfig = async () => {
-      try {
-        const config = await obsidianSyncService.getConfig();
-        setObsidianConfig(config);
-        setLocalObsidianFolderPath(config.folderPath);
-      } catch (error) {
-        console.error("[OptionsPage] Failed to load Obsidian config:", error);
-      }
-    };
-    loadObsidianConfig();
   }, []);
 
   // 加载向量统计信息（通过 background service）
@@ -1634,105 +1591,6 @@ export function OptionsPage() {
                   checked={appSettings.autoSaveSnapshot}
                   onCheckedChange={handleAutoSaveSnapshotChange}
                 />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>
-                    {t("settings:settings.general.defaultSnapshotType")}
-                  </Label>
-                  <p className="text-sm text-muted-foreground">
-                    {t("settings:settings.general.defaultSnapshotTypeDesc")}
-                  </p>
-                </div>
-                <Select
-                  value={appSettings.defaultSnapshotType ?? "auto"}
-                  onValueChange={(value) =>
-                    handleDefaultSnapshotTypeChange(
-                      value as DefaultSnapshotType,
-                    )
-                  }
-                >
-                  <SelectTrigger className="w-40">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="auto">
-                      {t("settings:settings.general.snapshotTypes.auto")}
-                    </SelectItem>
-                    <SelectItem value="markdown">
-                      {t("settings:settings.general.snapshotTypes.markdown")}
-                    </SelectItem>
-                    <SelectItem value="html">
-                      {t("settings:settings.general.snapshotTypes.html")}
-                    </SelectItem>
-                    <SelectItem value="none">
-                      {t("settings:settings.general.snapshotTypes.none")}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-4 rounded-md border p-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>
-                      {t("settings:settings.general.obsidian.title")}
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      {t("settings:settings.general.obsidian.description")}
-                    </p>
-                  </div>
-                  <Switch
-                    checked={obsidianConfig.enabled}
-                    onCheckedChange={(checked) =>
-                      updateObsidianConfig({ enabled: checked })
-                    }
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="obsidian-folder">
-                    {t("settings:settings.general.obsidian.folderPath")}
-                  </Label>
-                  <Input
-                    id="obsidian-folder"
-                    value={localObsidianFolderPath}
-                    onChange={(event) =>
-                      setLocalObsidianFolderPath(event.target.value)
-                    }
-                    onBlur={() =>
-                      updateObsidianConfig({
-                        folderPath:
-                          localObsidianFolderPath.trim() ||
-                          "Obsidian/HamHome",
-                      })
-                    }
-                    placeholder="Obsidian/HamHome"
-                    className="font-mono text-sm"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    {t("settings:settings.general.obsidian.folderPathDesc")}
-                  </p>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>
-                      {t("settings:settings.general.obsidian.autoSync")}
-                    </Label>
-                    <p className="text-sm text-muted-foreground">
-                      {t("settings:settings.general.obsidian.autoSyncDesc")}
-                    </p>
-                  </div>
-                  <Switch
-                    checked={obsidianConfig.autoSyncOnSave}
-                    disabled={!obsidianConfig.enabled}
-                    onCheckedChange={(checked) =>
-                      updateObsidianConfig({ autoSyncOnSave: checked })
-                    }
-                  />
-                </div>
               </div>
 
               <div className="flex items-center justify-between">

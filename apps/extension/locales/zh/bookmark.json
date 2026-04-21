@@ -169,14 +169,7 @@
       "title": "保存快照",
       "enabledDesc": "保存离线内容，便于后续回看",
       "disabledDesc": "仅保存书签信息，减少空间占用",
-      "typeLabel": "快照类型",
       "syncToObsidian": "保存后同步到 Obsidian",
-      "types": {
-        "auto": "自动",
-        "markdown": "Markdown 优先",
-        "html": "完整 HTML",
-        "none": "默认不保存"
-      },
       "status": {
         "savingBookmark": "正在保存书签",
         "bookmarkSaved": "书签已保存",

@@ -153,7 +153,6 @@ export type PanelPosition = "left" | "right";
  */
 export interface LocalSettings {
   autoSaveSnapshot: boolean; // 自动保存快照
-  defaultSnapshotType: DefaultSnapshotType; // 默认快照类型
   enableOmniboxSearch: boolean; // 是否启用地址栏搜索支持
   defaultCategory: string | null;
   theme: ThemeMode;
@@ -179,12 +178,6 @@ export interface SnapshotSaveResult {
   skipped?: boolean;
   type?: SnapshotContentType;
   error?: string;
-}
-
-export interface ObsidianSyncConfig {
-  enabled: boolean;
-  folderPath: string;
-  autoSyncOnSave: boolean;
 }
 
 export type ObsidianSyncStatus =

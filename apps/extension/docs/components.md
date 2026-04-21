@@ -2,7 +2,7 @@
 
 ## SavePanel
 
-保存当前页面为 HamHome 书签的弹出面板，负责书签表单、AI 推荐入口和页面快照保存策略。
+保存当前页面为 HamHome 书签的弹出面板，负责书签表单、AI 推荐入口和页面快照/Obsidian 保存开关。
 
 ### SavePanelView
 
@@ -22,11 +22,9 @@
 | aiError | `string \| null` | ✓ | - | AI 错误信息 |
 | saving | `boolean` | ✓ | - | 是否正在保存 |
 | saveSnapshot | `boolean` | ✓ | - | 本次保存是否保存快照 |
-| defaultSnapshotType | `DefaultSnapshotType` | ✓ | - | 本次保存使用的快照类型策略 |
 | snapshotStatus | `SavePanelSnapshotStatus` | ✓ | - | 书签与快照保存状态 |
 | snapshotError | `string \| null` | ✓ | - | 快照保存错误信息 |
-| syncToObsidian | `boolean` | ✓ | - | 本次保存后是否同步 Markdown 快照到 Obsidian |
-| obsidianEnabled | `boolean` | ✓ | - | Obsidian 保存是否已启用 |
+| syncToObsidian | `boolean` | ✓ | - | 本次保存快照后是否发送 Markdown 快照到 Obsidian |
 | obsidianStatus | `SavePanelObsidianStatus` | ✓ | - | Obsidian 同步状态 |
 | obsidianError | `string \| null` | ✓ | - | Obsidian 同步错误信息 |
 | onTitleChange | `(value: string) => void` | ✓ | - | 标题变更回调 |
@@ -34,7 +32,6 @@
 | onCategoryChange | `(value: string \| null) => void` | ✓ | - | 分类变更回调 |
 | onTagsChange | `(value: string[]) => void` | ✓ | - | 标签变更回调 |
 | onSaveSnapshotChange | `(value: boolean) => void` | ✓ | - | 快照开关变更回调 |
-| onDefaultSnapshotTypeChange | `(value: DefaultSnapshotType) => void` | ✓ | - | 快照类型策略变更回调 |
 | onSyncToObsidianChange | `(value: boolean) => void` | ✓ | - | Obsidian 同步开关变更回调 |
 | onLoadSuggestions | `() => void` | ✓ | - | 触发 AI 推荐 |
 | onApplyAICategory | `() => void` | ✓ | - | 应用 AI 推荐分类 |
@@ -60,11 +57,9 @@
   aiError={aiError}
   saving={saving}
   saveSnapshot={saveSnapshot}
-  defaultSnapshotType={defaultSnapshotType}
   snapshotStatus={snapshotStatus}
   snapshotError={snapshotError}
   syncToObsidian={syncToObsidian}
-  obsidianEnabled={obsidianEnabled}
   obsidianStatus={obsidianStatus}
   obsidianError={obsidianError}
   onTitleChange={setTitle}
@@ -72,7 +67,6 @@
   onCategoryChange={setCategoryId}
   onTagsChange={setTags}
   onSaveSnapshotChange={setSaveSnapshot}
-  onDefaultSnapshotTypeChange={setDefaultSnapshotType}
   onSyncToObsidianChange={setSyncToObsidian}
   onLoadSuggestions={runAIAnalysis}
   onApplyAICategory={applyAIRecommendedCategory}
@@ -85,8 +79,9 @@
 
 - `saveSnapshot` 初始值跟随设置页的默认保存快照策略。
 - 保存面板内调整快照开关只影响本次保存，不反写设置页默认值。
-- `defaultSnapshotType` 为 `none` 时会关闭本次快照保存。
-- 启用 Obsidian 保存后，面板会显示 `保存后同步到 Obsidian` 开关；只同步 Markdown 快照。
+- 快照类型由系统自动决定：可阅读页面优先保存 Markdown，其他页面保存完整 HTML。
+- 勾选 `保存快照` 后，面板会显示 `保存后同步到 Obsidian` 开关；只发送 Markdown 快照。
+- Obsidian 保存使用 `obsidian://new` 协议，优先通过剪贴板传递笔记内容。
 - 快照保存失败不会回滚已保存书签，面板会保留错误状态，用户可稍后通过书签管理页重试。
 
 ## bookmarkPanel

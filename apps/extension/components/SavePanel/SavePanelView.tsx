@@ -18,16 +18,11 @@ import {
   Textarea,
   Label,
   Switch,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
 } from "@hamhome/ui";
 import { TagInput } from "@/components/common/TagInput";
 import { CategorySelect } from "@/components/common/CategorySelect";
 import { AIStatus, type AIStatusType } from "./AIStatus";
-import type { DefaultSnapshotType, LocalBookmark, LocalCategory } from "@/types";
+import type { LocalBookmark, LocalCategory } from "@/types";
 import type {
   SavePanelObsidianStatus,
   SavePanelSnapshotStatus,
@@ -46,11 +41,9 @@ export interface SavePanelViewProps {
   aiError: string | null;
   saving: boolean;
   saveSnapshot: boolean;
-  defaultSnapshotType: DefaultSnapshotType;
   snapshotStatus: SavePanelSnapshotStatus;
   snapshotError: string | null;
   syncToObsidian: boolean;
-  obsidianEnabled: boolean;
   obsidianStatus: SavePanelObsidianStatus;
   obsidianError: string | null;
   onTitleChange: (value: string) => void;
@@ -58,7 +51,6 @@ export interface SavePanelViewProps {
   onCategoryChange: (value: string | null) => void;
   onTagsChange: (value: string[]) => void;
   onSaveSnapshotChange: (value: boolean) => void;
-  onDefaultSnapshotTypeChange: (value: DefaultSnapshotType) => void;
   onSyncToObsidianChange: (value: boolean) => void;
   onLoadSuggestions: () => void;
   onApplyAICategory: () => void;
@@ -82,11 +74,9 @@ export function SavePanelView({
   aiError,
   saving,
   saveSnapshot,
-  defaultSnapshotType,
   snapshotStatus,
   snapshotError,
   syncToObsidian,
-  obsidianEnabled,
   obsidianStatus,
   obsidianError,
   onTitleChange,
@@ -94,7 +84,6 @@ export function SavePanelView({
   onCategoryChange,
   onTagsChange,
   onSaveSnapshotChange,
-  onDefaultSnapshotTypeChange,
   onSyncToObsidianChange,
   onLoadSuggestions,
   onApplyAICategory,
@@ -132,16 +121,13 @@ export function SavePanelView({
 
       <SnapshotOptions
         saveSnapshot={saveSnapshot}
-        defaultSnapshotType={defaultSnapshotType}
         snapshotStatus={snapshotStatus}
         snapshotError={snapshotError}
         syncToObsidian={syncToObsidian}
-        obsidianEnabled={obsidianEnabled}
         obsidianStatus={obsidianStatus}
         obsidianError={obsidianError}
         disabled={saving}
         onSaveSnapshotChange={onSaveSnapshotChange}
-        onDefaultSnapshotTypeChange={onDefaultSnapshotTypeChange}
         onSyncToObsidianChange={onSyncToObsidianChange}
       />
 
@@ -194,31 +180,25 @@ export function SavePanelView({
 
 interface SnapshotOptionsProps {
   saveSnapshot: boolean;
-  defaultSnapshotType: DefaultSnapshotType;
   snapshotStatus: SavePanelSnapshotStatus;
   snapshotError: string | null;
   syncToObsidian: boolean;
-  obsidianEnabled: boolean;
   obsidianStatus: SavePanelObsidianStatus;
   obsidianError: string | null;
   disabled: boolean;
   onSaveSnapshotChange: (value: boolean) => void;
-  onDefaultSnapshotTypeChange: (value: DefaultSnapshotType) => void;
   onSyncToObsidianChange: (value: boolean) => void;
 }
 
 function SnapshotOptions({
   saveSnapshot,
-  defaultSnapshotType,
   snapshotStatus,
   snapshotError,
   syncToObsidian,
-  obsidianEnabled,
   obsidianStatus,
   obsidianError,
   disabled,
   onSaveSnapshotChange,
-  onDefaultSnapshotTypeChange,
   onSyncToObsidianChange,
 }: SnapshotOptionsProps) {
   const { t } = useTranslation();
@@ -226,7 +206,7 @@ function SnapshotOptions({
   const obsidianStatusKey = getObsidianStatusKey(obsidianStatus);
 
   return (
-    <div className="space-y-3 rounded-md border p-3">
+    <div className="space-y-3">
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0 space-y-1">
           <Label
@@ -250,37 +230,6 @@ function SnapshotOptions({
         />
       </div>
 
-      <div className="flex items-center justify-between gap-3">
-        <Label className="text-xs text-muted-foreground">
-          {t("bookmark:savePanel.snapshot.typeLabel")}
-        </Label>
-        <Select
-          value={defaultSnapshotType}
-          disabled={disabled}
-          onValueChange={(value) =>
-            onDefaultSnapshotTypeChange(value as DefaultSnapshotType)
-          }
-        >
-          <SelectTrigger className="h-8 w-40 text-xs shadow-none">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="auto">
-              {t("bookmark:savePanel.snapshot.types.auto")}
-            </SelectItem>
-            <SelectItem value="markdown">
-              {t("bookmark:savePanel.snapshot.types.markdown")}
-            </SelectItem>
-            <SelectItem value="html">
-              {t("bookmark:savePanel.snapshot.types.html")}
-            </SelectItem>
-            <SelectItem value="none">
-              {t("bookmark:savePanel.snapshot.types.none")}
-            </SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
-
       {statusKey && (
         <p
           className={`text-xs ${
@@ -293,10 +242,10 @@ function SnapshotOptions({
         </p>
       )}
 
-      {obsidianEnabled && saveSnapshot && (
-        <div className="flex items-center justify-between gap-3 border-t pt-3">
+      {saveSnapshot && (
+        <div className="flex items-center justify-between gap-3 pl-6">
           <div className="min-w-0">
-            <Label className="text-xs font-medium">
+            <Label className="text-xs font-medium" htmlFor="sync-obsidian">
               {t("bookmark:savePanel.snapshot.syncToObsidian")}
             </Label>
             {obsidianStatusKey && (
@@ -312,6 +261,7 @@ function SnapshotOptions({
             )}
           </div>
           <Switch
+            id="sync-obsidian"
             checked={syncToObsidian}
             disabled={disabled}
             onCheckedChange={onSyncToObsidianChange}

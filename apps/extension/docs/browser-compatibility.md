@@ -85,9 +85,9 @@ WXT 框架已提供以下兼容性支持：
 
 - `entrypoints/background.ts`
 
-### Downloads API (`chrome.downloads`)
+### Clipboard API (`navigator.clipboard`)
 
-- `contexts/BookmarkContext.tsx`
+- `lib/services/obsidian-sync-service.ts`
 
 ## Manifest 配置差异
 
@@ -99,7 +99,7 @@ WXT 框架已提供以下兼容性支持：
    - `storage` - 所有浏览器支持
    - `activeTab` - 所有浏览器支持
    - `scripting` - Manifest V3，所有浏览器支持
-   - `downloads` - 所有浏览器支持
+   - `clipboardWrite` - 所有浏览器支持
 
 2. **host_permissions** ✅
    - `<all_urls>` - 所有浏览器支持

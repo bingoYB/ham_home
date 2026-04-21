@@ -34,11 +34,9 @@ export function SavePanel({
     aiRecommendedCategory,
     saving,
     saveSnapshot,
-    defaultSnapshotType,
     snapshotStatus,
     snapshotError,
     syncToObsidian,
-    obsidianEnabled,
     obsidianStatus,
     obsidianError,
     setTitle,
@@ -46,7 +44,6 @@ export function SavePanel({
     setCategoryId,
     setTags,
     setSaveSnapshot,
-    setDefaultSnapshotType,
     setSyncToObsidian,
     runAIAnalysis,
     retryAnalysis,
@@ -73,11 +70,9 @@ export function SavePanel({
       aiError={aiError}
       saving={saving}
       saveSnapshot={saveSnapshot}
-      defaultSnapshotType={defaultSnapshotType}
       snapshotStatus={snapshotStatus}
       snapshotError={snapshotError}
       syncToObsidian={syncToObsidian}
-      obsidianEnabled={obsidianEnabled}
       obsidianStatus={obsidianStatus}
       obsidianError={obsidianError}
       onTitleChange={setTitle}
@@ -85,7 +80,6 @@ export function SavePanel({
       onCategoryChange={setCategoryId}
       onTagsChange={setTags}
       onSaveSnapshotChange={setSaveSnapshot}
-      onDefaultSnapshotTypeChange={setDefaultSnapshotType}
       onSyncToObsidianChange={setSyncToObsidian}
       onLoadSuggestions={runAIAnalysis}
       onApplyAICategory={applyAIRecommendedCategory}

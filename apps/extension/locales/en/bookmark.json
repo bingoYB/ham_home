@@ -169,14 +169,7 @@
       "title": "Save Snapshot",
       "enabledDesc": "Save offline content for later review",
       "disabledDesc": "Save bookmark info only to reduce storage usage",
-      "typeLabel": "Snapshot type",
       "syncToObsidian": "Sync to Obsidian after saving",
-      "types": {
-        "auto": "Auto",
-        "markdown": "Markdown first",
-        "html": "Full HTML",
-        "none": "Do not save by default"
-      },
       "status": {
         "savingBookmark": "Saving bookmark",
         "bookmarkSaved": "Bookmark saved",

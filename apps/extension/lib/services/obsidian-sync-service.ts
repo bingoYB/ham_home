@@ -5,32 +5,19 @@ import { snapshotStorage } from "@/lib/storage/snapshot-storage";
 import type {
   LocalBookmark,
   ObsidianBatchSyncResult,
-  ObsidianSyncConfig,
   ObsidianSyncResult,
 } from "@/types";
 
 const MARKDOWN_TYPE = "text/markdown;charset=utf-8";
+const DEFAULT_OBSIDIAN_FOLDER_PATH = "HamHome";
+const CLIPBOARD_FALLBACK_MESSAGE =
+  "HamHome 已将笔记内容复制到剪贴板。如果 Obsidian 无法读取剪贴板，请回到 HamHome 后重试。";
 
 class ObsidianSyncService {
-  async getConfig(): Promise<ObsidianSyncConfig> {
-    return obsidianSyncStorage.getConfig();
-  }
-
-  async setConfig(
-    config: Partial<ObsidianSyncConfig>,
-  ): Promise<ObsidianSyncConfig> {
-    return obsidianSyncStorage.setConfig(config);
-  }
-
   async syncBookmark(
     bookmarkId: string,
     options: { skipUnchanged?: boolean } = {},
   ): Promise<ObsidianSyncResult> {
-    const config = await obsidianSyncStorage.getConfig();
-    if (!config.enabled) {
-      return this.fail(bookmarkId, "Obsidian 保存未启用");
-    }
-
     const bookmark = await bookmarkStorage.getBookmarkById(bookmarkId);
     if (!bookmark) {
       return this.fail(bookmarkId, "书签不存在");
@@ -67,22 +54,19 @@ class ObsidianSyncService {
         return { bookmarkId, status: "skipped" };
       }
 
-      const filePath = buildObsidianFilePath(config.folderPath, bookmark);
-      const fileContent = buildMarkdownFile(bookmark, markdown);
-      const blobUrl = URL.createObjectURL(
-        new Blob([fileContent], { type: MARKDOWN_TYPE }),
+      const notePath = buildObsidianNotePath(
+        DEFAULT_OBSIDIAN_FOLDER_PATH,
+        bookmark,
       );
+      const fileContent = buildMarkdownFile(bookmark, markdown);
+      const copied = await copyToClipboard(fileContent);
+      const obsidianUrl = buildObsidianUrl({
+        notePath,
+        useClipboard: copied,
+        content: copied ? CLIPBOARD_FALLBACK_MESSAGE : fileContent,
+      });
 
-      try {
-        await browser.downloads.download({
-          url: blobUrl,
-          filename: filePath,
-          saveAs: false,
-          conflictAction: "overwrite",
-        });
-      } finally {
-        URL.revokeObjectURL(blobUrl);
-      }
+      await openObsidianUrl(obsidianUrl);
 
       await obsidianSyncStorage.updateState(bookmarkId, {
         status: "synced",
@@ -92,7 +76,7 @@ class ObsidianSyncService {
         error: undefined,
       });
 
-      return { bookmarkId, status: "success", filePath };
+      return { bookmarkId, status: "success", filePath: `${notePath}.md` };
     } catch (error) {
       return this.fail(
         bookmarkId,
@@ -108,14 +92,6 @@ class ObsidianSyncService {
     }
 
     return summarizeBatch(results);
-  }
-
-  async autoSyncAfterSave(bookmarkId: string): Promise<ObsidianSyncResult> {
-    const config = await obsidianSyncStorage.getConfig();
-    if (!config.enabled || !config.autoSyncOnSave) {
-      return { bookmarkId, status: "skipped" };
-    }
-    return this.syncBookmark(bookmarkId, { skipUnchanged: false });
   }
 
   private async fail(
@@ -159,12 +135,12 @@ function buildMarkdownFile(bookmark: LocalBookmark, markdown: string): string {
   ].join("\n");
 }
 
-function buildObsidianFilePath(
+function buildObsidianNotePath(
   folderPath: string,
   bookmark: LocalBookmark,
 ): string {
   const folder = sanitizeFolderPath(folderPath);
-  const filename = `${sanitizeFileName(bookmark.title || bookmark.url)}.md`;
+  const filename = sanitizeFileName(bookmark.title || bookmark.url);
   return folder ? `${folder}/${filename}` : filename;
 }
 
@@ -182,6 +158,47 @@ function sanitizeFileName(value: string): string {
     .replace(/\s+/g, " ")
     .trim();
   return (sanitized || "untitled").slice(0, 120);
+}
+
+async function copyToClipboard(content: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(content);
+    return true;
+  } catch (error) {
+    console.warn("[ObsidianSyncService] Clipboard write failed:", error);
+    return false;
+  }
+}
+
+function buildObsidianUrl({
+  notePath,
+  useClipboard,
+  content,
+}: {
+  notePath: string;
+  useClipboard: boolean;
+  content: string;
+}): string {
+  let url = `obsidian://new?file=${encodeURIComponent(notePath)}&overwrite=true`;
+  if (useClipboard) {
+    url += "&clipboard";
+  }
+  url += `&content=${encodeURIComponent(content)}`;
+  return url;
+}
+
+async function openObsidianUrl(url: string): Promise<void> {
+  const [activeTab] = await browser.tabs.query({
+    active: true,
+    currentWindow: true,
+  });
+
+  if (activeTab?.id) {
+    await browser.tabs.update(activeTab.id, { url });
+    return;
+  }
+
+  await browser.tabs.create({ url, active: true });
 }
 
 async function hashText(text: string): Promise<string> {

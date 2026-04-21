@@ -16,12 +16,7 @@ import {
 import { getBackgroundService } from "@/lib/services";
 import { obsidianSyncService } from "@/lib/services/obsidian-sync-service";
 import { createMarkdownContent } from "defuddle/full";
-import type {
-  DefaultSnapshotType,
-  PageContent,
-  LocalBookmark,
-  LocalCategory,
-} from "@/types";
+import type { PageContent, LocalBookmark, LocalCategory } from "@/types";
 import type { AIStatusType } from "./AIStatus";
 import { parseCategoryPath } from "../common/CategoryTree";
 
@@ -67,11 +62,9 @@ interface UseSavePanelResult {
   // 操作状态
   saving: boolean;
   saveSnapshot: boolean;
-  defaultSnapshotType: DefaultSnapshotType;
   snapshotStatus: SavePanelSnapshotStatus;
   snapshotError: string | null;
   syncToObsidian: boolean;
-  obsidianEnabled: boolean;
   obsidianStatus: SavePanelObsidianStatus;
   obsidianError: string | null;
 
@@ -82,7 +75,6 @@ interface UseSavePanelResult {
   setCategoryId: (value: string | null) => void;
   setTags: (value: string[]) => void;
   setSaveSnapshot: (value: boolean) => void;
-  setDefaultSnapshotType: (value: DefaultSnapshotType) => void;
   setSyncToObsidian: (value: boolean) => void;
 
   // 业务操作
@@ -129,13 +121,10 @@ export function useSavePanel({
   // 操作状态
   const [saving, setSaving] = useState(false);
   const [saveSnapshot, setSaveSnapshotState] = useState(false);
-  const [defaultSnapshotType, setDefaultSnapshotTypeState] =
-    useState<DefaultSnapshotType>("auto");
   const [snapshotStatus, setSnapshotStatus] =
     useState<SavePanelSnapshotStatus>("idle");
   const [snapshotError, setSnapshotError] = useState<string | null>(null);
   const [syncToObsidian, setSyncToObsidian] = useState(false);
-  const [obsidianEnabled, setObsidianEnabled] = useState(false);
   const [obsidianStatus, setObsidianStatus] =
     useState<SavePanelObsidianStatus>("idle");
   const [obsidianError, setObsidianError] = useState<string | null>(null);
@@ -143,50 +132,28 @@ export function useSavePanel({
   // 加载分类和标签列表
   useEffect(() => {
     const loadData = async () => {
-      const [cats, existingTags, settings, obsidianConfig] = await Promise.all([
+      const [cats, existingTags, settings] = await Promise.all([
         bookmarkStorage.getCategories(),
         bookmarkStorage.getAllTags(),
         configStorage.getSettings(),
-        obsidianSyncService.getConfig(),
       ]);
-      const snapshotType = normalizeDefaultSnapshotType(
-        settings.defaultSnapshotType,
-      );
       setCategories(cats);
       setAllTags(existingTags);
-      setDefaultSnapshotTypeState(snapshotType);
-      setSaveSnapshotState(
-        settings.autoSaveSnapshot && snapshotType !== "none",
-      );
-      setObsidianEnabled(obsidianConfig.enabled);
-      setSyncToObsidian(
-        obsidianConfig.enabled && obsidianConfig.autoSyncOnSave,
-      );
+      setSaveSnapshotState(settings.autoSaveSnapshot);
       setDataLoaded(true);
     };
     loadData();
   }, []);
 
-  const setSaveSnapshot = useCallback(
-    (value: boolean) => {
-      setSaveSnapshotState(value);
-      setSnapshotStatus("idle");
-      setSnapshotError(null);
-      setObsidianStatus("idle");
-      setObsidianError(null);
-      if (value && defaultSnapshotType === "none") {
-        setDefaultSnapshotTypeState("auto");
-      }
-    },
-    [defaultSnapshotType],
-  );
-
-  const setDefaultSnapshotType = useCallback((value: DefaultSnapshotType) => {
-    const snapshotType = normalizeDefaultSnapshotType(value);
-    setDefaultSnapshotTypeState(snapshotType);
+  const setSaveSnapshot = useCallback((value: boolean) => {
+    setSaveSnapshotState(value);
     setSnapshotStatus("idle");
     setSnapshotError(null);
-    setSaveSnapshotState(snapshotType !== "none");
+    setObsidianStatus("idle");
+    setObsidianError(null);
+    if (!value) {
+      setSyncToObsidian(false);
+    }
   }, []);
 
   // 如果已存在书签，填充现有数据
@@ -425,7 +392,6 @@ export function useSavePanel({
         try {
           const backgroundService = getBackgroundService();
           const snapshotMarkdown = shouldUseMarkdownSnapshot(
-            defaultSnapshotType,
             pageContent,
             markdown,
           )
@@ -436,7 +402,7 @@ export function useSavePanel({
             bookmark.id,
             {
               markdown: snapshotMarkdown,
-              mode: defaultSnapshotType,
+              mode: "auto",
             },
           );
 
@@ -496,7 +462,6 @@ export function useSavePanel({
     markdown,
     existingBookmark,
     saveSnapshot,
-    defaultSnapshotType,
     syncToObsidian,
     onSaved,
   ]);
@@ -540,11 +505,9 @@ export function useSavePanel({
     aiError,
     saving,
     saveSnapshot,
-    defaultSnapshotType,
     snapshotStatus,
     snapshotError,
     syncToObsidian,
-    obsidianEnabled,
     obsidianStatus,
     obsidianError,
     setUrl,
@@ -553,7 +516,6 @@ export function useSavePanel({
     setCategoryId,
     setTags,
     setSaveSnapshot,
-    setDefaultSnapshotType,
     setSyncToObsidian,
     runAIAnalysis,
     retryAnalysis,
@@ -564,30 +526,12 @@ export function useSavePanel({
   };
 }
 
-// ========== 辅助函数 ==========
-
-function normalizeDefaultSnapshotType(
-  value?: DefaultSnapshotType,
-): DefaultSnapshotType {
-  if (
-    value === "auto" ||
-    value === "markdown" ||
-    value === "html" ||
-    value === "none"
-  ) {
-    return value;
-  }
-  return "auto";
-}
-
 function shouldUseMarkdownSnapshot(
-  type: DefaultSnapshotType,
   pageContent: PageContent,
   markdown: string,
 ): boolean {
   if (!markdown) return false;
-  if (type === "markdown") return true;
-  return type === "auto" && !!pageContent.isReaderable;
+  return !!pageContent.isReaderable;
 }
 
 /**

@@ -3,7 +3,6 @@
  */
 export interface Settings {
   autoSaveSnapshot: boolean;
-  defaultSnapshotType?: 'auto' | 'markdown' | 'html' | 'none';
   defaultCategory: string | null;
   theme: 'light' | 'dark' | 'system';
   language: 'zh' | 'en';
