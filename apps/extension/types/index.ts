@@ -238,7 +238,18 @@ export interface WorkspaceTabPage {
   pinned?: boolean;
   windowId?: number;
   index: number;
+  aiCategory?: string;
+  bookmarkId?: string;
+  convertedToBookmarkAt?: number;
+  bookmarkConversionStatus?: WorkspacePageBookmarkStatus;
+  bookmarkConversionError?: string;
 }
+
+export type WorkspacePageBookmarkStatus =
+  | "not_bookmarked"
+  | "converted"
+  | "existing"
+  | "failed";
 
 export interface Workspace {
   id: string;
@@ -290,6 +301,28 @@ export interface WorkspaceRestoreOptions {
 export interface WorkspaceRestoreResult {
   restoredCount: number;
   skippedDuplicateCount: number;
+}
+
+export interface WorkspaceBookmarkConversionOptions {
+  workspaceId: string;
+  pageIds: string[];
+  categoryId: string | null;
+  tags: string[];
+}
+
+export interface WorkspaceBookmarkConversionResult {
+  total: number;
+  created: number;
+  skippedExisting: number;
+  failed: number;
+}
+
+export interface WorkspaceBookmarkRecommendation {
+  pageIds: string[];
+  recommendedCategoryId: string | null;
+  recommendedTags: string[];
+  reasons: Record<string, string>;
+  excludedReasons: Record<string, string>;
 }
 
 /**

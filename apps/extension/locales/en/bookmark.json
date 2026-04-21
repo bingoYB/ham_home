@@ -176,7 +176,32 @@
     "noSelectedPages": "Select pages to restore first",
     "deleteConfirm": "Delete workspace \"{{name}}\"? This action cannot be undone.",
     "deleteSuccess": "Workspace deleted",
-    "confirmRestoreMany": "You are about to restore {{count}} pages. Continue?"
+    "confirmRestoreMany": "You are about to restore {{count}} pages. Continue?",
+    "allDomains": "All Domains",
+    "allBookmarkStatus": "All Bookmark Statuses",
+    "allAiCategories": "All AI Categories",
+    "notBookmarked": "Not Bookmarked",
+    "converted": "Converted",
+    "alreadyBookmarked": "Already Bookmarked",
+    "convertFailedStatus": "Failed",
+    "convertAll": "Convert All",
+    "convertSelected": "Convert Selected",
+    "aiCommandPlaceholder": "Example: bookmark technical docs, exclude search results",
+    "aiRecommend": "AI Recommend",
+    "aiCommandRequired": "Enter an AI command first",
+    "aiRecommendSuccess": "AI recommended {{count}} pages. Confirm before saving bookmarks",
+    "convertDialogTitle": "Convert to Bookmarks",
+    "convertDialogDescription": "Save {{count}} pages as bookmarks. Existing URLs will be skipped",
+    "confirmConvert": "Confirm Conversion",
+    "converting": "Converting...",
+    "convertSuccess": "Conversion complete: {{created}} created, {{skipped}} skipped, {{failed}} failed",
+    "convertFailed": "Failed to convert bookmarks",
+    "pageStatus": {
+      "not_bookmarked": "Not Bookmarked",
+      "converted": "Converted",
+      "existing": "Existing",
+      "failed": "Failed"
+    }
   },
   "popup": {
     "save": "Save",

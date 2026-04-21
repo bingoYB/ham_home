@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "@hamhome/ui";
 import { workspaceStorage } from "@/lib/storage/workspace-storage";
+import { workspaceBookmarkService } from "@/lib/services/workspace-bookmark-service";
 import {
   workspaceService,
   type WorkspacePreview,
@@ -9,7 +10,10 @@ import {
 import type {
   LocalCategory,
   Workspace,
+  WorkspaceBookmarkRecommendation,
+  WorkspacePageBookmarkStatus,
   WorkspaceRestoreMode,
+  WorkspaceTabPage,
 } from "@/types";
 import {
   ALL_CATEGORIES,
@@ -44,6 +48,24 @@ export function useWorkspacesPage({ categories }: UseWorkspacesPageOptions) {
     null,
   );
   const [workspaceTags, setWorkspaceTags] = useState<string[]>([]);
+  const [domainFilter, setDomainFilter] = useState(ALL_CATEGORIES);
+  const [bookmarkStatusFilter, setBookmarkStatusFilter] = useState<
+    WorkspacePageBookmarkStatus | typeof ALL_CATEGORIES
+  >(ALL_CATEGORIES);
+  const [aiCategoryFilter, setAiCategoryFilter] = useState(ALL_CATEGORIES);
+  const [pageStatusById, setPageStatusById] = useState<
+    Record<string, WorkspacePageBookmarkStatus>
+  >({});
+  const [convertDialogOpen, setConvertDialogOpen] = useState(false);
+  const [convertPageIds, setConvertPageIds] = useState<string[]>([]);
+  const [convertCategoryId, setConvertCategoryId] = useState<string | null>(
+    null,
+  );
+  const [convertTags, setConvertTags] = useState<string[]>([]);
+  const [converting, setConverting] = useState(false);
+  const [aiCommand, setAiCommand] = useState("");
+  const [aiRecommendation, setAiRecommendation] =
+    useState<WorkspaceBookmarkRecommendation | null>(null);
 
   useEffect(() => {
     workspaceStorage.getWorkspaces().then(setWorkspaces).catch(console.error);
@@ -66,12 +88,17 @@ export function useWorkspacesPage({ categories }: UseWorkspacesPageOptions) {
     if (!selectedWorkspace) {
       setSelectedWorkspaceId(null);
       setSelectedPageIds(new Set());
+      setPageStatusById({});
       return;
     }
 
     setSelectedWorkspaceId(selectedWorkspace.id);
     setSelectedPageIds(new Set(selectedWorkspace.pages.map((page) => page.id)));
-  }, [selectedWorkspace?.id]);
+    workspaceBookmarkService
+      .getPageBookmarkStatuses(selectedWorkspace)
+      .then(setPageStatusById)
+      .catch(console.error);
+  }, [selectedWorkspace?.id, selectedWorkspace?.updatedAt]);
 
   const filteredWorkspaces = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -92,6 +119,30 @@ export function useWorkspacesPage({ categories }: UseWorkspacesPageOptions) {
       return bValue - aValue;
     });
   }, [categoryFilter, searchQuery, sortBy, workspaces]);
+
+  const filteredWorkspacePages = useMemo(() => {
+    if (!selectedWorkspace) return [];
+    return selectedWorkspace.pages.filter((page) =>
+      matchesPageFilters(page, {
+        domainFilter,
+        aiCategoryFilter,
+        bookmarkStatusFilter,
+        pageStatusById,
+      }),
+    );
+  }, [
+    aiCategoryFilter,
+    bookmarkStatusFilter,
+    domainFilter,
+    pageStatusById,
+    selectedWorkspace,
+  ]);
+
+  const convertPages = useMemo(() => {
+    if (!selectedWorkspace) return [];
+    const pageIds = new Set(convertPageIds);
+    return selectedWorkspace.pages.filter((page) => pageIds.has(page.id));
+  }, [convertPageIds, selectedWorkspace]);
 
   const openSaveDialog = useCallback(async () => {
     try {
@@ -197,12 +248,82 @@ export function useWorkspacesPage({ categories }: UseWorkspacesPageOptions) {
 
   const toggleAllPages = useCallback(() => {
     if (!selectedWorkspace) return;
-    setSelectedPageIds((prev) =>
-      prev.size === selectedWorkspace.pages.length
-        ? new Set()
-        : new Set(selectedWorkspace.pages.map((page) => page.id)),
+    const filteredIds = filteredWorkspacePages.map((page) => page.id);
+    const allFilteredSelected = filteredIds.every((id) =>
+      selectedPageIds.has(id),
     );
-  }, [selectedWorkspace]);
+    setSelectedPageIds((prev) =>
+      allFilteredSelected
+        ? new Set()
+        : new Set([...Array.from(prev), ...filteredIds]),
+    );
+  }, [filteredWorkspacePages, selectedPageIds, selectedWorkspace]);
+
+  const openConvertDialog = useCallback(
+    (pageIds: string[]) => {
+      if (!selectedWorkspace || pageIds.length === 0) {
+        toast.error(t("workspace.noSelectedPages"));
+        return;
+      }
+      setConvertPageIds(pageIds);
+      setConvertCategoryId(selectedWorkspace.categoryId);
+      setConvertTags(selectedWorkspace.tags);
+      setConvertDialogOpen(true);
+    },
+    [selectedWorkspace, t],
+  );
+
+  const convertSelectedPages = useCallback(async () => {
+    if (!selectedWorkspace) return;
+    setConverting(true);
+    try {
+      const result = await workspaceBookmarkService.convertPagesToBookmarks({
+        workspaceId: selectedWorkspace.id,
+        pageIds: convertPageIds,
+        categoryId: convertCategoryId,
+        tags: convertTags,
+      });
+      setConvertDialogOpen(false);
+      toast.success(
+        t("workspace.convertSuccess", {
+          created: result.created,
+          skipped: result.skippedExisting,
+          failed: result.failed,
+        }),
+      );
+    } catch (error) {
+      toast.error(getErrorMessage(error, t("workspace.convertFailed")));
+    } finally {
+      setConverting(false);
+    }
+  }, [convertCategoryId, convertPageIds, convertTags, selectedWorkspace, t]);
+
+  const runAiRecommendation = useCallback(() => {
+    if (!selectedWorkspace) return;
+    if (!aiCommand.trim()) {
+      toast.error(t("workspace.aiCommandRequired"));
+      return;
+    }
+    const recommendation =
+      workspaceBookmarkService.recommendPagesForBookmarkConversion(
+        selectedWorkspace,
+        aiCommand,
+        categories,
+      );
+    setAiRecommendation(recommendation);
+    setSelectedPageIds(new Set(recommendation.pageIds));
+    if (recommendation.recommendedCategoryId) {
+      setConvertCategoryId(recommendation.recommendedCategoryId);
+    }
+    if (recommendation.recommendedTags.length > 0) {
+      setConvertTags(recommendation.recommendedTags);
+    }
+    toast.success(
+      t("workspace.aiRecommendSuccess", {
+        count: recommendation.pageIds.length,
+      }),
+    );
+  }, [aiCommand, categories, selectedWorkspace, t]);
 
   return {
     workspaces,
@@ -212,9 +333,21 @@ export function useWorkspacesPage({ categories }: UseWorkspacesPageOptions) {
     sortBy,
     selectedWorkspace,
     selectedPageIds,
+    filteredWorkspacePages,
+    pageStatusById,
     saveDialogOpen,
     preview,
     saving,
+    domainFilter,
+    bookmarkStatusFilter,
+    aiCategoryFilter,
+    convertDialogOpen,
+    convertPages,
+    convertCategoryId,
+    convertTags,
+    converting,
+    aiCommand,
+    aiRecommendation,
     workspaceName,
     workspaceDescription,
     workspaceCategoryId,
@@ -224,11 +357,18 @@ export function useWorkspacesPage({ categories }: UseWorkspacesPageOptions) {
     setCategoryFilter,
     setSortBy,
     setSelectedWorkspaceId,
+    setDomainFilter,
+    setBookmarkStatusFilter,
+    setAiCategoryFilter,
     setSaveDialogOpen,
     setWorkspaceName,
     setWorkspaceDescription,
     setWorkspaceCategoryId,
     setWorkspaceTags,
+    setConvertDialogOpen,
+    setConvertCategoryId,
+    setConvertTags,
+    setAiCommand,
     openSaveDialog,
     saveWorkspace,
     restoreWorkspace,
@@ -236,6 +376,9 @@ export function useWorkspacesPage({ categories }: UseWorkspacesPageOptions) {
     deleteWorkspace,
     togglePage,
     toggleAllPages,
+    openConvertDialog,
+    convertSelectedPages,
+    runAiRecommendation,
   };
 }
 
@@ -250,6 +393,26 @@ function workspaceMatchesSearch(workspace: Workspace, query: string) {
         page.url.toLowerCase().includes(query) ||
         page.domain.toLowerCase().includes(query),
     )
+  );
+}
+
+function matchesPageFilters(
+  page: WorkspaceTabPage,
+  filters: {
+    domainFilter: string;
+    aiCategoryFilter: string;
+    bookmarkStatusFilter: WorkspacePageBookmarkStatus | typeof ALL_CATEGORIES;
+    pageStatusById: Record<string, WorkspacePageBookmarkStatus>;
+  },
+) {
+  const status = filters.pageStatusById[page.id] ?? "not_bookmarked";
+  return (
+    (filters.domainFilter === ALL_CATEGORIES ||
+      page.domain === filters.domainFilter) &&
+    (filters.aiCategoryFilter === ALL_CATEGORIES ||
+      (page.aiCategory ?? "") === filters.aiCategoryFilter) &&
+    (filters.bookmarkStatusFilter === ALL_CATEGORIES ||
+      status === filters.bookmarkStatusFilter)
   );
 }
 

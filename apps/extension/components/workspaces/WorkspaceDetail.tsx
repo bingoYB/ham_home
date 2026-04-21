@@ -1,23 +1,22 @@
 import { useTranslation } from "react-i18next";
-import {
-  CheckSquare,
-  ExternalLink,
-  Globe,
-  RotateCcw,
-  Square,
-} from "lucide-react";
-import {
-  Button,
-  ScrollArea,
-  Separator,
-  cn,
-} from "@hamhome/ui";
-import type { Workspace, WorkspaceRestoreMode } from "@/types";
+import type { ReactNode } from "react";
+import { CheckSquare, ExternalLink, RotateCcw, Square } from "lucide-react";
+import { Button, ScrollArea, Separator } from "@hamhome/ui";
+import type {
+  Workspace,
+  WorkspacePageBookmarkStatus,
+  WorkspaceRestoreMode,
+  WorkspaceTabPage,
+} from "@/types";
 import { formatWorkspaceDate } from "./workspace-ui";
+import { WorkspacePageRow } from "./WorkspacePageRow";
 
 interface WorkspaceDetailProps {
   workspace: Workspace | null;
+  pages: WorkspaceTabPage[];
+  statusById: Record<string, WorkspacePageBookmarkStatus>;
   selectedPageIds: Set<string>;
+  toolbar?: ReactNode;
   onTogglePage: (pageId: string) => void;
   onToggleAllPages: () => void;
   onRestoreSelected: (mode: WorkspaceRestoreMode) => void;
@@ -25,7 +24,10 @@ interface WorkspaceDetailProps {
 
 export function WorkspaceDetail({
   workspace,
+  pages,
+  statusById,
   selectedPageIds,
+  toolbar,
   onTogglePage,
   onToggleAllPages,
   onRestoreSelected,
@@ -40,7 +42,8 @@ export function WorkspaceDetail({
     );
   }
 
-  const allSelected = selectedPageIds.size === workspace.pages.length;
+  const allSelected =
+    pages.length > 0 && pages.every((page) => selectedPageIds.has(page.id));
 
   return (
     <div className="flex h-full min-h-[360px] flex-col rounded-lg border">
@@ -80,6 +83,7 @@ export function WorkspaceDetail({
           </Button>
         </div>
       </div>
+      {toolbar}
       <Separator />
       <div className="flex items-center justify-between px-4 py-2">
         <Button variant="ghost" size="sm" onClick={onToggleAllPages}>
@@ -90,43 +94,22 @@ export function WorkspaceDetail({
           )}
           {t("workspace.selectedPages", {
             selected: selectedPageIds.size,
-            total: workspace.pages.length,
+            total: pages.length,
           })}
         </Button>
       </div>
       <ScrollArea className="min-h-0 flex-1">
         <div className="space-y-2 p-4 pt-0">
-          {workspace.pages.map((page) => {
-            const checked = selectedPageIds.has(page.id);
+          {pages.map((page) => {
+            const status = statusById[page.id] ?? "not_bookmarked";
             return (
-              <button
+              <WorkspacePageRow
                 key={page.id}
-                type="button"
-                className={cn(
-                  "flex w-full items-start gap-3 rounded-md border p-3 text-left transition-colors hover:bg-accent",
-                  checked && "border-primary bg-primary/5",
-                )}
-                onClick={() => onTogglePage(page.id)}
-              >
-                {checked ? (
-                  <CheckSquare className="mt-0.5 h-4 w-4 text-primary" />
-                ) : (
-                  <Square className="mt-0.5 h-4 w-4 text-muted-foreground" />
-                )}
-                {page.favicon ? (
-                  <img src={page.favicon} alt="" className="mt-0.5 h-4 w-4 rounded-sm" />
-                ) : (
-                  <Globe className="mt-0.5 h-4 w-4 text-muted-foreground" />
-                )}
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm font-medium">
-                    {page.title}
-                  </span>
-                  <span className="block truncate text-xs text-muted-foreground">
-                    {page.url}
-                  </span>
-                </span>
-              </button>
+                page={page}
+                checked={selectedPageIds.has(page.id)}
+                status={status}
+                onToggle={onTogglePage}
+              />
             );
           })}
         </div>

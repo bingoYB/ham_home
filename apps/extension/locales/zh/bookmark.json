@@ -176,7 +176,32 @@
     "noSelectedPages": "请先选择要恢复的页面",
     "deleteConfirm": "确定删除工作空间 \"{{name}}\" 吗？此操作无法撤销。",
     "deleteSuccess": "工作空间已删除",
-    "confirmRestoreMany": "即将恢复 {{count}} 个页面，是否继续？"
+    "confirmRestoreMany": "即将恢复 {{count}} 个页面，是否继续？",
+    "allDomains": "全部域名",
+    "allBookmarkStatus": "全部收藏状态",
+    "allAiCategories": "全部 AI 分类",
+    "notBookmarked": "未收藏",
+    "converted": "已转书签",
+    "alreadyBookmarked": "已存在书签",
+    "convertFailedStatus": "转换失败",
+    "convertAll": "全部转书签",
+    "convertSelected": "转为书签",
+    "aiCommandPlaceholder": "例如：把技术文档转成书签，排除搜索结果",
+    "aiRecommend": "AI 推荐",
+    "aiCommandRequired": "请先输入 AI 命令",
+    "aiRecommendSuccess": "AI 已推荐 {{count}} 个页面，请确认后再转为书签",
+    "convertDialogTitle": "转为书签",
+    "convertDialogDescription": "确认将 {{count}} 个页面保存为书签，已存在的 URL 会跳过",
+    "confirmConvert": "确认转为书签",
+    "converting": "转换中...",
+    "convertSuccess": "转书签完成：新增 {{created}}，跳过 {{skipped}}，失败 {{failed}}",
+    "convertFailed": "转书签失败",
+    "pageStatus": {
+      "not_bookmarked": "未收藏",
+      "converted": "已转书签",
+      "existing": "已存在",
+      "failed": "失败"
+    }
   },
   "popup": {
     "save": "收藏",
