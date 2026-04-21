@@ -1,6 +1,6 @@
 /**
  * @hamhome/ai - HamHome AI 客户端 SDK
- * 基于 LangChain 构建
+ * 基于 @hamhome/agent 的 AI SDK 构建
  */
 
 export * from "./types";

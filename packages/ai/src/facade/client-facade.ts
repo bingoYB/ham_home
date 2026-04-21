@@ -1,6 +1,11 @@
+import { generateStructuredObject } from "@hamhome/agent";
 import { z } from "zod";
 
-import { CategorySuggestionsSchema, GeneratedCategoriesSchema, TagSuggestionsSchema } from "../types";
+import {
+  CategorySuggestionsSchema,
+  GeneratedCategoriesSchema,
+  TagSuggestionsSchema,
+} from "../types";
 import type {
   AIClient,
   AIClientConfig,
@@ -10,9 +15,12 @@ import type {
   GeneratedCategory,
   TagSuggestionResult,
 } from "../types";
-import { createChatModel } from "../factory/chat-model";
-import { buildGenerateCategoriesPrompt, buildSuggestCategoryPrompt, buildSuggestTagsPrompt, buildTranslatePrompt } from "../prompts/generation";
-import { invokeStructuredChain, invokeTextChain } from "../chains/runnable-helpers";
+import {
+  buildGenerateCategoriesPrompt,
+  buildSuggestCategoryPrompt,
+  buildSuggestTagsPrompt,
+  buildTranslatePrompt,
+} from "../prompts/generation";
 import {
   BatchBookmarkAnalysisStrategy,
   SinglePassBookmarkAnalysisStrategy,
@@ -46,32 +54,46 @@ interface ClientFacadeOptions {
   isBatchModeEnabled: () => boolean;
 }
 
-export class LangChainAIClientFacade implements ExtendedAIClient {
-  private readonly model: ReturnType<typeof createChatModel>;
+export class AISDKAIClientFacade implements ExtendedAIClient {
   private readonly language: AILanguage;
-  private readonly debug: boolean;
   private readonly singlePassStrategy: SinglePassBookmarkAnalysisStrategy;
   private readonly batchStrategy: BatchBookmarkAnalysisStrategy;
 
   constructor(private readonly options: ClientFacadeOptions) {
-    this.model = createChatModel(this.options.config);
     this.language = this.options.config.language || "zh";
-    this.debug = this.options.config.debug ?? false;
     this.singlePassStrategy = new SinglePassBookmarkAnalysisStrategy({
-      model: this.model,
+      config: this.options.config,
       language: this.language,
-      debug: this.debug,
+      debug: this.options.config.debug,
     });
     this.batchStrategy = new BatchBookmarkAnalysisStrategy({
-      model: this.model,
+      config: this.options.config,
       language: this.language,
-      debug: this.debug,
+      debug: this.options.config.debug,
     });
   }
 
-  async analyzeBookmark(
-    input: AnalyzeBookmarkInput,
-  ) {
+  private async generateObjectWithConfig<T>(options: {
+    schema: z.ZodType<T>;
+    prompt: string;
+    system?: string;
+  }): Promise<T> {
+    const result = await generateStructuredObject({
+      provider: this.options.config.provider,
+      model: this.options.config.model || "gpt-4o-mini",
+      apiKey: this.options.config.apiKey,
+      baseURL: this.options.config.baseUrl,
+      temperature: this.options.config.temperature,
+      maxTokens: this.options.config.maxTokens,
+      schema: options.schema,
+      prompt: options.prompt,
+      system: options.system,
+    });
+
+    return result.object as T;
+  }
+
+  async analyzeBookmark(input: AnalyzeBookmarkInput) {
     const strategy = this.options.isBatchModeEnabled()
       ? this.batchStrategy
       : this.singlePassStrategy;
@@ -85,12 +107,9 @@ export class LangChainAIClientFacade implements ExtendedAIClient {
     existingTags: string[];
   }): Promise<TagSuggestionResult[]> {
     try {
-      return await invokeStructuredChain({
-        model: this.model,
+      return await this.generateObjectWithConfig({
         schema: TagSuggestionsSchema,
         prompt: buildSuggestTagsPrompt(this.language, input),
-        taskName: "suggestTags",
-        debug: this.debug,
       });
     } catch {
       return [];
@@ -104,12 +123,9 @@ export class LangChainAIClientFacade implements ExtendedAIClient {
     userCategories: string[];
   }): Promise<CategorySuggestionResult[]> {
     try {
-      return await invokeStructuredChain({
-        model: this.model,
+      return await this.generateObjectWithConfig({
         schema: CategorySuggestionsSchema,
         prompt: buildSuggestCategoryPrompt(this.language, input),
-        taskName: "suggestCategory",
-        debug: this.debug,
       });
     } catch {
       return [];
@@ -121,12 +137,13 @@ export class LangChainAIClientFacade implements ExtendedAIClient {
     targetLang: "zh" | "en" = "zh",
   ): Promise<string> {
     try {
-      return await invokeTextChain({
-        model: this.model,
+      const result = await this.generateObjectWithConfig({
+        schema: z.object({
+          text: z.string(),
+        }),
         prompt: buildTranslatePrompt(text, targetLang),
-        taskName: "translate",
-        debug: this.debug,
       });
+      return result.text;
     } catch {
       return text;
     }
@@ -137,32 +154,24 @@ export class LangChainAIClientFacade implements ExtendedAIClient {
     prompt: string;
     system?: string;
   }): Promise<T> {
-    return invokeStructuredChain({
-      model: this.model,
-      schema: options.schema,
-      prompt: options.prompt,
-      system: options.system,
-      taskName: "generateObject",
-      debug: this.debug,
-    });
+    return this.generateObjectWithConfig(options);
   }
 
   async generateRaw(prompt: string): Promise<string> {
-    return invokeTextChain({
-      model: this.model,
+    const result = await this.generateObjectWithConfig({
+      schema: z.object({
+        text: z.string(),
+      }),
       prompt,
-      taskName: "generateRaw",
-      debug: this.debug,
     });
+
+    return result.text;
   }
 
   async generateCategories(description: string): Promise<GeneratedCategory[]> {
-    const result = await invokeStructuredChain({
-      model: this.model,
+    const result = await this.generateObjectWithConfig({
       schema: GeneratedCategoriesSchema,
       prompt: buildGenerateCategoriesPrompt(this.language, description),
-      taskName: "generateCategories",
-      debug: this.debug,
     });
 
     return result.categories || [];

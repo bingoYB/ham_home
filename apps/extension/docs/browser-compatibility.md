@@ -97,9 +97,14 @@ WXT 框架已提供以下兼容性支持：
 
 1. **permissions** ✅
    - `storage` - 所有浏览器支持
+   - `unlimitedStorage` - Chromium/Firefox 支持，用于大体积本地快照、页面内容和向量索引
    - `activeTab` - 所有浏览器支持
    - `scripting` - Manifest V3，所有浏览器支持
    - `clipboardWrite` - 所有浏览器支持
+   - `contextMenus` - 所有浏览器支持
+   - `bookmarks` - 所有浏览器支持
+   - `alarms` - 所有浏览器支持
+   - `favicon` - Chromium 支持，Firefox 中走安全回退
 
 2. **host_permissions** ✅
    - `<all_urls>` - 所有浏览器支持

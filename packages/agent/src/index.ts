@@ -1,4 +1,5 @@
 export * from "./agent";
+export * from "./embedding";
 export * from "./event";
 export * from "./generation";
 export * from "./memory";

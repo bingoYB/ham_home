@@ -89,7 +89,7 @@
       "deleteSuccess": "快照已删除",
       "deleteFailed": "删除快照失败",
       "obsidianSyncSuccess": "已同步到 Obsidian",
-      "obsidianSyncSkipped": "快照未变化，已跳过同步",
+      "obsidianSyncSkipped": "笔记内容未变化，已跳过同步",
       "obsidianSyncFailed": "同步到 Obsidian 失败",
       "obsidianBatchResult": "Obsidian 同步完成：成功 {{success}}，失败 {{failed}}，跳过 {{skipped}}",
       "noSnapshot": "暂无快照"

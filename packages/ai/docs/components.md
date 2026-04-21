@@ -2,15 +2,14 @@
 
 ## 架构说明
 
-`@hamhome/ai` 已重构为基于 LangChain 的分层架构，并保持原有 facade API 不变：
+`@hamhome/ai` 当前基于 `@hamhome/agent` 与 AI SDK 构建，并保持原有 facade API 不变：
 
-- `config/providers.ts`：Provider 元数据与默认配置
-- `factory/chat-model.ts`：统一创建 LangChain ChatModel（Factory Method）
+- `config/providers.ts`：复用 `@hamhome/agent` 的 provider 元数据与默认配置
 - `prompts/*`：提示词模板与输入上下文拼装
 - `strategies/bookmark-analysis.ts`：单阶段 / 分批分析策略（Strategy）
 - `facade/client-facade.ts`：对外统一 API 门面（Facade）
-- `chains/runnable-helpers.ts`：基于 `ChatPromptTemplate` 与 `RunnableSequence` 的通用执行流
-- `config/embedding-providers.ts` + `factory/embedding-model.ts`：LangChain Embeddings provider 配置与工厂
+- `config/embedding-providers.ts`：复用 `@hamhome/agent` 的 embedding provider 配置
+- `@hamhome/agent`：统一提供 structured output 与 embedding 执行能力
 
 这样可以让扩展侧只负责配置读取与业务上下文适配，未来也能直接在服务端环境复用同一套 AI 能力。
 
@@ -21,7 +20,7 @@
 - `@hamhome/ai/providers`：provider 元数据、默认模型、embedding 支持判断
 - `@hamhome/ai/fallback`：本地规则 fallback
 - `@hamhome/ai/search-rules`：搜索规则解析与状态合并
-- `@hamhome/ai/search-planner`：基于 LangChain 的搜索 AI planner
+- `@hamhome/ai/search-planner`：基于 AI SDK 结构化输出的搜索 AI planner
 - `@hamhome/ai/clients`：完整 chat client / extended client
 - `@hamhome/ai/embeddings`：完整 embedding client
 
@@ -44,7 +43,7 @@ AI 提示词输出语言配置。
 
 创建 AI 客户端，用于书签分析。
 
-内部实现基于 LangChain `ChatPromptTemplate`、`RunnableSequence` 与结构化输出能力。
+内部实现基于 `@hamhome/agent` 暴露的 AI SDK 结构化输出能力。
 
 ### Props
 
@@ -112,7 +111,7 @@ const result = await client.analyzeBookmark({
 
 用于生成符合指定 Zod schema 的结构化输出。
 
-内部统一走 LangChain 结构化输出链，适合搜索解析、意图识别与其他需要稳定 JSON 输出的场景。
+内部统一走 AI SDK 结构化输出调用，适合搜索解析、意图识别与其他需要稳定 JSON 输出的场景。
 
 #### 参数
 
@@ -183,7 +182,7 @@ console.log(request.refinedQuery); // 'React 教程'
 
 ## createEmbeddingClient
 
-创建 Embedding 客户端，用于生成文本向量。基于 LangChain `Embeddings` 抽象与 `OpenAIEmbeddings` 实现。
+创建 Embedding 客户端，用于生成文本向量。内部复用 `@hamhome/agent` 的 AI SDK embedding client。
 
 ### Props
 
@@ -224,7 +223,7 @@ console.log(request.refinedQuery); // 'React 教程'
 | getModelKey() | 获取模型标识（用于向量存储） |
 
 说明：
-当前 LangChain Embeddings 不直接暴露 token usage，因此返回结果中的 `tokens` 字段统一为 `0`，向量结果与连接能力不受影响。
+AI SDK embedding 接口会在 provider 支持时返回 token usage；不支持时返回 `0`。
 
 ### 使用示例
 

@@ -1,14 +1,13 @@
 import { browser } from "wxt/browser";
 import { bookmarkStorage } from "@/lib/storage/bookmark-storage";
 import { obsidianSyncStorage } from "@/lib/storage/obsidian-sync-storage";
-import { snapshotStorage } from "@/lib/storage/snapshot-storage";
 import type {
   LocalBookmark,
   ObsidianBatchSyncResult,
+  ObsidianSyncBookmarkOptions,
   ObsidianSyncResult,
 } from "@/types";
 
-const MARKDOWN_TYPE = "text/markdown;charset=utf-8";
 const DEFAULT_OBSIDIAN_FOLDER_PATH = "HamHome";
 const CLIPBOARD_FALLBACK_MESSAGE =
   "HamHome 已将笔记内容复制到剪贴板。如果 Obsidian 无法读取剪贴板，请回到 HamHome 后重试。";
@@ -16,7 +15,7 @@ const CLIPBOARD_FALLBACK_MESSAGE =
 class ObsidianSyncService {
   async syncBookmark(
     bookmarkId: string,
-    options: { skipUnchanged?: boolean } = {},
+    options: ObsidianSyncBookmarkOptions = {},
   ): Promise<ObsidianSyncResult> {
     const bookmark = await bookmarkStorage.getBookmarkById(bookmarkId);
     if (!bookmark) {
@@ -29,17 +28,17 @@ class ObsidianSyncService {
     });
 
     try {
-      const snapshot = await snapshotStorage.getSnapshot(bookmarkId);
-      if (!snapshot) {
-        return this.fail(bookmarkId, "未找到快照");
+      const markdown = resolveBookmarkMarkdown(bookmark, options.markdown);
+      if (!markdown) {
+        return this.fail(bookmarkId, "没有可同步的笔记内容");
       }
 
-      if (snapshot.type !== MARKDOWN_TYPE) {
-        return this.fail(bookmarkId, "仅支持同步 Markdown 快照");
-      }
-
-      const markdown = await snapshot.html.text();
-      const contentHash = await hashText(markdown);
+      const notePath = buildObsidianNotePath(
+        DEFAULT_OBSIDIAN_FOLDER_PATH,
+        bookmark,
+      );
+      const fileContent = buildMarkdownFile(bookmark, markdown);
+      const contentHash = await hashText(fileContent);
       const state = await obsidianSyncStorage.getState(bookmarkId);
 
       if (
@@ -54,11 +53,6 @@ class ObsidianSyncService {
         return { bookmarkId, status: "skipped" };
       }
 
-      const notePath = buildObsidianNotePath(
-        DEFAULT_OBSIDIAN_FOLDER_PATH,
-        bookmark,
-      );
-      const fileContent = buildMarkdownFile(bookmark, markdown);
       const copied = await copyToClipboard(fileContent);
       const obsidianUrl = buildObsidianUrl({
         notePath,
@@ -71,7 +65,7 @@ class ObsidianSyncService {
       await obsidianSyncStorage.updateState(bookmarkId, {
         status: "synced",
         lastSyncedAt: Date.now(),
-        snapshotUpdatedAt: snapshot.createdAt,
+        sourceUpdatedAt: options.sourceUpdatedAt ?? bookmark.updatedAt,
         contentHash,
         error: undefined,
       });
@@ -118,6 +112,26 @@ function summarizeBatch(results: ObsidianSyncResult[]): ObsidianBatchSyncResult 
     },
     { total: 0, success: 0, failed: 0, skipped: 0, results: [] },
   );
+}
+
+function resolveBookmarkMarkdown(
+  bookmark: LocalBookmark,
+  markdown?: string,
+): string | null {
+  const content = markdown?.trim() || bookmark.content?.trim();
+  if (content) return content;
+
+  const fallback: string[] = [];
+  const description = bookmark.description?.trim();
+  if (description) {
+    fallback.push(description);
+  }
+  const url = bookmark.url?.trim();
+  const title = bookmark.title?.trim() || url;
+  if (!title) return null;
+
+  fallback.push(url ? `[${title}](${url})` : title);
+  return fallback.join("\n\n");
 }
 
 function buildMarkdownFile(bookmark: LocalBookmark, markdown: string): string {

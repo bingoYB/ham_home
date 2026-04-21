@@ -1,136 +1,30 @@
+import {
+  PROVIDER_DEFAULTS as AGENT_PROVIDER_DEFAULTS,
+  getDefaultBaseUrl as getAgentDefaultBaseUrl,
+  getDefaultModel as getAgentDefaultModel,
+  getProviderModels as getAgentProviderModels,
+  requiresApiKey as checkRequiresApiKey,
+  type ProviderConfig,
+} from "@hamhome/agent";
 import type { AIProvider } from "../types";
 
-export interface ProviderConfig {
-  baseUrl: string;
-  models: string[];
-  requiresApiKey: boolean;
-}
+export type { ProviderConfig };
 
-export const PROVIDER_DEFAULTS: Record<AIProvider, ProviderConfig> = {
-  openai: {
-    baseUrl: "https://api.openai.com/v1",
-    models: [
-      "gpt-4o-mini",
-      "gpt-4o",
-      "gpt-4-turbo",
-      "gpt-3.5-turbo",
-      "o1-mini",
-      "o1-preview",
-    ],
-    requiresApiKey: true,
-  },
-  anthropic: {
-    baseUrl: "https://api.anthropic.com",
-    models: [
-      "claude-3-5-haiku-latest",
-      "claude-3-5-sonnet-latest",
-      "claude-3-opus-latest",
-    ],
-    requiresApiKey: true,
-  },
-  google: {
-    baseUrl: "https://generativelanguage.googleapis.com/v1beta/openai",
-    models: [
-      "gemini-2.0-flash",
-      "gemini-2.0-flash-lite",
-      "gemini-1.5-flash",
-      "gemini-1.5-pro",
-    ],
-    requiresApiKey: true,
-  },
-  azure: {
-    baseUrl: "",
-    models: ["gpt-4o-mini", "gpt-4o", "gpt-4-turbo", "gpt-35-turbo"],
-    requiresApiKey: true,
-  },
-  deepseek: {
-    baseUrl: "https://api.deepseek.com/v1",
-    models: ["deepseek-chat", "deepseek-reasoner"],
-    requiresApiKey: true,
-  },
-  groq: {
-    baseUrl: "https://api.groq.com/openai/v1",
-    models: [
-      "llama-3.3-70b-versatile",
-      "llama-3.1-8b-instant",
-      "mixtral-8x7b-32768",
-      "gemma2-9b-it",
-    ],
-    requiresApiKey: true,
-  },
-  mistral: {
-    baseUrl: "https://api.mistral.ai/v1",
-    models: [
-      "mistral-small-latest",
-      "mistral-medium-latest",
-      "mistral-large-latest",
-      "open-mistral-7b",
-    ],
-    requiresApiKey: true,
-  },
-  moonshot: {
-    baseUrl: "https://api.moonshot.cn/v1",
-    models: ["moonshot-v1-8k", "moonshot-v1-32k", "moonshot-v1-128k"],
-    requiresApiKey: true,
-  },
-  zhipu: {
-    baseUrl: "https://open.bigmodel.cn/api/paas/v4",
-    models: ["glm-4-flash", "glm-4-plus", "glm-4-air", "glm-4-long"],
-    requiresApiKey: true,
-  },
-  hunyuan: {
-    baseUrl: "https://api.hunyuan.cloud.tencent.com/v1",
-    models: [
-      "hunyuan-lite",
-      "hunyuan-standard",
-      "hunyuan-pro",
-      "hunyuan-turbo",
-    ],
-    requiresApiKey: true,
-  },
-  nvidia: {
-    baseUrl: "https://integrate.api.nvidia.com/v1",
-    models: [
-      "meta/llama-3.1-8b-instruct",
-      "meta/llama-3.1-70b-instruct",
-      "nvidia/llama-3.1-nemotron-70b-instruct",
-    ],
-    requiresApiKey: true,
-  },
-  siliconflow: {
-    baseUrl: "https://api.siliconflow.cn/v1",
-    models: [
-      "Qwen/Qwen2.5-7B-Instruct",
-      "Qwen/Qwen2.5-72B-Instruct",
-      "deepseek-ai/DeepSeek-V3",
-      "Pro/deepseek-ai/DeepSeek-R1",
-    ],
-    requiresApiKey: true,
-  },
-  ollama: {
-    baseUrl: "http://localhost:11434/v1",
-    models: ["llama3.2", "llama3.1", "mistral", "qwen2.5", "phi3"],
-    requiresApiKey: false,
-  },
-  custom: {
-    baseUrl: "",
-    models: ["gpt-4o-mini"],
-    requiresApiKey: true,
-  },
-};
+export const PROVIDER_DEFAULTS: Record<AIProvider, ProviderConfig> =
+  AGENT_PROVIDER_DEFAULTS as Record<AIProvider, ProviderConfig>;
 
 export function getDefaultModel(provider: AIProvider): string {
-  return PROVIDER_DEFAULTS[provider]?.models[0] || "gpt-4o-mini";
+  return getAgentDefaultModel(provider);
 }
 
 export function getProviderModels(provider: AIProvider): string[] {
-  return PROVIDER_DEFAULTS[provider]?.models || ["gpt-4o-mini"];
+  return getAgentProviderModels(provider);
 }
 
 export function getDefaultBaseUrl(provider: AIProvider): string {
-  return PROVIDER_DEFAULTS[provider]?.baseUrl || "";
+  return getAgentDefaultBaseUrl(provider);
 }
 
 export function requiresApiKey(provider: AIProvider): boolean {
-  return PROVIDER_DEFAULTS[provider]?.requiresApiKey ?? true;
+  return checkRequiresApiKey(provider);
 }

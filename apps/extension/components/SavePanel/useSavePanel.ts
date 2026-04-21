@@ -418,7 +418,11 @@ export function useSavePanel({
             setObsidianStatus("syncing");
             const obsidianResult = await obsidianSyncService.syncBookmark(
               bookmark.id,
-              { skipUnchanged: false },
+              {
+                skipUnchanged: false,
+                markdown,
+                sourceUpdatedAt: bookmark.updatedAt,
+              },
             );
             if (obsidianResult.status === "failed") {
               setObsidianStatus("failed");

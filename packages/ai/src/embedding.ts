@@ -1,7 +1,11 @@
 /**
  * Embedding 模块
- * 基于 LangChain Embeddings 提供统一向量能力
+ * 基于 @hamhome/agent 的 AI SDK Embedding 能力
  */
+import {
+  createEmbeddingClient as createAgentEmbeddingClient,
+  getEmbeddingModelKey,
+} from "@hamhome/agent";
 import { createLogger } from "@hamhome/utils";
 
 import {
@@ -9,8 +13,6 @@ import {
   getDefaultEmbeddingModel,
   isEmbeddingSupported,
 } from "./config/embedding-providers";
-import { createEmbeddingsModel } from "./factory/embedding-model";
-import { getEmbeddingModelKey } from "./providers";
 import { calculateCosineSimilarity } from "./utils/vector";
 import type { AIProvider } from "./types";
 
@@ -35,7 +37,14 @@ export interface EmbeddingBatchResult {
 }
 
 export function createEmbeddingClient(config: EmbeddingClientConfig) {
-  const model = createEmbeddingsModel(config);
+  const client = createAgentEmbeddingClient({
+    provider: config.provider,
+    apiKey: config.apiKey,
+    baseUrl:
+      config.baseUrl || EMBEDDING_PROVIDER_DEFAULTS[config.provider]?.baseUrl,
+    model: config.model,
+    dimensions: config.dimensions,
+  });
 
   return {
     getModelKey(): string {
@@ -50,15 +59,15 @@ export function createEmbeddingClient(config: EmbeddingClientConfig) {
       });
 
       try {
-        const embedding = await model.embedQuery(text);
+        const result = await client.embed(text);
 
         logger.debug("Embedding generated", {
-          dimensions: embedding.length,
+          dimensions: result.embedding.length,
         });
 
         return {
-          embedding,
-          tokens: 0,
+          embedding: result.embedding,
+          tokens: result.tokens,
         };
       } catch (error) {
         logger.error("Embedding generation failed", error);
@@ -78,16 +87,16 @@ export function createEmbeddingClient(config: EmbeddingClientConfig) {
       });
 
       try {
-        const embeddings = await model.embedDocuments(texts);
+        const result = await client.embedMany(texts);
 
         logger.debug("Embeddings batch generated", {
-          count: embeddings.length,
-          dimensions: embeddings[0]?.length,
+          count: result.embeddings.length,
+          dimensions: result.embeddings[0]?.length,
         });
 
         return {
-          embeddings,
-          tokens: 0,
+          embeddings: result.embeddings,
+          tokens: result.tokens,
         };
       } catch (error) {
         logger.error("Embeddings batch generation failed", error);
@@ -100,18 +109,7 @@ export function createEmbeddingClient(config: EmbeddingClientConfig) {
       error?: string;
       dimensions?: number;
     }> {
-      try {
-        const embedding = await model.embedQuery("test");
-        return {
-          success: true,
-          dimensions: embedding.length,
-        };
-      } catch (error) {
-        return {
-          success: false,
-          error: error instanceof Error ? error.message : String(error),
-        };
-      }
+      return client.testConnection();
     },
   };
 }

@@ -1,5 +1,5 @@
 import type { AIClient, AIClientConfig } from "./types";
-import { LangChainAIClientFacade, type ExtendedAIClient } from "./facade/client-facade";
+import { AISDKAIClientFacade, type ExtendedAIClient } from "./facade/client-facade";
 import {
   getDefaultBaseUrl,
   getDefaultModel,
@@ -24,14 +24,14 @@ export function getAIBatchMode(): boolean {
 }
 
 export function createAIClient(config: AIClientConfig): AIClient {
-  return new LangChainAIClientFacade({
+  return new AISDKAIClientFacade({
     config,
     isBatchModeEnabled: () => AI_BATCH_MODE,
   });
 }
 
 export function createExtendedAIClient(config: AIClientConfig): ExtendedAIClient {
-  return new LangChainAIClientFacade({
+  return new AISDKAIClientFacade({
     config,
     isBatchModeEnabled: () => AI_BATCH_MODE,
   });

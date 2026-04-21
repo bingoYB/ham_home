@@ -24,7 +24,7 @@
 | saveSnapshot | `boolean` | ✓ | - | 本次保存是否保存快照 |
 | snapshotStatus | `SavePanelSnapshotStatus` | ✓ | - | 书签与快照保存状态 |
 | snapshotError | `string \| null` | ✓ | - | 快照保存错误信息 |
-| syncToObsidian | `boolean` | ✓ | - | 本次保存快照后是否发送 Markdown 快照到 Obsidian |
+| syncToObsidian | `boolean` | ✓ | - | 本次保存快照后是否将书签笔记发送到 Obsidian |
 | obsidianStatus | `SavePanelObsidianStatus` | ✓ | - | Obsidian 同步状态 |
 | obsidianError | `string \| null` | ✓ | - | Obsidian 同步错误信息 |
 | onTitleChange | `(value: string) => void` | ✓ | - | 标题变更回调 |
@@ -80,8 +80,9 @@
 - `saveSnapshot` 初始值跟随设置页的默认保存快照策略。
 - 保存面板内调整快照开关只影响本次保存，不反写设置页默认值。
 - 快照类型由系统自动决定：可阅读页面优先保存 Markdown，其他页面保存完整 HTML。
-- 勾选 `保存快照` 后，面板会显示 `保存后同步到 Obsidian` 开关；只发送 Markdown 快照。
-- Obsidian 保存使用 `obsidian://new` 协议，优先通过剪贴板传递笔记内容。
+- 勾选 `保存快照` 后，面板会显示 `保存后同步到 Obsidian` 开关。
+- Obsidian 保存与本地快照格式解耦，使用书签正文生成 Markdown 笔记；本地快照可自动保存为 Markdown 或 HTML。
+- Obsidian 保存使用 `obsidian://new` 协议，优先通过剪贴板传递笔记内容，剪贴板失败时回退到 URI 内容参数。
 - 快照保存失败不会回滚已保存书签，面板会保留错误状态，用户可稍后通过书签管理页重试。
 
 ## bookmarkPanel
@@ -362,7 +363,7 @@ const { container: portalContainer } = useContentUI();
 | onViewSnapshot | `() => void` | - | - | 查看快照 |
 | onSaveSnapshot | `() => void` | - | - | 保存或更新快照 |
 | onDeleteSnapshot | `() => void` | - | - | 删除快照 |
-| onSyncToObsidian | `() => void` | - | - | 同步 Markdown 快照到 Obsidian |
+| onSyncToObsidian | `() => void` | - | - | 同步书签笔记到 Obsidian |
 | onTogglePin | `() => void` | - | - | 置顶或取消置顶书签 |
 | isPinned | `boolean` | - | `false` | 当前书签是否已置顶 |
 | onReanalyzeAI | `() => void` | - | - | 重新执行 AI 分析 |
@@ -417,7 +418,7 @@ const { container: portalContainer } = useContentUI();
 | onViewSnapshot | `() => void` | - | - | 查看快照 |
 | onSaveSnapshot | `() => void` | - | - | 保存或更新快照 |
 | onDeleteSnapshot | `() => void` | - | - | 删除快照 |
-| onSyncToObsidian | `() => void` | - | - | 同步 Markdown 快照到 Obsidian |
+| onSyncToObsidian | `() => void` | - | - | 同步书签笔记到 Obsidian |
 | onTogglePin | `() => void` | - | - | 置顶或取消置顶书签 |
 | isPinned | `boolean` | - | `false` | 当前书签是否已置顶 |
 | onReanalyzeAI | `() => void` | - | - | 重新执行 AI 分析 |

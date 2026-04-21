@@ -164,13 +164,13 @@ export interface LocalSettings {
 
 // ============ 快照相关 ============
 
-export type DefaultSnapshotType = "auto" | "markdown" | "html" | "none";
+export type SnapshotSaveMode = "auto" | "markdown" | "html" | "none";
 
 export type SnapshotContentType = "text/html" | "text/markdown;charset=utf-8";
 
 export interface SaveSnapshotBackgroundOptions {
   markdown?: string;
-  mode?: DefaultSnapshotType;
+  mode?: SnapshotSaveMode;
 }
 
 export interface SnapshotSaveResult {
@@ -191,9 +191,15 @@ export interface ObsidianBookmarkSyncState {
   bookmarkId: string;
   status: ObsidianSyncStatus;
   lastSyncedAt?: number;
-  snapshotUpdatedAt?: number;
+  sourceUpdatedAt?: number;
   contentHash?: string;
   error?: string;
+}
+
+export interface ObsidianSyncBookmarkOptions {
+  skipUnchanged?: boolean;
+  markdown?: string;
+  sourceUpdatedAt?: number;
 }
 
 export interface ObsidianSyncResult {

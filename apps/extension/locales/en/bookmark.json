@@ -89,7 +89,7 @@
       "deleteSuccess": "Snapshot deleted",
       "deleteFailed": "Failed to delete snapshot",
       "obsidianSyncSuccess": "Synced to Obsidian",
-      "obsidianSyncSkipped": "Snapshot unchanged, sync skipped",
+      "obsidianSyncSkipped": "Note content unchanged, sync skipped",
       "obsidianSyncFailed": "Failed to sync to Obsidian",
       "obsidianBatchResult": "Obsidian sync completed: {{success}} succeeded, {{failed}} failed, {{skipped}} skipped",
       "noSnapshot": "No snapshot available"

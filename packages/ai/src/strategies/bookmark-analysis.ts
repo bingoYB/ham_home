@@ -1,6 +1,8 @@
+import { generateStructuredObject } from "@hamhome/agent";
 import { z } from "zod";
 
 import type {
+  AIClientConfig,
   AILanguage,
   AnalyzeBookmarkInput,
   BookmarkAnalysisResult,
@@ -15,10 +17,8 @@ import {
   getTagsSystemPrompt,
   getTitleSummarySystemPrompt,
 } from "../prompts/bookmark-analysis";
-import { invokeStructuredChain } from "../chains/runnable-helpers";
 import { cleanTags } from "../utils/text";
 import { createBookmarkAnalysisFallback } from "../utils/fallback";
-import type { SupportedChatModel } from "../factory/chat-model";
 
 const TitleSummarySchema = z.object({
   title: z.string().describe("优化后的标题，简洁明了，不超过50字"),
@@ -38,9 +38,30 @@ export interface BookmarkAnalysisStrategy {
 }
 
 interface BookmarkAnalysisStrategyOptions {
-  model: SupportedChatModel;
+  config: AIClientConfig;
   language: AILanguage;
   debug?: boolean;
+}
+
+async function invokeStructuredTask<T>(options: {
+  config: AIClientConfig;
+  schema: z.ZodType<T>;
+  prompt: string;
+  system?: string;
+}): Promise<T> {
+  const result = await generateStructuredObject({
+    provider: options.config.provider,
+    model: options.config.model || "gpt-4o-mini",
+    apiKey: options.config.apiKey,
+    baseURL: options.config.baseUrl,
+    temperature: options.config.temperature,
+    maxTokens: options.config.maxTokens,
+    schema: options.schema,
+    prompt: options.prompt,
+    system: options.system,
+  });
+
+  return result.object as T;
 }
 
 export class SinglePassBookmarkAnalysisStrategy
@@ -49,8 +70,8 @@ export class SinglePassBookmarkAnalysisStrategy
   constructor(private readonly options: BookmarkAnalysisStrategyOptions) {}
 
   async analyze(input: AnalyzeBookmarkInput): Promise<BookmarkAnalysisResult> {
-    const object = await invokeStructuredChain({
-      model: this.options.model,
+    const object = await invokeStructuredTask({
+      config: this.options.config,
       schema: z.object({
         title: z.string().describe("优化后的标题，简洁明了，不超过50字"),
         summary: z
@@ -64,8 +85,6 @@ export class SinglePassBookmarkAnalysisStrategy
       }),
       system: getBookmarkAnalysisSystemPrompt(this.options.language),
       prompt: buildBookmarkAnalysisPrompt(input, this.options.language),
-      taskName: "analyzeBookmarkSingle",
-      debug: this.options.debug,
     });
 
     return {
@@ -83,32 +102,26 @@ export class BatchBookmarkAnalysisStrategy implements BookmarkAnalysisStrategy {
   async analyze(input: AnalyzeBookmarkInput): Promise<BookmarkAnalysisResult> {
     try {
       const [titleSummary, category, tags] = await Promise.all([
-        invokeStructuredChain({
-          model: this.options.model,
+        invokeStructuredTask({
+          config: this.options.config,
           schema: TitleSummarySchema,
           system: getTitleSummarySystemPrompt(this.options.language),
           prompt: buildTitleSummaryPrompt(input, this.options.language),
-          taskName: "TitleSummary",
-          debug: this.options.debug,
         }).catch(() => ({
           title: input.title || "未命名书签",
           summary: "",
         })),
-        invokeStructuredChain({
-          model: this.options.model,
+        invokeStructuredTask({
+          config: this.options.config,
           schema: CategorySchema,
           system: getCategorySystemPrompt(this.options.language),
           prompt: buildCategoryPrompt(input, this.options.language),
-          taskName: "Category",
-          debug: this.options.debug,
         }).catch(() => ({ category: "未分类" })),
-        invokeStructuredChain({
-          model: this.options.model,
+        invokeStructuredTask({
+          config: this.options.config,
           schema: TagsSchema,
           system: getTagsSystemPrompt(this.options.language),
           prompt: buildTagsPrompt(input, this.options.language),
-          taskName: "Tags",
-          debug: this.options.debug,
         }).catch(() => ({ tags: [] })),
       ]);
 

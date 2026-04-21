@@ -24,7 +24,6 @@
     "@hamhome/agent": "workspace:*",
     "@hamhome/ui": "workspace:*",
     "@hamhome/utils": "workspace:*",
-    "@langchain/openai": "1.2.12",
     "@mozilla/readability": "^0.5.0",
     "@tanstack/react-virtual": "^3.13.18",
     "@webext-core/proxy-service": "^2.0.0",
