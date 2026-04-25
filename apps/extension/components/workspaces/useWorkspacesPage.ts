@@ -2,106 +2,113 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { toast } from "@hamhome/ui";
 import { workspaceStorage } from "@/lib/storage/workspace-storage";
-import { workspaceBookmarkService } from "@/lib/services/workspace-bookmark-service";
 import { workspaceAnalysisService } from "@/lib/services/workspace-analysis-service";
 import {
   workspaceService,
   type WorkspacePreview,
 } from "@/lib/services/workspace-service";
 import type {
-  LocalCategory,
   Workspace,
-  WorkspaceBookmarkRecommendation,
-  WorkspacePageBookmarkStatus,
+  WorkspaceCategory,
   WorkspaceRestoreMode,
   WorkspaceTabPage,
 } from "@/types";
 import {
   ALL_CATEGORIES,
+  filterWorkspaceTabGroups,
   MANY_PAGES_THRESHOLD,
   UNCATEGORIZED,
 } from "./workspace-ui";
 
-interface UseWorkspacesPageOptions {
-  categories: LocalCategory[];
-}
+interface UseWorkspacesPageOptions { }
 
-export function useWorkspacesPage({ categories }: UseWorkspacesPageOptions) {
+export function useWorkspacesPage({ }: UseWorkspacesPageOptions) {
   const { t } = useTranslation("bookmark");
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [workspaceCategories, setWorkspaceCategories] = useState<
+    WorkspaceCategory[]
+  >([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState(ALL_CATEGORIES);
-  const [sortBy, setSortBy] = useState<"createdAt" | "restoredAt">(
-    "createdAt",
+  const [sortBy, setSortBy] = useState<"createdAt" | "restoredAt" | "manual">(
+    "manual",
   );
-  const [selectedWorkspaceId, setSelectedWorkspaceId] = useState<string | null>(
+
+  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingWorkspaceId, setEditingWorkspaceId] = useState<string | null>(
     null,
   );
-  const [selectedPageIds, setSelectedPageIds] = useState<Set<string>>(
-    () => new Set(),
-  );
-  const [saveDialogOpen, setSaveDialogOpen] = useState(false);
   const [preview, setPreview] = useState<WorkspacePreview | null>(null);
   const [saving, setSaving] = useState(false);
+  const [updatingWorkspace, setUpdatingWorkspace] = useState(false);
+  const [currentWindowPreview, setCurrentWindowPreview] =
+    useState<WorkspacePreview | null>(null);
+  const [currentWindowLoading, setCurrentWindowLoading] = useState(false);
   const [workspaceName, setWorkspaceName] = useState("");
   const [workspaceDescription, setWorkspaceDescription] = useState("");
   const [workspaceCategoryId, setWorkspaceCategoryId] = useState<string | null>(
     null,
   );
   const [workspaceTags, setWorkspaceTags] = useState<string[]>([]);
+  const [newWorkspaceCategoryName, setNewWorkspaceCategoryName] = useState("");
+  const [creatingWorkspaceCategory, setCreatingWorkspaceCategory] =
+    useState(false);
   const [keepDuplicatePages, setKeepDuplicatePages] = useState(false);
-  const [domainFilter, setDomainFilter] = useState(ALL_CATEGORIES);
-  const [bookmarkStatusFilter, setBookmarkStatusFilter] = useState<
-    WorkspacePageBookmarkStatus | typeof ALL_CATEGORIES
-  >(ALL_CATEGORIES);
-  const [aiCategoryFilter, setAiCategoryFilter] = useState(ALL_CATEGORIES);
-  const [pageStatusById, setPageStatusById] = useState<
-    Record<string, WorkspacePageBookmarkStatus>
-  >({});
-  const [convertDialogOpen, setConvertDialogOpen] = useState(false);
-  const [convertPageIds, setConvertPageIds] = useState<string[]>([]);
-  const [convertCategoryId, setConvertCategoryId] = useState<string | null>(
-    null,
-  );
-  const [convertTags, setConvertTags] = useState<string[]>([]);
-  const [converting, setConverting] = useState(false);
-  const [analyzing, setAnalyzing] = useState(false);
-  const [aiCommand, setAiCommand] = useState("");
-  const [aiRecommendation, setAiRecommendation] =
-    useState<WorkspaceBookmarkRecommendation | null>(null);
+  const [editingPage, setEditingPage] = useState<WorkspaceTabPage | null>(null);
+  const [editingPageWorkspaceId, setEditingPageWorkspaceId] = useState<string | null>(null);
+  const [editPageDialogOpen, setEditPageDialogOpen] = useState(false);
+  const [pageName, setPageName] = useState("");
+  const [pageUrl, setPageUrl] = useState("");
+
 
   useEffect(() => {
     workspaceStorage.getWorkspaces().then(setWorkspaces).catch(console.error);
     return workspaceStorage.watchWorkspaces(setWorkspaces);
   }, []);
 
-  const categoryNameById = useMemo(() => {
-    return new Map(categories.map((category) => [category.id, category.name]));
-  }, [categories]);
+  useEffect(() => {
+    workspaceStorage
+      .getCategories()
+      .then(setWorkspaceCategories)
+      .catch(console.error);
+    return workspaceStorage.watchCategories(setWorkspaceCategories);
+  }, []);
 
-  const selectedWorkspace = useMemo(() => {
-    return (
-      workspaces.find((workspace) => workspace.id === selectedWorkspaceId) ??
-      workspaces[0] ??
-      null
-    );
-  }, [selectedWorkspaceId, workspaces]);
+  const refreshCurrentWindowPreview = useCallback(async () => {
+    setCurrentWindowLoading(true);
+    try {
+      const nextPreview = await workspaceService.previewCurrentWindow();
+      setCurrentWindowPreview(nextPreview);
+    } catch (error) {
+      console.error("[WorkspacesPage] Failed to preview current window:", error);
+      setCurrentWindowPreview(null);
+    } finally {
+      setCurrentWindowLoading(false);
+    }
+  }, []);
 
   useEffect(() => {
-    if (!selectedWorkspace) {
-      setSelectedWorkspaceId(null);
-      setSelectedPageIds(new Set());
-      setPageStatusById({});
-      return;
-    }
+    void refreshCurrentWindowPreview();
+  }, [refreshCurrentWindowPreview]);
 
-    setSelectedWorkspaceId(selectedWorkspace.id);
-    setSelectedPageIds(new Set(selectedWorkspace.pages.map((page) => page.id)));
-    workspaceBookmarkService
-      .getPageBookmarkStatuses(selectedWorkspace)
-      .then(setPageStatusById)
-      .catch(console.error);
-  }, [selectedWorkspace?.id, selectedWorkspace?.updatedAt]);
+  const categoryById = useMemo(() => {
+    return new Map(
+      workspaceCategories.map((category) => [category.id, category]),
+    );
+  }, [workspaceCategories]);
+
+  const categoryNameById = useMemo(() => {
+    return new Map(
+      workspaceCategories.map((category) => [category.id, category.name]),
+    );
+  }, [workspaceCategories]);
+
+  const workspaceTagSuggestions = useMemo(() => {
+    return Array.from(new Set(workspaces.flatMap((workspace) => workspace.tags)));
+  }, [workspaces]);
+
+
 
   const filteredWorkspaces = useMemo(() => {
     const query = searchQuery.trim().toLowerCase();
@@ -116,6 +123,8 @@ export function useWorkspacesPage({ categories }: UseWorkspacesPageOptions) {
       return workspaceMatchesSearch(workspace, query);
     });
 
+    if (sortBy === "manual") return filtered;
+
     return filtered.sort((a, b) => {
       const aValue = a[sortBy] ?? 0;
       const bValue = b[sortBy] ?? 0;
@@ -123,42 +132,22 @@ export function useWorkspacesPage({ categories }: UseWorkspacesPageOptions) {
     });
   }, [categoryFilter, searchQuery, sortBy, workspaces]);
 
-  const filteredWorkspacePages = useMemo(() => {
-    if (!selectedWorkspace) return [];
-    return selectedWorkspace.pages.filter((page) =>
-      matchesPageFilters(page, {
-        domainFilter,
-        aiCategoryFilter,
-        bookmarkStatusFilter,
-        pageStatusById,
-      }),
-    );
-  }, [
-    aiCategoryFilter,
-    bookmarkStatusFilter,
-    domainFilter,
-    pageStatusById,
-    selectedWorkspace,
-  ]);
 
-  const convertPages = useMemo(() => {
-    if (!selectedWorkspace) return [];
-    const pageIds = new Set(convertPageIds);
-    return selectedWorkspace.pages.filter((page) => pageIds.has(page.id));
-  }, [convertPageIds, selectedWorkspace]);
 
-  const openSaveDialog = useCallback(async () => {
+  const openSaveDialog = useCallback(async (customPreview?: WorkspacePreview) => {
     try {
-      const nextPreview = await workspaceService.previewCurrentWindow();
+      const nextPreview = customPreview ?? await workspaceService.previewCurrentWindow(true);
       if (nextPreview.pages.length === 0) {
         toast.error(t("workspace.noPagesToSave"));
         return;
       }
+      setCurrentWindowPreview(nextPreview);
       setPreview(nextPreview);
       setWorkspaceName(nextPreview.name);
       setWorkspaceDescription("");
       setWorkspaceCategoryId(null);
       setWorkspaceTags([]);
+      setNewWorkspaceCategoryName("");
       setKeepDuplicatePages(false);
       setSaveDialogOpen(true);
     } catch (error) {
@@ -179,10 +168,12 @@ export function useWorkspacesPage({ categories }: UseWorkspacesPageOptions) {
         categoryId: workspaceCategoryId,
         tags: workspaceTags,
         pages,
+        tabGroups: filterWorkspaceTabGroups(preview.tabGroups, pages),
       });
       await workspaceAnalysisService.analyzeWorkspace(workspace);
-      setSelectedWorkspaceId(workspace.id);
+      await workspaceService.closeSavedPageTabs(preview.pages);
       setSaveDialogOpen(false);
+      void refreshCurrentWindowPreview();
       toast.success(t("workspace.saveSuccess"));
     } catch (error) {
       toast.error(getErrorMessage(error, t("workspace.saveFailed")));
@@ -197,7 +188,73 @@ export function useWorkspacesPage({ categories }: UseWorkspacesPageOptions) {
     workspaceDescription,
     workspaceName,
     workspaceTags,
+    refreshCurrentWindowPreview,
   ]);
+
+  const createWorkspaceCategory = useCallback(async () => {
+    const name = newWorkspaceCategoryName.trim();
+    if (!name) return;
+    setCreatingWorkspaceCategory(true);
+    try {
+      const category = await workspaceStorage.createCategory(name);
+      setWorkspaceCategoryId(category.id);
+      setNewWorkspaceCategoryName("");
+      toast.success(t("workspace.categoryCreateSuccess"));
+    } catch (error) {
+      toast.error(getErrorMessage(error, t("workspace.categoryCreateFailed")));
+    } finally {
+      setCreatingWorkspaceCategory(false);
+    }
+  }, [newWorkspaceCategoryName, t]);
+
+  const openEditDialog = useCallback((workspace: Workspace) => {
+    setEditingWorkspaceId(workspace.id);
+    setWorkspaceName(workspace.name || "");
+    setWorkspaceDescription(workspace.description || "");
+    setWorkspaceCategoryId(workspace.categoryId || null);
+    setWorkspaceTags(workspace.tags || []);
+    setNewWorkspaceCategoryName("");
+    setEditDialogOpen(true);
+  }, []);
+
+  const updateWorkspace = useCallback(async () => {
+    if (!editingWorkspaceId) return;
+    setUpdatingWorkspace(true);
+    try {
+      await workspaceStorage.updateWorkspace(editingWorkspaceId, {
+        name: workspaceName.trim() || t("workspace.untitled"),
+        description: workspaceDescription.trim(),
+        categoryId: workspaceCategoryId,
+        tags: workspaceTags,
+      });
+      setEditDialogOpen(false);
+      toast.success(t("workspace.updateSuccess"));
+    } catch (error) {
+      toast.error(getErrorMessage(error, t("workspace.updateFailed")));
+    } finally {
+      setUpdatingWorkspace(false);
+    }
+  }, [
+    editingWorkspaceId,
+    t,
+    workspaceCategoryId,
+    workspaceDescription,
+    workspaceName,
+    workspaceTags,
+  ]);
+
+  const updateWorkspaceName = useCallback(
+    async (workspaceId: string, newName: string) => {
+      const name = newName.trim();
+      if (!name) return;
+      try {
+        await workspaceStorage.updateWorkspace(workspaceId, { name });
+      } catch (error) {
+        toast.error(getErrorMessage(error, t("workspace.updateFailed")));
+      }
+    },
+    [t],
+  );
 
   const confirmRestore = useCallback(
     (pageCount: number) => {
@@ -216,23 +273,6 @@ export function useWorkspacesPage({ categories }: UseWorkspacesPageOptions) {
     [confirmRestore, t],
   );
 
-  const restoreSelectedPages = useCallback(
-    async (mode: WorkspaceRestoreMode) => {
-      if (!selectedWorkspace || selectedPageIds.size === 0) {
-        toast.error(t("workspace.noSelectedPages"));
-        return;
-      }
-      await runRestore(
-        selectedWorkspace,
-        mode,
-        Array.from(selectedPageIds),
-        confirmRestore,
-        t,
-      );
-    },
-    [confirmRestore, selectedPageIds, selectedWorkspace, t],
-  );
-
   const deleteWorkspace = useCallback(
     async (workspace: Workspace) => {
       if (
@@ -246,165 +286,271 @@ export function useWorkspacesPage({ categories }: UseWorkspacesPageOptions) {
     [t],
   );
 
-  const togglePage = useCallback((pageId: string) => {
-    setSelectedPageIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(pageId)) next.delete(pageId);
-      else next.add(pageId);
-      return next;
-    });
+
+
+  const [savingBookmarkPage, setSavingBookmarkPage] = useState<WorkspaceTabPage | null>(null);
+
+  const openSaveBookmarkDialog = useCallback((page: WorkspaceTabPage) => {
+    setSavingBookmarkPage(page);
   }, []);
 
-  const toggleAllPages = useCallback(() => {
-    if (!selectedWorkspace) return;
-    const filteredIds = filteredWorkspacePages.map((page) => page.id);
-    const allFilteredSelected = filteredIds.every((id) =>
-      selectedPageIds.has(id),
-    );
-    setSelectedPageIds((prev) =>
-      allFilteredSelected
-        ? new Set()
-        : new Set([...Array.from(prev), ...filteredIds]),
-    );
-  }, [filteredWorkspacePages, selectedPageIds, selectedWorkspace]);
+  const reorderWorkspaces = useCallback(
+    async (activeId: string, overId: string) => {
+      const oldIndex = filteredWorkspaces.findIndex((w) => w.id === activeId);
+      const newIndex = filteredWorkspaces.findIndex((w) => w.id === overId);
+      if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return;
 
-  const openConvertDialog = useCallback(
-    (pageIds: string[]) => {
-      if (!selectedWorkspace || pageIds.length === 0) {
-        toast.error(t("workspace.noSelectedPages"));
-        return;
-      }
-      setConvertPageIds(pageIds);
-      setConvertCategoryId(selectedWorkspace.categoryId);
-      setConvertTags(selectedWorkspace.tags);
-      setConvertDialogOpen(true);
+      const reordered = [...filteredWorkspaces];
+      const [moved] = reordered.splice(oldIndex, 1);
+      reordered.splice(newIndex, 0, moved);
+
+      // Optimistic update
+      setWorkspaces((prev) => {
+        const idSet = new Set(reordered.map((w) => w.id));
+        const rest = prev.filter((w) => !idSet.has(w.id));
+        return [...reordered, ...rest];
+      });
+
+      await workspaceStorage.reorderWorkspaces(
+        reordered.map((w) => w.id),
+      );
     },
-    [selectedWorkspace, t],
+    [filteredWorkspaces],
   );
 
-  const convertSelectedPages = useCallback(async () => {
-    if (!selectedWorkspace) return;
-    setConverting(true);
-    try {
-      const result = await workspaceBookmarkService.convertPagesToBookmarks({
-        workspaceId: selectedWorkspace.id,
-        pageIds: convertPageIds,
-        categoryId: convertCategoryId,
-        tags: convertTags,
-      });
-      setConvertDialogOpen(false);
-      toast.success(
-        t("workspace.convertSuccess", {
-          created: result.created,
-          skipped: result.skippedExisting,
-          failed: result.failed,
+  const addPageToWorkspace = useCallback(
+    async (workspaceId: string, page: WorkspaceTabPage, insertIndex?: number) => {
+      const workspace = workspaces.find((w) => w.id === workspaceId);
+      if (!workspace) return;
+
+      // Deduplicate by URL
+      if (workspace.pages.some((p) => p.url === page.url)) {
+        toast.info(t("workspace.pageAlreadyExists"));
+        return;
+      }
+
+      const updatedPages = [...workspace.pages];
+      if (insertIndex != null && insertIndex >= 0 && insertIndex <= updatedPages.length) {
+        updatedPages.splice(insertIndex, 0, page);
+      } else {
+        updatedPages.push(page);
+      }
+      await workspaceStorage.updateWorkspace(workspaceId, { pages: updatedPages });
+      toast.success(t("workspace.pageAdded"));
+    },
+    [workspaces, t],
+  );
+
+  const reorderPagesInWorkspace = useCallback(
+    async (workspaceId: string, activePageId: string, overPageId: string) => {
+      const workspace = workspaces.find((w) => w.id === workspaceId);
+      if (!workspace) return;
+
+      const pages = [...workspace.pages];
+      const oldIndex = pages.findIndex((p) => p.id === activePageId);
+      const newIndex = pages.findIndex((p) => p.id === overPageId);
+      if (oldIndex === -1 || newIndex === -1 || oldIndex === newIndex) return;
+
+      const overPage = pages[newIndex];
+      const [moved] = pages.splice(oldIndex, 1);
+      // Auto-inherit tab group from the target position
+      const updated =
+        moved.tabGroupId !== overPage.tabGroupId
+          ? { ...moved, tabGroupId: overPage.tabGroupId, windowId: overPage.windowId }
+          : moved;
+      pages.splice(newIndex, 0, updated);
+
+      // Optimistic update
+      setWorkspaces((prev) =>
+        prev.map((w) => (w.id === workspaceId ? { ...w, pages } : w)),
+      );
+
+      await workspaceStorage.updateWorkspace(workspaceId, { pages });
+    },
+    [workspaces],
+  );
+
+  const movePageBetweenWorkspaces = useCallback(
+    async (
+      srcWorkspaceId: string,
+      pageId: string,
+      dstWorkspaceId: string,
+      insertIndex?: number,
+    ) => {
+      const srcWorkspace = workspaces.find((w) => w.id === srcWorkspaceId);
+      const dstWorkspace = workspaces.find((w) => w.id === dstWorkspaceId);
+      if (!srcWorkspace || !dstWorkspace) return;
+
+      const page = srcWorkspace.pages.find((p) => p.id === pageId);
+      if (!page) return;
+
+      // Deduplicate by URL
+      if (dstWorkspace.pages.some((p) => p.url === page.url)) {
+        toast.info(t("workspace.pageAlreadyExists"));
+        return;
+      }
+
+      const srcPages = srcWorkspace.pages.filter((p) => p.id !== pageId);
+      const dstPages = [...dstWorkspace.pages];
+      if (insertIndex != null && insertIndex >= 0 && insertIndex <= dstPages.length) {
+        dstPages.splice(insertIndex, 0, page);
+      } else {
+        dstPages.push(page);
+      }
+
+      // Optimistic update
+      setWorkspaces((prev) =>
+        prev.map((w) => {
+          if (w.id === srcWorkspaceId) return { ...w, pages: srcPages };
+          if (w.id === dstWorkspaceId) return { ...w, pages: dstPages };
+          return w;
         }),
       );
-    } catch (error) {
-      toast.error(getErrorMessage(error, t("workspace.convertFailed")));
-    } finally {
-      setConverting(false);
-    }
-  }, [convertCategoryId, convertPageIds, convertTags, selectedWorkspace, t]);
 
-  const runAiRecommendation = useCallback(() => {
-    if (!selectedWorkspace) return;
-    if (!aiCommand.trim()) {
-      toast.error(t("workspace.aiCommandRequired"));
-      return;
-    }
-    const recommendation =
-      workspaceBookmarkService.recommendPagesForBookmarkConversion(
-        selectedWorkspace,
-        aiCommand,
-        categories,
+      await workspaceStorage.updateWorkspace(srcWorkspaceId, { pages: srcPages });
+      await workspaceStorage.updateWorkspace(dstWorkspaceId, { pages: dstPages });
+      toast.success(t("workspace.pageMoved"));
+    },
+    [workspaces, t],
+  );
+
+  const movePageToTabGroup = useCallback(
+    async (
+      workspaceId: string,
+      pageId: string,
+      tabGroupId: number,
+      windowId?: number,
+    ) => {
+      const workspace = workspaces.find((w) => w.id === workspaceId);
+      if (!workspace) return;
+
+      const updatedPages = workspace.pages.map((p) =>
+        p.id === pageId ? { ...p, tabGroupId, windowId: windowId ?? p.windowId } : p,
       );
-    setAiRecommendation(recommendation);
-    setSelectedPageIds(new Set(recommendation.pageIds));
-    if (recommendation.recommendedCategoryId) {
-      setConvertCategoryId(recommendation.recommendedCategoryId);
-    }
-    if (recommendation.recommendedTags.length > 0) {
-      setConvertTags(recommendation.recommendedTags);
-    }
-    toast.success(
-      t("workspace.aiRecommendSuccess", {
-        count: recommendation.pageIds.length,
-      }),
-    );
-  }, [aiCommand, categories, selectedWorkspace, t]);
 
-  const analyzeSelectedWorkspace = useCallback(async () => {
-    if (!selectedWorkspace) return;
-    setAnalyzing(true);
+      setWorkspaces((prev) =>
+        prev.map((w) => (w.id === workspaceId ? { ...w, pages: updatedPages } : w)),
+      );
+
+      await workspaceStorage.updateWorkspace(workspaceId, { pages: updatedPages });
+    },
+    [workspaces],
+  );
+
+  const deletePageFromWorkspace = useCallback(
+    async (workspaceId: string, pageId: string) => {
+      const workspace = workspaces.find((w) => {
+        return w.pages.some((p) => p.id === pageId);
+      });
+      const targetWorkspaceId = workspaceId || workspace?.id;
+      if (!targetWorkspaceId) return;
+
+      const targetWorkspace = workspaces.find(w => w.id === targetWorkspaceId);
+      if (!targetWorkspace) return;
+
+      const page = targetWorkspace.pages.find(p => p.id === pageId);
+      if (!page) return;
+
+      if (!window.confirm(t("workspace.deletePageConfirm", { title: page.title }))) {
+        return;
+      }
+
+      const updatedPages = targetWorkspace.pages.filter((p) => p.id !== pageId);
+      await workspaceStorage.updateWorkspace(targetWorkspaceId, { pages: updatedPages });
+      toast.success(t("workspace.pageDeleted"));
+    },
+    [workspaces, t],
+  );
+
+  const openEditPageDialog = useCallback((workspaceId: string, page: WorkspaceTabPage) => {
+    setEditingPageWorkspaceId(workspaceId);
+    setEditingPage(page);
+    setPageName(page.title);
+    setPageUrl(page.url);
+    setEditPageDialogOpen(true);
+  }, []);
+
+  const updatePageInWorkspace = useCallback(async () => {
+    if (!editingPage || !editingPageWorkspaceId) return;
+    
+    const workspace = workspaces.find(w => w.id === editingPageWorkspaceId);
+    if (!workspace) return;
+
+    const updatedPages = workspace.pages.map(p => 
+      p.id === editingPage.id ? { ...p, title: pageName, url: pageUrl } : p
+    );
+
     try {
-      await workspaceAnalysisService.analyzeWorkspace(selectedWorkspace);
-      toast.success(t("workspace.analysis.success"));
+      await workspaceStorage.updateWorkspace(editingPageWorkspaceId, { pages: updatedPages });
+      setEditPageDialogOpen(false);
+      toast.success(t("workspace.updateSuccess"));
     } catch (error) {
-      toast.error(getErrorMessage(error, t("workspace.analysis.failed")));
-    } finally {
-      setAnalyzing(false);
+      toast.error(getErrorMessage(error, t("workspace.updateFailed")));
     }
-  }, [selectedWorkspace, t]);
+  }, [editingPage, editingPageWorkspaceId, pageName, pageUrl, workspaces, t]);
 
   return {
     workspaces,
+    workspaceCategories,
+    workspaceTagSuggestions,
     filteredWorkspaces,
     searchQuery,
     categoryFilter,
     sortBy,
-    selectedWorkspace,
-    selectedPageIds,
-    filteredWorkspacePages,
-    pageStatusById,
     saveDialogOpen,
+    editDialogOpen,
     preview,
     saving,
-    domainFilter,
-    bookmarkStatusFilter,
-    aiCategoryFilter,
-    convertDialogOpen,
-    convertPages,
-    convertCategoryId,
-    convertTags,
-    converting,
-    analyzing,
-    aiCommand,
-    aiRecommendation,
+    updatingWorkspace,
+    currentWindowPreview,
+    currentWindowLoading,
     workspaceName,
     workspaceDescription,
     workspaceCategoryId,
     workspaceTags,
+    newWorkspaceCategoryName,
+    creatingWorkspaceCategory,
     keepDuplicatePages,
     categoryNameById,
+    categoryById,
+    savingBookmarkPage,
+    editingPage,
+    editPageDialogOpen,
+    pageName,
+    pageUrl,
     setSearchQuery,
     setCategoryFilter,
     setSortBy,
-    setSelectedWorkspaceId,
-    setDomainFilter,
-    setBookmarkStatusFilter,
-    setAiCategoryFilter,
     setSaveDialogOpen,
+    setEditDialogOpen,
     setWorkspaceName,
     setWorkspaceDescription,
     setWorkspaceCategoryId,
     setWorkspaceTags,
+    setNewWorkspaceCategoryName,
     setKeepDuplicatePages,
-    setConvertDialogOpen,
-    setConvertCategoryId,
-    setConvertTags,
-    setAiCommand,
+    setSavingBookmarkPage,
+    setEditPageDialogOpen,
+    setPageName,
+    setPageUrl,
+    refreshCurrentWindowPreview,
     openSaveDialog,
     saveWorkspace,
+    createWorkspaceCategory,
+    openEditDialog,
+    updateWorkspace,
+    updateWorkspaceName,
     restoreWorkspace,
-    restoreSelectedPages,
     deleteWorkspace,
-    togglePage,
-    toggleAllPages,
-    openConvertDialog,
-    convertSelectedPages,
-    runAiRecommendation,
-    analyzeSelectedWorkspace,
+    openSaveBookmarkDialog,
+    reorderWorkspaces,
+    addPageToWorkspace,
+    reorderPagesInWorkspace,
+    movePageBetweenWorkspaces,
+    movePageToTabGroup,
+    deletePageFromWorkspace,
+    openEditPageDialog,
+    updatePageInWorkspace,
   };
 }
 
@@ -412,8 +558,8 @@ function workspaceMatchesSearch(workspace: Workspace, query: string) {
   return (
     workspace.name.toLowerCase().includes(query) ||
     workspace.description.toLowerCase().includes(query) ||
-    workspace.tags.some((tag) => tag.toLowerCase().includes(query)) ||
-    workspace.pages.some(
+    (workspace.tags ?? []).some((tag) => tag.toLowerCase().includes(query)) ||
+    (workspace.pages ?? []).some(
       (page) =>
         page.title.toLowerCase().includes(query) ||
         page.url.toLowerCase().includes(query) ||
@@ -422,25 +568,7 @@ function workspaceMatchesSearch(workspace: Workspace, query: string) {
   );
 }
 
-function matchesPageFilters(
-  page: WorkspaceTabPage,
-  filters: {
-    domainFilter: string;
-    aiCategoryFilter: string;
-    bookmarkStatusFilter: WorkspacePageBookmarkStatus | typeof ALL_CATEGORIES;
-    pageStatusById: Record<string, WorkspacePageBookmarkStatus>;
-  },
-) {
-  const status = filters.pageStatusById[page.id] ?? "not_bookmarked";
-  return (
-    (filters.domainFilter === ALL_CATEGORIES ||
-      page.domain === filters.domainFilter) &&
-    (filters.aiCategoryFilter === ALL_CATEGORIES ||
-      (page.aiCategory ?? "") === filters.aiCategoryFilter) &&
-    (filters.bookmarkStatusFilter === ALL_CATEGORIES ||
-      status === filters.bookmarkStatusFilter)
-  );
-}
+
 
 async function runRestore(
   workspace: Workspace,

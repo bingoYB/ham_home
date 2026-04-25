@@ -11,6 +11,7 @@ import { QuickActions } from "@/components/common/QuickActions";
 import { useCurrentPage } from "@/hooks/useCurrentPage";
 import { useShortcuts } from "@/hooks/useShortcuts";
 import { bookmarkStorage } from "@/lib/storage/bookmark-storage";
+import { APP_WEBSITE_URL } from "@/lib/constants/app-info";
 import type { LocalBookmark } from "@/types";
 import "../../style.css";
 import { useBookmarks } from "@/contexts";
@@ -69,10 +70,24 @@ export function App() {
       </main>
 
       {/* 底部状态栏 */}
-      <footer className="px-4 py-2 border-t bg-muted/30 text-xs text-muted-foreground shrink-0">
-        <div className="flex items-center justify-between">
-          <span>{t("bookmark:popup.shortcut")}: {saveShortcut}</span>
-          <QuickActions size="sm" showTooltip />
+      <footer className="px-4 py-2 border-t bg-muted/5 text-[12px] text-muted-foreground/60 shrink-0">
+        <div className="grid grid-cols-3 items-center w-full">
+          <div className="flex justify-start">
+            <span>{t("bookmark:popup.shortcut")}: {saveShortcut}</span>
+          </div>
+          <div className="flex justify-center">
+            <a 
+              href={APP_WEBSITE_URL} 
+              target="_blank" 
+              rel="noopener noreferrer"
+              className="hover:text-primary transition-colors cursor-pointer flex items-center gap-1"
+            >
+              v{browser.runtime.getManifest().version}
+            </a>
+          </div>
+          <div className="flex justify-end">
+            <QuickActions size="sm" showTooltip />
+          </div>
         </div>
       </footer>
 

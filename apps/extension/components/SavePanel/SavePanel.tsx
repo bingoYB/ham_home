@@ -13,6 +13,8 @@ interface SavePanelProps {
   onSaved: () => void;
   onClose?: () => void;
   onDelete?: () => void;
+  hideSnapshotOptions?: boolean;
+  initialSaveSnapshot?: boolean;
 }
 
 export function SavePanel({
@@ -21,6 +23,8 @@ export function SavePanel({
   onSaved,
   onClose,
   onDelete,
+  hideSnapshotOptions = false,
+  initialSaveSnapshot,
 }: SavePanelProps) {
   const {
     title,
@@ -54,6 +58,7 @@ export function SavePanel({
     pageContent,
     existingBookmark,
     onSaved,
+    initialSaveSnapshot,
   });
 
   return (
@@ -98,6 +103,7 @@ export function SavePanel({
             }
           : undefined
       }
+      hideSnapshotOptions={hideSnapshotOptions}
     />
   );
 }

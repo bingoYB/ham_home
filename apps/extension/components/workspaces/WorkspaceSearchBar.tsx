@@ -8,17 +8,17 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@hamhome/ui";
-import type { LocalCategory } from "@/types";
+import type { WorkspaceCategory } from "@/types";
 import { ALL_CATEGORIES, UNCATEGORIZED } from "./workspace-ui";
 
 interface WorkspaceSearchBarProps {
   searchQuery: string;
   categoryFilter: string;
-  sortBy: "createdAt" | "restoredAt";
-  categories: LocalCategory[];
+  sortBy: "createdAt" | "restoredAt" | "manual";
+  categories: WorkspaceCategory[];
   onSearchChange: (value: string) => void;
   onCategoryFilterChange: (value: string) => void;
-  onSortByChange: (value: "createdAt" | "restoredAt") => void;
+  onSortByChange: (value: "createdAt" | "restoredAt" | "manual") => void;
 }
 
 export function WorkspaceSearchBar({
@@ -56,19 +56,25 @@ export function WorkspaceSearchBar({
           </SelectItem>
           {categories.map((category) => (
             <SelectItem key={category.id} value={category.id}>
-              {category.name}
+              <div className="flex items-center gap-2">
+                {category.icon && <span className="shrink-0">{category.icon}</span>}
+                <span className="truncate">{category.name}</span>
+              </div>
             </SelectItem>
           ))}
         </SelectContent>
       </Select>
       <Select
         value={sortBy}
-        onValueChange={(value) => onSortByChange(value as "createdAt" | "restoredAt")}
+        onValueChange={(value) => onSortByChange(value as "createdAt" | "restoredAt" | "manual")}
       >
         <SelectTrigger className="w-[170px]">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
+          <SelectItem value="manual">
+            {t("workspace.sortManual")}
+          </SelectItem>
           <SelectItem value="createdAt">
             {t("workspace.sortCreatedAt")}
           </SelectItem>

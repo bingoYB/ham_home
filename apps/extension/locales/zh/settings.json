@@ -365,6 +365,11 @@
       "categoryName": "分类名称",
       "categoryNamePlaceholder": "输入分类名称",
       "bookmarkCount": "{{count}} 个书签",
+      "workspaceCount": "{{count}} 个工作空间",
+      "tabs": {
+        "bookmarks": "书签分类",
+        "workspaces": "工作空间分类"
+      },
       "noCategories": "还没有分类，点击「新建分类」或「使用预设分类」开始",
       "edit": "编辑",
       "delete": "删除",

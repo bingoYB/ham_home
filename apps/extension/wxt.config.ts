@@ -58,6 +58,9 @@ export default defineConfig({
       "unlimitedStorage", // 本地保存网页快照、页面内容和向量索引，避免数据量增大后触发默认存储配额限制
       "activeTab", // 仅在用户主动操作当前标签页时，读取当前页面信息并执行保存、快照、面板切换等操作
       "tabs", // 读取当前窗口标签页标题、URL、图标和固定状态，用于保存/恢复工作空间
+      ...(browser !== "firefox"
+        ? ["tabGroups"] // 使用 Chromium 原生 Tab Groups API，按用户规则自动创建和更新浏览器标签页分组
+        : []),
       "scripting", // 在当前活动页面按需执行脚本，用于提取页面 HTML/正文内容，保存书签快照或分析页面内容
       "clipboardWrite", // 将 Obsidian 笔记内容写入剪贴板后通过 Obsidian 协议保存
       "contextMenus", // 在网页右键菜单中提供“收藏到 HamHome”入口，方便用户快速保存当前页面或链接

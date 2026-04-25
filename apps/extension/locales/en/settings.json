@@ -365,6 +365,11 @@
       "categoryName": "Category Name",
       "categoryNamePlaceholder": "Enter category name",
       "bookmarkCount": "{{count}} bookmarks",
+      "workspaceCount": "{{count}} workspaces",
+      "tabs": {
+        "bookmarks": "Bookmark Categories",
+        "workspaces": "Workspace Categories"
+      },
       "noCategories": "No categories yet, click \"New Category\" or \"Use Preset\" to start",
       "edit": "Edit",
       "delete": "Delete",

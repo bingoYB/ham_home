@@ -5,12 +5,12 @@
 
 /* fix scroll area viewport display issue */
 /* https://github.com/radix-ui/primitives/issues/2964 */
-.bookmark-list-view [data-slot="scroll-area-viewport"] > div {
+.scroll-table-fix [data-slot="scroll-area-viewport"]>div {
   display: block !important;
 }
 
 /* achieve scroll area viewport height 100% */
-#main-content [data-slot="scroll-area-viewport"] > div {
+#main-content [data-slot="scroll-area-viewport"]>div {
   height: 100%;
 }
 
@@ -52,20 +52,17 @@
 /* 圆形扩展动画 - 从点击位置向外扩展 */
 @keyframes theme-transition-expand {
   from {
-    clip-path: circle(
-      0px at var(--theme-transition-x, 50%) var(--theme-transition-y, 50%)
-    );
+    clip-path: circle(0px at var(--theme-transition-x, 50%) var(--theme-transition-y, 50%));
   }
+
   to {
-    clip-path: circle(
-      var(--theme-transition-radius, 100%) at var(--theme-transition-x, 50%)
-        var(--theme-transition-y, 50%)
-    );
+    clip-path: circle(var(--theme-transition-radius, 100%) at var(--theme-transition-x, 50%) var(--theme-transition-y, 50%));
   }
 }
 
 /* 减少动画偏好支持 */
 @media (prefers-reduced-motion: reduce) {
+
   ::view-transition-old(root),
   ::view-transition-new(root) {
     animation-duration: 0.01ms !important;

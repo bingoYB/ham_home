@@ -7,7 +7,9 @@ import { registerBackgroundService } from "@/lib/services/background-service-ser
 import { configStorage } from "@/lib/storage";
 import { bookmarkStorage } from "@/lib/storage/bookmark-storage";
 import { workspaceStorage } from "@/lib/storage/workspace-storage";
+import { workspaceRestoreSuppressionStorage } from "@/lib/storage/workspace-restore-suppression-storage";
 import { workspaceService } from "@/lib/services/workspace-service";
+import { tabGroupRuleService } from "@/lib/services/tab-group-rule-service";
 import {
   safeOpenPopup,
   safeSendMessageToActiveTab,
@@ -19,6 +21,7 @@ import type { Language } from "@/types";
 // 右键菜单 ID
 const CONTEXT_MENU_ID = "save-to-hamhome";
 const WORKSPACE_CONTEXT_MENU_ID = "save-window-workspace";
+const MANAGE_HAMHOME_CONTEXT_MENU_ID = "manage-hamhome";
 
 /**
  * SingleFile 后台资源获取（匹配官方 bg/fetch.js 的 fetchResource）
@@ -81,12 +84,18 @@ const WORKSPACE_MENU_TITLES: Record<Language, string> = {
   zh: "保存当前窗口为工作空间",
 };
 
+const MANAGE_MENU_TITLES: Record<Language, string> = {
+  en: "Open HamHome",
+  zh: "打开 HamHome",
+};
+
 /**
  * 获取右键菜单标题（根据用户语言设置）
  */
 async function getContextMenuTitles(): Promise<{
   bookmark: string;
   workspace: string;
+  manage: string;
 }> {
   try {
     // 优先从用户设置中获取语言
@@ -96,6 +105,7 @@ async function getContextMenuTitles(): Promise<{
       return {
         bookmark: MENU_TITLES[language],
         workspace: WORKSPACE_MENU_TITLES[language],
+        manage: MANAGE_MENU_TITLES[language],
       };
     }
   } catch (error) {
@@ -109,6 +119,7 @@ async function getContextMenuTitles(): Promise<{
     return {
       bookmark: MENU_TITLES.zh,
       workspace: WORKSPACE_MENU_TITLES.zh,
+      manage: MANAGE_MENU_TITLES.zh,
     };
   }
 
@@ -116,6 +127,7 @@ async function getContextMenuTitles(): Promise<{
   return {
     bookmark: MENU_TITLES.en,
     workspace: WORKSPACE_MENU_TITLES.en,
+    manage: MANAGE_MENU_TITLES.en,
   };
 }
 
@@ -140,6 +152,11 @@ async function createContextMenu() {
       title: titles.workspace,
       contexts: ["page"],
     });
+    await browser.contextMenus.create({
+      id: MANAGE_HAMHOME_CONTEXT_MENU_ID,
+      title: titles.manage,
+      contexts: ["action", "page"],
+    });
 
     console.log("[HamHome Background] 右键菜单已创建:", titles);
   } catch (error) {
@@ -159,6 +176,9 @@ async function updateContextMenuTitle() {
     await browser.contextMenus.update(WORKSPACE_CONTEXT_MENU_ID, {
       title: titles.workspace,
     });
+    await browser.contextMenus.update(MANAGE_HAMHOME_CONTEXT_MENU_ID, {
+      title: titles.manage,
+    });
     console.log("[HamHome Background] 右键菜单标题已更新:", titles);
   } catch (error) {
     console.warn("[HamHome Background] 更新右键菜单标题失败:", error);
@@ -171,6 +191,52 @@ async function saveCurrentWindowWorkspaceFromBackground() {
     console.log("[HamHome Background] 工作空间已保存:", workspace.id);
   } catch (error) {
     console.error("[HamHome Background] 保存工作空间失败:", error);
+  }
+}
+
+async function autoGroupTabFromRules(
+  tabId: number,
+  tab: { url?: string; pendingUrl?: string; title?: string; windowId?: number; pinned?: boolean },
+  options?: { allowAI?: boolean },
+) {
+  if (tab.pinned) return;
+
+  try {
+    const shouldSuppress = await workspaceRestoreSuppressionStorage.shouldSuppress({
+      tabId,
+      url: tab.url,
+      pendingUrl: tab.pendingUrl,
+    });
+    if (shouldSuppress) return;
+
+    const description = options?.allowAI
+      ? await getTabDescription(tabId)
+      : undefined;
+    await tabGroupRuleService.autoGroupTab(
+      tabId,
+      tab.url || tab.pendingUrl,
+      tab.windowId,
+      tab.title,
+      { allowAI: options?.allowAI, description },
+    );
+  } catch (error) {
+    console.warn("[HamHome Background] 自动 Tab 分组失败:", error);
+  }
+}
+
+async function getTabDescription(tabId: number): Promise<string | undefined> {
+  try {
+    const [result] = await browser.scripting.executeScript({
+      target: { tabId },
+      func: () =>
+        document
+          .querySelector('meta[name="description"], meta[property="og:description"]')
+          ?.getAttribute("content")
+          ?.trim() || "",
+    });
+    return typeof result?.result === "string" ? result.result : undefined;
+  } catch {
+    return undefined;
   }
 }
 
@@ -234,6 +300,23 @@ export default defineBackground(() => {
     console.log("[HamHome Background] 已注册的快捷键:", commands);
   });
 
+  browser.tabs.onCreated.addListener((tab) => {
+    if (tab.id != null) {
+      void autoGroupTabFromRules(tab.id, tab, { allowAI: false });
+    }
+  });
+
+  browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    if (changeInfo.status === "complete" || changeInfo.url) {
+      void autoGroupTabFromRules(tabId, {
+        ...tab,
+        url: changeInfo.url || tab.url,
+      }, {
+        allowAI: changeInfo.status === "complete",
+      });
+    }
+  });
+
   // Service Worker 每次启动时创建右键菜单（确保菜单始终存在）
   createContextMenu();
 
@@ -259,6 +342,8 @@ export default defineBackground(() => {
       await safeOpenPopup();
     } else if (info.menuItemId === WORKSPACE_CONTEXT_MENU_ID) {
       await saveCurrentWindowWorkspaceFromBackground();
+    } else if (info.menuItemId === MANAGE_HAMHOME_CONTEXT_MENU_ID) {
+      safeCreateTab(getExtensionURL("app.html"));
     }
   });
 

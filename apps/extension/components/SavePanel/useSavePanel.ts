@@ -40,6 +40,7 @@ interface UseSavePanelProps {
   pageContent: PageContent;
   existingBookmark: LocalBookmark | null;
   onSaved?: () => void;
+  initialSaveSnapshot?: boolean;
 }
 
 interface UseSavePanelResult {
@@ -89,6 +90,7 @@ export function useSavePanel({
   pageContent,
   existingBookmark,
   onSaved,
+  initialSaveSnapshot,
 }: UseSavePanelProps): UseSavePanelResult {
   // 将 content.ts 传来的 HTML 正文转为 Markdown
   // 提升性能，仅在 UI 层按需处理
@@ -139,11 +141,18 @@ export function useSavePanel({
       ]);
       setCategories(cats);
       setAllTags(existingTags);
-      setSaveSnapshotState(settings.autoSaveSnapshot);
+      
+      // Use initialSaveSnapshot if provided, otherwise fallback to settings
+      if (initialSaveSnapshot !== undefined) {
+        setSaveSnapshotState(initialSaveSnapshot);
+      } else {
+        setSaveSnapshotState(settings.autoSaveSnapshot);
+      }
+      
       setDataLoaded(true);
     };
     loadData();
-  }, []);
+  }, [initialSaveSnapshot]);
 
   const setSaveSnapshot = useCallback((value: boolean) => {
     setSaveSnapshotState(value);

@@ -87,7 +87,7 @@
 
 ## WorkspacesPage
 
-工作空间管理页面，用于保存当前浏览器窗口、搜索筛选已保存工作空间、查看页面详情，并恢复全部或选中的页面。
+工作空间管理页面，用于保存所有浏览器窗口（当前会话）、搜索筛选已保存工作空间、按分组网格查看已保存页面，并在右侧按窗口分组查看当前所有打开的 Tabs。
 
 | Prop | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
@@ -101,16 +101,502 @@
 
 **行为说明：**
 
-- 点击 `保存当前窗口` 会读取当前窗口可保存页面，展示名称、描述、分类、标签和页面列表确认弹窗。
+- 页面采用左侧工作空间内容流 + 右侧当前 Tabs 侧栏结构。
+- 左侧每个工作空间以保存时间作为分组头，页面以紧凑卡片网格展示。
+- 点击分组或卡片会选中工作空间，选中后在分组内展示选择、恢复、智能分析和转书签工具。
+- 右侧 Tabs 侧栏通过 `workspaceService.previewCurrentWindow(true)` 读取所有窗口可保存页面，并支持按窗口分组展示、刷新、标题排序和保存所有窗口。
 - 工作空间使用 `local:workspaces` 持久化，包含名称、描述、分类、标签、页面标题/URL/域名/图标、恢复状态和后续 AI 分析预留字段。
-- 列表支持关键词搜索、分类筛选、按保存时间或最近恢复时间排序。
-- 详情区支持选择部分页面，并在新窗口或当前窗口恢复；当前窗口恢复会跳过已打开的重复 URL。
-- 恢复页面数量超过阈值时会先弹出确认，恢复成功后更新 `restoredAt` 和 `isRestored`。
-- 详情区支持按域名、AI 分类和收藏状态筛选页面，并将全部或选中页面转为书签。
+- 工作空间分类使用独立的 `local:workspaceCategories` 持久化，不复用书签分类；转书签弹窗仍使用书签分类。
+- 分组头部提供编辑入口，可修改工作空间名称、描述、独立分类和标签。
+- 恢复页面数量超过阈值时会先弹出确认，恢复成功后更新 `restoredAt` 和 `isRestored`；若工作空间保存了浏览器原生 Tab Groups，会在恢复时重建分组，并短暂跳过插件自动分组规则，避免规则分组覆盖工作空间分组。
 - 转书签前会弹出确认框，允许统一设置分类和标签；已存在 URL 会标记并跳过。
 - AI 命令推荐只会更新候选页面选择，不会直接写入书签，仍需用户在确认框中提交。
 - 保存弹窗会提示重复 URL，默认去重保存；用户也可以选择保留全部页面。
-- 详情区的智能分析摘要展示推荐名称、推荐标签、分类分布、去重后页面数和可转书签建议数量。
+- 工作空间保存和分析完成后，会关闭本次保存预览中的浏览器 Tab；重复 URL 即使被去重未写入工作空间，也会一并关闭。
+
+## TabGroupsPage
+
+浏览器 Tab 分组规则管理页面，用于创建、编辑、启停和删除自动 Tab 分组规则，并控制 AI 自动分组开关。页面通过 `useTabGroupRules` 读取 `sync:tabGroupRules` 和 `sync:tabGroupAutoGroupSettings`，按分组配置聚合展示已保存规则，并通过弹窗维护规则条件；后台监听新建/更新 Tab 后执行同一套匹配规则。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| - | - | - | - | 页面组件自行组合规则弹窗和规则列表，不接收外部 props |
+
+**用法示例：**
+
+```tsx
+<TabGroupsPage />
+```
+
+**行为说明：**
+
+- 规则匹配对象支持域名部分、URL、页面标题和页面标题忽略大小写。
+- 匹配条件支持包含、完全相等、前缀为、后缀为和正则匹配。
+- 同一分组可以配置多条匹配条件，底层仍按多条 `TabGroupRule` 保存以兼容已有数据。
+- 规则保存到 `sync:tabGroupRules`，会跟随浏览器账号同步。
+- AI 自动分组开关保存到 `sync:tabGroupAutoGroupSettings`，默认关闭。
+- AI 自动分组结果按归一化 URL 缓存在 `local:tabGroupAIGroupCache`，再次打开相同页面时优先使用缓存，避免重复调用 AI。
+- Chromium 浏览器命中规则后使用 `chrome.tabs.group` 分组，并用 `chrome.tabGroups.update` 设置组名、颜色和折叠状态。
+- 已存在同名分组时，新 Tab 会加入同名分组；不存在时会创建新的浏览器原生分组。
+- AI 自动分组开启时，后台先执行规则匹配；未命中且页面加载完成后，读取 URL、标题和页面描述，调用已配置的 AI 服务选择已有分组或返回新分组名。
+- 当前浏览器不支持 `chrome.tabGroups` 时页面仍允许编辑规则，但会展示不支持提示，后台不会执行分组。
+
+### TabGroupRuleForm
+
+Tab 分组规则弹窗表单组件，负责渲染规则名称、目标分组名称、颜色、多条匹配对象与匹配条件、折叠和启用状态输入。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| form | `TabGroupRuleFormState` | ✓ | - | 当前弹窗表单状态，包含 `matchers` 条件列表，每条条件包含 `matchType`、`matchCondition` 和 `pattern` |
+| editing | `boolean` | ✓ | - | 是否处于编辑已有规则分组状态 |
+| saving | `boolean` | ✓ | - | 保存按钮 loading/disabled 状态 |
+| onChange | `(form: TabGroupRuleFormState) => void` | ✓ | - | 表单字段变更回调 |
+| onSave | `() => void \| Promise<void>` | ✓ | - | 保存或创建规则 |
+| onCancel | `() => void` | ✓ | - | 关闭弹窗并重置表单 |
+
+**用法示例：**
+
+```tsx
+<TabGroupRuleForm
+  form={form}
+  editing={editingGroupKey != null}
+  saving={saving}
+  onChange={setForm}
+  onSave={saveRule}
+  onCancel={resetForm}
+/>
+```
+
+**行为说明：**
+
+- 组件不直接访问存储层，字段校验和保存由 `useTabGroupRules` 处理。
+- 新建规则默认启用，默认颜色为 `blue`，默认不折叠目标分组。
+- 匹配对象下拉项包含域名部分、URL、页面标题和页面标题(忽略大小写)，不展示旧版正则对象。
+- 匹配条件下拉项包含包含、完全相等、前缀为、后缀为和正则匹配。
+- 点击加号会在当前条件后新增一条匹配条件；点击减号删除该条件，至少保留一条条件。
+
+### TabGroupRuleList
+
+Tab 分组规则列表组件，按规则名称、目标分组、颜色和折叠状态聚合展示已保存规则，展示匹配方式、匹配内容和目标分组，并提供启停、编辑、删除操作入口。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| groups | `TabGroupRuleGroup[]` | ✓ | - | 已聚合的规则分组列表 |
+| loading | `boolean` | ✓ | - | 是否正在加载规则 |
+| onEdit | `(group: TabGroupRuleGroup) => void` | ✓ | - | 编辑规则分组回调 |
+| onDelete | `(group: TabGroupRuleGroup) => void` | ✓ | - | 删除规则分组回调 |
+| onToggle | `(group: TabGroupRuleGroup) => void` | ✓ | - | 启用/停用规则分组回调 |
+
+**用法示例：**
+
+```tsx
+<TabGroupRuleList
+  groups={groups}
+  loading={loading}
+  onEdit={editRuleGroup}
+  onDelete={deleteRuleGroup}
+  onToggle={toggleRuleGroup}
+/>
+```
+
+**行为说明：**
+
+- 空列表时显示空状态，引导用户创建第一条规则。
+- 每个分组面板显示该分组下的所有匹配条件，启停操作会同步更新该分组下的全部底层规则。
+- 列表组件只触发上层回调，不直接修改规则存储。
+
+### WorkspacePageDialogs
+
+工作空间页面弹窗组合组件，集中挂载保存、编辑和转书签弹窗，降低 `WorkspacesPage` 的组合复杂度。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| state | `ReturnType<typeof useWorkspacesPage>` | ✓ | - | 工作空间页面 hook 状态和操作集合 |
+| bookmarkCategories | `LocalCategory[]` | ✓ | - | 书签分类列表，仅传给转书签弹窗 |
+| bookmarkTags | `string[]` | ✓ | - | 书签标签列表，仅传给转书签弹窗 |
+
+**用法示例：**
+
+```tsx
+<WorkspacePageDialogs
+  state={state}
+  bookmarkCategories={bookmarkCategories}
+  bookmarkTags={bookmarkTags}
+/>
+```
+
+**行为说明：**
+
+- 保存和编辑弹窗使用 `state.workspaceCategories`，不读取 `bookmarkCategories`。
+- 转书签弹窗使用 `bookmarkCategories`，因为转书签目标仍是书签系统。
+
+### WorkspaceSection
+
+工作空间展示组件，负责渲染单个工作空间的分组头和页面卡片网格。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| workspace | `Workspace` | ✓ | - | 当前工作空间 |
+| pages | `WorkspaceTabPage[]` | ✓ | - | 当前要展示的页面列表 |
+| categoryName | `string` | ✓ | - | 展示用分类名称 |
+| onEdit | `(workspace: Workspace) => void` | ✓ | - | 打开工作空间编辑弹窗 |
+| onUpdateName | `(workspaceId: string, newName: string) => void` | - | - | 更新工作空间名称回调 |
+| onRestore | `(workspace: Workspace, mode: WorkspaceRestoreMode) => void` | ✓ | - | 恢复整个工作空间 |
+| onDelete | `(workspace: Workspace) => void` | ✓ | - | 删除工作空间 |
+
+**用法示例：**
+
+```tsx
+<WorkspaceSection
+  workspace={workspace}
+  pages={workspace.pages}
+  categoryName="默认分类"
+  onEdit={openEditDialog}
+  onUpdateName={updateWorkspaceName}
+  onRestore={restoreWorkspace}
+  onDelete={deleteWorkspace}
+/>
+```
+
+**行为说明：**
+
+- 当 `workspace.tabGroups` 存在时，页面会按浏览器原生标签组关系插入分组 Header；组内页面仍使用外层同一套卡片布局。
+- 未选中时点击页面卡片只切换到对应工作空间，不直接改变页面选择。
+- 选中时页面卡片可切换选择状态，并展示转书签状态徽标。
+- 编辑按钮只打开编辑弹窗，不改变当前页面选择。
+
+### WorkspaceTabGroupList
+
+工作空间标签分组展示组件，按浏览器标签顺序渲染未分组页面和原生标签组 Header。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| pages | `WorkspaceTabPage[]` | ✓ | - | 要展示的页面列表 |
+| tabGroups | `WorkspaceTabGroup[]` | - | - | 已保存或当前会话中的浏览器标签组元信息 |
+| className | `string` | - | - | 外层容器样式 |
+| grid | `boolean` | - | `false` | 是否使用工作空间网格布局 |
+| renderPage | `(page: WorkspaceTabPage) => React.ReactNode` | ✓ | - | 页面卡片渲染函数 |
+
+**用法示例：**
+
+```tsx
+<WorkspaceTabGroupList
+  pages={workspace.pages}
+  tabGroups={workspace.tabGroups}
+  grid
+  renderPage={(page) => <WorkspacePageTile page={page} />}
+/>
+```
+
+**行为说明：**
+
+- 分组键由 `windowId` 和 `tabGroupId` 共同确定，避免多窗口中原生分组 ID 冲突。
+- 分组标题、颜色、折叠状态来自保存会话时采集的浏览器 `tabGroups` 元信息。
+- 组件不为分组额外包裹卡片容器，组内页面和未分组页面保持相同列表或网格布局。
+
+### WorkspaceSectionHeader
+
+工作空间头部组件，展示名称、分类、页面数、创建/恢复时间及操作按钮。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| workspace | `Workspace` | ✓ | - | 当前工作空间 |
+| categoryName | `string` | ✓ | - | 展示用工作空间分类名称 |
+| onEdit | `(workspace: Workspace) => void` | ✓ | - | 打开编辑弹窗 |
+| onRestore | `(workspace: Workspace, mode: WorkspaceRestoreMode) => void` | ✓ | - | 恢复整个工作空间 |
+| onDelete | `(workspace: Workspace) => void` | ✓ | - | 删除工作空间 |
+| onUpdateName | `(workspaceId: string, newName: string) => void` | - | - | 更新工作空间名称 |
+| expanded | `boolean` | - | `true` | 是否展开内容网格 |
+| onToggle | `() => void` | - | - | 切换展开/收起 |
+
+**用法示例：**
+
+```tsx
+<WorkspaceSectionHeader
+  workspace={workspace}
+  categoryName={categoryName}
+  onEdit={openEditDialog}
+  onRestore={restoreWorkspace}
+  onDelete={deleteWorkspace}
+  onUpdateName={updateWorkspaceName}
+  expanded={expanded}
+  onToggle={() => setExpanded(!expanded)}
+/>
+```
+
+**行为说明：**
+
+- 点击标题区域只切换当前工作空间。
+- 编辑、恢复和删除按钮各自触发上层回调，不直接访问存储层。
+
+### WorkspaceSaveDialog
+
+保存当前窗口为工作空间的确认弹窗，负责展示工作空间基础字段、独立分类创建入口、重复 URL 提示和页面预览。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| open | `boolean` | ✓ | - | 弹窗是否打开 |
+| preview | `WorkspacePreview \| null` | ✓ | - | 当前窗口预览 |
+| saving | `boolean` | ✓ | - | 是否正在保存 |
+| name | `string` | ✓ | - | 工作空间名称 |
+| description | `string` | ✓ | - | 工作空间描述 |
+| categoryId | `string \| null` | ✓ | - | 工作空间分类 ID，来自 `local:workspaceCategories` |
+| tags | `string[]` | ✓ | - | 工作空间标签 |
+| keepDuplicatePages | `boolean` | ✓ | - | 是否保留重复 URL 页面 |
+| categories | `WorkspaceCategory[]` | ✓ | - | 独立工作空间分类列表 |
+| allTags | `string[]` | ✓ | - | 工作空间标签建议 |
+| newCategoryName | `string` | ✓ | - | 待创建的工作空间分类名称 |
+| creatingCategory | `boolean` | ✓ | - | 是否正在创建工作空间分类 |
+| onOpenChange | `(open: boolean) => void` | ✓ | - | 弹窗开关回调 |
+| onNameChange | `(value: string) => void` | ✓ | - | 名称变更 |
+| onDescriptionChange | `(value: string) => void` | ✓ | - | 描述变更 |
+| onCategoryChange | `(value: string \| null) => void` | ✓ | - | 工作空间分类变更 |
+| onTagsChange | `(value: string[]) => void` | ✓ | - | 标签变更 |
+| onNewCategoryNameChange | `(value: string) => void` | ✓ | - | 新分类名称变更 |
+| onCreateCategory | `() => void` | ✓ | - | 创建工作空间分类 |
+| onKeepDuplicatePagesChange | `(value: boolean) => void` | ✓ | - | 重复 URL 保留策略变更 |
+| onSave | `() => void` | ✓ | - | 保存工作空间 |
+
+**用法示例：**
+
+```tsx
+<WorkspaceSaveDialog
+  open={saveDialogOpen}
+  preview={preview}
+  saving={saving}
+  name={workspaceName}
+  description={workspaceDescription}
+  categoryId={workspaceCategoryId}
+  tags={workspaceTags}
+  keepDuplicatePages={keepDuplicatePages}
+  categories={workspaceCategories}
+  allTags={workspaceTagSuggestions}
+  newCategoryName={newWorkspaceCategoryName}
+  creatingCategory={creatingWorkspaceCategory}
+  onOpenChange={setSaveDialogOpen}
+  onNameChange={setWorkspaceName}
+  onDescriptionChange={setWorkspaceDescription}
+  onCategoryChange={setWorkspaceCategoryId}
+  onTagsChange={setWorkspaceTags}
+  onNewCategoryNameChange={setNewWorkspaceCategoryName}
+  onCreateCategory={createWorkspaceCategory}
+  onKeepDuplicatePagesChange={setKeepDuplicatePages}
+  onSave={saveWorkspace}
+/>
+```
+
+**行为说明：**
+
+- 分类选择和新建分类只读写工作空间分类，不访问书签分类。
+- 保存弹窗的标签建议来自已有工作空间标签。
+- 页面预览复用 `WorkspaceTabGroupList`，保存前即可确认浏览器原生标签组关系。
+
+### WorkspaceEditDialog
+
+编辑已保存工作空间的弹窗，复用 `WorkspaceSaveFields` 修改名称、描述、独立分类和标签。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| open | `boolean` | ✓ | - | 弹窗是否打开 |
+| saving | `boolean` | ✓ | - | 是否正在保存修改 |
+| name | `string` | ✓ | - | 工作空间名称 |
+| description | `string` | ✓ | - | 工作空间描述 |
+| categoryId | `string \| null` | ✓ | - | 工作空间分类 ID |
+| tags | `string[]` | ✓ | - | 工作空间标签 |
+| categories | `WorkspaceCategory[]` | ✓ | - | 独立工作空间分类列表 |
+| allTags | `string[]` | ✓ | - | 工作空间标签建议 |
+| newCategoryName | `string` | ✓ | - | 待创建的工作空间分类名称 |
+| creatingCategory | `boolean` | ✓ | - | 是否正在创建工作空间分类 |
+| onOpenChange | `(open: boolean) => void` | ✓ | - | 弹窗开关回调 |
+| onNameChange | `(value: string) => void` | ✓ | - | 名称变更 |
+| onDescriptionChange | `(value: string) => void` | ✓ | - | 描述变更 |
+| onCategoryChange | `(value: string \| null) => void` | ✓ | - | 工作空间分类变更 |
+| onTagsChange | `(value: string[]) => void` | ✓ | - | 标签变更 |
+| onNewCategoryNameChange | `(value: string) => void` | ✓ | - | 新分类名称变更 |
+| onCreateCategory | `() => void` | ✓ | - | 创建工作空间分类 |
+| onSave | `() => void` | ✓ | - | 保存修改 |
+
+**用法示例：**
+
+```tsx
+<WorkspaceEditDialog
+  open={editDialogOpen}
+  saving={updatingWorkspace}
+  name={workspaceName}
+  description={workspaceDescription}
+  categoryId={workspaceCategoryId}
+  tags={workspaceTags}
+  categories={workspaceCategories}
+  allTags={workspaceTagSuggestions}
+  newCategoryName={newWorkspaceCategoryName}
+  creatingCategory={creatingWorkspaceCategory}
+  onOpenChange={setEditDialogOpen}
+  onNameChange={setWorkspaceName}
+  onDescriptionChange={setWorkspaceDescription}
+  onCategoryChange={setWorkspaceCategoryId}
+  onTagsChange={setWorkspaceTags}
+  onNewCategoryNameChange={setNewWorkspaceCategoryName}
+  onCreateCategory={createWorkspaceCategory}
+  onSave={updateWorkspace}
+/>
+```
+
+**行为说明：**
+
+- 保存修改调用 `workspaceStorage.updateWorkspace`，不改变工作空间页面列表。
+
+### WorkspaceSaveFields
+
+工作空间表单字段组件，渲染名称、描述、独立工作空间分类、新建分类和标签输入。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| name | `string` | ✓ | - | 工作空间名称 |
+| description | `string` | ✓ | - | 工作空间描述 |
+| categoryId | `string \| null` | ✓ | - | 当前工作空间分类 ID |
+| tags | `string[]` | ✓ | - | 当前标签 |
+| categories | `WorkspaceCategory[]` | ✓ | - | 独立工作空间分类列表 |
+| allTags | `string[]` | ✓ | - | 标签建议 |
+| newCategoryName | `string` | ✓ | - | 待创建分类名称 |
+| creatingCategory | `boolean` | ✓ | - | 是否正在创建分类 |
+| namePlaceholder | `string` | - | - | 名称占位符 |
+| onNameChange | `(value: string) => void` | ✓ | - | 名称变更 |
+| onDescriptionChange | `(value: string) => void` | ✓ | - | 描述变更 |
+| onCategoryChange | `(value: string \| null) => void` | ✓ | - | 分类变更 |
+| onTagsChange | `(value: string[]) => void` | ✓ | - | 标签变更 |
+| onNewCategoryNameChange | `(value: string) => void` | ✓ | - | 新分类名称变更 |
+| onCreateCategory | `() => void` | ✓ | - | 创建分类 |
+
+**用法示例：**
+
+```tsx
+<WorkspaceSaveFields
+  name={workspaceName}
+  description={workspaceDescription}
+  categoryId={workspaceCategoryId}
+  tags={workspaceTags}
+  categories={workspaceCategories}
+  allTags={workspaceTagSuggestions}
+  newCategoryName={newWorkspaceCategoryName}
+  creatingCategory={creatingWorkspaceCategory}
+  onNameChange={setWorkspaceName}
+  onDescriptionChange={setWorkspaceDescription}
+  onCategoryChange={setWorkspaceCategoryId}
+  onTagsChange={setWorkspaceTags}
+  onNewCategoryNameChange={setNewWorkspaceCategoryName}
+  onCreateCategory={createWorkspaceCategory}
+/>
+```
+
+**行为说明：**
+
+- `categories` 必须来自工作空间分类存储，不能传入书签分类。
+- 在新分类输入框按 Enter 会触发 `onCreateCategory`。
+
+### WorkspaceCurrentTabsPanel
+
+当前会话 Tabs 侧栏组件，展示所有浏览器窗口可保存标签页，按窗口分组展示，并提供刷新、排序和保存入口。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| preview | `WorkspacePreview \| null` | ✓ | - | 当前窗口预览数据 |
+| loading | `boolean` | ✓ | - | 是否正在读取当前窗口 Tabs |
+| onRefresh | `() => void` | ✓ | - | 刷新当前窗口 Tabs |
+| onSaveCurrentWindow | `(customPreview?: WorkspacePreview) => void` | ✓ | - | 打开保存工作空间弹窗，可传入指定窗口预览 |
+
+**用法示例：**
+
+```tsx
+<WorkspaceCurrentTabsPanel
+  preview={currentWindowPreview}
+  loading={currentWindowLoading}
+  onRefresh={refreshCurrentWindowPreview}
+  onSaveCurrentWindow={openSaveDialog}
+/>
+```
+
+**行为说明：**
+
+- 默认按浏览器标签页顺序展示；有浏览器原生标签组时，会在对应窗口内用分组 Header 分隔组内页面。
+- 无可保存页面时展示空状态，不触发保存。
+
+### WorkspaceSearchBar
+
+工作空间搜索和筛选条，负责关键词搜索、独立工作空间分类筛选和排序方式选择。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| searchQuery | `string` | ✓ | - | 搜索关键词 |
+| categoryFilter | `string` | ✓ | - | 当前分类筛选值 |
+| sortBy | `'createdAt' \| 'restoredAt'` | ✓ | - | 排序方式 |
+| categories | `WorkspaceCategory[]` | ✓ | - | 独立工作空间分类列表 |
+| onSearchChange | `(value: string) => void` | ✓ | - | 搜索变更 |
+| onCategoryFilterChange | `(value: string) => void` | ✓ | - | 分类筛选变更 |
+| onSortByChange | `(value: 'createdAt' \| 'restoredAt') => void` | ✓ | - | 排序变更 |
+
+**用法示例：**
+
+```tsx
+<WorkspaceSearchBar
+  searchQuery={searchQuery}
+  categoryFilter={categoryFilter}
+  sortBy={sortBy}
+  categories={workspaceCategories}
+  onSearchChange={setSearchQuery}
+  onCategoryFilterChange={setCategoryFilter}
+  onSortByChange={setSortBy}
+/>
+```
+
+**行为说明：**
+
+- `categories` 必须来自 `workspaceStorage.getCategories()`，不能传入 `BookmarkContext.categories`。
+
+### WorkspacePageTile
+
+工作空间页面卡片组件，用于在分组网格中展示单个已保存页面。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| page | `WorkspaceTabPage` | ✓ | - | 页面数据 |
+| selected | `boolean` | ✓ | - | 页面是否选中 |
+| status | `WorkspacePageBookmarkStatus` | - | - | 页面转书签状态 |
+| onClick | `(pageId: string) => void` | ✓ | - | 点击页面卡片 |
+
+**用法示例：**
+
+```tsx
+<WorkspacePageTile
+  page={page}
+  selected={selectedPageIds.has(page.id)}
+  status={pageStatusById[page.id]}
+  onClick={togglePage}
+/>
+```
+
+**行为说明：**
+
+- `status` 为 `not_bookmarked` 或未传入时不显示状态徽标。
+
+### WorkspacePageFavicon
+
+页面 favicon 展示组件，提供统一尺寸和无图标时的站点占位图标。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| favicon | `string` | - | - | favicon URL |
+| className | `string` | - | - | 自定义尺寸或样式 |
+
+**用法示例：**
+
+```tsx
+<WorkspacePageFavicon favicon={page.favicon} className="h-7 w-7" />
+```
+
+**行为说明：**
+
+- favicon 图片统一使用方形展示，不做圆形裁切。
+- `favicon` 为空时显示 `Globe` 占位图标，避免页面卡片布局跳动。
 
 ## bookmarkPanel
 

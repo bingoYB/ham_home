@@ -21,8 +21,8 @@ import {
   Cloud,
   Loader2,
   AlertTriangle,
-  RefreshCw,
   Briefcase,
+  Layers,
 } from "lucide-react";
 import {
   Toaster,
@@ -60,6 +60,7 @@ import { OptionsPage } from "@/components/OptionsPage";
 import { CategoriesPage } from "@/components/CategoriesPage";
 import { TagsPage } from "@/components/TagsPage";
 import { WorkspacesPage } from "@/components/WorkspacesPage";
+import { TabGroupsPage } from "@/components/TabGroupsPage";
 import { PrivacyPage } from "@/components/PrivacyPage";
 import { ImportExportPage } from "@/components/ImportExportPage";
 import { AboutPage } from "@/components/AboutPage";
@@ -92,6 +93,10 @@ const PAGE_TITLES: Record<string, { title: string; description?: string }> = {
   workspaces: {
     title: "bookmark:workspace.title",
     description: "bookmark:workspace.description",
+  },
+  "tab-groups": {
+    title: "bookmark:tabGroups.title",
+    description: "bookmark:tabGroups.description",
   },
   "import-export": {
     title: "settings:settings.importExport.title",
@@ -261,6 +266,18 @@ function AppContent() {
         badge: bookmarks.length,
       },
       {
+        title: t("bookmark:workspace.title"),
+        url: "#workspaces",
+        icon: Briefcase,
+        isActive: currentViewBase === "workspaces",
+      },
+      {
+        title: t("bookmark:tabGroups.navTitle"),
+        url: "#tab-groups",
+        icon: Layers,
+        isActive: currentViewBase === "tab-groups",
+      },
+      {
         title: t("bookmark:bookmark.categories"),
         url: "#categories",
         icon: Folder,
@@ -273,12 +290,6 @@ function AppContent() {
         icon: Tag,
         isActive: currentViewBase === "tags",
         badge: allTags.length,
-      },
-      {
-        title: t("bookmark:workspace.title"),
-        url: "#workspaces",
-        icon: Briefcase,
-        isActive: currentViewBase === "workspaces",
       },
       {
         title: t("bookmark:bookmark.privacy"),
@@ -454,6 +465,8 @@ function AppContent() {
         return <TagsPage />;
       case "workspaces":
         return <WorkspacesPage />;
+      case "tab-groups":
+        return <TabGroupsPage />;
       case "import-export":
         return <ImportExportPage />;
       case "about":

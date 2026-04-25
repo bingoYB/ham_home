@@ -454,21 +454,6 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
     openSnapshot(bookmark.id);
   };
 
-  const handleSaveSnapshot = async (bookmark: LocalBookmark) => {
-    const content = bookmark.content || bookmark.description || bookmark.title;
-    const ok = await saveSnapshot(
-      bookmark.id,
-      content,
-      "text/markdown;charset=utf-8",
-    );
-    if (ok) {
-      toast.success(t("bookmark:bookmark.snapshot.saveSuccess"));
-      refreshBookmarks();
-    } else {
-      toast.error(t("bookmark:bookmark.snapshot.saveFailed"));
-    }
-  };
-
   const handleSyncToObsidian = async (bookmark: LocalBookmark) => {
     const result = await obsidianSyncService.syncBookmark(bookmark.id);
     if (result.status === "success") {
@@ -618,9 +603,19 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
 
   const handleBatchSyncToObsidian = async () => {
     if (selectedIds.size === 0) return;
-    const result = await obsidianSyncService.syncBookmarks(
-      Array.from(selectedIds),
-    );
+    
+    // 过滤出有快照的书签
+    const idsWithSnapshot = Array.from(selectedIds).filter(id => {
+      const bookmark = bookmarks.find(b => b.id === id);
+      return bookmark?.hasSnapshot;
+    });
+
+    if (idsWithSnapshot.length === 0) {
+      toast.error(t("bookmark:bookmark.snapshot.noSnapshotToSync"));
+      return;
+    }
+
+    const result = await obsidianSyncService.syncBookmarks(idsWithSnapshot);
     toast.info(
       t("bookmark:bookmark.snapshot.obsidianBatchResult", {
         success: result.success,
@@ -878,6 +873,7 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
                     variant="secondary"
                     size="sm"
                     onClick={handleBatchSyncToObsidian}
+                    disabled={!Array.from(selectedIds).some(id => bookmarks.find(b => b.id === id)?.hasSnapshot)}
                   >
                     <Download className="h-4 w-4 mr-1" />
                     {t("bookmark:bookmark.snapshot.syncSelectedToObsidian")}
@@ -1044,7 +1040,6 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
                     onViewSnapshot={
                       bm.hasSnapshot ? () => handleViewSnapshot(bm) : undefined
                     }
-                    onSaveSnapshot={() => handleSaveSnapshot(bm)}
                     onDeleteSnapshot={
                       bm.hasSnapshot
                         ? () => handleDeleteBookmarkSnapshot(bm)
@@ -1098,7 +1093,6 @@ export function MainContent({ currentView, onViewChange }: MainContentProps) {
                         ? () => handleViewSnapshot(bookmark)
                         : undefined
                     }
-                    onSaveSnapshot={() => handleSaveSnapshot(bookmark)}
                     onDeleteSnapshot={
                       bookmark.hasSnapshot
                         ? () => handleDeleteBookmarkSnapshot(bookmark)

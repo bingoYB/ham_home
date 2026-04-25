@@ -36,7 +36,7 @@ class WorkspaceAnalysisService {
 
     return workspaceStorage.updateWorkspace(workspace.id, {
       name: workspace.name || analysis.recommendedName,
-      tags: workspace.tags.length ? workspace.tags : analysis.recommendedTags,
+      tags: (workspace.tags ?? []).length ? workspace.tags : analysis.recommendedTags,
       pages,
       analysis,
     });

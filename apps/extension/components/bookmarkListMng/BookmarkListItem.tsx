@@ -224,7 +224,7 @@ export function BookmarkListItem({
                     {t("bookmark:bookmark.snapshot.delete")}
                   </DropdownMenuItem>
                 )}
-                {onSyncToObsidian && (
+                {bookmark.hasSnapshot && onSyncToObsidian && (
                   <DropdownMenuItem onClick={onSyncToObsidian}>
                     <Download className="h-4 w-4 mr-2" />
                     {t("bookmark:bookmark.snapshot.syncToObsidian")}

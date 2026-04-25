@@ -65,7 +65,7 @@ export function BookmarkListView({
       highlightedBookmarkId={highlightedBookmarkId}
       bookmarkRefs={bookmarkRefs}
       onOpenBookmark={onOpenBookmark}
-      className={cn('bookmark-list-view', className)}
+      className={cn('scroll-table-fix', className)}
     />
   );
 }

@@ -71,11 +71,14 @@ import {
   flattenCategories,
   type PresetCategoryScheme,
 } from "@/lib/preset-categories";
-import type {
+import {
   LocalCategory,
   AIGeneratedCategory,
   HierarchicalCategory,
+  WorkspaceCategory,
+  Workspace,
 } from "@/types";
+import { workspaceStorage } from "@/lib/storage/workspace-storage";
 
 // prettier-ignore
 const PRESET_EMOJIS = [
@@ -167,7 +170,7 @@ interface CategoryTreeNode {
   order: number;
   createdAt: number;
   children: CategoryTreeNode[];
-  bookmarkCount: number;
+  itemCount: number;
 }
 
 export function CategoriesPage() {
@@ -180,6 +183,12 @@ export function CategoriesPage() {
     deleteCategory,
     bulkAddCategories,
   } = useBookmarks();
+
+  const [mode, setMode] = useState<"bookmarks" | "workspaces">("bookmarks");
+  const [workspaceCategories, setWorkspaceCategories] = useState<
+    WorkspaceCategory[]
+  >([]);
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
 
   // 根据当前语言获取预设分类
   const currentLang = i18n.language;
@@ -223,23 +232,47 @@ export function CategoriesPage() {
 
   // 构建分类树
   const categoryTree = useMemo(() => {
-    const getBookmarkCount = (categoryId: string): number => {
-      return bookmarks.filter((b) => b.categoryId === categoryId).length;
+    const getItemCount = (categoryId: string): number => {
+      if (mode === "bookmarks") {
+        return bookmarks.filter((b) => b.categoryId === categoryId).length;
+      } else {
+        return workspaces.filter((w) => w.categoryId === categoryId).length;
+      }
     };
 
     const buildTree = (parentId: string | null): CategoryTreeNode[] => {
-      return categories
+      const currentCategories =
+        mode === "bookmarks" ? categories : workspaceCategories;
+      return currentCategories
         .filter((c) => c.parentId === parentId)
         .sort((a, b) => a.order - b.order)
         .map((c) => ({
           ...c,
           children: buildTree(c.id),
-          bookmarkCount: getBookmarkCount(c.id),
+          itemCount: getItemCount(c.id),
         }));
     };
 
     return buildTree(null);
-  }, [categories, bookmarks]);
+  }, [mode, categories, workspaceCategories, bookmarks, workspaces]);
+
+  useEffect(() => {
+    const loadWorkspaceData = async () => {
+      const cats = await workspaceStorage.getCategories();
+      const ws = await workspaceStorage.getWorkspaces();
+      setWorkspaceCategories(cats);
+      setWorkspaces(ws);
+    };
+    loadWorkspaceData();
+
+    const unwatchCats = workspaceStorage.watchCategories(setWorkspaceCategories);
+    const unwatchWorkspaces = workspaceStorage.watchWorkspaces(setWorkspaces);
+
+    return () => {
+      unwatchCats();
+      unwatchWorkspaces();
+    };
+  }, []);
 
   useEffect(() => {
     const loadPinnedItems = async () => {
@@ -292,23 +325,33 @@ export function CategoriesPage() {
 
   // 全选/取消全选
   const toggleSelectAll = useCallback(() => {
-    if (selectedIds.size === categories.length) {
+    const currentCategories =
+      mode === "bookmarks" ? categories : workspaceCategories;
+    if (selectedIds.size === currentCategories.length) {
       setSelectedIds(new Set());
     } else {
-      setSelectedIds(new Set(categories.map((c) => c.id)));
+      setSelectedIds(new Set(currentCategories.map((c) => c.id)));
     }
-  }, [categories, selectedIds.size]);
+  }, [mode, categories, workspaceCategories, selectedIds.size]);
 
   // 添加分类
   const handleAdd = async () => {
     if (!categoryName.trim()) return;
 
     try {
-      await addCategory(
-        categoryName.trim(),
-        parentCategoryId,
-        categoryIcon.trim() || undefined,
-      );
+      if (mode === "bookmarks") {
+        await addCategory(
+          categoryName.trim(),
+          parentCategoryId,
+          categoryIcon.trim() || undefined,
+        );
+      } else {
+        await workspaceStorage.createCategory(
+          categoryName.trim(),
+          parentCategoryId,
+          categoryIcon.trim() || undefined,
+        );
+      }
       setCategoryName("");
       setCategoryIcon("");
       setParentCategoryId(null);
@@ -323,10 +366,17 @@ export function CategoriesPage() {
     if (!selectedCategory || !categoryName.trim()) return;
 
     try {
-      await updateCategory(selectedCategory.id, {
-        name: categoryName.trim(),
-        icon: categoryIcon.trim() || undefined,
-      });
+      if (mode === "bookmarks") {
+        await updateCategory(selectedCategory.id, {
+          name: categoryName.trim(),
+          icon: categoryIcon.trim() || undefined,
+        });
+      } else {
+        await workspaceStorage.updateCategory(selectedCategory.id, {
+          name: categoryName.trim(),
+          icon: categoryIcon.trim() || undefined,
+        });
+      }
       setShowEditDialog(false);
       setSelectedCategory(null);
       setCategoryName("");
@@ -341,7 +391,11 @@ export function CategoriesPage() {
     if (!selectedCategory) return;
 
     try {
-      await deleteCategory(selectedCategory.id);
+      if (mode === "bookmarks") {
+        await deleteCategory(selectedCategory.id);
+      } else {
+        await workspaceStorage.deleteCategory(selectedCategory.id);
+      }
       setShowDeleteDialog(false);
       setSelectedCategory(null);
     } catch (error) {
@@ -352,8 +406,14 @@ export function CategoriesPage() {
   // 批量删除
   const handleBatchDelete = async () => {
     try {
-      for (const id of selectedIds) {
-        await deleteCategory(id);
+      if (mode === "bookmarks") {
+        for (const id of selectedIds) {
+          await deleteCategory(id);
+        }
+      } else {
+        for (const id of selectedIds) {
+          await workspaceStorage.deleteCategory(id);
+        }
       }
       setSelectedIds(new Set());
       setShowBatchDeleteDialog(false);
@@ -455,13 +515,35 @@ export function CategoriesPage() {
 
   return (
     <div className="w-full max-w-4xl mx-auto p-6 h-full flex flex-col">
-      {/* 页面头部操作 */}
-      <div className="flex items-center justify-end mb-6 shrink-0">
+      {/* 模式切换 */}
+      <div className="flex items-center justify-between mb-6 shrink-0">
+        <Tabs
+          value={mode}
+          onValueChange={(val: any) => {
+            setMode(val);
+            setIsBatchMode(false);
+            setSelectedIds(new Set());
+          }}
+          className="w-auto"
+        >
+          <TabsList>
+            <TabsTrigger value="bookmarks">
+              {t("settings:settings.categories.tabs.bookmarks")}
+            </TabsTrigger>
+            <TabsTrigger value="workspaces">
+              {t("settings:settings.categories.tabs.workspaces")}
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        {/* 页面头部操作 */}
         <div className="flex gap-2">
           {isBatchMode ? (
             <>
               <Button variant="outline" size="sm" onClick={toggleSelectAll}>
-                {selectedIds.size === categories.length ? (
+                {selectedIds.size ===
+                (mode === "bookmarks" ? categories : workspaceCategories)
+                  .length ? (
                   <>
                     <Square className="h-4 w-4 mr-2" />
                     {t("settings:settings.categories.deselectAll")}
@@ -506,14 +588,16 @@ export function CategoriesPage() {
                 <Trash2 className="h-4 w-4 mr-2" />
                 {t("settings:settings.categories.batchDelete")}
               </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setShowPresetDialog(true)}
-              >
-                <Download className="h-4 w-4 mr-2" />
-                {t("settings:settings.categories.usePreset")}
-              </Button>
+              {mode === "bookmarks" && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setShowPresetDialog(true)}
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  {t("settings:settings.categories.usePreset")}
+                </Button>
+              )}
               <Button size="sm" onClick={() => openAddDialog(null)}>
                 <Plus className="h-4 w-4 mr-2" />
                 {t("settings:settings.categories.newCategory")}
@@ -545,6 +629,7 @@ export function CategoriesPage() {
                     onTogglePin={handleToggleCategoryPin}
                     pinnedCategoryIds={pinnedCategoryIds}
                     t={t}
+                    mode={mode}
                   />
                 ))}
               </div>
@@ -932,6 +1017,7 @@ interface CategoryTreeItemProps {
   onTogglePin: (category: LocalCategory) => void;
   pinnedCategoryIds: Set<string>;
   t: (key: string, options?: any) => string;
+  mode: "bookmarks" | "workspaces";
 }
 
 function CategoryTreeItem({
@@ -948,6 +1034,7 @@ function CategoryTreeItem({
   onTogglePin,
   pinnedCategoryIds,
   t,
+  mode,
 }: CategoryTreeItemProps) {
   const hasChildren = node.children.length > 0;
   const isExpanded = expandedIds.has(node.id);
@@ -1009,9 +1096,15 @@ function CategoryTreeItem({
           {node.name}
         </span>
 
-        {/* 书签数量 */}
+        {/* 数量 */}
         <span className="text-xs text-muted-foreground mr-2">
-          {node.bookmarkCount}
+          {mode === "bookmarks"
+            ? t("settings:settings.categories.bookmarkCount", {
+                count: node.itemCount,
+              })
+            : t("settings:settings.categories.workspaceCount", {
+                count: node.itemCount,
+              })}
         </span>
 
         {/* 操作菜单 */}
@@ -1072,6 +1165,7 @@ function CategoryTreeItem({
               onTogglePin={onTogglePin}
               pinnedCategoryIds={pinnedCategoryIds}
               t={t}
+              mode={mode}
             />
           ))}
         </>

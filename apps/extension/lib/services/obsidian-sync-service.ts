@@ -22,6 +22,10 @@ class ObsidianSyncService {
       return this.fail(bookmarkId, "书签不存在");
     }
 
+    if (!bookmark.hasSnapshot) {
+      return this.fail(bookmarkId, "书签没有快照，无法同步到 Obsidian");
+    }
+
     await obsidianSyncStorage.updateState(bookmarkId, {
       status: "syncing",
       error: undefined,

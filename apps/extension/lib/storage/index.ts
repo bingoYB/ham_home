@@ -7,6 +7,7 @@ export { configStorage, DEFAULT_AI_CONFIG, DEFAULT_SETTINGS, DEFAULT_EMBEDDING_C
 export { obsidianSyncStorage } from './obsidian-sync-storage';
 export { pinStorage } from './pin-storage';
 export { workspaceStorage } from './workspace-storage';
+export { tabGroupRulesStorage } from './tab-group-rules-storage';
 export { aiCacheStorage } from './ai-cache-storage';
 export { vectorStore } from './vector-store';
 export { importTaskStorage } from './import-task-storage';

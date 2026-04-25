@@ -59,6 +59,7 @@ export interface SavePanelViewProps {
   onSave: () => void;
   onCancel?: () => void;
   onDelete?: () => void;
+  hideSnapshotOptions?: boolean;
 }
 
 export function SavePanelView({
@@ -92,6 +93,7 @@ export function SavePanelView({
   onSave,
   onCancel,
   onDelete,
+  hideSnapshotOptions = false,
 }: SavePanelViewProps) {
   const { t } = useTranslation();
 
@@ -119,17 +121,19 @@ export function SavePanelView({
         onConfigureAI={onConfigureAI}
       />
 
-      <SnapshotOptions
-        saveSnapshot={saveSnapshot}
-        snapshotStatus={snapshotStatus}
-        snapshotError={snapshotError}
-        syncToObsidian={syncToObsidian}
-        obsidianStatus={obsidianStatus}
-        obsidianError={obsidianError}
-        disabled={saving}
-        onSaveSnapshotChange={onSaveSnapshotChange}
-        onSyncToObsidianChange={onSyncToObsidianChange}
-      />
+      {!hideSnapshotOptions && (
+        <SnapshotOptions
+          saveSnapshot={saveSnapshot}
+          snapshotStatus={snapshotStatus}
+          snapshotError={snapshotError}
+          syncToObsidian={syncToObsidian}
+          obsidianStatus={obsidianStatus}
+          obsidianError={obsidianError}
+          disabled={saving}
+          onSaveSnapshotChange={onSaveSnapshotChange}
+          onSyncToObsidianChange={onSyncToObsidianChange}
+        />
+      )}
 
       <div className="flex gap-2 pt-2">
         <Button

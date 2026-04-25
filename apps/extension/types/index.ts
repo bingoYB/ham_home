@@ -246,8 +246,38 @@ export interface WorkspaceTabPage {
   purpose?: string;
   duplicateGroupId?: string;
   isDuplicate?: boolean;
+  tabId?: number;
+  tabGroupId?: number;
   bookmarkRecommendation?: "recommended" | "excluded";
   bookmarkRecommendationReason?: string;
+}
+
+export type WorkspaceTabGroupColor =
+  | "grey"
+  | "blue"
+  | "red"
+  | "yellow"
+  | "green"
+  | "pink"
+  | "purple"
+  | "cyan"
+  | "orange";
+
+export interface WorkspaceTabGroup {
+  id: number;
+  title: string;
+  color: WorkspaceTabGroupColor;
+  collapsed?: boolean;
+  windowId?: number;
+}
+
+export interface WorkspaceCategory {
+  id: string;
+  name: string;
+  icon?: string;
+  parentId: string | null;
+  order: number;
+  createdAt: number;
 }
 
 export type WorkspacePageBookmarkStatus =
@@ -263,6 +293,7 @@ export interface Workspace {
   categoryId: string | null;
   tags: string[];
   pages: WorkspaceTabPage[];
+  tabGroups?: WorkspaceTabGroup[];
   analysis?: WorkspaceAnalysis;
   isRestored: boolean;
   restoredAt?: number;
@@ -353,6 +384,73 @@ export interface WorkspaceBookmarkRecommendation {
   recommendedTags: string[];
   reasons: Record<string, string>;
   excludedReasons: Record<string, string>;
+}
+
+// ============ Tab 分组规则相关 ============
+
+export type TabGroupRuleMatchType =
+  | "domain"
+  | "urlContains"
+  | "title"
+  | "titleIgnoreCase"
+  | "regex";
+
+export type TabGroupRuleMatchCondition =
+  | "contains"
+  | "equals"
+  | "startsWith"
+  | "endsWith"
+  | "regex";
+
+export type TabGroupRuleColor =
+  | "grey"
+  | "blue"
+  | "red"
+  | "yellow"
+  | "green"
+  | "pink"
+  | "purple"
+  | "cyan"
+  | "orange";
+
+export interface TabGroupRule {
+  id: string;
+  name: string;
+  enabled: boolean;
+  matchType: TabGroupRuleMatchType;
+  matchCondition?: TabGroupRuleMatchCondition;
+  pattern: string;
+  groupTitle: string;
+  color: TabGroupRuleColor;
+  collapsed: boolean;
+  order: number;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export type CreateTabGroupRuleInput = Omit<
+  TabGroupRule,
+  "id" | "createdAt" | "updatedAt"
+>;
+
+export type UpdateTabGroupRuleInput = Partial<
+  Omit<TabGroupRule, "id" | "createdAt" | "updatedAt">
+>;
+
+export interface TabGroupRuleMatchResult {
+  rule: TabGroupRule;
+  normalizedUrl: string;
+}
+
+export interface TabGroupAutoGroupSettings {
+  aiAutoGroupEnabled: boolean;
+}
+
+export interface TabGroupAICacheEntry {
+  url: string;
+  groupTitle: string;
+  color: TabGroupRuleColor;
+  updatedAt: number;
 }
 
 /**
