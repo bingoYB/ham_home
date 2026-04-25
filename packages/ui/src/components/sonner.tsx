@@ -9,12 +9,13 @@ const Toaster = ({ theme = "system", ...props }: ToasterProps) => {
       className="toaster group"
       toastOptions={{
         classNames: {
-          toast: "rounded-2xl! text-white!",
-          success:
-            "bg-success!",
-          error: "bg-red-400!",
-          warning: "bg-yellow-500!",
-          description: "text-white!",
+          toast: "rounded-2xl!",
+          success: "bg-success! text-white!",
+          error: "bg-red-400! text-white!",
+          warning: "bg-yellow-500! text-white!",
+          info:
+            "border-blue-100! bg-blue-50! text-blue-700! dark:border-blue-900! dark:bg-blue-950! dark:text-blue-300!",
+          description: "text-inherit!",
         },
       }}
       style={

@@ -1,5 +1,35 @@
 # UI Components API
 
+## Toaster
+
+Sonner toast 容器组件，统一应用 HamHome 的圆角、主题变量和状态样式。
+
+### Props
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| theme | `ToasterProps["theme"]` | No | `"system"` | toast 主题，透传给 Sonner |
+| ...props | `ToasterProps` | No | - | 其他 Sonner `Toaster` 属性 |
+
+### Usage
+
+```tsx
+import { Toaster, toast } from "@hamhome/ui";
+
+<Toaster theme="light" />
+
+toast.info("已跳过同步");
+toast.success("保存成功");
+toast.error("保存失败");
+toast.warning("请检查配置");
+```
+
+### Notes
+
+- `info` 使用浅蓝背景和深蓝文字，避免亮色主题下白底白字。
+- `success`、`error`、`warning` 保持彩色背景和白色文字。
+- 描述文字继承当前 toast 状态颜色。
+
 ## Masonry (Waterfall)
 
 瀑布流布局组件，支持虚拟滚动和动态高度计算。

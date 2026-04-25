@@ -10,5 +10,4 @@ export * from './logger';
 // 版本常量，用于验证模块引用
 export const UTILS_VERSION = '1.0.0';
 
-console.log('[@hamhome/utils] loaded, version:', UTILS_VERSION);
 

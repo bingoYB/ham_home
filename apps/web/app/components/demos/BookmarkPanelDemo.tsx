@@ -347,7 +347,7 @@ export function BookmarkPanelDemo({
           </div>
 
           {/* 分类树视图 - 与 extension CategoryTreeView 一致 */}
-          <ScrollArea className="flex-1 min-h-0 bookmark-list-view pb-8">
+          <ScrollArea className="flex-1 min-h-0 scroll-table-fix pb-8">
             <div className="p-2 overflow-hidden">
               {rootCategories.map((cat) => (
                 <CategoryNode
