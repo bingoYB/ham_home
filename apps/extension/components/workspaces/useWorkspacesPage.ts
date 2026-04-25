@@ -3,6 +3,7 @@ import { useTranslation } from "react-i18next";
 import { toast } from "@hamhome/ui";
 import { workspaceStorage } from "@/lib/storage/workspace-storage";
 import { workspaceBookmarkService } from "@/lib/services/workspace-bookmark-service";
+import { workspaceAnalysisService } from "@/lib/services/workspace-analysis-service";
 import {
   workspaceService,
   type WorkspacePreview,
@@ -48,6 +49,7 @@ export function useWorkspacesPage({ categories }: UseWorkspacesPageOptions) {
     null,
   );
   const [workspaceTags, setWorkspaceTags] = useState<string[]>([]);
+  const [keepDuplicatePages, setKeepDuplicatePages] = useState(false);
   const [domainFilter, setDomainFilter] = useState(ALL_CATEGORIES);
   const [bookmarkStatusFilter, setBookmarkStatusFilter] = useState<
     WorkspacePageBookmarkStatus | typeof ALL_CATEGORIES
@@ -63,6 +65,7 @@ export function useWorkspacesPage({ categories }: UseWorkspacesPageOptions) {
   );
   const [convertTags, setConvertTags] = useState<string[]>([]);
   const [converting, setConverting] = useState(false);
+  const [analyzing, setAnalyzing] = useState(false);
   const [aiCommand, setAiCommand] = useState("");
   const [aiRecommendation, setAiRecommendation] =
     useState<WorkspaceBookmarkRecommendation | null>(null);
@@ -156,6 +159,7 @@ export function useWorkspacesPage({ categories }: UseWorkspacesPageOptions) {
       setWorkspaceDescription("");
       setWorkspaceCategoryId(null);
       setWorkspaceTags([]);
+      setKeepDuplicatePages(false);
       setSaveDialogOpen(true);
     } catch (error) {
       toast.error(getErrorMessage(error, t("workspace.saveFailed")));
@@ -166,13 +170,17 @@ export function useWorkspacesPage({ categories }: UseWorkspacesPageOptions) {
     if (!preview) return;
     setSaving(true);
     try {
+      const pages = keepDuplicatePages
+        ? preview.pages
+        : workspaceAnalysisService.getUniquePages(preview.pages);
       const workspace = await workspaceStorage.createWorkspace({
         name: workspaceName.trim() || preview.name,
         description: workspaceDescription.trim(),
         categoryId: workspaceCategoryId,
         tags: workspaceTags,
-        pages: preview.pages,
+        pages,
       });
+      await workspaceAnalysisService.analyzeWorkspace(workspace);
       setSelectedWorkspaceId(workspace.id);
       setSaveDialogOpen(false);
       toast.success(t("workspace.saveSuccess"));
@@ -183,6 +191,7 @@ export function useWorkspacesPage({ categories }: UseWorkspacesPageOptions) {
     }
   }, [
     preview,
+    keepDuplicatePages,
     t,
     workspaceCategoryId,
     workspaceDescription,
@@ -325,6 +334,19 @@ export function useWorkspacesPage({ categories }: UseWorkspacesPageOptions) {
     );
   }, [aiCommand, categories, selectedWorkspace, t]);
 
+  const analyzeSelectedWorkspace = useCallback(async () => {
+    if (!selectedWorkspace) return;
+    setAnalyzing(true);
+    try {
+      await workspaceAnalysisService.analyzeWorkspace(selectedWorkspace);
+      toast.success(t("workspace.analysis.success"));
+    } catch (error) {
+      toast.error(getErrorMessage(error, t("workspace.analysis.failed")));
+    } finally {
+      setAnalyzing(false);
+    }
+  }, [selectedWorkspace, t]);
+
   return {
     workspaces,
     filteredWorkspaces,
@@ -346,12 +368,14 @@ export function useWorkspacesPage({ categories }: UseWorkspacesPageOptions) {
     convertCategoryId,
     convertTags,
     converting,
+    analyzing,
     aiCommand,
     aiRecommendation,
     workspaceName,
     workspaceDescription,
     workspaceCategoryId,
     workspaceTags,
+    keepDuplicatePages,
     categoryNameById,
     setSearchQuery,
     setCategoryFilter,
@@ -365,6 +389,7 @@ export function useWorkspacesPage({ categories }: UseWorkspacesPageOptions) {
     setWorkspaceDescription,
     setWorkspaceCategoryId,
     setWorkspaceTags,
+    setKeepDuplicatePages,
     setConvertDialogOpen,
     setConvertCategoryId,
     setConvertTags,
@@ -379,6 +404,7 @@ export function useWorkspacesPage({ categories }: UseWorkspacesPageOptions) {
     openConvertDialog,
     convertSelectedPages,
     runAiRecommendation,
+    analyzeSelectedWorkspace,
   };
 }
 

@@ -165,6 +165,8 @@
     "tagsPlaceholder": "Enter tag and press Enter",
     "pageList": "Pages",
     "duplicatePages": "{{count}} duplicate URLs",
+    "duplicateNotice": "{{count}} duplicate pages found. By default only the first page for each URL is kept",
+    "keepDuplicatePages": "Keep all pages",
     "cancel": "Cancel",
     "save": "Save",
     "saving": "Saving...",
@@ -201,6 +203,17 @@
       "converted": "Converted",
       "existing": "Existing",
       "failed": "Failed"
+    },
+    "analysis": {
+      "title": "Smart Analysis",
+      "run": "Analyze",
+      "rerun": "Analyze Again",
+      "empty": "No analysis yet. Run analysis to see category distribution, recommended name, tags, and bookmark suggestions.",
+      "total": "{{count}} pages total",
+      "deduped": "{{count}} after dedupe",
+      "recommended": "{{count}} recommended",
+      "success": "Workspace analysis complete",
+      "failed": "Workspace analysis failed"
     }
   },
   "popup": {

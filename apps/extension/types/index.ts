@@ -243,6 +243,11 @@ export interface WorkspaceTabPage {
   convertedToBookmarkAt?: number;
   bookmarkConversionStatus?: WorkspacePageBookmarkStatus;
   bookmarkConversionError?: string;
+  purpose?: string;
+  duplicateGroupId?: string;
+  isDuplicate?: boolean;
+  bookmarkRecommendation?: "recommended" | "excluded";
+  bookmarkRecommendationReason?: string;
 }
 
 export type WorkspacePageBookmarkStatus =
@@ -258,12 +263,37 @@ export interface Workspace {
   categoryId: string | null;
   tags: string[];
   pages: WorkspaceTabPage[];
-  analysis?: Record<string, unknown>;
+  analysis?: WorkspaceAnalysis;
   isRestored: boolean;
   restoredAt?: number;
   convertedToBookmarks: boolean;
   createdAt: number;
   updatedAt: number;
+}
+
+export interface WorkspaceDuplicateGroup {
+  id: string;
+  url: string;
+  pageIds: string[];
+  preferredPageId: string;
+}
+
+export interface WorkspaceCategoryDistribution {
+  category: string;
+  count: number;
+}
+
+export interface WorkspaceAnalysis {
+  analyzedAt: number;
+  recommendedName: string;
+  recommendedTags: string[];
+  categoryDistribution: WorkspaceCategoryDistribution[];
+  totalPageCount: number;
+  dedupedPageCount: number;
+  duplicateGroups: WorkspaceDuplicateGroup[];
+  bookmarkRecommendedPageIds: string[];
+  excludedPageIds: string[];
+  aiEnabled: boolean;
 }
 
 export type CreateWorkspaceInput = Omit<

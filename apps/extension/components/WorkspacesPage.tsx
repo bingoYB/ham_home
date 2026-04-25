@@ -6,6 +6,7 @@ import { WorkspaceCard } from "@/components/workspaces/WorkspaceCard";
 import { WorkspaceBookmarkControls } from "@/components/workspaces/WorkspaceBookmarkControls";
 import { WorkspaceConvertDialog } from "@/components/workspaces/WorkspaceConvertDialog";
 import { WorkspaceDetail } from "@/components/workspaces/WorkspaceDetail";
+import { WorkspaceAnalysisSummary } from "@/components/workspaces/WorkspaceAnalysisSummary";
 import { WorkspaceSaveDialog } from "@/components/workspaces/WorkspaceSaveDialog";
 import { WorkspaceSearchBar } from "@/components/workspaces/WorkspaceSearchBar";
 import { useWorkspacesPage } from "@/components/workspaces/useWorkspacesPage";
@@ -77,21 +78,28 @@ export function WorkspacesPage() {
           selectedPageIds={state.selectedPageIds}
           toolbar={
             state.selectedWorkspace ? (
-              <WorkspaceBookmarkControls
-                workspace={state.selectedWorkspace}
-                pages={state.filteredWorkspacePages}
-                selectedPageIds={state.selectedPageIds}
-                domainFilter={state.domainFilter}
-                bookmarkStatusFilter={state.bookmarkStatusFilter}
-                aiCategoryFilter={state.aiCategoryFilter}
-                aiCommand={state.aiCommand}
-                onDomainFilterChange={state.setDomainFilter}
-                onBookmarkStatusFilterChange={state.setBookmarkStatusFilter}
-                onAiCategoryFilterChange={state.setAiCategoryFilter}
-                onAiCommandChange={state.setAiCommand}
-                onAiRecommend={state.runAiRecommendation}
-                onConvertPages={state.openConvertDialog}
-              />
+              <>
+                <WorkspaceAnalysisSummary
+                  workspace={state.selectedWorkspace}
+                  analyzing={state.analyzing}
+                  onAnalyze={state.analyzeSelectedWorkspace}
+                />
+                <WorkspaceBookmarkControls
+                  workspace={state.selectedWorkspace}
+                  pages={state.filteredWorkspacePages}
+                  selectedPageIds={state.selectedPageIds}
+                  domainFilter={state.domainFilter}
+                  bookmarkStatusFilter={state.bookmarkStatusFilter}
+                  aiCategoryFilter={state.aiCategoryFilter}
+                  aiCommand={state.aiCommand}
+                  onDomainFilterChange={state.setDomainFilter}
+                  onBookmarkStatusFilterChange={state.setBookmarkStatusFilter}
+                  onAiCategoryFilterChange={state.setAiCategoryFilter}
+                  onAiCommandChange={state.setAiCommand}
+                  onAiRecommend={state.runAiRecommendation}
+                  onConvertPages={state.openConvertDialog}
+                />
+              </>
             ) : null
           }
           onTogglePage={state.togglePage}
@@ -107,6 +115,7 @@ export function WorkspacesPage() {
         description={state.workspaceDescription}
         categoryId={state.workspaceCategoryId}
         tags={state.workspaceTags}
+        keepDuplicatePages={state.keepDuplicatePages}
         categories={categories}
         allTags={allTags}
         onOpenChange={state.setSaveDialogOpen}
@@ -114,6 +123,7 @@ export function WorkspacesPage() {
         onDescriptionChange={state.setWorkspaceDescription}
         onCategoryChange={state.setWorkspaceCategoryId}
         onTagsChange={state.setWorkspaceTags}
+        onKeepDuplicatePagesChange={state.setKeepDuplicatePages}
         onSave={state.saveWorkspace}
       />
       <WorkspaceConvertDialog

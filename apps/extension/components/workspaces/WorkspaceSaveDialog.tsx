@@ -8,15 +8,12 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  Input,
-  Label,
   ScrollArea,
-  Textarea,
 } from "@hamhome/ui";
-import { CategorySelect } from "@/components/common/CategorySelect";
-import { TagInput } from "@/components/common/TagInput";
 import type { LocalCategory } from "@/types";
 import type { WorkspacePreview } from "@/lib/services/workspace-service";
+import { WorkspaceDuplicateNotice } from "./WorkspaceDuplicateNotice";
+import { WorkspaceSaveFields } from "./WorkspaceSaveFields";
 
 interface WorkspaceSaveDialogProps {
   open: boolean;
@@ -26,6 +23,7 @@ interface WorkspaceSaveDialogProps {
   description: string;
   categoryId: string | null;
   tags: string[];
+  keepDuplicatePages: boolean;
   categories: LocalCategory[];
   allTags: string[];
   onOpenChange: (open: boolean) => void;
@@ -33,6 +31,7 @@ interface WorkspaceSaveDialogProps {
   onDescriptionChange: (value: string) => void;
   onCategoryChange: (value: string | null) => void;
   onTagsChange: (value: string[]) => void;
+  onKeepDuplicatePagesChange: (value: boolean) => void;
   onSave: () => void;
 }
 
@@ -44,6 +43,7 @@ export function WorkspaceSaveDialog({
   description,
   categoryId,
   tags,
+  keepDuplicatePages,
   categories,
   allTags,
   onOpenChange,
@@ -51,6 +51,7 @@ export function WorkspaceSaveDialog({
   onDescriptionChange,
   onCategoryChange,
   onTagsChange,
+  onKeepDuplicatePagesChange,
   onSave,
 }: WorkspaceSaveDialogProps) {
   const { t } = useTranslation("bookmark");
@@ -68,44 +69,24 @@ export function WorkspaceSaveDialog({
         </DialogHeader>
         <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_280px]">
           <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="workspace-name">{t("workspace.name")}</Label>
-              <Input
-                id="workspace-name"
-                value={name}
-                onChange={(event) => onNameChange(event.target.value)}
-                placeholder={preview?.name}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="workspace-description">
-                {t("workspace.summary")}
-              </Label>
-              <Textarea
-                id="workspace-description"
-                value={description}
-                onChange={(event) => onDescriptionChange(event.target.value)}
-                placeholder={t("workspace.descriptionPlaceholder")}
-                rows={3}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>{t("workspace.category")}</Label>
-              <CategorySelect
-                value={categoryId}
-                onChange={onCategoryChange}
-                categories={categories}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>{t("workspace.tags")}</Label>
-              <TagInput
-                value={tags}
-                onChange={onTagsChange}
-                suggestions={allTags}
-                placeholder={t("workspace.tagsPlaceholder")}
-              />
-            </div>
+            <WorkspaceSaveFields
+              name={name}
+              description={description}
+              categoryId={categoryId}
+              tags={tags}
+              categories={categories}
+              allTags={allTags}
+              namePlaceholder={preview?.name}
+              onNameChange={onNameChange}
+              onDescriptionChange={onDescriptionChange}
+              onCategoryChange={onCategoryChange}
+              onTagsChange={onTagsChange}
+            />
+            <WorkspaceDuplicateNotice
+              duplicateCount={preview?.duplicateUrlCount ?? 0}
+              keepDuplicatePages={keepDuplicatePages}
+              onKeepDuplicatePagesChange={onKeepDuplicatePagesChange}
+            />
           </div>
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">

@@ -165,6 +165,8 @@
     "tagsPlaceholder": "输入标签后回车",
     "pageList": "页面列表",
     "duplicatePages": "{{count}} 个重复 URL",
+    "duplicateNotice": "发现 {{count}} 个重复页面，默认只保留每个 URL 的第一个页面",
+    "keepDuplicatePages": "仍然全部保存",
     "cancel": "取消",
     "save": "保存",
     "saving": "保存中...",
@@ -201,6 +203,17 @@
       "converted": "已转书签",
       "existing": "已存在",
       "failed": "失败"
+    },
+    "analysis": {
+      "title": "智能分析",
+      "run": "开始分析",
+      "rerun": "重新分析",
+      "empty": "尚未分析。分析后会展示分类分布、推荐名称、推荐标签和可转书签建议。",
+      "total": "总计 {{count}} 页",
+      "deduped": "去重后 {{count}} 页",
+      "recommended": "建议转书签 {{count}} 页",
+      "success": "工作空间分析完成",
+      "failed": "工作空间分析失败"
     }
   },
   "popup": {
