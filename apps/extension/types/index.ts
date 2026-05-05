@@ -249,7 +249,6 @@ export interface WorkspaceTabPage {
   tabId?: number;
   tabGroupId?: number;
   bookmarkRecommendation?: "recommended" | "excluded";
-  bookmarkRecommendationReason?: string;
 }
 
 export type WorkspaceTabGroupColor =

@@ -12,6 +12,8 @@ import React, {
   ReactNode,
 } from "react";
 import { bookmarkStorage } from "@/lib/storage/bookmark-storage";
+import { workspaceStorage } from "@/lib/storage/workspace-storage";
+import { tabGroupRulesStorage } from "@/lib/storage/tab-group-rules-storage";
 import {
   configStorage,
   DEFAULT_AI_CONFIG,
@@ -82,7 +84,7 @@ interface BookmarkContextType {
   // 数据管理
   clearAllData: () => Promise<void>;
   clearBookmarkData: () => Promise<void>;
-  exportData: (format: "json" | "html") => void;
+  exportData: (format: "json" | "html") => Promise<void>;
 
   // 批量导入辅助：暂停/恢复 storage watcher，避免每条写入都触发全量刷新
   pauseWatchers: () => void;
@@ -388,12 +390,28 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
   };
 
   // 导出数据
-  const exportData = (format: "json" | "html") => {
+  const exportData = async (format: "json" | "html") => {
+    const [
+      workspaces,
+      workspaceCategories,
+      tabGroupRules,
+      tabGroupAutoGroupSettings,
+    ] = await Promise.all([
+      workspaceStorage.getWorkspaces(),
+      workspaceStorage.getCategories(),
+      tabGroupRulesStorage.getRules(),
+      tabGroupRulesStorage.getAutoGroupSettings(),
+    ]);
+
     const data = {
       version: "1.0.0",
       exportedAt: Date.now(),
       bookmarks,
       categories,
+      workspaces,
+      workspaceCategories,
+      tabGroupRules,
+      tabGroupAutoGroupSettings,
     };
 
     if (format === "json") {

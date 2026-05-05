@@ -97,6 +97,18 @@ class TabGroupRulesStorage {
     return updated;
   }
 
+  async importRawRule(rule: TabGroupRule): Promise<void> {
+    const rules = await this.getRules();
+    const index = rules.findIndex((item) => item.id === rule.id);
+    if (index === -1) {
+      await this.setRules([...rules, rule]);
+      return;
+    }
+
+    rules[index] = { ...rules[index], ...rule };
+    await this.setRules(rules);
+  }
+
   watchAutoGroupSettings(
     callback: (settings: TabGroupAutoGroupSettings) => void,
   ): () => void {

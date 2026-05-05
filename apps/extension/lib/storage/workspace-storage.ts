@@ -229,6 +229,30 @@ class WorkspaceStorage {
     await workspacesItem.setValue(reordered);
   }
 
+  async importRawWorkspace(workspace: Workspace): Promise<void> {
+    const workspaces = await workspacesItem.getValue();
+    const index = workspaces.findIndex((item) => item.id === workspace.id);
+    if (index === -1) {
+      await workspacesItem.setValue([workspace, ...workspaces]);
+      return;
+    }
+
+    workspaces[index] = { ...workspaces[index], ...workspace };
+    await workspacesItem.setValue([...workspaces]);
+  }
+
+  async importRawCategory(category: WorkspaceCategory): Promise<void> {
+    const categories = await workspaceCategoriesItem.getValue();
+    const index = categories.findIndex((item) => item.id === category.id);
+    if (index === -1) {
+      await workspaceCategoriesItem.setValue([...categories, category]);
+      return;
+    }
+
+    categories[index] = { ...categories[index], ...category };
+    await workspaceCategoriesItem.setValue([...categories]);
+  }
+
   private matchesSearch(workspace: Workspace, search: string): boolean {
     if (!search) return true;
 

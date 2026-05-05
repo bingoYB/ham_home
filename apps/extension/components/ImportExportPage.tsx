@@ -34,6 +34,8 @@ import {
 } from "@hamhome/ui";
 import { useBookmarks } from "@/contexts/BookmarkContext";
 import { bookmarkStorage } from "@/lib/storage/bookmark-storage";
+import { workspaceStorage } from "@/lib/storage/workspace-storage";
+import { tabGroupRulesStorage } from "@/lib/storage/tab-group-rules-storage";
 import { importTaskStorage } from "@/lib/storage/import-task-storage";
 import { getBackgroundService } from "@/lib/services";
 import { bookmarkAnalysisService } from "@/lib/agent";
@@ -41,7 +43,12 @@ import {
   useChromeBookmarks,
   ChromeBookmarkError,
 } from "@/hooks/useChromeBookmarks";
-import type { LocalCategory } from "@/types";
+import type {
+  LocalCategory,
+  TabGroupRule,
+  Workspace,
+  WorkspaceCategory,
+} from "@/types";
 import type {
   BookmarkToImport,
   HtmlImportTask,
@@ -174,13 +181,13 @@ export function ImportExportPage() {
   };
 
   // 导出 JSON
-  const handleExportJSON = () => {
-    exportData("json");
+  const handleExportJSON = async () => {
+    await exportData("json");
   };
 
   // 导出 HTML
-  const handleExportHTML = () => {
-    exportData("html");
+  const handleExportHTML = async () => {
+    await exportData("html");
   };
 
   // 触发文件选择
@@ -437,6 +444,87 @@ export function ImportExportPage() {
       importedBookmarkIds.push(...created.map((b) => b.id));
     }
 
+    let workspaceCategoriesCreated = 0;
+    let workspacesImported = 0;
+    let tabGroupRulesImported = 0;
+
+    const workspaceCategoryIdMap = new Map<string, string>();
+    let allWorkspaceCategories = await workspaceStorage.getCategories();
+    for (const category of allWorkspaceCategories) {
+      workspaceCategoryIdMap.set(category.id, category.id);
+    }
+
+    if (Array.isArray(data.workspaceCategories)) {
+      const sortedWorkspaceCategories = [...data.workspaceCategories].sort((a, b) => {
+        if (a.parentId === null && b.parentId !== null) return -1;
+        if (a.parentId !== null && b.parentId === null) return 1;
+        return 0;
+      });
+      const pending = [...sortedWorkspaceCategories];
+      let round = 0;
+
+      while (pending.length > 0 && round < 10) {
+        round++;
+        const stillPending: typeof pending = [];
+
+        for (const category of pending as WorkspaceCategory[]) {
+          const newParentId = category.parentId
+            ? (workspaceCategoryIdMap.get(category.parentId) ?? null)
+            : null;
+
+          if (category.parentId && !workspaceCategoryIdMap.has(category.parentId)) {
+            stillPending.push(category);
+            continue;
+          }
+
+          const existing = allWorkspaceCategories.find(
+            (item) => item.name === category.name && item.parentId === newParentId,
+          );
+
+          if (existing) {
+            workspaceCategoryIdMap.set(category.id, existing.id);
+            continue;
+          }
+
+          const created = await workspaceStorage.createCategory(
+            category.name,
+            newParentId,
+            category.icon,
+          );
+          workspaceCategoryIdMap.set(category.id, created.id);
+          allWorkspaceCategories = [...allWorkspaceCategories, created];
+          workspaceCategoriesCreated++;
+        }
+
+        pending.length = 0;
+        pending.push(...stillPending);
+      }
+    }
+
+    if (Array.isArray(data.workspaces)) {
+      for (const workspace of data.workspaces as Workspace[]) {
+        const mappedCategoryId = workspace.categoryId
+          ? (workspaceCategoryIdMap.get(workspace.categoryId) ?? null)
+          : null;
+        await workspaceStorage.importRawWorkspace({
+          ...workspace,
+          categoryId: mappedCategoryId,
+        });
+        workspacesImported++;
+      }
+    }
+
+    if (Array.isArray(data.tabGroupRules)) {
+      for (const rule of data.tabGroupRules as TabGroupRule[]) {
+        await tabGroupRulesStorage.importRawRule(rule);
+        tabGroupRulesImported++;
+      }
+    }
+
+    if (data.tabGroupAutoGroupSettings) {
+      await tabGroupRulesStorage.setAutoGroupSettings(data.tabGroupAutoGroupSettings);
+    }
+
     // 批量添加 embedding 任务（在 background 中执行）
     if (importedBookmarkIds.length > 0) {
       try {
@@ -460,6 +548,13 @@ export function ImportExportPage() {
         categoriesCreated,
         ns: "settings",
       });
+    }
+    if (
+      workspacesImported > 0 ||
+      workspaceCategoriesCreated > 0 ||
+      tabGroupRulesImported > 0
+    ) {
+      details += `；工作空间 ${workspacesImported} 个，工作空间分类 ${workspaceCategoriesCreated} 个，Tab 分组规则 ${tabGroupRulesImported} 条`;
     }
 
     setImportResult({

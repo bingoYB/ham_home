@@ -78,9 +78,6 @@ class WorkspaceAnalysisService {
         ? this.buildDuplicateGroupId(page.url)
         : page.duplicateGroupId,
       bookmarkRecommendation: excluded ? "excluded" : "recommended",
-      bookmarkRecommendationReason: excluded
-        ? "重复页面、搜索结果或登录页不建议长期保存"
-        : "页面内容适合作为长期书签沉淀",
     };
   }
 
