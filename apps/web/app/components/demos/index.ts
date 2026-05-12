@@ -5,3 +5,4 @@ export { BookmarkListMngDemo } from "./BookmarkListMngDemo";
 export { CategoriesDemo, CategoriesDemo as AIFeatureDemo } from "./CategoriesDemo";
 export { AIChatSearchDemo } from "./AIChatSearchDemo";
 export { ImportExportDemo } from "./ImportExportDemo";
+export { WorkspaceDemo } from "./WorkspaceDemo";

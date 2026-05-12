@@ -7,13 +7,15 @@ app/components/
 ├── Header.tsx          # 导航栏组件
 ├── Footer.tsx          # 页脚组件
 ├── PrivacyPolicyContent.tsx # 隐私权政策内容组件
-├── FeatureShowcase.tsx # 功能展示区 (Tab 切换)
+├── FeatureSection.tsx  # 功能区块容器 (垂直布局)
+├── FeatureShowcase.tsx # 功能展示区 (垂直排列各功能区块)
 ├── index.ts            # 导出入口
 └── demos/              # Demo 展示组件
     ├── BookmarkCardDemo.tsx    # 书签卡片演示
     ├── SaveBookmarkDemo.tsx    # 保存书签演示
     ├── BookmarkPanelDemo.tsx   # 书签面板演示
     ├── BookmarkListMngDemo.tsx # 书签管理演示
+    ├── WorkspaceDemo.tsx       # 工作空间与 Tab 分组演示
     ├── CategoriesDemo.tsx      # 分类方案演示
     ├── AIChatSearchDemo.tsx    # AI 对话搜索演示
     ├── ImportExportDemo.tsx    # 导入导出演示
@@ -85,9 +87,41 @@ app/components/
 
 ---
 
+## FeatureSection
+
+功能区块容器组件，用于垂直布局中每个功能模块的展示。包含图标、标题、描述和 Demo 内容区域。偶数/奇数行交替使用不同背景色，并添加装饰性渐变光斑。
+
+### Props
+
+| name | type | required | default | description |
+|------|------|----------|---------|-------------|
+| id | string | ✓ | - | 区块 ID，用于锚点定位 |
+| icon | ReactNode | ✓ | - | 区块图标 |
+| title | string | ✓ | - | 区块标题 |
+| description | string | ✓ | - | 区块描述文字 |
+| children | ReactNode | ✓ | - | Demo 内容 |
+| alternate | boolean | ✗ | false | 是否使用交替背景样式 |
+| className | string | ✗ | - | 额外 CSS 类名 |
+
+### Usage
+
+```tsx
+<FeatureSection
+  id="ai-save"
+  icon={<Sparkles className="h-5 w-5" />}
+  title="AI 智能书签收藏"
+  description="一键保存书签，AI 自动生成摘要..."
+  alternate
+>
+  <SaveBookmarkDemo ... />
+</FeatureSection>
+```
+
+---
+
 ## FeatureShowcase
 
-功能展示区组件，使用 Tab 切换展示不同功能模块。
+功能展示区组件，将各功能模块按垂直方向依次排列展示。每个模块使用 `FeatureSection` 容器包裹，配有独立的标题、描述和 Demo 内容。
 
 ### Props
 
@@ -111,15 +145,16 @@ app/components/
 />
 ```
 
-### 包含的 Tab
+### 包含的功能区块（垂直排列）
 
-1. **保存书签** - SaveBookmarkDemo
-2. **书签面板** - BookmarkPanelDemo
-3. **书签管理** - BookmarkListMngDemo
-4. **分类方案** - CategoriesDemo
-5. **导入导出** - ImportExportDemo
+1. **AI 智能书签收藏** - SaveBookmarkDemo
+2. **工作空间与 Tab 分组** - WorkspaceDemo
+3. **侧边栏书签面板** - BookmarkPanelDemo
+4. **全功能书签管理** - BookmarkListMngDemo
+5. **智能分类方案** - CategoriesDemo
+6. **无缝导入导出** - ImportExportDemo
 
-> AI 对话搜索不再单独占用 Tab，已集成到 **书签面板** 和 **书签管理** 两个演示中。
+> AI 对话搜索已集成到 **书签面板** 和 **书签管理** 两个演示中。
 
 ---
 
@@ -240,6 +275,26 @@ app/components/
 - 筛选状态显示
 - 批量选择操作
 - AI 对话面板位于管理视图根容器底部（与 extension `MainContent` 相同相对位置）
+
+---
+
+## WorkspaceDemo
+
+工作空间与 Tab 分组演示组件，展示标签页管理、AI智能分组与云同步等功能。
+
+### Props
+
+| name | type | required | default | description |
+|------|------|----------|---------|-------------|
+| isEn | boolean | ✓ | - | 当前是否为英文模式 |
+
+### 功能
+
+- 显示当前工作区及标签页数量
+- 模拟 AI 一键智能分组（分析进度反馈及结果洞察）
+- 展示不同话题的标签页分组列表
+- 提供“云端同步”与“转为书签”快速操作
+- 具有清晰层次结构的卡片式界面
 
 ---
 

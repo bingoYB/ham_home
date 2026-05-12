@@ -9,9 +9,7 @@ import {
   aiCacheStorage,
 } from "@/lib/storage";
 import {
-  bookmarkAnalysisService,
   matchCategoryByName,
-  translationService,
 } from "@/lib/agent";
 import { getBackgroundService } from "@/lib/services";
 import { obsidianSyncService } from "@/lib/services/obsidian-sync-service";
@@ -235,8 +233,9 @@ export function useSavePanel({
         }
 
         // 2. 执行分析（传递已有标签避免生成语义相近的重复标签）
+        const backgroundService = getBackgroundService();
         const existingTags = await bookmarkStorage.getAllTags();
-        const result = await bookmarkAnalysisService.analyzeBookmark({
+        const result = await backgroundService.analyzeBookmark({
           pageContent: { ...pageContent, content: markdown },
           userCategories: categories,
           existingTags,
@@ -575,7 +574,8 @@ async function applyAnalysisResultWithSetters(
   // 处理描述（翻译功能）
   if (result.summary) {
     if (config.enableTranslation) {
-      const translatedSummary = await translationService.translate(
+      const backgroundService = getBackgroundService();
+      const translatedSummary = await backgroundService.translate(
         result.summary,
         targetLang,
       );
@@ -588,9 +588,10 @@ async function applyAnalysisResultWithSetters(
   // 处理标签（仅在启用标签推荐时）
   if (config.enableTagSuggestion && result.tags.length > 0) {
     if (config.enableTranslation) {
+      const backgroundService = getBackgroundService();
       const translatedTags = await Promise.all(
         result.tags.map((tag: string) =>
-          translationService.translate(tag, targetLang),
+          backgroundService.translate(tag, targetLang),
         ),
       );
       setTags(translatedTags);

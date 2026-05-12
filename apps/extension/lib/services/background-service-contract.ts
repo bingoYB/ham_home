@@ -5,11 +5,17 @@ import type {
   SemanticSearchOptions,
   SemanticSearchResult,
 } from "@/lib/search/semantic-retriever";
+import type { ChatSearchTurnResult } from "@/lib/agent/services/chat-search-service";
 import type {
+  AnalysisResult,
   BookmarkEmbedding,
+  ConversationalSearchSession,
+  ConversationalSearchTurnInput,
+  Language,
   LocalBookmark,
   LocalCategory,
   LocalSettings,
+  PageContent,
   SaveSnapshotBackgroundOptions,
   SnapshotSaveResult,
 } from "@/types";
@@ -61,6 +67,16 @@ export interface IBackgroundService {
     coverage: number;
   }>;
   getShortcuts(): Promise<ShortcutCommand[]>;
+  chatSearchRunTurn(
+    input: ConversationalSearchTurnInput,
+    state: ConversationalSearchSession,
+  ): Promise<ChatSearchTurnResult>;
+  analyzeBookmark(options: {
+    pageContent: PageContent;
+    userCategories?: LocalCategory[];
+    existingTags?: string[];
+  }): Promise<AnalysisResult>;
+  translate(text: string, targetLang: Language): Promise<string>;
 }
 
 export const BACKGROUND_SERVICE_KEY =

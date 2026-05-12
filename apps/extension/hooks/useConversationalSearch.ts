@@ -12,6 +12,7 @@ import type {
   Suggestion,
   SuggestionActionType,
 } from "@/types";
+import { getBackgroundService } from "@/lib/services";
 
 /**
  * 建议操作处理器类型
@@ -142,14 +143,14 @@ export function useConversationalSearch(): UseConversationalSearchReturn {
     try {
       setStatus("searching");
 
-      const { chatSearchAgent } = await import("@/lib/search/chat-search-agent");
+      const backgroundService = getBackgroundService();
 
       const {
         response,
         bookmarks: resultBookmarks,
         searchResult,
         newState,
-      } = await chatSearchAgent.runTurn(
+      } = await backgroundService.chatSearchRunTurn(
         input,
         conversationSessionRef.current,
       );

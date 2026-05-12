@@ -16,9 +16,19 @@ import { vectorStore } from "@/lib/storage/vector-store";
 import { workspaceService } from "@/lib/services/workspace-service";
 import { embeddingClient, embeddingQueue } from "@/lib/embedding";
 import { semanticRetriever } from "@/lib/search/semantic-retriever";
+import {
+  bookmarkAnalysisService,
+  translationService,
+} from "@/lib/agent";
 import { getExtensionURL, type ShortcutCommand } from "@/utils/browser-api";
+import { chatSearchService, type ChatSearchTurnResult } from "@/lib/agent/services/chat-search-service";
 import type {
+  AnalysisResult,
   BookmarkEmbedding,
+  ConversationalSearchSession,
+  ConversationalSearchTurnInput,
+  LocalCategory,
+  PageContent,
   SaveSnapshotBackgroundOptions,
   SnapshotSaveResult,
 } from "@/types";
@@ -407,6 +417,25 @@ class BackgroundServiceImpl implements IBackgroundService {
       console.error("[BackgroundService] Failed to get shortcuts:", error);
       return [];
     }
+  }
+
+  async chatSearchRunTurn(
+    input: ConversationalSearchTurnInput,
+    state: ConversationalSearchSession,
+  ): Promise<ChatSearchTurnResult> {
+    return chatSearchService.runTurn(input, state);
+  }
+
+  async analyzeBookmark(options: {
+    pageContent: PageContent;
+    userCategories?: LocalCategory[];
+    existingTags?: string[];
+  }): Promise<AnalysisResult> {
+    return bookmarkAnalysisService.analyzeBookmark(options);
+  }
+
+  async translate(text: string, targetLang: "zh" | "en"): Promise<string> {
+    return translationService.translate(text, targetLang);
   }
 
   private async broadcastEmbeddingProgress(

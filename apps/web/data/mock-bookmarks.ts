@@ -427,7 +427,7 @@ export function formatRelativeDate(timestamp: number, isEn: boolean): string {
   const now = Date.now();
   const diff = now - timestamp;
   const days = Math.floor(diff / 86400000);
-  
+
   if (days === 0) return isEn ? 'Today' : '今天';
   if (days === 1) return isEn ? 'Yesterday' : '昨天';
   return isEn ? `${days} days ago` : `${days} 天前`;
