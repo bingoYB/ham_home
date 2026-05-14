@@ -57,6 +57,9 @@ importers:
       '@hamhome/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@hamhome/ui-business':
+        specifier: workspace:*
+        version: link:../../packages/ui-business
       '@hamhome/utils':
         specifier: workspace:*
         version: link:../../packages/utils
@@ -157,6 +160,9 @@ importers:
       '@hamhome/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@hamhome/ui-business':
+        specifier: workspace:*
+        version: link:../../packages/ui-business
       '@hamhome/utils':
         specifier: workspace:*
         version: link:../../packages/utils
@@ -550,6 +556,34 @@ importers:
       tailwindcss:
         specifier: 4.0.0
         version: 4.0.0
+      tsup:
+        specifier: ^8.3.0
+        version: 8.5.1(@swc/core@1.15.3(@swc/helpers@0.5.15))(jiti@2.6.1)(postcss@8.5.6)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+
+  packages/ui-business:
+    dependencies:
+      '@hamhome/ui':
+        specifier: workspace:*
+        version: link:../ui
+      lucide-react:
+        specifier: ^0.469.0
+        version: 0.469.0(react@19.2.3)
+      react:
+        specifier: ^19.0.0
+        version: 19.2.3
+      react-dom:
+        specifier: ^19.0.0
+        version: 19.2.3(react@19.2.3)
+    devDependencies:
+      '@types/react':
+        specifier: ^19.0.0
+        version: 19.2.7
+      '@types/react-dom':
+        specifier: ^19.0.0
+        version: 19.2.3(@types/react@19.2.7)
       tsup:
         specifier: ^8.3.0
         version: 8.5.1(@swc/core@1.15.3(@swc/helpers@0.5.15))(jiti@2.6.1)(postcss@8.5.6)(typescript@5.9.3)

@@ -1,0 +1,66 @@
+{
+  "name": "@hamhome/ui-business",
+  "version": "1.0.0",
+  "private": true,
+  "description": "HamHome 共享业务 UI 组件",
+  "type": "module",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    },
+    "./workspace": {
+      "types": "./src/workspace/index.ts",
+      "default": "./src/workspace/index.ts"
+    },
+    "./bookmark": {
+      "types": "./src/bookmark/index.ts",
+      "default": "./src/bookmark/index.ts"
+    },
+    "./bookmark-panel": {
+      "types": "./src/bookmark-panel/index.ts",
+      "default": "./src/bookmark-panel/index.ts"
+    },
+    "./category": {
+      "types": "./src/category/index.ts",
+      "default": "./src/category/index.ts"
+    },
+    "./common": {
+      "types": "./src/common/index.ts",
+      "default": "./src/common/index.ts"
+    },
+    "./ai-search": {
+      "types": "./src/ai-search/index.ts",
+      "default": "./src/ai-search/index.ts"
+    },
+    "./import-export": {
+      "types": "./src/import-export/index.ts",
+      "default": "./src/import-export/index.ts"
+    }
+  },
+  "files": [
+    "src"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "lucide-react": "^0.469.0"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "@hamhome/ui": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "tsup": "^8.3.0",
+    "typescript": "^5.7.0"
+  }
+}
