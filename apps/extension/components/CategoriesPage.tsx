@@ -62,6 +62,7 @@ import {
   PopoverContent,
   cn,
 } from "@hamhome/ui";
+import { CategoryPreviewTree } from "@hamhome/ui-business/category";
 import { useBookmarks } from "@/contexts/BookmarkContext";
 import { pinStorage } from "@/lib/storage";
 import { categoryGenerationService } from "@/lib/agent";
@@ -74,7 +75,6 @@ import {
 import {
   LocalCategory,
   AIGeneratedCategory,
-  HierarchicalCategory,
   WorkspaceCategory,
   Workspace,
 } from "@/types";
@@ -846,7 +846,7 @@ export function CategoriesPage() {
                   <CardContent className="flex-1 pt-0">
                     <ScrollArea className="h-80 rounded-lg border border-border/60 bg-muted/30">
                       <div className="p-3 pr-4">
-                        <PresetCategoryTree
+                        <CategoryPreviewTree
                           categories={presetCategoriesGeneral}
                         />
                       </div>
@@ -880,7 +880,7 @@ export function CategoriesPage() {
                   <CardContent className="flex-1 pt-0">
                     <ScrollArea className="h-80 rounded-lg border border-border/60 bg-muted/30">
                       <div className="p-3 pr-4">
-                        <PresetCategoryTree
+                        <CategoryPreviewTree
                           categories={presetCategoriesProfessional}
                         />
                       </div>
@@ -965,8 +965,9 @@ export function CategoriesPage() {
                     </div>
 
                     <div className="p-4 bg-muted/50 rounded-lg space-y-2">
-                      <AIGeneratedCategoryTree
+                      <CategoryPreviewTree
                         categories={aiGeneratedCategories}
+                        generated
                       />
                     </div>
 
@@ -1171,96 +1172,6 @@ function CategoryTreeItem({
         </>
       )}
     </>
-  );
-}
-
-// ========== 预设分类树形展示（全展开） ==========
-
-interface PresetCategoryTreeProps {
-  categories: HierarchicalCategory[];
-  level?: number;
-}
-
-function PresetCategoryTree({
-  categories,
-  level = 0,
-}: PresetCategoryTreeProps) {
-  return (
-    <div
-      className={
-        level > 0 ? "ml-4 border-l border-muted-foreground/20 pl-3" : ""
-      }
-    >
-      {categories.map((cat) => {
-        const hasChildren = cat.children && cat.children.length > 0;
-
-        return (
-          <div key={cat.id} className="py-1">
-            <div className="flex items-center gap-2 text-sm">
-              {hasChildren ? (
-                <ChevronDown className="h-3 w-3 text-muted-foreground" />
-              ) : (
-                <div className="w-3" />
-              )}
-              <span className="text-base">{cat.icon}</span>
-              <span className={level === 0 ? "font-medium" : ""}>
-                {cat.name}
-              </span>
-            </div>
-            {hasChildren && (
-              <PresetCategoryTree
-                categories={cat.children!}
-                level={level + 1}
-              />
-            )}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// ========== AI 生成分类预览 ==========
-
-function AIGeneratedCategoryTree({
-  categories,
-  level = 0,
-}: {
-  categories: AIGeneratedCategory[];
-  level?: number;
-}) {
-  return (
-    <div
-      className={
-        level > 0 ? "ml-4 border-l border-muted-foreground/20 pl-3" : ""
-      }
-    >
-      {categories.map((cat, index) => (
-        <div key={index} className="py-1">
-          <div className="flex items-center gap-2 text-sm">
-            {cat.children && cat.children.length > 0 ? (
-              <ChevronDown className="h-3 w-3 text-muted-foreground" />
-            ) : (
-              <div className="w-3" />
-            )}
-            {cat.icon ? (
-              <span className="text-base leading-none w-3.5 h-3.5 flex items-center justify-center">
-                {cat.icon}
-              </span>
-            ) : (
-              <Folder className="h-3.5 w-3.5 text-amber-500" />
-            )}
-            <span className={level === 0 ? "font-medium" : ""}>{cat.name}</span>
-          </div>
-          {cat.children && cat.children.length > 0 && (
-            <AIGeneratedCategoryTree
-              categories={cat.children}
-              level={level + 1}
-            />
-          )}
-        </div>
-      ))}
-    </div>
   );
 }
 

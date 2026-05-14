@@ -1,21 +1,17 @@
-import { Fragment, useMemo } from "react";
-import type React from "react";
+/**
+ * WorkspaceTabGroupList - Extension 包装层
+ * 注入 SortableContext 作为 sortableWrapper
+ */
+import type { ReactNode } from "react";
 import {
   SortableContext,
   rectSortingStrategy,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { cn } from "@hamhome/ui";
-import { Plus } from "lucide-react";
-import type {
-  WorkspaceTabGroup,
-  WorkspaceTabGroupColor,
-  WorkspaceTabPage,
-} from "@/types";
+import type { WorkspaceTabGroup, WorkspaceTabPage } from "@/types";
 import {
-  getWorkspacePageGroupKey,
-  getWorkspaceTabGroupKey,
-} from "./workspace-ui";
+  WorkspaceTabGroupList as SharedWorkspaceTabGroupList,
+} from "@hamhome/ui-business/workspace";
 
 interface InsertPlaceholderInfo {
   /** Target page ID. null = append at end of last section */
@@ -32,88 +28,7 @@ interface WorkspaceTabGroupListProps {
   workspaceId?: string;
   /** Show an insertion placeholder at the specified position */
   insertPlaceholder?: InsertPlaceholderInfo;
-  renderPage: (page: WorkspaceTabPage, sortableId?: string) => React.ReactNode;
-}
-
-interface DisplaySection {
-  key: string;
-  group?: WorkspaceTabGroup;
-  pages: WorkspaceTabPage[];
-}
-
-const groupColorClasses: Record<WorkspaceTabGroupColor, string> = {
-  grey: "bg-slate-400",
-  blue: "bg-blue-500",
-  red: "bg-red-500",
-  yellow: "bg-yellow-400",
-  green: "bg-emerald-500",
-  pink: "bg-pink-500",
-  purple: "bg-violet-500",
-  cyan: "bg-cyan-500",
-  orange: "bg-orange-500",
-};
-
-function buildDisplaySections(
-  pages: WorkspaceTabPage[],
-  tabGroups?: WorkspaceTabGroup[],
-): DisplaySection[] {
-  const groupsByKey = new Map(
-    (tabGroups ?? []).map((group) => [getWorkspaceTabGroupKey(group), group]),
-  );
-  const ungroupedPages: WorkspaceTabPage[] = [];
-  const groupedPagesMap = new Map<string, WorkspaceTabPage[]>();
-
-  for (const page of pages) {
-    const key = getWorkspacePageGroupKey(page);
-    const group = key ? groupsByKey.get(key) : null;
-    if (!key || !group) {
-      ungroupedPages.push(page);
-      continue;
-    }
-    const arr = groupedPagesMap.get(key);
-    if (arr) arr.push(page);
-    else groupedPagesMap.set(key, [page]);
-  }
-
-  const sections: DisplaySection[] = [];
-
-  if (ungroupedPages.length > 0) {
-    sections.push({ key: "__ungrouped__", pages: ungroupedPages });
-  }
-
-  const groupEntries = Array.from(groupedPagesMap.entries())
-    .map(([key, gPages]) => ({
-      key,
-      group: groupsByKey.get(key)!,
-      pages: gPages,
-      order: Math.min(...gPages.map((p) => p.index)),
-    }))
-    .sort((a, b) => a.order - b.order);
-
-  for (const entry of groupEntries) {
-    sections.push({ key: entry.key, group: entry.group, pages: entry.pages });
-  }
-
-  return sections;
-}
-
-/** Generate a sortable ID for a page within a workspace */
-function pageSortableId(workspaceId: string, pageId: string): string {
-  return `page-${workspaceId}-${pageId}`;
-}
-
-/** Placeholder card shown at the insertion point */
-function InsertionPlaceholder({ grid }: { grid: boolean }) {
-  return (
-    <div
-      className={cn(
-        "flex items-center justify-center rounded-[12px] border-2 border-dashed border-primary/40 bg-primary/5 transition-all animate-in fade-in-0 zoom-in-95 duration-200",
-        grid ? "min-h-14" : "min-h-12",
-      )}
-    >
-      <Plus className="h-5 w-5 text-primary/50" />
-    </div>
-  );
+  renderPage: (page: WorkspaceTabPage, sortableId?: string) => ReactNode;
 }
 
 export function WorkspaceTabGroupList({
@@ -125,85 +40,25 @@ export function WorkspaceTabGroupList({
   insertPlaceholder,
   renderPage,
 }: WorkspaceTabGroupListProps) {
-  const sections = useMemo(
-    () => buildDisplaySections(pages, tabGroups),
-    [pages, tabGroups],
+  const sortableWrapper = (items: string[], children: ReactNode) => (
+    <SortableContext
+      items={items}
+      strategy={grid ? rectSortingStrategy : verticalListSortingStrategy}
+    >
+      {children}
+    </SortableContext>
   );
 
-  const gridClasses = grid
-    ? "grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4"
-    : "space-y-2";
-
   return (
-    <div className={cn(className)}>
-      {sections.map((section, sectionIdx) => {
-        const sectionPageIds = workspaceId
-          ? section.pages.map((p) => pageSortableId(workspaceId, p.id))
-          : [];
-
-        const pageElements = section.pages.map((page) => {
-          const sid = workspaceId
-            ? pageSortableId(workspaceId, page.id)
-            : undefined;
-          const matchesPage = insertPlaceholder?.pageId === page.id;
-          const showBefore = matchesPage && insertPlaceholder?.position === "before";
-          const showAfter = matchesPage && insertPlaceholder?.position === "after";
-          return (
-            <Fragment key={page.id}>
-              {showBefore && <InsertionPlaceholder grid={grid} />}
-              <div>{renderPage(page, sid)}</div>
-              {showAfter && <InsertionPlaceholder grid={grid} />}
-            </Fragment>
-          );
-        });
-
-        const isLastSection = sectionIdx === sections.length - 1;
-        const showEnd =
-          insertPlaceholder?.pageId === null && isLastSection;
-
-        const gridContent = (
-          <div className={gridClasses}>
-            {pageElements}
-            {showEnd && <InsertionPlaceholder grid={grid} />}
-          </div>
-        );
-
-        return (
-          <div key={section.key} className={sectionIdx > 0 ? "mt-3" : undefined}>
-            {section.group && (
-              <div className="flex min-h-9 min-w-0 items-center gap-2 border-b px-1 py-1 mb-2">
-                <span
-                  className={cn(
-                    "h-3 w-3 shrink-0 rounded-full",
-                    groupColorClasses[section.group.color],
-                  )}
-                />
-                <span className="min-w-0 flex-1 truncate text-sm font-semibold">
-                  {section.group.title}
-                </span>
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  {section.pages.length}
-                </span>
-              </div>
-            )}
-            {workspaceId && sectionPageIds.length > 0 ? (
-              <SortableContext
-                items={sectionPageIds}
-                strategy={grid ? rectSortingStrategy : verticalListSortingStrategy}
-              >
-                {gridContent}
-              </SortableContext>
-            ) : (
-              gridContent
-            )}
-          </div>
-        );
-      })}
-      {sections.length === 0 && insertPlaceholder && (
-        <div className={gridClasses}>
-          <InsertionPlaceholder grid={grid} />
-        </div>
-      )}
-    </div>
+    <SharedWorkspaceTabGroupList
+      pages={pages}
+      tabGroups={tabGroups}
+      className={className}
+      grid={grid}
+      workspaceId={workspaceId}
+      insertPlaceholder={insertPlaceholder}
+      renderPage={renderPage}
+      sortableWrapper={sortableWrapper}
+    />
   );
 }

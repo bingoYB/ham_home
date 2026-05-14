@@ -27,6 +27,7 @@
     "@dnd-kit/utilities": "^3.2.2",
     "@hamhome/agent": "workspace:*",
     "@hamhome/ui": "workspace:*",
+    "@hamhome/ui-business": "workspace:*",
     "@hamhome/utils": "workspace:*",
     "@mozilla/readability": "^0.5.0",
     "@tanstack/react-virtual": "^3.13.18",

@@ -3,6 +3,12 @@ import { Plus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import { Button, ScrollArea } from "@hamhome/ui";
 import {
+  WorkspaceLabelsProvider,
+  WorkspaceSearchBar,
+  WorkspaceCurrentTabsPanel,
+  type WorkspaceLabels,
+} from "@hamhome/ui-business/workspace";
+import {
   DndContext,
   DragOverlay,
   closestCenter,
@@ -23,12 +29,10 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { WorkspaceSection, WORKSPACE_DROP_TYPE } from "@/components/workspaces/WorkspaceSection";
-import { WorkspaceCurrentTabsPanel } from "@/components/workspaces/WorkspaceCurrentTabsPanel";
 import { WorkspacePageDialogs } from "@/components/workspaces/WorkspacePageDialogs";
-import { WorkspaceSearchBar } from "@/components/workspaces/WorkspaceSearchBar";
 import { useWorkspacesPage } from "@/components/workspaces/useWorkspacesPage";
 import { WorkspacePageBookmarkDialog } from "@/components/workspaces/WorkspacePageBookmarkDialog";
-import { TAB_DRAG_TYPE } from "@/components/workspaces/DraggableTabCard";
+import { DraggableTabCard, TAB_DRAG_TYPE } from "@/components/workspaces/DraggableTabCard";
 import { PAGE_DRAG_TYPE } from "@/components/workspaces/WorkspacePageTile";
 
 import type { WorkspaceTabPage } from "@/types";
@@ -49,6 +53,38 @@ export function WorkspacesPage() {
   const [insertTarget, setInsertTarget] = useState<{ workspaceId: string; pageId: string | null; position: "before" | "after" } | null>(null);
 
   const isManualSort = state.sortBy === "manual";
+
+  const workspaceLabels = useMemo<WorkspaceLabels>(() => ({
+    pageCount: (count) => t("workspace.pageCount", { count }),
+    restoredAt: t("workspace.restoredAt"),
+    neverRestored: t("workspace.neverRestored"),
+    editWorkspace: t("workspace.editWorkspace"),
+    restoreNewWindow: t("workspace.restoreNewWindow"),
+    restoreCurrentWindow: t("workspace.restoreCurrentWindow"),
+    deleteWorkspace: t("workspace.deleteWorkspace"),
+    clickToEdit: t("workspace.clickToEdit"),
+    moreActions: t("workspace.moreActions"),
+    edit: t("bookmark.edit"),
+    openPage: t("workspace.openPage"),
+    copyUrl: t("workspace.copyUrl"),
+    saveToBookmark: t("workspace.saveToBookmark"),
+    deletePage: t("workspace.deletePage"),
+    searchPlaceholder: t("workspace.searchPlaceholder"),
+    allCategories: t("workspace.allCategories"),
+    uncategorized: t("bookmark.uncategorized"),
+    unknownCategory: t("workspace.unknownCategory"),
+    sortManual: t("workspace.sortManual"),
+    sortCreatedAt: t("workspace.sortCreatedAt"),
+    sortRestoredAt: t("workspace.sortRestoredAt"),
+    currentTabs: t("workspace.currentTabs"),
+    saveCurrentWindow: t("workspace.saveCurrentWindow"),
+    saveThisWindow: t("workspace.saveThisWindow"),
+    refreshCurrentTabs: t("workspace.refreshCurrentTabs"),
+    currentTabsLoading: t("workspace.currentTabsLoading"),
+    currentTabsEmpty: t("workspace.currentTabsEmpty"),
+    currentWindowLabel: t("workspace.currentWindowLabel"),
+    windowLabel: (index) => t("workspace.windowLabel", { index }),
+  }), [t]);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -255,6 +291,7 @@ export function WorkspacesPage() {
   const dragOverlayPage = draggingItem?.page ?? null;
 
   return (
+    <WorkspaceLabelsProvider labels={workspaceLabels}>
     <DndContext
       sensors={sensors}
       collisionDetection={collisionDetection}
@@ -266,7 +303,7 @@ export function WorkspacesPage() {
       <div className="flex h-full min-h-0 flex-col bg-background xl:flex-row">
         <section className="flex min-w-0 flex-1 flex-col">
           <header className="flex min-h-16 flex-wrap items-center gap-3 border-b px-4 py-3">
-            <div className="min-w-70 flex-1">
+            <div className="min-w-0 flex-1">
               <WorkspaceSearchBar
                 searchQuery={state.searchQuery}
                 categoryFilter={state.categoryFilter}
@@ -278,11 +315,12 @@ export function WorkspacesPage() {
               />
             </div>
             <Button 
+              size="sm"
               onClick={() => state.openSaveDialog()}
-              title={t("workspace.saveCurrentWindow")}
+              title={workspaceLabels.saveCurrentWindow}
             >
               <Plus className="mr-2 h-4 w-4" />
-              {t("workspace.saveCurrentWindow")}
+              {workspaceLabels.saveCurrentWindow}
             </Button>
           </header>
           <ScrollArea className="min-h-0 flex-1">
@@ -339,7 +377,18 @@ export function WorkspacesPage() {
           preview={state.currentWindowPreview}
           loading={state.currentWindowLoading}
           onRefresh={state.refreshCurrentWindowPreview}
-          onSaveCurrentWindow={state.openSaveDialog}
+          onSaveCurrentWindow={(pages) => {
+            import("@/lib/services/workspace-service").then(({ workspaceService }) => {
+              state.openSaveDialog(
+                workspaceService.createPreviewFromPages(
+                  pages as any,
+                  state.currentWindowPreview?.currentWindowId,
+                  state.currentWindowPreview?.tabGroups,
+                )
+              );
+            });
+          }}
+          renderPage={(page) => <DraggableTabCard page={page as any} />}
         />
         <WorkspacePageDialogs
           state={state}
@@ -365,5 +414,6 @@ export function WorkspacesPage() {
         ) : null}
       </DragOverlay>
     </DndContext>
+    </WorkspaceLabelsProvider>
   );
 }

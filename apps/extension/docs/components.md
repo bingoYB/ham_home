@@ -735,6 +735,26 @@ const { container: portalContainer } = useContentUI();
 
 ---
 
+### TagInput
+
+标签输入组件，复用 `@hamhome/ui-business/common` 的 `TagInput`，Extension 侧仅负责注入 i18n 文案。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| value | `string[]` | ✓ | - | 当前标签列表 |
+| onChange | `(tags: string[]) => void` | ✓ | - | 标签变更回调 |
+| placeholder | `string` | - | - | 输入框占位文案 |
+| maxTags | `number` | - | `10` | 最大标签数 |
+| suggestions | `string[]` | - | `[]` | 标签建议列表 |
+| className | `string` | - | - | 自定义样式类 |
+
+**行为说明：**
+
+- 回车添加标签，空输入 Backspace 删除最后一个标签。
+- 建议筛选、标签样式和删除按钮来自共享业务组件。
+
+---
+
 ### CategorySelect
 
 分类选择组件，用于书签保存/编辑场景，支持树形分类搜索、未分类选项和 AI 推荐分类映射。
@@ -761,6 +781,7 @@ const { container: portalContainer } = useContentUI();
 ### CategoryTreeView
 
 分类层级树视图组件，按分类层级展示书签，支持展开/折叠。
+主体树与书签项结构复用 `@hamhome/ui-business/bookmark-panel`，Extension 侧注入安全 favicon 和 content UI Portal 容器。
 
 | Prop                  | Type                                        | Required | Default | Description              |
 | --------------------- | ------------------------------------------- | -------- | ------- | ------------------------ |
@@ -834,6 +855,7 @@ const { container: portalContainer } = useContentUI();
 ### BookmarkListItem
 
 书签列表项组件，用于在分类树中显示单个书签。
+该组件是 `@hamhome/ui-business/bookmark-panel` 的薄封装，保留 Extension 数据类型与 favicon 安全处理。
 
 | Prop     | Type            | Required | Default | Description |
 | -------- | --------------- | -------- | ------- | ----------- |
@@ -861,6 +883,7 @@ const { container: portalContainer } = useContentUI();
 ### BookmarkCard
 
 网格视图书签卡片，展示书签摘要、分类、标签和更多操作菜单。
+主体 UI 复用 `@hamhome/ui-business/bookmark` 的 `BookmarkCard`，Extension 侧负责注入 favicon 解析、i18n 和菜单回调。
 
 | Prop | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
@@ -917,6 +940,7 @@ const { container: portalContainer } = useContentUI();
 ### BookmarkListItem（管理列表）
 
 列表视图书签行，展示书签标题、域名、分类、时间、标签和更多操作菜单。
+主体 UI 复用 `@hamhome/ui-business/bookmark` 的 `BookmarkListItem`，Extension 侧负责注入 favicon 解析、i18n 和菜单回调。
 
 | Prop | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
@@ -976,6 +1000,7 @@ AI 对话式搜索相关组件，提供底部 AI 搜索栏和对话窗口。
 ### SearchInputArea
 
 关键词搜索输入组件（纯关键词搜索）。
+UI 复用 `@hamhome/ui-business/ai-search` 的 `SearchInputArea`，Extension 侧注入 `ai.searchPlaceholder` 文案。
 
 | Prop        | Type                    | Required | Default | Description        |
 | ----------- | ----------------------- | -------- | ------- | ------------------ |
@@ -1007,6 +1032,7 @@ AI 对话式搜索相关组件，提供底部 AI 搜索栏和对话窗口。
 ### AIChatPanel
 
 AI 对话面板组件，合并了搜索栏和对话窗口，使用 sticky 布局吸附在底部。内容区域最大宽度 720px，居中显示，顶部圆角。
+UI 复用 `@hamhome/ui-business/ai-search` 的 `AIChatPanel`，Extension 侧负责将 i18n 文案映射为 `AIChatLabels`。
 
 | Prop              | Type                              | Required | Default | Description          |
 | ----------------- | --------------------------------- | -------- | ------- | -------------------- |

@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "@hamhome/ui/globals.css";
 @source "../../packages/ui/src/**/*.{js,ts,jsx,tsx}";
+@source "../../packages/ui-business/src/**/*.{js,ts,jsx,tsx}";
 @plugin "@tailwindcss/typography";
 
 /* fix scroll area viewport display issue */
