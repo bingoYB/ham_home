@@ -1,30 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import {
-  CheckCircle2,
-  Download,
-  FileJson,
-  FileText,
-  FolderTree,
-  Globe,
-  Loader2,
-  Sparkles,
-  Upload,
-} from 'lucide-react';
-import {
-  Badge,
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Checkbox,
-  Label,
-  Progress,
-  cn,
-} from '@hamhome/ui';
+import { ImportExportDemoPanel } from '@hamhome/ui-business/import-export';
 import type { Bookmark, Category } from '@/data/mock-bookmarks';
 
 interface ImportExportDemoProps {
@@ -168,146 +145,19 @@ export function ImportExportDemo({ bookmarks, categories, isEn }: ImportExportDe
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Upload className="h-5 w-5 text-primary" />
-          {texts.title}
-        </CardTitle>
-        <CardDescription>{texts.description}</CardDescription>
-      </CardHeader>
-      <CardContent className="grid gap-4 lg:grid-cols-2">
-        <div className="rounded-xl border border-border bg-card p-4 space-y-4">
-          <div>
-            <h3 className="font-medium flex items-center gap-2">
-              <Download className="h-4 w-4 text-emerald-500" />
-              {texts.exportTitle}
-            </h3>
-            <p className="text-sm text-muted-foreground mt-1">{texts.exportDesc}</p>
-          </div>
-
-          <div className="flex items-center gap-2 flex-wrap">
-            <Badge variant="secondary">{texts.stats}</Badge>
-            <Badge variant="outline">JSON / HTML</Badge>
-          </div>
-
-          <div className="grid gap-2 sm:grid-cols-2">
-            <Button variant="outline" className="justify-start gap-2">
-              <FileJson className="h-4 w-4" />
-              {texts.exportJSON}
-            </Button>
-            <Button variant="outline" className="justify-start gap-2">
-              <FileText className="h-4 w-4" />
-              {texts.exportHTML}
-            </Button>
-          </div>
-        </div>
-
-        <div className="rounded-xl border border-border bg-card p-4 space-y-4">
-          <div>
-            <h3 className="font-medium flex items-center gap-2">
-              <Upload className="h-4 w-4 text-indigo-500" />
-              {texts.importTitle}
-            </h3>
-            <p className="text-sm text-muted-foreground mt-1">{texts.importDesc}</p>
-          </div>
-
-          <div className="space-y-3">
-            <label className="flex items-start gap-3">
-              <Checkbox
-                checked={preserveFolders}
-                onCheckedChange={(checked) => handlePreserveFoldersChange(Boolean(checked))}
-                className="mt-0.5"
-              />
-              <div className="space-y-0.5">
-                <Label>{texts.preserveFolders}</Label>
-                <p className="text-xs text-muted-foreground">{texts.preserveFoldersDesc}</p>
-              </div>
-            </label>
-
-            <label className="flex items-start gap-3">
-              <Checkbox
-                checked={enableAIAnalysis}
-                onCheckedChange={(checked) => handleEnableAIAnalysisChange(Boolean(checked))}
-                className="mt-0.5"
-              />
-              <div className="space-y-0.5">
-                <Label className="flex items-center gap-1.5">
-                  <Sparkles className="h-3.5 w-3.5 text-amber-500" />
-                  {texts.enableAIAnalysis}
-                </Label>
-                <p className="text-xs text-muted-foreground">{texts.enableAIAnalysisDesc}</p>
-              </div>
-            </label>
-
-            <label className="flex items-start gap-3">
-              <Checkbox
-                checked={fetchPageContent}
-                disabled={!enableAIAnalysis}
-                onCheckedChange={(checked) => setFetchPageContent(Boolean(checked))}
-                className="mt-0.5"
-              />
-              <div className="space-y-0.5">
-                <Label className={cn(!enableAIAnalysis && 'text-muted-foreground')}>
-                  {texts.fetchPageContent}
-                </Label>
-                <p className="text-xs text-muted-foreground">{texts.fetchPageContentDesc}</p>
-              </div>
-            </label>
-          </div>
-
-          <div className="grid gap-2 sm:grid-cols-2">
-            <Button
-              variant="outline"
-              className="justify-start gap-2"
-              onClick={() => startImport('file')}
-              disabled={importing}
-            >
-              {importing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
-              {texts.importFile}
-            </Button>
-            <Button
-              variant="outline"
-              className="justify-start gap-2"
-              onClick={() => startImport('browser')}
-              disabled={importing}
-            >
-              {importing ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Globe className="h-4 w-4" />
-              )}
-              {texts.importBrowser}
-            </Button>
-          </div>
-
-          <p className="text-xs text-muted-foreground flex items-center gap-1.5">
-            <FolderTree className="h-3.5 w-3.5" />
-            {texts.browserCount}
-          </p>
-
-          {(importing || result) && (
-            <div className="rounded-lg border border-border bg-muted/30 p-3 space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span>{texts.progress}</span>
-                <span>{progress}%</span>
-              </div>
-              <Progress value={progress} className="h-2" />
-              {importing && <p className="text-xs text-muted-foreground">{texts.importing}</p>}
-            </div>
-          )}
-
-          {result && (
-            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3">
-              <p className="text-sm font-medium flex items-center gap-2 text-emerald-700 dark:text-emerald-300">
-                <CheckCircle2 className="h-4 w-4" />
-                {result.message}
-              </p>
-              <p className="text-xs mt-1 text-emerald-700/80 dark:text-emerald-300/80">{result.details}</p>
-            </div>
-          )}
-        </div>
-      </CardContent>
-    </Card>
+    <ImportExportDemoPanel
+      texts={texts}
+      preserveFolders={preserveFolders}
+      enableAIAnalysis={enableAIAnalysis}
+      fetchPageContent={fetchPageContent}
+      importing={importing}
+      progress={progress}
+      result={result}
+      onPreserveFoldersChange={handlePreserveFoldersChange}
+      onEnableAIAnalysisChange={handleEnableAIAnalysisChange}
+      onFetchPageContentChange={setFetchPageContent}
+      onImportFile={() => startImport('file')}
+      onImportBrowser={() => startImport('browser')}
+    />
   );
 }

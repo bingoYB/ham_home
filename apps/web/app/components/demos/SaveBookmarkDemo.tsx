@@ -10,14 +10,12 @@ import {
   Sparkles,
   ChevronDown,
   Shield,
-  X,
 } from 'lucide-react';
 import {
   Button,
   Input,
   Textarea,
   Label,
-  Badge,
   Card,
   CardContent,
   CardDescription,
@@ -28,6 +26,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@hamhome/ui';
+import { TagInput } from '@hamhome/ui-business/common';
 import type { Category, PageContent } from '@/data/mock-bookmarks';
 
 interface SaveBookmarkDemoProps {
@@ -40,12 +39,13 @@ interface SaveBookmarkDemoProps {
 export function SaveBookmarkDemo({
   pageContent,
   categories,
+  allTags,
   isEn,
 }: SaveBookmarkDemoProps) {
   const [title, setTitle] = useState(pageContent.title);
   const [description, setDescription] = useState(pageContent.excerpt);
   const [selectedCategory] = useState(isEn ? 'AI & Machine Learning' : 'AI 与机器学习');
-  const [tags] = useState(['AI', 'Claude', 'Anthropic']);
+  const [tags, setTags] = useState(['AI', 'Claude', 'Anthropic']);
 
   const texts = {
     saveBookmark: isEn ? 'Save Bookmark' : '保存书签',
@@ -153,37 +153,17 @@ export function SaveBookmarkDemo({
               <TagIcon className="h-4 w-4 text-purple-500" />
               {texts.tagsLabel}
             </Label>
-            <div className="space-y-2">
-              {/* 已添加的标签 */}
-              {tags.length > 0 && (
-                <div className="flex flex-wrap gap-1">
-                  {tags.map((tag) => (
-                    <Badge
-                      key={tag}
-                      variant="secondary"
-                      className="pl-2 pr-1 py-0.5 flex items-center gap-1 cursor-default bg-linear-to-r from-violet-500/90 to-indigo-500/90 dark:from-violet-600/80 dark:to-indigo-600/80 text-white border-0 shadow-sm"
-                    >
-                      <span className="text-xs font-medium">{tag}</span>
-                      <button
-                        type="button"
-                        className="hover:bg-white/20 rounded-full p-0.5 transition-colors"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
-              )}
-              {/* 输入框 */}
-              <Input
-                placeholder={isEn ? 'Type and press Enter to add tags' : '输入标签后按回车'}
-                className="text-sm"
-              />
-              {/* 提示文字 */}
-              <p className="text-xs text-muted-foreground">
-                {tags.length}/10 {isEn ? 'tags' : '个标签'}
-              </p>
-            </div>
+            <TagInput
+              value={tags}
+              onChange={setTags}
+              suggestions={allTags}
+              placeholder={isEn ? 'Type and press Enter to add tags' : '输入标签后按回车'}
+              labels={{
+                maxTags: (count) => (isEn ? `Up to ${count} tags` : `最多 ${count} 个标签`),
+                tagCount: (count, max) => (isEn ? `${count}/${max} tags` : `${count}/${max} 个标签`),
+                removeTag: (tag) => (isEn ? `Remove tag ${tag}` : `删除标签 ${tag}`),
+              }}
+            />
           </div>
 
           {/* 操作按钮 */}

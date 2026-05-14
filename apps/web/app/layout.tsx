@@ -76,7 +76,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="zh-CN" suppressHydrationWarning>
-      <body className="min-h-screen bg-background antialiased">
+      <body className="min-h-screen bg-background antialiased scroll-table-fix">
         {children}
         <Script id="microsoft-clarity" strategy="afterInteractive">
           {`

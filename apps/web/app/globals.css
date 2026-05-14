@@ -1,6 +1,8 @@
 @import "tailwindcss";
 @import "@hamhome/ui/globals.css";
 @source "../../../packages/ui/src/**/*.{js,ts,jsx,tsx}";
+@source "../../../packages/ui-business/src/**/*.{js,ts,jsx,tsx}";
+
 
 /* fix scroll area viewport display issue */
 /* https://github.com/radix-ui/primitives/issues/2964 */

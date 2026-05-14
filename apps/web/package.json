@@ -15,6 +15,7 @@
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "@hamhome/ui": "workspace:*",
+    "@hamhome/ui-business": "workspace:*",
     "@hamhome/types": "workspace:*",
     "@hamhome/utils": "workspace:*",
     "lucide-react": "^0.469.0"

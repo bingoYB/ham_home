@@ -1,233 +1,226 @@
 'use client';
 
 import { useState } from 'react';
+import { GripVertical, MoreHorizontal, Plus } from 'lucide-react';
+import { Button, Card, CardContent, ScrollArea } from '@hamhome/ui';
 import {
-  Bot,
-  BookmarkPlus,
-  RefreshCcw,
-  CheckCircle2,
-  ChevronDown,
-  MonitorDot,
-  MoreHorizontal,
-  Cloud,
-  GripVertical,
-  Edit3,
-  ExternalLink,
-  RotateCcw,
-  Trash2,
-} from 'lucide-react';
-import {
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Badge,
-} from '@hamhome/ui';
+  WorkspaceLabelsProvider,
+  WorkspaceSectionHeader,
+  WorkspaceTabGroupList,
+  WorkspacePageTile,
+  WorkspaceSearchBar,
+  WorkspaceCurrentTabsPanel,
+  type WorkspaceLabels,
+  type WorkspaceData,
+  type WorkspaceTabPageData,
+  type WorkspaceTabGroupData,
+  type WorkspaceRestoreMode,
+} from '@hamhome/ui-business/workspace';
 
 interface WorkspaceDemoProps {
   isEn: boolean;
 }
 
+const WORKSPACE_DEMO_NOW = new Date('2026-05-13T21:48:00+08:00').getTime();
+
 export function WorkspaceDemo({ isEn }: WorkspaceDemoProps) {
-  const [analyzing, setAnalyzing] = useState(false);
-  const [analyzed, setAnalyzed] = useState(false);
+  const [expandedStates, setExpandedStates] = useState<Record<string, boolean>>({
+    'demo-ws': true,
+    'ai-ws': true,
+  });
 
-  const texts = {
-    title: isEn ? 'Workspace & Tab Groups' : '工作空间与 Tab 分组',
-    description: isEn
-      ? 'Manage browser tabs seamlessly. Save, restore, group by AI, and sync across devices.'
-      : '无缝管理浏览器标签页。支持一键保存恢复、AI 智能分组和多端同步。',
-    activeWorkspace: isEn ? 'Project Research' : '项目调研',
-    tabGroups: isEn ? 'Tab Groups' : '标签分组',
-    aiAnalyzeBtn: isEn ? 'AI Analysis' : 'AI 分析',
-    analyzing: isEn ? 'Analyzing...' : '分析中...',
-    saveAsBookmarkBtn: isEn ? 'Save as Bookmarks' : '转为书签',
-    syncBtn: isEn ? 'Cloud Sync' : '云端同步',
-    group1: isEn ? 'Frontend Frameworks' : '前端框架',
-    group2: isEn ? 'Design Resources' : '设计资源',
-    tabsCount: (count: number) => (isEn ? `${count} tabs` : `${count} 个标签页`),
-    aiInsight: isEn ? 'AI Insight: This workspace focuses on modern frontend tools and UI components.' : 'AI 洞察：此工作区主要关注现代前端工具和 UI 组件库。',
-    restoredNever: isEn ? 'Restored: Never' : '恢复时间：从不',
-    development: isEn ? 'Development' : '开发',
+  const toggleExpanded = (id: string) => {
+    setExpandedStates(prev => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const group1Tabs = [
-    { title: 'React Documentation', url: 'react.dev', domain: 'react.dev', icon: 'R' },
-    { title: 'Next.js Routing', url: 'nextjs.org', domain: 'nextjs.org', icon: 'N' },
-    { title: 'Tailwind CSS Classes', url: 'tailwindcss.com', domain: 'tailwindcss.com', icon: 'T' },
-  ];
-
-  const group2Tabs = [
-    { title: 'Figma UI Kit', url: 'figma.com', domain: 'figma.com', icon: 'F' },
-    { title: 'Dribbble Inspirations', url: 'dribbble.com', domain: 'dribbble.com', icon: 'D' },
-  ];
-
-  const handleAnalyze = () => {
-    setAnalyzing(true);
-    setTimeout(() => {
-      setAnalyzing(false);
-      setAnalyzed(true);
-    }, 1500);
+  const labels: WorkspaceLabels = {
+    pageCount: (count) => (isEn ? `${count} tabs` : `${count} 个标签页`),
+    restoredAt: isEn ? 'Restored' : '恢复时间',
+    neverRestored: isEn ? 'Never' : '从不',
+    editWorkspace: isEn ? 'Edit' : '编辑工作空间',
+    restoreNewWindow: isEn ? 'Open in new window' : '新窗口恢复',
+    restoreCurrentWindow: isEn ? 'Restore' : '当前窗口恢复',
+    deleteWorkspace: isEn ? 'Delete' : '删除工作空间',
+    clickToEdit: isEn ? 'Click to edit' : '点击编辑名称',
+    moreActions: isEn ? 'More actions' : '更多操作',
+    edit: isEn ? 'Edit' : '编辑',
+    openPage: isEn ? 'Open page' : '打开页面',
+    copyUrl: isEn ? 'Copy URL' : '复制链接',
+    saveToBookmark: isEn ? 'Save as bookmark' : '保存为书签',
+    deletePage: isEn ? 'Delete page' : '删除页面',
+    searchPlaceholder: isEn ? 'Search workspaces...' : '搜索工作空间...',
+    allCategories: isEn ? 'All Categories' : '所有分类',
+    uncategorized: isEn ? 'Uncategorized' : '未分类',
+    unknownCategory: isEn ? 'Unknown' : '未知分类',
+    sortManual: isEn ? 'Manual' : '手动排序',
+    sortCreatedAt: isEn ? 'Created At' : '按创建时间',
+    sortRestoredAt: isEn ? 'Last Restored' : '按最近恢复',
+    currentTabs: isEn ? 'Current Tabs' : '当前标签页',
+    saveCurrentWindow: isEn ? 'Save current window' : '保存当前窗口',
+    saveThisWindow: isEn ? 'Save this window' : '保存此窗口',
+    refreshCurrentTabs: isEn ? 'Refresh' : '刷新当前状态',
+    currentTabsLoading: isEn ? 'Loading tabs...' : '正在获取当前标签页...',
+    currentTabsEmpty: isEn ? 'No tabs open' : '当前窗口没有打开的标签页',
+    currentWindowLabel: isEn ? 'Current Window' : '当前窗口',
+    windowLabel: (index) => (isEn ? `Window ${index}` : `窗口 ${index}`),
   };
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [categoryFilter, setCategoryFilter] = useState('__all__');
+  const [sortBy, setSortBy] = useState<'createdAt' | 'restoredAt' | 'manual'>('manual');
+
+  const categories = [
+    { id: 'dev', name: isEn ? 'Development' : '开发', icon: '💻' },
+    { id: 'design', name: isEn ? 'Design' : '设计', icon: '🎨' },
+  ];
+
+  const tabGroups: WorkspaceTabGroupData[] = [
+    { id: 1, title: isEn ? 'Frontend Frameworks' : '前端框架', color: 'blue', windowId: 1 },
+    { id: 2, title: isEn ? 'Design Resources' : '设计资源', color: 'purple', windowId: 1 },
+  ];
+
+  const tabGroups2: WorkspaceTabGroupData[] = [
+    { id: 3, title: isEn ? 'AI Models' : 'AI 模型', color: 'green', windowId: 2 },
+  ];
+
+  const pages: WorkspaceTabPageData[] = [
+    { id: '1', title: 'React Documentation', url: 'https://react.dev', domain: 'react.dev', favicon: '', index: 0, tabGroupId: 1, windowId: 1 },
+    { id: '2', title: 'Next.js Routing', url: 'https://nextjs.org', domain: 'nextjs.org', favicon: '', index: 1, tabGroupId: 1, windowId: 1 },
+    { id: '3', title: 'Tailwind CSS Classes', url: 'https://tailwindcss.com', domain: 'tailwindcss.com', favicon: '', index: 2, tabGroupId: 1, windowId: 1 },
+    { id: '4', title: 'Figma UI Kit', url: 'https://figma.com', domain: 'figma.com', favicon: '', index: 3, tabGroupId: 2, windowId: 1 },
+    { id: '5', title: 'Dribbble Inspirations', url: 'https://dribbble.com', domain: 'dribbble.com', favicon: '', index: 4, tabGroupId: 2, windowId: 1 },
+  ];
+
+  const pages2: WorkspaceTabPageData[] = [
+    { id: 'a1', title: 'ChatGPT', url: 'https://chat.openai.com', domain: 'openai.com', favicon: '', index: 0, tabGroupId: 3, windowId: 2 },
+    { id: 'a2', title: 'Claude AI', url: 'https://claude.ai', domain: 'claude.ai', favicon: '', index: 1, tabGroupId: 3, windowId: 2 },
+    { id: 'a3', title: 'Midjourney Showcase', url: 'https://midjourney.com', domain: 'midjourney.com', favicon: '', index: 2, windowId: 2 },
+  ];
+
+  const workspaces: WorkspaceData[] = [
+    {
+      id: 'demo-ws',
+      name: isEn ? 'Project Research' : '项目调研',
+      description: '',
+      categoryId: 'dev',
+      tags: [],
+      pages,
+      tabGroups,
+      isRestored: false,
+      createdAt: WORKSPACE_DEMO_NOW - 86400000,
+      updatedAt: WORKSPACE_DEMO_NOW - 86400000,
+    },
+    {
+      id: 'ai-ws',
+      name: isEn ? 'AI Learning' : 'AI 学习',
+      description: '',
+      categoryId: 'dev',
+      tags: [],
+      pages: pages2,
+      tabGroups: tabGroups2,
+      isRestored: true,
+      restoredAt: WORKSPACE_DEMO_NOW - 3600000,
+      createdAt: WORKSPACE_DEMO_NOW - 172800000,
+      updatedAt: WORKSPACE_DEMO_NOW - 3600000,
+    }
+  ];
+
+  const currentWindowPreview = {
+    pages: [
+      { id: 'c1', title: 'HamHome - Smart Bookmark', url: 'https://hamhome.com', domain: 'hamhome.com', index: 0, windowId: 1 },
+      { id: 'c2', title: 'Google Search', url: 'https://google.com', domain: 'google.com', index: 1, windowId: 1 },
+    ],
+    tabGroups: [],
+    currentWindowId: 1,
+  };
+
+  const noop = () => {};
+
+  const renderPage = (page: WorkspaceTabPageData) => (
+    <WorkspacePageTile
+      page={page}
+      dragHandle={
+        <div className="relative z-10 shrink-0 touch-none cursor-grab">
+          <GripVertical className="h-4 w-4 text-muted-foreground" />
+        </div>
+      }
+      actions={
+        <Button size="icon" variant="ghost" className="h-8 w-8 rounded-md">
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      }
+    />
+  );
 
   return (
-    <Card className="w-full">
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <div>
-            <CardTitle className="flex items-center gap-2">
-              <MonitorDot className="h-5 w-5 text-primary" />
-              {texts.title}
-            </CardTitle>
-            <CardDescription className="mt-1">{texts.description}</CardDescription>
-          </div>
-          <div className="hidden sm:flex items-center gap-2">
-            <Button variant="outline" size="sm" className="gap-2">
-              <Cloud className="h-4 w-4" />
-              {texts.syncBtn}
-            </Button>
-            <Button variant="outline" size="sm" className="gap-2">
-              <BookmarkPlus className="h-4 w-4" />
-              {texts.saveAsBookmarkBtn}
-            </Button>
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-6">
-        {/* Mock Workspace Section */}
-        <div className="border rounded-lg bg-background overflow-hidden shadow-sm">
-          {/* Section Header */}
-          <div className="flex items-center gap-2 px-4 pl-3 py-3 bg-muted/20 border-b">
-            <div className="shrink-0 touch-none mr-1 cursor-grab">
-              <GripVertical className="h-4 w-4 text-muted-foreground" />
-            </div>
-            <div className="min-w-0 flex-1 text-left cursor-pointer">
-              <span className="flex min-w-0 items-center gap-2">
-                <span className="truncate text-base font-semibold cursor-text hover:underline">
-                  {texts.activeWorkspace}
-                </span>
-                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
-              </span>
-              <div className="mt-1 flex items-center flex-wrap gap-x-2 gap-y-1 text-xs text-muted-foreground">
-                <span>{new Date().toLocaleDateString()}</span>
-                <span>·</span>
-                <Badge variant="secondary" className="px-1.5 py-0 h-4 text-[10px] font-normal gap-1 bg-blue-500/10 text-blue-500 hover:bg-blue-500/20">
-                  <span className="text-[12px]">💻</span>
-                  {texts.development}
-                </Badge>
-                <span>·</span>
-                <span>{texts.tabsCount(5)}</span>
-                <span>·</span>
-                <span>{texts.restoredNever}</span>
-              </div>
-            </div>
-            <div className="hidden sm:flex shrink-0 items-center gap-1">
-              <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
-                <Edit3 className="h-4 w-4" />
-              </Button>
-              <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
-                <ExternalLink className="h-4 w-4" />
-              </Button>
-              <Button size="sm" variant="ghost" className="h-8 w-8 p-0">
-                <RotateCcw className="h-4 w-4" />
-              </Button>
-              <Button size="sm" variant="ghost" className="h-8 w-8 p-0 text-destructive hover:text-destructive">
-                <Trash2 className="h-4 w-4" />
-              </Button>
-            </div>
-          </div>
-
-          {/* Section Content */}
-          <div className="px-4 sm:px-8 pb-8 pt-4">
+    <WorkspaceLabelsProvider labels={labels}>
+      <Card className="w-full overflow-hidden border-none shadow-none bg-transparent">
+        <CardContent className="p-0">
+          <div className="flex h-[600px] min-h-0 flex-col bg-background xl:flex-row border rounded-xl overflow-hidden shadow-2xl">
+            <section className="flex min-w-0 flex-1 flex-col">
+              <header className="flex min-h-16 flex-wrap items-center gap-3 border-b px-4 py-3 bg-muted/5">
+                <div className="min-w-0 flex-1">
+                  <WorkspaceSearchBar
+                    searchQuery={searchQuery}
+                    categoryFilter={categoryFilter}
+                    sortBy={sortBy}
+                    categories={categories}
+                    onSearchChange={setSearchQuery}
+                    onCategoryFilterChange={setCategoryFilter}
+                    onSortByChange={setSortBy}
+                  />
+                </div>
+                <Button size="sm" onClick={noop} className="shrink-0">
+                  <Plus className="mr-2 h-4 w-4" />
+                  {labels.saveCurrentWindow}
+                </Button>
+              </header>
+              <ScrollArea className="min-h-0 flex-1">
+                <div className="p-4 space-y-6">
+                  {workspaces.map(ws => (
+                    <div key={ws.id} className="border rounded-lg bg-background overflow-hidden shadow-sm">
+                      <WorkspaceSectionHeader
+                        workspace={ws}
+                        categoryName={isEn ? 'Development' : '开发'}
+                        categoryIcon="💻"
+                        onEdit={noop as any}
+                        onRestore={noop as any}
+                        onDelete={noop as any}
+                        expanded={expandedStates[ws.id]}
+                        onToggle={() => toggleExpanded(ws.id)}
+                        dragHandle={
+                          <div className="shrink-0 touch-none mr-1 cursor-grab">
+                            <GripVertical className="h-4 w-4 text-muted-foreground" />
+                          </div>
+                        }
+                      />
+                      {expandedStates[ws.id] && (
+                        <div className="px-8 pb-8 pt-4">
+                          <WorkspaceTabGroupList
+                            pages={ws.pages}
+                            tabGroups={ws.tabGroups}
+                            grid
+                            renderPage={renderPage}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </section>
             
-            {/* Action Bar inside workspace (for demo purposes) */}
-            <div className="flex justify-between items-center mb-6">
-              <Button 
-                onClick={handleAnalyze} 
-                disabled={analyzing || analyzed}
-                className="gap-2"
-                size="sm"
-              >
-                {analyzing ? (
-                  <RefreshCcw className="h-4 w-4 animate-spin" />
-                ) : analyzed ? (
-                  <CheckCircle2 className="h-4 w-4" />
-                ) : (
-                  <Bot className="h-4 w-4" />
-                )}
-                {analyzing ? texts.analyzing : texts.aiAnalyzeBtn}
-              </Button>
-            </div>
-
-            {analyzed && (
-              <div className="mb-6 p-4 rounded-xl bg-primary/5 border border-primary/20 text-sm flex items-start gap-3 animate-in fade-in slide-in-from-top-2">
-                <Bot className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                <p className="text-foreground leading-relaxed">{texts.aiInsight}</p>
-              </div>
-            )}
-
-            <div className="space-y-6">
-              {/* Group 1 */}
-              <div>
-                <div className="flex min-h-9 min-w-0 items-center gap-2 border-b px-1 py-1 mb-3">
-                  <span className="h-3 w-3 shrink-0 rounded-full bg-blue-500" />
-                  <span className="min-w-0 flex-1 truncate text-sm font-semibold">{texts.group1}</span>
-                  <span className="shrink-0 text-xs text-muted-foreground">3</span>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {group1Tabs.map((tab, i) => (
-                    <div key={i} className="group relative flex min-h-14 w-full items-center gap-4 rounded-[12px] border bg-card p-3 text-left transition-all hover:border-primary/40 hover:shadow-md hover:bg-accent/5">
-                      <div className="relative z-10 shrink-0 touch-none cursor-grab">
-                        <GripVertical className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                      <div className="relative z-10 pointer-events-none shrink-0 h-7 w-7 rounded bg-muted flex items-center justify-center font-bold text-muted-foreground text-xs">
-                        {tab.icon}
-                      </div>
-                      <span className="relative z-10 min-w-0 flex-1 pointer-events-none">
-                        <span className="block truncate text-sm font-medium leading-snug">{tab.title}</span>
-                        <span className="block truncate text-xs text-muted-foreground">{tab.domain}</span>
-                      </span>
-                      <div className="relative z-10 shrink-0 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
-                        <Button size="icon" variant="ghost" className="h-8 w-8 rounded-md"><MoreHorizontal className="h-4 w-4" /></Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-
-              {/* Group 2 */}
-              <div>
-                <div className="flex min-h-9 min-w-0 items-center gap-2 border-b px-1 py-1 mb-3">
-                  <span className="h-3 w-3 shrink-0 rounded-full bg-purple-500" />
-                  <span className="min-w-0 flex-1 truncate text-sm font-semibold">{texts.group2}</span>
-                  <span className="shrink-0 text-xs text-muted-foreground">2</span>
-                </div>
-                <div className="grid gap-3 sm:grid-cols-2">
-                  {group2Tabs.map((tab, i) => (
-                    <div key={i} className="group relative flex min-h-14 w-full items-center gap-4 rounded-[12px] border bg-card p-3 text-left transition-all hover:border-primary/40 hover:shadow-md hover:bg-accent/5">
-                      <div className="relative z-10 shrink-0 touch-none cursor-grab">
-                        <GripVertical className="h-4 w-4 text-muted-foreground" />
-                      </div>
-                      <div className="relative z-10 pointer-events-none shrink-0 h-7 w-7 rounded bg-muted flex items-center justify-center font-bold text-muted-foreground text-xs">
-                        {tab.icon}
-                      </div>
-                      <span className="relative z-10 min-w-0 flex-1 pointer-events-none">
-                        <span className="block truncate text-sm font-medium leading-snug">{tab.title}</span>
-                        <span className="block truncate text-xs text-muted-foreground">{tab.domain}</span>
-                      </span>
-                      <div className="relative z-10 shrink-0 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
-                        <Button size="icon" variant="ghost" className="h-8 w-8 rounded-md"><MoreHorizontal className="h-4 w-4" /></Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+            <WorkspaceCurrentTabsPanel
+              preview={currentWindowPreview}
+              loading={false}
+              onRefresh={noop}
+              onSaveCurrentWindow={noop}
+              renderPage={renderPage}
+              className="xl:w-80"
+            />
           </div>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </WorkspaceLabelsProvider>
   );
 }

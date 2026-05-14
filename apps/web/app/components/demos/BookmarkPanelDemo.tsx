@@ -1,17 +1,11 @@
 'use client';
 
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Search,
   Bookmark as BookmarkIcon,
   Tag as TagIcon,
   Filter,
-  ChevronRight,
-  ChevronDown,
-  Folder,
-  FolderOpen,
-  ExternalLink,
-  Link2,
   LayoutGrid,
   Settings,
   X,
@@ -19,13 +13,9 @@ import {
 import {
   Button,
   Input,
-  HoverCard,
-  HoverCardContent,
-  HoverCardTrigger,
-  ScrollArea,
   cn,
-  buttonVariants,
 } from '@hamhome/ui';
+import { BookmarkCategoryTreeView } from '@hamhome/ui-business/bookmark-panel';
 import type { Bookmark, Category } from '@/data/mock-bookmarks';
 import { AIChatSearchDemo } from './AIChatSearchDemo';
 
@@ -34,114 +24,6 @@ interface BookmarkPanelDemoProps {
   categories: Category[];
   allTags: string[];
   isEn: boolean;
-}
-
-// 书签列表项 - 与 extension 的 BookmarkListItem 一致
-function PanelBookmarkItem({ bookmark }: { bookmark: Bookmark }) {
-  return (
-    <HoverCard openDelay={300} closeDelay={100}>
-      <HoverCardTrigger asChild>
-        <a
-          href={bookmark.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className={cn(
-            buttonVariants({ variant: 'outline', size: 'default' }),
-            'group flex items-center gap-3 px-3 py-2.5 w-full justify-start border-0 shadow-none overflow-hidden'
-          )}
-        >
-          {/* Favicon */}
-          <div className="w-8 h-8 rounded-md flex items-center justify-center shrink-0">
-            {bookmark.favicon ? (
-              <img src={bookmark.favicon} alt="" className="w-5 h-5 rounded" />
-            ) : (
-              <Link2 className="h-4 w-4 text-muted-foreground" />
-            )}
-          </div>
-
-          {/* 标题 */}
-          <div className="flex-1 min-w-0 overflow-hidden">
-            <h4 className="text-sm font-medium truncate leading-tight">{bookmark.title}</h4>
-          </div>
-
-          {/* 打开图标 */}
-          <ExternalLink className="h-4 w-4 opacity-0 group-hover:opacity-100 transition-opacity shrink-0 text-muted-foreground" />
-        </a>
-      </HoverCardTrigger>
-      <HoverCardContent side="right" align="start" sideOffset={4} className="w-64 max-w-xs z-50">
-        <div className="space-y-1">
-          <div className="font-medium text-sm truncate">{bookmark.title}</div>
-          {bookmark.description && (
-            <div className="text-xs text-muted-foreground line-clamp-2">{bookmark.description}</div>
-          )}
-          <div className="text-xs text-muted-foreground truncate">{bookmark.url}</div>
-        </div>
-      </HoverCardContent>
-    </HoverCard>
-  );
-}
-
-// 分类树节点 - 与 extension 的 CategoryTreeNode 一致
-function CategoryNode({
-  category,
-  bookmarks,
-  level,
-  isExpanded,
-  onToggle,
-  isEn,
-}: {
-  category: Category | null;
-  bookmarks: Bookmark[];
-  level: number;
-  isExpanded: boolean;
-  onToggle: () => void;
-  isEn: boolean;
-}) {
-  const nodeName = category?.name || (isEn ? 'Uncategorized' : '未分类');
-  const hasBookmarks = bookmarks.length > 0;
-
-  if (!hasBookmarks) return null;
-
-  return (
-    <div className="overflow-hidden">
-      {/* 分类头部 */}
-      <Button
-        variant="outline"
-        onClick={onToggle}
-        className="border-0 w-full justify-start shadow-none overflow-hidden"
-        style={{ paddingLeft: `${level * 16 + 8}px` }}
-      >
-        {/* 展开/折叠图标 */}
-        {isExpanded ? (
-          <ChevronDown className="h-4 w-4 shrink-0" />
-        ) : (
-          <ChevronRight className="h-4 w-4 shrink-0" />
-        )}
-
-        {/* 文件夹图标 */}
-        {isExpanded ? (
-          <FolderOpen className="h-4 w-4 shrink-0" />
-        ) : (
-          <Folder className="h-4 w-4 shrink-0" />
-        )}
-
-        {/* 分类名称 */}
-        <span className="flex-1 min-w-0 text-sm font-medium truncate text-left">{nodeName}</span>
-
-        {/* 计数 */}
-        <span className="text-xs shrink-0 text-muted-foreground">{bookmarks.length}</span>
-      </Button>
-
-      {/* 展开的书签列表 */}
-      {isExpanded && (
-        <div className="overflow-hidden" style={{ paddingLeft: `${(level + 1) * 16 + 8}px` }}>
-          {bookmarks.map((bookmark) => (
-            <PanelBookmarkItem key={bookmark.id} bookmark={bookmark} />
-          ))}
-        </div>
-      )}
-    </div>
-  );
 }
 
 // 模拟网页内容 - 作为底部背景
@@ -204,9 +86,6 @@ export function BookmarkPanelDemo({
   isEn,
 }: BookmarkPanelDemoProps) {
   const [isOpen, setIsOpen] = useState(false);
-  const [expandedIds, setExpandedIds] = useState<Set<string>>(
-    () => new Set(categories.filter((c) => !c.parentId).map((c) => c.id))
-  );
   const [hasTagFilter] = useState(false);
   const [hasFilter] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -223,34 +102,6 @@ export function BookmarkPanelDemo({
     const timer = setTimeout(() => setIsOpen(true), 800);
     return () => clearTimeout(timer);
   }, []);
-
-  // 按分类分组书签
-  const bookmarksByCategory = useMemo(() => {
-    const map = new Map<string | null, Bookmark[]>();
-    bookmarks.forEach((b) => {
-      const catId = b.categoryId;
-      if (!map.has(catId)) {
-        map.set(catId, []);
-      }
-      map.get(catId)!.push(b);
-    });
-    return map;
-  }, [bookmarks]);
-
-  const toggleExpand = (id: string) => {
-    setExpandedIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-      }
-      return next;
-    });
-  };
-
-  // 顶层分类
-  const rootCategories = categories.filter((c) => !c.parentId);
 
   return (
     <div className="space-y-4">
@@ -346,33 +197,12 @@ export function BookmarkPanelDemo({
             </div>
           </div>
 
-          {/* 分类树视图 - 与 extension CategoryTreeView 一致 */}
-          <ScrollArea className="flex-1 min-h-0 scroll-table-fix pb-8">
-            <div className="p-2 overflow-hidden">
-              {rootCategories.map((cat) => (
-                <CategoryNode
-                  key={cat.id}
-                  category={cat}
-                  bookmarks={bookmarksByCategory.get(cat.id) || []}
-                  level={0}
-                  isExpanded={expandedIds.has(cat.id)}
-                  onToggle={() => toggleExpand(cat.id)}
-                  isEn={isEn}
-                />
-              ))}
-              {/* 未分类 */}
-              {bookmarksByCategory.get(null) && (
-                <CategoryNode
-                  category={null}
-                  bookmarks={bookmarksByCategory.get(null) || []}
-                  level={0}
-                  isExpanded={expandedIds.has('uncategorized')}
-                  onToggle={() => toggleExpand('uncategorized')}
-                  isEn={isEn}
-                />
-              )}
-            </div>
-          </ScrollArea>
+          <BookmarkCategoryTreeView
+            bookmarks={bookmarks}
+            categories={categories}
+            uncategorizedLabel={isEn ? 'Uncategorized' : '未分类'}
+            className="flex-1 min-h-0 scroll-table-fix pb-8"
+          />
 
           <AIChatSearchDemo bookmarks={bookmarks} isEn={isEn} className="px-2 w-full" />
         </div>

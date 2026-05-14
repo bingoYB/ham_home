@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
   Search,
   LayoutGrid,
@@ -10,7 +10,6 @@ import {
   Filter,
   X,
   Folder,
-  Bookmark as BookmarkIcon,
 } from 'lucide-react';
 import {
   Badge,
@@ -21,9 +20,12 @@ import {
   CardHeader,
   CardTitle,
   Input,
-  Checkbox,
 } from '@hamhome/ui';
-import { BookmarkCardDemo } from './BookmarkCardDemo';
+import {
+  BookmarkCard,
+  BookmarkListItem,
+  type BookmarkLabelResolver,
+} from '@hamhome/ui-business/bookmark';
 import { AIChatSearchDemo } from './AIChatSearchDemo';
 import type { Bookmark, Category } from '@/data/mock-bookmarks';
 import { getCategoryName, formatRelativeDate } from '@/data/mock-bookmarks';
@@ -35,69 +37,41 @@ interface BookmarkListMngDemoProps {
   isEn: boolean;
 }
 
-// 书签列表项组件
-function BookmarkListItemDemo({
+const noop = () => {};
+
+function getBookmarkPreviewMeta({
   bookmark,
   categories,
   isEn,
-  isSelected,
 }: {
   bookmark: Bookmark;
   categories: Category[];
   isEn: boolean;
-  isSelected: boolean;
 }) {
-  const categoryName = getCategoryName(bookmark.categoryId, categories, isEn);
-  const formattedDate = formatRelativeDate(bookmark.createdAt, isEn);
-  const hostname = new URL(bookmark.url).hostname;
+  return {
+    categoryName: getCategoryName(bookmark.categoryId, categories, isEn),
+    formattedDate: formatRelativeDate(bookmark.createdAt, isEn),
+  };
+}
 
-  return (
-    <div
-      className={`group flex items-center gap-4 p-4 rounded-xl border transition-shadow hover:shadow-md ${
-        isSelected ? 'border-primary bg-primary/5' : 'border-border bg-card hover:bg-muted/50'
-      }`}
-    >
-      {/* 选择框 */}
-      <div className="shrink-0">
-        <Checkbox checked={isSelected} />
-      </div>
+function createBookmarkLabels(isEn: boolean): BookmarkLabelResolver {
+  const labels: Record<string, string> = {
+    'bookmark:bookmark.open': isEn ? 'Open' : '打开',
+    'bookmark:bookmark.edit': isEn ? 'Edit' : '编辑',
+    'bookmark:bookmark.copyLink': isEn ? 'Copy Link' : '复制链接',
+    'bookmark:bookmark.share': isEn ? 'Share' : '分享',
+    'bookmark:bookmark.pin': isEn ? 'Pin' : '置顶',
+    'bookmark:bookmark.unpin': isEn ? 'Unpin' : '取消置顶',
+    'bookmark:bookmark.viewSnapshot': isEn ? 'View Snapshot' : '查看快照',
+    'bookmark:bookmark.snapshot.save': isEn ? 'Save Snapshot' : '保存快照',
+    'bookmark:bookmark.snapshot.update': isEn ? 'Update Snapshot' : '更新快照',
+    'bookmark:bookmark.snapshot.delete': isEn ? 'Delete Snapshot' : '删除快照',
+    'bookmark:bookmark.snapshot.syncToObsidian': isEn ? 'Sync to Obsidian' : '同步到 Obsidian',
+    'bookmark:bookmark.delete': isEn ? 'Delete' : '删除',
+    'ai:reanalyze': isEn ? 'Reanalyze' : '重新分析',
+  };
 
-      {/* 图标 */}
-      <div className="w-10 h-10 rounded-lg bg-muted flex items-center justify-center shrink-0">
-        {bookmark.favicon ? (
-          <img src={bookmark.favicon} alt="" className="w-5 h-5 rounded" />
-        ) : (
-          <BookmarkIcon className="h-5 w-5 text-muted-foreground" />
-        )}
-      </div>
-
-      {/* 内容 */}
-      <div className="flex-1 min-w-0">
-        <h3 className="font-medium text-foreground truncate">{bookmark.title}</h3>
-        {bookmark.description && (
-          <p className="text-xs text-muted-foreground truncate mt-1">{bookmark.description}</p>
-        )}
-        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-          <span className="truncate max-w-[200px]">{hostname}</span>
-          <span className="shrink-0">•</span>
-          <span className="shrink-0">{categoryName}</span>
-          <span className="shrink-0">•</span>
-          <span className="shrink-0">{formattedDate}</span>
-        </div>
-      </div>
-
-      {/* 标签 */}
-      {bookmark.tags.length > 0 && (
-        <div className="hidden lg:flex flex-wrap items-center gap-1.5 max-w-[240px]">
-          {bookmark.tags.slice(0, 3).map((tag) => (
-            <Badge key={tag} variant="secondary" className="text-xs">
-              {tag}
-            </Badge>
-          ))}
-        </div>
-      )}
-    </div>
-  );
+  return (key) => labels[key] ?? key;
 }
 
 export function BookmarkListMngDemo({
@@ -109,6 +83,7 @@ export function BookmarkListMngDemo({
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [selectedTags, setSelectedTags] = useState<string[]>([isEn ? 'React' : 'React']);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set(['bk-1']));
+  const bookmarkLabels = useMemo(() => createBookmarkLabels(isEn), [isEn]);
 
   const texts = {
     title: isEn ? 'Bookmark Management' : '书签管理',
@@ -130,6 +105,68 @@ export function BookmarkListMngDemo({
   const toggleTag = (tag: string) => {
     setSelectedTags((prev) =>
       prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]
+    );
+  };
+
+  const toggleBookmark = (bookmarkId: string) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(bookmarkId)) {
+        next.delete(bookmarkId);
+      } else {
+        next.add(bookmarkId);
+      }
+      return next;
+    });
+  };
+
+  const openBookmark = (url: string) => {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
+  const renderBookmarkCard = (bookmark: Bookmark) => {
+    const { categoryName, formattedDate } = getBookmarkPreviewMeta({
+      bookmark,
+      categories,
+      isEn,
+    });
+
+    return (
+      <BookmarkCard
+        key={bookmark.id}
+        bookmark={bookmark}
+        categoryName={categoryName}
+        formattedDate={formattedDate}
+        isSelected={selectedIds.has(bookmark.id)}
+        onToggleSelect={() => toggleBookmark(bookmark.id)}
+        onOpen={() => openBookmark(bookmark.url)}
+        onEdit={noop}
+        onDelete={noop}
+        t={bookmarkLabels}
+      />
+    );
+  };
+
+  const renderBookmarkListItem = (bookmark: Bookmark) => {
+    const { categoryName, formattedDate } = getBookmarkPreviewMeta({
+      bookmark,
+      categories,
+      isEn,
+    });
+
+    return (
+      <BookmarkListItem
+        key={bookmark.id}
+        bookmark={bookmark}
+        categoryName={categoryName}
+        formattedDate={formattedDate}
+        isSelected={selectedIds.has(bookmark.id)}
+        onToggleSelect={() => toggleBookmark(bookmark.id)}
+        onOpen={() => openBookmark(bookmark.url)}
+        onEdit={noop}
+        onDelete={noop}
+        t={bookmarkLabels}
+      />
     );
   };
 
@@ -256,26 +293,11 @@ export function BookmarkListMngDemo({
         {/* 书签列表 */}
         {viewMode === 'grid' ? (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {bookmarks.slice(0, 6).map((bookmark) => (
-              <BookmarkCardDemo
-                key={bookmark.id}
-                bookmark={bookmark}
-                categories={categories}
-                isEn={isEn}
-              />
-            ))}
+            {bookmarks.slice(0, 6).map(renderBookmarkCard)}
           </div>
         ) : (
           <div className="space-y-2">
-            {bookmarks.slice(0, 5).map((bookmark) => (
-              <BookmarkListItemDemo
-                key={bookmark.id}
-                bookmark={bookmark}
-                categories={categories}
-                isEn={isEn}
-                isSelected={selectedIds.has(bookmark.id)}
-              />
-            ))}
+            {bookmarks.slice(0, 5).map(renderBookmarkListItem)}
           </div>
         )}
 

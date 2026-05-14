@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Sparkles, ChevronDown, Check, Loader2, Download, Folder } from 'lucide-react';
+import { Sparkles, Check, Loader2, Download } from 'lucide-react';
 import {
   Button,
   Card,
@@ -16,6 +16,7 @@ import {
   TabsTrigger,
   TabsContent,
 } from '@hamhome/ui';
+import { CategoryPreviewTree } from '@hamhome/ui-business/category';
 
 interface AIFeatureDemoProps {
   isEn: boolean;
@@ -209,68 +210,6 @@ interface AIGeneratedCategory {
   children?: AIGeneratedCategory[];
 }
 
-// 预设分类树形展示
-function PresetCategoryTree({
-  categories,
-  level = 0,
-}: {
-  categories: HierarchicalCategory[];
-  level?: number;
-}) {
-  return (
-    <div className={level > 0 ? 'ml-4 border-l border-muted-foreground/20 pl-3' : ''}>
-      {categories.map((cat) => {
-        const hasChildren = cat.children && cat.children.length > 0;
-
-        return (
-          <div key={cat.id} className="py-1">
-            <div className="flex items-center gap-2 text-sm">
-              {hasChildren ? (
-                <ChevronDown className="h-3 w-3 text-muted-foreground" />
-              ) : (
-                <div className="w-3" />
-              )}
-              <span className="text-base">{cat.icon}</span>
-              <span className={level === 0 ? 'font-medium' : ''}>{cat.name}</span>
-            </div>
-            {hasChildren && <PresetCategoryTree categories={cat.children!} level={level + 1} />}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
-
-// AI 生成分类预览
-function AIGeneratedCategoryTree({
-  categories,
-  level = 0,
-}: {
-  categories: AIGeneratedCategory[];
-  level?: number;
-}) {
-  return (
-    <div className={level > 0 ? 'ml-4 border-l border-muted-foreground/20 pl-3' : ''}>
-      {categories.map((cat, index) => (
-        <div key={index} className="py-1">
-          <div className="flex items-center gap-2 text-sm">
-            {cat.children && cat.children.length > 0 ? (
-              <ChevronDown className="h-3 w-3 text-muted-foreground" />
-            ) : (
-              <div className="w-3" />
-            )}
-            <Folder className="h-3.5 w-3.5 text-amber-500" />
-            <span className={level === 0 ? 'font-medium' : ''}>{cat.name}</span>
-          </div>
-          {cat.children && cat.children.length > 0 && (
-            <AIGeneratedCategoryTree categories={cat.children} level={level + 1} />
-          )}
-        </div>
-      ))}
-    </div>
-  );
-}
-
 // Demo 数据
 const AI_DEMO_CATEGORIES: AIGeneratedCategory[] = [
   {
@@ -395,7 +334,7 @@ export function CategoriesDemo({ isEn }: AIFeatureDemoProps) {
               <CardContent className="flex-1 pt-0">
                 <ScrollArea className="h-[320px] bg-muted/30 rounded-lg">
                   <div className="p-3">
-                    <PresetCategoryTree categories={presetCategoriesGeneral} />
+                    <CategoryPreviewTree categories={presetCategoriesGeneral} />
                   </div>
                 </ScrollArea>
               </CardContent>
@@ -419,7 +358,7 @@ export function CategoriesDemo({ isEn }: AIFeatureDemoProps) {
               <CardContent className="flex-1 pt-0">
                 <ScrollArea className="h-[320px] bg-muted/30 rounded-lg">
                   <div className="p-3">
-                    <PresetCategoryTree categories={presetCategoriesProfessional} />
+                    <CategoryPreviewTree categories={presetCategoriesProfessional} />
                   </div>
                 </ScrollArea>
               </CardContent>
@@ -470,7 +409,7 @@ export function CategoriesDemo({ isEn }: AIFeatureDemoProps) {
             <div className="space-y-3">
               <label className="text-sm font-medium">{texts.aiRecommended}</label>
               <div className="p-4 bg-muted/50 rounded-lg">
-                <AIGeneratedCategoryTree categories={aiGeneratedCategories} />
+                <CategoryPreviewTree categories={aiGeneratedCategories} generated />
               </div>
               <Button className="w-full" size="sm">
                 <Check className="h-4 w-4 mr-2" />
