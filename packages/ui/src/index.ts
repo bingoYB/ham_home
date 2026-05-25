@@ -32,6 +32,7 @@ export * from "./components/breadcrumb";
 export { default as Masonry } from "./components/masonry";
 export type { MasonryRef } from "./components/masonry";
 export { Toaster, toast } from "./components/sonner";
+export * from "./components/carousel";
 
 // Hooks 导出
 export { useDebounce } from "./hooks/useDebounce";

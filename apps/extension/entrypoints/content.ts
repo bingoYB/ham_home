@@ -276,10 +276,10 @@ export default defineContentScript({
   matches: ["<all_urls>"],
   cssInjectionMode: "ui",
   async main(ctx) {
-    registerSingleFileTestHelpers();
+    // registerSingleFileTestHelpers();
 
     // 动态导入 React 组件
-    const { mountContentUI } = await import("@/lib/contentUi/index");
+    const { mountContentUI } = await import("@/components/contentUi/index");
 
     // 创建 Shadow Root UI
     const ui = await createShadowRootUi(ctx, {

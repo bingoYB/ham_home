@@ -30,6 +30,27 @@ export interface ChromeBookmarkNode {
   parentId?: string;
 }
 
+const BOOKMARK_BAR_IDS = new Set(['1', 'toolbar_____']);
+
+function resolveBookmarkTreeNodes(tree: ChromeBookmarkNode[]): {
+  rootNode: ChromeBookmarkNode;
+  bookmarkBarNode: ChromeBookmarkNode;
+} {
+  const [rootNode] = tree;
+  if (!rootNode) {
+    throw new Error('bookmark tree root not found');
+  }
+
+  const bookmarkBarNode = rootNode.children?.find((node) =>
+    BOOKMARK_BAR_IDS.has(node.id)
+  );
+  if (!bookmarkBarNode) {
+    throw new Error('bookmark bar node not found');
+  }
+
+  return { rootNode, bookmarkBarNode };
+}
+
 export function useChromeBookmarks() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -156,7 +177,10 @@ ${buildDL(nodes)}
       } = params;
 
       const ROOT_FOLDER_TITLE = 'HamHome';
-      const BAR_ID = '1'; // 书签栏节点 ID（Chrome/Edge/Firefox 均为 '1'）
+      const tree = await browser.bookmarks.getTree();
+      const { rootNode, bookmarkBarNode } = resolveBookmarkTreeNodes(tree);
+      const rootNodeId = rootNode.id;
+      const bookmarkBarNodeId = bookmarkBarNode.id;
 
       // ── 递归删除文件夹下所有子项 ─────────────────────────────
       const removeSubtree = async (nodeId: string): Promise<void> => {
@@ -167,7 +191,7 @@ ${buildDL(nodes)}
       };
 
       // ── 解析书签栏直接子项 ────────────────────────────────────
-      const barChildren = await browser.bookmarks.getChildren(BAR_ID);
+      const barChildren = await browser.bookmarks.getChildren(bookmarkBarNodeId);
 
       // ── 确定写入的"根节点" ────────────────────────────────────
       let rootId: string;
@@ -184,7 +208,7 @@ ${buildDL(nodes)}
           }
         } else {
           hamHomeFolder = await browser.bookmarks.create({
-            parentId: BAR_ID,
+            parentId: bookmarkBarNodeId,
             title: ROOT_FOLDER_TITLE,
           });
         }
@@ -202,7 +226,7 @@ ${buildDL(nodes)}
             }
           }
         }
-        rootId = BAR_ID;
+        rootId = bookmarkBarNodeId;
       }
 
       // ── 收集去重 URL 集合 ──────────────────────────────────────
@@ -226,8 +250,8 @@ ${buildDL(nodes)}
         // 清空模式：目标文件夹已清空，从空集开始
         existingUrls = new Set<string>();
       } else if (skipGlobalDuplicates) {
-        // 全局去重：从整棵书签树（根节点 '0'）收集所有 URL
-        existingUrls = await collectExistingUrls('0');
+        // 全局去重：从当前浏览器返回的真实根节点收集所有 URL
+        existingUrls = await collectExistingUrls(rootNodeId);
       } else {
         // 局部去重：只检查目标文件夹内
         existingUrls = await collectExistingUrls(rootId);

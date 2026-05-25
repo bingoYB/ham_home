@@ -55,7 +55,7 @@ import type { AppSidebarNavItem, AppSidebarBrand } from "@hamhome/ui";
 import { BookmarkProvider, useBookmarks } from "@/contexts/BookmarkContext";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useRelativeTime } from "@/hooks/useRelativeTime";
-import { MainContent } from "@/components/MainContent";
+import { BookmarksPage } from "@/components/BookmarksPage";
 import { OptionsPage } from "@/components/OptionsPage";
 import { CategoriesPage } from "@/components/CategoriesPage";
 import { TagsPage } from "@/components/TagsPage";
@@ -473,7 +473,7 @@ function AppContent() {
         return <AboutPage />;
       default:
         return (
-          <MainContent
+          <BookmarksPage
             currentView={currentViewBase}
             onViewChange={handleViewChange}
           />

@@ -71,11 +71,11 @@ export function App() {
 
       {/* 底部状态栏 */}
       <footer className="px-4 py-2 border-t bg-muted/5 text-[12px] text-muted-foreground/60 shrink-0">
-        <div className="grid grid-cols-3 items-center w-full">
-          <div className="flex justify-start">
+        <div className="flex items-center justify-between w-full relative">
+          <div className="flex justify-start whitespace-nowrap z-10">
             <span>{t("bookmark:popup.shortcut")}: {saveShortcut}</span>
           </div>
-          <div className="flex justify-center">
+          <div className="absolute left-1/2 -translate-x-1/2 flex justify-center">
             <a 
               href={APP_WEBSITE_URL} 
               target="_blank" 
@@ -85,7 +85,7 @@ export function App() {
               v{browser.runtime.getManifest().version}
             </a>
           </div>
-          <div className="flex justify-end">
+          <div className="flex justify-end z-10">
             <QuickActions size="sm" showTooltip />
           </div>
         </div>

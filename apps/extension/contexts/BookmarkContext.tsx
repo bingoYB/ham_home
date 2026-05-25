@@ -32,10 +32,11 @@ import { syncConfigStorage } from "@/lib/sync/sync-config-storage";
 import { syncEngine } from "@/lib/sync/sync-engine";
 
 // 存储信息类型
-interface StorageInfo {
+export interface StorageInfo {
   bookmarkCount: number;
   categoryCount: number;
   tagCount: number;
+  workspaceCount: number;
   storageSize: string;
 }
 
@@ -117,6 +118,7 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
     bookmarkCount: 0,
     categoryCount: 0,
     tagCount: 0,
+    workspaceCount: 0,
     storageSize: "0 KB",
   });
   const [loading, setLoading] = useState(true);
@@ -136,8 +138,11 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
       const tags = await bookmarkStorage.getAllTags(data);
       setAllTags(tags);
 
+      // 获取工作空间列表以用于计算
+      const workspaces = await workspaceStorage.getWorkspaces();
+
       // 更新存储信息
-      updateStorageInfo(data, categoriesRef.current);
+      updateStorageInfo(data, categoriesRef.current, workspaces.length);
     } catch (error) {
       console.error("[BookmarkContext] Failed to refresh bookmarks:", error);
     }
@@ -154,18 +159,19 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
   }, []);
 
   // 更新存储信息（轻量级估算，不使用 JSON.stringify + Blob）
-  const updateStorageInfo = (bms: LocalBookmark[], cats: LocalCategory[]) => {
+  const updateStorageInfo = (bms: LocalBookmark[], cats: LocalCategory[], workspaceCount = 0) => {
     const tagSet = new Set<string>();
     bms.forEach((b) => b.tags.forEach((t) => tagSet.add(t)));
 
-    // 轻量级估算：每条书签按平均字段长度估算约 500 字节
-    const estimatedBytes = bms.length * 500 + cats.length * 100;
+    // 轻量级估算：每条书签按平均字段长度估算约 500 字节，工作空间估算 1000 字节
+    const estimatedBytes = bms.length * 500 + cats.length * 100 + workspaceCount * 1000;
     const sizeInKB = (estimatedBytes / 1024).toFixed(2);
 
     setStorageInfo({
       bookmarkCount: bms.length,
       categoryCount: cats.length,
       tagCount: tagSet.size,
+      workspaceCount,
       storageSize: `${sizeInKB} KB`,
     });
   };
@@ -175,7 +181,7 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
     const loadData = async () => {
       setLoading(true);
       try {
-        const [bms, cats, config, settings, sConfig, sStatus] =
+        const [bms, cats, config, settings, sConfig, sStatus, wss] =
           await Promise.all([
             bookmarkStorage.getBookmarks(),
             bookmarkStorage.getCategories(),
@@ -183,6 +189,7 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
             configStorage.getSettings(),
             syncConfigStorage.getConfig(),
             syncConfigStorage.getStatus(),
+            workspaceStorage.getWorkspaces(),
           ]);
 
         // 复用已加载的 bms 提取标签
@@ -195,7 +202,7 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
         setAppSettings(settings);
         setSyncConfig(sConfig);
         setSyncStatus(sStatus);
-        updateStorageInfo(bms, cats);
+        updateStorageInfo(bms, cats, wss.length);
       } catch (error) {
         console.error("[BookmarkContext] Failed to load data:", error);
       } finally {
@@ -223,12 +230,19 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
     const unwatchSyncStatus = syncConfigStorage.watchStatus((newStatus) => {
       setSyncStatus(newStatus!);
     });
+    const unwatchWorkspaces = workspaceStorage.watchWorkspaces((workspaces) => {
+      setStorageInfo(prev => ({
+        ...prev,
+        workspaceCount: workspaces.length,
+      }));
+    });
 
     return () => {
       unwatchBookmarks();
       unwatchCategories();
       unwatchSyncConfig();
       unwatchSyncStatus();
+      unwatchWorkspaces();
     };
   }, [refreshBookmarks, refreshCategories]);
 
@@ -376,12 +390,13 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
     setBookmarks([]);
     setCategories([]);
     setAllTags([]);
-    setStorageInfo({
+    setStorageInfo(prev => ({
+      ...prev,
       bookmarkCount: 0,
       categoryCount: 0,
       tagCount: 0,
-      storageSize: "0 KB",
-    });
+      storageSize: "0 KB", // Might be slightly inaccurate due to workspace count, but refreshBookmarks handles recalculation. Or we can just calculate here.
+    }));
   };
 
   // 清除所有数据（不删除配置类数据：AI配置、应用设置、筛选器、WebDAV配置）

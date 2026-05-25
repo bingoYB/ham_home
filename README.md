@@ -4,7 +4,7 @@
 
 # HamHome
 
-**AI-Powered Bookmark Manager for Modern Browsers**
+**AI-Powered Browser Workspace for Bookmarks, Tabs, and Collections**
 
 <p>
   <img src="https://img.shields.io/github/v/release/bingoYB/ham_home?style=flat-square" alt="Release" />
@@ -26,7 +26,9 @@
 
 ## What is HamHome?
 
-HamHome is an AI-powered bookmark manager for modern browsers. It uses AI to automatically categorize saved pages, generate summaries, suggest tags, and search bookmarks semantically. It also helps you save and restore browser tab workspaces, manage native tab grouping rules, and keep your data local and portable.
+HamHome is an AI-powered browser workspace for modern browsing. It brings together bookmark management, saved tab workspaces, and automatic tab grouping so you can organize both long-term knowledge and in-progress browsing in one place.
+
+Use HamHome to save, manage, and restore tabs that are already open in your browser, automatically group active tabs by rules or AI, and turn valuable pages into structured bookmarks with AI-generated summaries, categories, tags, and semantic search. Your data stays local-first, portable, and syncable across devices when you need it.
 
 👉 **[View Product Introduction](https://bingoyb.github.io/ham_home/)** - Learn more about features and capabilities
 
@@ -46,21 +48,6 @@ HamHome is an AI-powered bookmark manager for modern browsers. It uses AI to aut
 
 ## Features
 
-### 🤖 AI-Assisted Organization
-
-- Auto-categorization based on page content
-- Smart tag suggestions with configurable presets
-- AI-generated summaries for quick reference
-- BYOK (Bring Your Own Key) support for OpenAI, Anthropic, Claude, Ollama, and custom endpoints
-
-### 🔄 Multi-Device Sync (WebDAV)
-
-- Support synchronization via WebDAV (e.g., Nextcloud, InfiniCLOUD, etc.)
-- Sync bookmarks, categories, settings, workspaces, workspace categories, and Tab Group configuration
-- End-to-end encrypted or plain data sync options
-- Real-time sync status widget in the header
-- Granular control over remote data (clear remote data anytime)
-
 ### 🧩 Workspaces & Tab Sessions
 
 - Save open tabs as restorable workspaces for research, projects, and recurring browsing sessions
@@ -73,6 +60,22 @@ HamHome is an AI-powered bookmark manager for modern browsers. It uses AI to aut
 - Create automatic Tab Group rules by domain, URL, title, case-insensitive title, or regex
 - Configure target group title, color, collapsed state, and multiple match conditions
 - Optional AI auto-grouping uses your configured AI provider and caches results for repeated pages
+
+### 🤖 AI-Assisted Bookmarking
+
+- Auto-categorization based on page content
+- Smart tag suggestions with configurable presets
+- AI-generated summaries for quick reference
+- Semantic and conversational search for saved bookmarks
+- BYOK (Bring Your Own Key) support for OpenAI, Anthropic, Claude, Ollama, and custom endpoints
+
+### 🔄 Multi-Device Sync (WebDAV)
+
+- Support synchronization via WebDAV (e.g., Nextcloud, InfiniCLOUD, etc.)
+- Sync bookmarks, categories, settings, workspaces, workspace categories, and Tab Group configuration
+- End-to-end encrypted or plain data sync options
+- Real-time sync status widget in the header
+- Granular control over remote data (clear remote data anytime)
 
 ### 🗂️ Category Management
 

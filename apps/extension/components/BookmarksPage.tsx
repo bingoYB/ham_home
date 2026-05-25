@@ -968,7 +968,7 @@ export function BookmarksPage({ currentView, onViewChange }: BookmarksPageProps)
                   <p className="text-sm text-muted-foreground mt-2">
                     {t("bookmark:bookmark.emptyGuide", {
                       defaultValue:
-                        "您还没有任何书签。您可以从浏览器或其他文件导入书签，或者通过 WebDAV 同步已有的数据。",
+                        "您还没有任何数据。您可以从浏览器或其他文件导入数据，或者通过 WebDAV 同步已有的数据。",
                     })}
                   </p>
                   <div className="flex items-center justify-center gap-3 mt-6 pt-4">
@@ -979,7 +979,7 @@ export function BookmarksPage({ currentView, onViewChange }: BookmarksPageProps)
                     >
                       <Download className="h-4 w-4" />
                       {t("settings:settings.importExport.title", {
-                        defaultValue: "导入书签",
+                        defaultValue: "导入数据",
                       })}
                     </Button>
                     <Button

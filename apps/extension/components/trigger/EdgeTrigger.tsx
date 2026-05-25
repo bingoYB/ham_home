@@ -19,7 +19,7 @@ export function EdgeTrigger({ position, visible, onClick }: EdgeTriggerProps) {
   return (
     <div
       className={cn(
-        'fixed top-1/2 -translate-y-1/2 z-99998',
+        'fixed top-1/2 -translate-y-1/2 z-[99998]',
         'transition-all duration-300 ease-out',
         position === 'left' ? 'left-0' : 'right-0',
         visible

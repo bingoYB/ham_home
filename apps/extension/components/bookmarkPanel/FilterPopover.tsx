@@ -71,7 +71,7 @@ export function FilterDropdownMenu({
   const hasActiveFilter = isPresetSelected || !!selectedCustomFilterId;
 
   return (
-    <DropdownMenu modal={false}>
+    <DropdownMenu>
       <DropdownMenuTrigger asChild>
         {children}
       </DropdownMenuTrigger>

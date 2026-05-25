@@ -48,7 +48,7 @@ export function TagFilterDropdown({
   };
 
   return (
-    <DropdownMenu modal={false}>
+    <DropdownMenu>
       <DropdownMenuTrigger asChild>
         {children}
       </DropdownMenuTrigger>

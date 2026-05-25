@@ -121,6 +121,11 @@ class WorkspaceStorage {
     );
   }
 
+  async clearAllData(): Promise<void> {
+    await workspacesItem.setValue([]);
+    await workspaceCategoriesItem.setValue([]);
+  }
+
   async searchWorkspaces(search: string, limit = 5): Promise<Workspace[]> {
     return this.getWorkspaces({ search, limit, sortBy: "createdAt" });
   }

@@ -297,22 +297,22 @@ export async function downloadSingleFileSnapshotForTest(
 }
 
 export function registerSingleFileTestHelpers(): void {
-  if (window.top !== window || window.__HAMHOME_SINGLEFILE_TEST__) {
-    return;
-  }
+  // if (window.top !== window || window.__HAMHOME_SINGLEFILE_TEST__) {
+  //   return;
+  // }
 
-  window.__HAMHOME_SINGLEFILE_TEST__ = {
-    captureSnapshot: captureSingleFileHtml,
-    downloadSnapshot: downloadSingleFileSnapshotForTest,
-  };
+  // window.__HAMHOME_SINGLEFILE_TEST__ = {
+  //   captureSnapshot: captureSingleFileHtml,
+  //   downloadSnapshot: downloadSingleFileSnapshotForTest,
+  // };
 
-  window.addEventListener("hamhome:test-singlefile-download", () => {
-    void downloadSingleFileSnapshotForTest({ openPreview: true });
-  });
+  // window.addEventListener("hamhome:test-singlefile-download", () => {
+  //   void downloadSingleFileSnapshotForTest({ openPreview: true });
+  // });
 
-  console.info(
-    "[HamHome] SingleFile 测试入口已注入。控制台执行 window.__HAMHOME_SINGLEFILE_TEST__.downloadSnapshot({ openPreview: true }) 可测试本地下载与还原效果。",
-  );
+  // console.info(
+  //   "[HamHome] SingleFile 测试入口已注入。控制台执行 window.__HAMHOME_SINGLEFILE_TEST__.downloadSnapshot({ openPreview: true }) 可测试本地下载与还原效果。",
+  // );
 }
 
 export async function handleExtractSingleFileHtmlResponse(captureId: string, sendResponse: (response?: any) => void): Promise<void> {

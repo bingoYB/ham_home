@@ -17,11 +17,15 @@ import {
   getExtensionURL,
 } from "@/utils/browser-api";
 import type { Language } from "@/types";
+import { initApiModePersistence } from "@/lib/agent/api-mode-persistence";
 
 // 右键菜单 ID
 const CONTEXT_MENU_ID = "save-to-hamhome";
 const WORKSPACE_CONTEXT_MENU_ID = "save-window-workspace";
 const MANAGE_HAMHOME_CONTEXT_MENU_ID = "manage-hamhome";
+
+// 防止并发创建菜单
+let isCreatingContextMenu = false;
 
 /**
  * SingleFile 后台资源获取（匹配官方 bg/fetch.js 的 fetchResource）
@@ -135,32 +139,54 @@ async function getContextMenuTitles(): Promise<{
  * 创建或更新右键菜单
  */
 async function createContextMenu() {
+  if (isCreatingContextMenu) return;
+  isCreatingContextMenu = true;
   try {
     const titles = await getContextMenuTitles();
 
     // 先删除所有菜单（避免重复 ID 错误）
-    await browser.contextMenus.removeAll();
+    try {
+      await browser.contextMenus.removeAll();
+    } catch (e) {
+      console.warn("[HamHome Background] 清除菜单失败:", e);
+    }
 
     // 创建新的右键菜单
-    await browser.contextMenus.create({
-      id: CONTEXT_MENU_ID,
-      title: titles.bookmark,
-      contexts: ["page", "selection", "link", "image"],
-    });
-    await browser.contextMenus.create({
-      id: WORKSPACE_CONTEXT_MENU_ID,
-      title: titles.workspace,
-      contexts: ["page"],
-    });
-    await browser.contextMenus.create({
-      id: MANAGE_HAMHOME_CONTEXT_MENU_ID,
-      title: titles.manage,
-      contexts: ["action", "page"],
-    });
+    // 使用 Promise.allSettled 或逐个创建并捕获错误
+    const menuConfigs = [
+      {
+        id: CONTEXT_MENU_ID,
+        title: titles.bookmark,
+        contexts: ["page", "selection", "link", "image"] as const,
+      },
+      {
+        id: WORKSPACE_CONTEXT_MENU_ID,
+        title: titles.workspace,
+        contexts: ["page"] as const,
+      },
+      {
+        id: MANAGE_HAMHOME_CONTEXT_MENU_ID,
+        title: titles.manage,
+        contexts: ["action", "page"] as const,
+      },
+    ];
 
-    console.log("[HamHome Background] 右键菜单已创建:", titles);
+    for (const config of menuConfigs) {
+      try {
+        await browser.contextMenus.create({ ...config, contexts: [...config.contexts] });
+      } catch (err: any) {
+        // 忽略重复 ID 错误
+        if (!err?.message?.includes("duplicate id")) {
+          console.warn(`[HamHome Background] 创建菜单 ${config.id} 失败:`, err);
+        }
+      }
+    }
+
+    console.log("[HamHome Background] 右键菜单已处理:", titles);
   } catch (error) {
     console.error("[HamHome Background] 创建右键菜单失败:", error);
+  } finally {
+    isCreatingContextMenu = false;
   }
 }
 
@@ -254,6 +280,9 @@ export default defineBackground(() => {
 
   // 注册 proxy service（必须在最顶部同步执行）
   registerBackgroundService();
+
+  // 初始化 OpenAI API 模式缓存持久化
+  initApiModePersistence();
 
   // 1. 初始化并订阅 WebDAV 存储变更自动同步
   Promise.all([

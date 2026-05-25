@@ -57,13 +57,16 @@ export function useEdgeTrigger({
       if (!enabled) return false;
 
       const windowWidth = window.innerWidth;
+      // 当触发器显示时，扩大判定区域，避免鼠标移到触发器上时消失（触发器宽度为 40px，预留 20px 缓冲）
+      const effectiveZoneWidth = isTriggerVisible ? Math.max(triggerZoneWidth, 60) : triggerZoneWidth;
+
       if (position === 'left') {
-        return mouseX <= triggerZoneWidth;
+        return mouseX <= effectiveZoneWidth;
       } else {
-        return mouseX >= windowWidth - triggerZoneWidth;
+        return mouseX >= windowWidth - effectiveZoneWidth;
       }
     },
-    [position, triggerZoneWidth, enabled]
+    [position, triggerZoneWidth, enabled, isTriggerVisible]
   );
 
   // 鼠标移动处理

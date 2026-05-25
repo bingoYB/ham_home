@@ -49,7 +49,7 @@ export function App() {
   const [panelPosition, setPanelPosition] = useState<PanelPosition>(DEFAULT_PANEL_POSITION);
   const [theme, setTheme] = useState<ThemeMode>('system');
   const [isPageInteractive, setIsPageInteractive] = useState<boolean>(getIsPageInteractive);
-  const [loading, setLoading] = useState(true);
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // 边缘触发 hook
   const {
@@ -69,8 +69,6 @@ export function App() {
   // 从 background 获取数据（使用 proxy-service）
   const fetchData = useCallback(async () => {
     try {
-      setLoading(true);
-      
       const backgroundService = getBackgroundService();
       
       // 并行获取数据
@@ -93,7 +91,7 @@ export function App() {
     } catch (error) {
       console.error('[HamHome] Failed to fetch data:', error);
     } finally {
-      setLoading(false);
+      setIsInitialized(true);
     }
   }, []);
 
@@ -192,23 +190,27 @@ export function App() {
 
   return (
     <div className="hamhome-content-root relative h-full w-full antialiased">
-      {/* 边缘触发器 */}
-      <EdgeTrigger
-        position={position}
-        visible={isTriggerVisible && !isPanelOpen}
-        onClick={openPanel}
-      />
+      {isInitialized && (
+        <>
+          {/* 边缘触发器 */}
+          <EdgeTrigger
+            position={position}
+            visible={isTriggerVisible && !isPanelOpen}
+            onClick={openPanel}
+          />
 
-      {/* 书签面板 */}
-      <BookmarkPanel
-        bookmarks={bookmarks}
-        categories={categories}
-        isOpen={isPanelOpen}
-        position={position}
-        onClose={closePanel}
-        onOpenBookmark={handleOpenBookmark}
-        onOpenSettings={handleOpenSettings}
-      />
+          {/* 书签面板 */}
+          <BookmarkPanel
+            bookmarks={bookmarks}
+            categories={categories}
+            isOpen={isPanelOpen}
+            position={position}
+            onClose={closePanel}
+            onOpenBookmark={handleOpenBookmark}
+            onOpenSettings={handleOpenSettings}
+          />
+        </>
+      )}
     </div>
   );
 }

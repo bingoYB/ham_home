@@ -302,7 +302,7 @@ export function WorkspacesPage() {
     >
       <div className="flex h-full min-h-0 flex-col bg-background xl:flex-row">
         <section className="flex min-w-0 flex-1 flex-col">
-          <header className="flex min-h-16 flex-wrap items-center gap-3 border-b px-4 py-3">
+          <header className="flex min-h-16 flex-wrap gap-3 border-b px-4 py-3">
             <div className="min-w-0 flex-1">
               <WorkspaceSearchBar
                 searchQuery={state.searchQuery}
@@ -388,6 +388,7 @@ export function WorkspacesPage() {
               );
             });
           }}
+          className="scroll-table-fix"
           renderPage={(page) => <DraggableTabCard page={page as any} />}
         />
         <WorkspacePageDialogs

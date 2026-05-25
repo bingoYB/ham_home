@@ -6,7 +6,7 @@ import { containsPrivateContent } from "@/lib/privacy/privacy-detector";
 import { tabGroupRulesStorage } from "@/lib/storage/tab-group-rules-storage";
 
 const UNSUPPORTED_URL_PROTOCOLS = ["chrome:", "edge:", "about:", "moz-extension:"];
-const DEFAULT_AI_GROUP_COLOR: TabGroupRuleColor = "blue";
+
 const TAB_GROUP_COLORS = [
   "grey",
   "blue",
@@ -20,12 +20,12 @@ const TAB_GROUP_COLORS = [
 ] as const;
 
 const aiTabGroupSuggestionSchema = z.object({
-  groupTitle: z.string().optional(),
-  title: z.string().optional(),
-  group: z.string().optional(),
-  answer: z.string().optional(),
-  color: z.enum(TAB_GROUP_COLORS).optional(),
-}).passthrough();
+  groupTitle: z.string().nullable(),
+  title: z.string().nullable(),
+  group: z.string().nullable(),
+  answer: z.string().nullable(),
+  color: z.string().nullable(),
+});
 
 type AITabGroupSuggestion = z.infer<typeof aiTabGroupSuggestionSchema>;
 
@@ -183,6 +183,10 @@ function extractColorFromText(value?: string): TabGroupRuleColor | null {
   return parseTabGroupColor(match?.[1]);
 }
 
+function getRandomColor(): TabGroupRuleColor {
+  return TAB_GROUP_COLORS[Math.floor(Math.random() * TAB_GROUP_COLORS.length)];
+}
+
 function normalizeAITabGroupSuggestion(
   suggestion: AITabGroupSuggestion,
 ): { groupTitle: string; color: TabGroupRuleColor } {
@@ -197,9 +201,12 @@ function normalizeAITabGroupSuggestion(
     throw new Error("AI did not return a group title");
   }
 
+  const aiColor = parseTabGroupColor(suggestion.color || undefined);
+  const textColor = extractColorFromText(rawTitle);
+
   return {
     groupTitle,
-    color: suggestion.color ?? extractColorFromText(rawTitle) ?? DEFAULT_AI_GROUP_COLOR,
+    color: aiColor ?? textColor ?? getRandomColor(),
   };
 }
 
@@ -217,6 +224,7 @@ async function suggestAITabGroup(input: {
     model: config.model,
     apiKey: config.apiKey,
     baseURL: config.baseURL,
+    apiMode: config.apiMode,
     temperature: 0.1,
     maxTokens: 180,
     schema: aiTabGroupSuggestionSchema,
