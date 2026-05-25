@@ -7,6 +7,8 @@ import { createDeepSeek } from "@ai-sdk/deepseek";
 import { createGroq } from "@ai-sdk/groq";
 import { createMistral } from "@ai-sdk/mistral";
 import { createOpenAICompatible } from "@ai-sdk/openai-compatible";
+import { createAdaptiveOpenAIModel, createOpenAIModelSync } from "./openai-adaptive";
+import type { OpenAIApiMode } from "./api-mode-cache";
 
 // ─── Provider 类型定义 ────────────────────────────────────────────
 
@@ -39,12 +41,16 @@ export interface ProviderMeta {
   requiresBaseURL: boolean;
   /** 使用的 SDK 接入方式 */
   sdkType: "native" | "openai-compatible" | "ollama";
+  /** 是否支持自适应 API 模式探测（responses/chat） */
+  supportsAdaptiveMode?: boolean;
 }
 
 export interface ProviderCreateOptions {
   apiKey?: string;
   baseURL?: string;
   model: string;
+  /** 强制指定 OpenAI API 模式（仅对支持自适应的 provider 生效） */
+  openaiApiMode?: OpenAIApiMode;
 }
 
 export interface ProviderConfig {
@@ -251,6 +257,7 @@ export const PROVIDER_REGISTRY: Record<ProviderName, ProviderMeta> = {
     requiresApiKey: true,
     requiresBaseURL: false,
     sdkType: "native",
+    supportsAdaptiveMode: true,
   },
   anthropic: {
     label: "Anthropic",
@@ -366,12 +373,9 @@ type EmbeddingFactory = (options: ProviderCreateOptions) => any;
  * 每个 provider 使用其对应的官方 @ai-sdk/* 包。
  */
 const nativeFactories: Partial<Record<ProviderName, ProviderFactory>> = {
-  openai: ({ apiKey, baseURL, model }) => {
-    const provider = createOpenAI({
-      apiKey,
-      ...(baseURL ? { baseURL } : {}),
-    });
-    return provider.chat(model);
+  openai: ({ apiKey, baseURL, model, openaiApiMode }) => {
+    // 如果指定了固定模式，使用同步创建
+    return createOpenAIModelSync({ apiKey, baseURL, model }, openaiApiMode || "chat");
   },
 
   anthropic: ({ apiKey, baseURL, model }) => {
@@ -558,10 +562,11 @@ function createOllamaEmbeddingModel(
 // ─── 统一创建入口 ──────────────────────────────────────────────────
 
 /**
- * 根据 provider 名称创建对应的 LanguageModel 实例。
+ * 根据 provider 名称创建对应的 LanguageModel 实例（同步版本）。
  * 自动选择最合适的 SDK 接入方式。
+ * 注意：OpenAI provider 在此模式下使用 openaiApiMode 指定的模式（默认 chat）。
  */
-export function createModelFromProvider(
+export function createModelFromProviderSync(
   providerName: ProviderName,
   options: ProviderCreateOptions,
 ): LanguageModel {
@@ -586,6 +591,32 @@ export function createModelFromProvider(
 
   // 3. OpenAI 兼容模式
   return createOpenAICompatibleModel(providerName, options, meta);
+}
+
+/**
+ * 根据 provider 名称创建对应的 LanguageModel 实例（异步版本）。
+ * 对于支持自适应模式的 provider（如 OpenAI），
+ * 首次调用会自动探测 responses/chat API 可用性并缓存结果。
+ */
+export async function createModelFromProvider(
+  providerName: ProviderName,
+  options: ProviderCreateOptions,
+): Promise<LanguageModel> {
+  const meta = PROVIDER_REGISTRY[providerName];
+  if (!meta) {
+    throw new Error(
+      `Unknown provider "${providerName}". ` +
+      `Supported providers: ${Object.keys(PROVIDER_REGISTRY).join(", ")}`,
+    );
+  }
+
+  // 1. 支持自适应探测的 provider 且未指定固定模式
+  if (meta.supportsAdaptiveMode && !options.openaiApiMode) {
+    return createAdaptiveOpenAIModel(providerName, options);
+  }
+
+  // 2. 使用同步工厂
+  return createModelFromProviderSync(providerName, options);
 }
 
 export function createEmbeddingModelFromProvider(

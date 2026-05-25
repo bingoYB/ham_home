@@ -89,7 +89,7 @@ export function AIChatMessage({
             : 'bg-muted'
         )}
       >
-        <div className="prose prose-sm dark:prose-invert max-w-none">
+        <div className="prose-sm dark:prose-invert max-w-none">
           {renderContent()}
         </div>
       </div>

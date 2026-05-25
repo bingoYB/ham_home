@@ -18,10 +18,10 @@ import { fetchPageContentForAI } from "../fetch-page-content";
 import { assertAgentConfigured, resolveAgentConfig } from "../factory";
 
 const bookmarkAnalysisSchema = z.object({
-  title: z.string().trim().min(1).max(200),
-  summary: z.string().trim().min(1).max(500),
-  category: z.string().trim().max(120).default(""),
-  tags: z.array(z.string().trim().min(1).max(40)).max(8).default([]),
+  title: z.string(),
+  summary: z.string(),
+  category: z.string(),
+  tags: z.array(z.string()),
 });
 
 type BookmarkAnalysisOutput = z.infer<typeof bookmarkAnalysisSchema>;
@@ -66,6 +66,7 @@ class BookmarkAnalysisService {
         model: config.model,
         apiKey: config.apiKey,
         baseURL: config.baseURL,
+        apiMode: config.apiMode,
         temperature: config.temperature ?? 0.2,
         maxTokens: config.maxTokens ?? 900,
         schema: bookmarkAnalysisSchema,
@@ -105,13 +106,20 @@ class BookmarkAnalysisService {
   async analyzeBookmarkForLibrary(options: {
     url: string;
     title: string;
+    description?: string;
     currentCategories: LocalCategory[];
     existingTags?: string[];
     shouldFetchPageContent?: boolean;
   }): Promise<BookmarkAnalysisApplyResult> {
-    const content = options.shouldFetchPageContent
-      ? await fetchPageContentForAI(options.url)
-      : "";
+    let content = "";
+    if (options.shouldFetchPageContent) {
+      try {
+        content = await fetchPageContentForAI(options.url);
+      } catch (error) {
+        console.warn(`[BookmarkAnalysisService] Failed to fetch page content for ${options.url}, falling back to description. Error:`, error);
+        content = options.description || "";
+      }
+    }
 
     const hostname = (() => {
       try {
@@ -128,7 +136,7 @@ class BookmarkAnalysisService {
         content,
         htmlContent: "",
         textContent: content,
-        excerpt: "",
+        excerpt: options.description || "",
         favicon: hostname
           ? `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`
           : "",

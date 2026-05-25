@@ -48,6 +48,7 @@ export function useBatchAITask() {
             const aiResult = await bookmarkAnalysisService.analyzeBookmarkForLibrary({
               url: bm.url,
               title: bm.title,
+              description: bm.description,
               currentCategories,
               existingTags: currentTags,
               shouldFetchPageContent: true,

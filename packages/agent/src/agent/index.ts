@@ -7,7 +7,7 @@ import { TaskManager } from "../scheduler";
 import { SkillLoader, type SkillDefinition } from "../skill";
 import { ToolRegistry } from "../tools";
 import { logger } from "../utils/logger";
-import { createAgentModel } from "./model";
+import { createAgentModel, createAgentModelAsync } from "./model";
 import type {
   AgentEventMap,
   AgentInput,
@@ -26,7 +26,7 @@ import type {
 } from "./types";
 export * from "./model";
 export * from "./providers";
-
+export * from "./api-mode-cache";
 
 
 function createRunId(): string {
@@ -153,6 +153,8 @@ export class Agent {
 
   private readonly modelConfig: AgentModelConfig;
   private readonly defaultModel: GenerateOptions["model"];
+  /** 自适应探测后的模型（懒加载） */
+  private adaptiveModelPromise: Promise<GenerateOptions["model"]> | undefined;
   private readonly memory?: BaseMemory;
   private readonly toolRegistry: ToolRegistry;
   private readonly skillLoader: SkillLoader;
@@ -171,7 +173,9 @@ export class Agent {
       baseURL: options.baseURL,
       baseUrl: options.baseUrl,
       baseurl: options.baseurl,
+      apiMode: options.apiMode,
     };
+    // 同步创建默认模型（用于回退）
     this.defaultModel = createAgentModel(this.modelConfig);
     this.memory = options.memory;
     this.toolRegistry = options.tools ?? new ToolRegistry();
@@ -329,7 +333,7 @@ export class Agent {
 
       for (let stepNumber = 0; stepNumber < maxIterations; stepNumber += 1) {
         const llmOptions: GenerateOptions = {
-          model: this.resolveModel(options),
+          model: await this.resolveModel(options),
           messages: [...conversation],
           tools,
           temperature: options.temperature,
@@ -483,7 +487,7 @@ export class Agent {
 
       for (let stepNumber = 0; stepNumber < maxIterations; stepNumber += 1) {
         const llmOptions: GenerateOptions = {
-          model: this.resolveModel(options),
+          model: await this.resolveModel(options),
           messages: [...conversation],
           tools,
           temperature: options.temperature,
@@ -659,7 +663,7 @@ export class Agent {
     const tools = await this.resolveTools(options, context);
 
     return {
-      model: this.resolveModel(options),
+      model: await this.resolveModel(options),
       messages,
       tools,
       temperature: options.temperature,
@@ -668,16 +672,48 @@ export class Agent {
   }
 
   private async generate(options: GenerateOptions): Promise<GenerateResult> {
-    const result = await generateText({
-      model: options.model,
-      messages: options.messages,
-      temperature: options.temperature,
-      maxOutputTokens: options.maxTokens,
-      tools: options.tools,
-    });
+    try {
+      const result = await generateText({
+        model: options.model,
+        messages: options.messages,
+        temperature: options.temperature,
+        maxOutputTokens: options.maxTokens,
+        tools: options.tools,
+      });
 
-    logger.info("generate result", result);
-    return normalizeGenerateResult(result);
+      logger.info("generate result", result);
+      return normalizeGenerateResult(result);
+    } catch (e: any) {
+      if (e.message?.includes("Invalid JSON response")) {
+        logger.warn("generateText failed with Invalid JSON response, falling back to streamText", { error: e.message });
+        const result = streamText({
+          model: options.model,
+          messages: options.messages,
+          temperature: options.temperature,
+          maxOutputTokens: options.maxTokens,
+          tools: options.tools,
+        });
+        
+        // Wait for the stream to complete and extract all values
+        const text = await result.text;
+        const toolCalls = await result.toolCalls;
+        const toolResults = await result.toolResults;
+        const finishReason = await result.finishReason;
+        const usage = await result.usage;
+        
+        const fallbackResult = {
+          text,
+          toolCalls,
+          toolResults,
+          finishReason,
+          usage,
+          response: { messages: [] }
+        };
+        logger.info("generate result (from streamText fallback)", fallbackResult);
+        return normalizeGenerateResult(fallbackResult);
+      }
+      throw e;
+    }
   }
 
   private async streamGenerate(
@@ -932,7 +968,7 @@ export class Agent {
     }
   }
 
-  private resolveModel(options: AgentRunOptions = {}): GenerateOptions["model"] {
+  private async resolveModel(options: AgentRunOptions = {}): Promise<GenerateOptions["model"]> {
     if (
       options.provider === undefined &&
       options.model === undefined &&
@@ -942,10 +978,17 @@ export class Agent {
       options.baseUrl === undefined &&
       options.baseurl === undefined
     ) {
-      return this.defaultModel;
+      // 懒加载自适应模型
+      if (!this.adaptiveModelPromise) {
+        this.adaptiveModelPromise = createAgentModelAsync(this.modelConfig).catch(() => {
+          // 自适应探测失败，回退到同步模型
+          return this.defaultModel;
+        });
+      }
+      return this.adaptiveModelPromise;
     }
 
-    return createAgentModel({
+    return createAgentModelAsync({
       provider: options.provider ?? this.modelConfig.provider,
       model: options.model ?? this.modelConfig.model,
       apiKey: options.apiKey ?? this.modelConfig.apiKey,
@@ -953,6 +996,7 @@ export class Agent {
       baseURL: options.baseURL ?? this.modelConfig.baseURL,
       baseUrl: options.baseUrl ?? this.modelConfig.baseUrl,
       baseurl: options.baseurl ?? this.modelConfig.baseurl,
+      apiMode: options.apiMode ?? this.modelConfig.apiMode,
     });
   }
 }

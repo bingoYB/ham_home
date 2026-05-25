@@ -17,6 +17,7 @@ export interface AgentModelConfig {
   baseURL?: string;
   baseUrl?: string;
   baseurl?: string;
+  apiMode?: 'chat' | 'responses';
 }
 
 export interface GenerateOptions {

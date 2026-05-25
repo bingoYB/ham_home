@@ -15,6 +15,7 @@ export interface AIConfig {
   maxTokens?: number;
   enabled: boolean;
   presetTags?: string[];     // 预设标签列表（用于自动匹配书签）
+  apiMode?: 'chat' | 'responses'; // 请求模式，主要用于 OpenAI 兼容的 provider
 }
 
 /**

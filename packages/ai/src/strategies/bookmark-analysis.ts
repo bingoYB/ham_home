@@ -65,9 +65,8 @@ async function invokeStructuredTask<T>(options: {
 }
 
 export class SinglePassBookmarkAnalysisStrategy
-  implements BookmarkAnalysisStrategy
-{
-  constructor(private readonly options: BookmarkAnalysisStrategyOptions) {}
+  implements BookmarkAnalysisStrategy {
+  constructor(private readonly options: BookmarkAnalysisStrategyOptions) { }
 
   async analyze(input: AnalyzeBookmarkInput): Promise<BookmarkAnalysisResult> {
     const object = await invokeStructuredTask({
@@ -97,7 +96,7 @@ export class SinglePassBookmarkAnalysisStrategy
 }
 
 export class BatchBookmarkAnalysisStrategy implements BookmarkAnalysisStrategy {
-  constructor(private readonly options: BookmarkAnalysisStrategyOptions) {}
+  constructor(private readonly options: BookmarkAnalysisStrategyOptions) { }
 
   async analyze(input: AnalyzeBookmarkInput): Promise<BookmarkAnalysisResult> {
     try {

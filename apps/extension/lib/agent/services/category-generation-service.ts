@@ -6,14 +6,14 @@ import { assertAgentConfigured, resolveAgentConfig } from "../factory";
 
 const generatedCategorySchema: z.ZodType<AIGeneratedCategory> = z.lazy(() =>
   z.object({
-    name: z.string().trim().min(1).max(40),
-    icon: z.string().trim().max(4).optional(),
-    children: z.array(generatedCategorySchema).max(12).optional(),
+    name: z.string(),
+    icon: z.string().nullable(),
+    children: z.array(generatedCategorySchema).nullable(),
   }),
 );
 
 const generatedCategoryListSchema = z.object({
-  categories: z.array(generatedCategorySchema).min(3).max(12),
+  categories: z.array(generatedCategorySchema),
 });
 
 type CategoryGenerationOutput = z.infer<typeof generatedCategoryListSchema>;
@@ -29,6 +29,7 @@ class CategoryGenerationService {
         model: config.model,
         apiKey: config.apiKey,
         baseURL: config.baseURL,
+        apiMode: config.apiMode,
         temperature: config.temperature ?? 0.4,
         maxTokens: config.maxTokens ?? 1200,
         schema: generatedCategoryListSchema,

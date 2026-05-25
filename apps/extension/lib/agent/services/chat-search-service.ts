@@ -39,18 +39,15 @@ const suggestionActionEnum = z.enum([
 ] satisfies [SuggestionActionType, ...SuggestionActionType[]]);
 
 const chatSearchResponseSchema = z.object({
-  answer: z.string().trim().min(1),
-  sources: z.array(z.string()).max(10).default([]),
-  nextSuggestions: z
-    .array(
-      z.object({
-        label: z.string().trim().min(1).max(40),
-        action: suggestionActionEnum,
-        payload: z.record(z.string(), z.unknown()).optional(),
-      }),
-    )
-    .max(4)
-    .default([]),
+  answer: z.string(),
+  sources: z.array(z.string()),
+  nextSuggestions: z.array(
+    z.object({
+      label: z.string(),
+      action: suggestionActionEnum,
+      payload: z.record(z.string(), z.unknown()).nullable(),
+    }),
+  ),
 });
 
 type ChatSearchResponseOutput = z.infer<typeof chatSearchResponseSchema>;
@@ -316,15 +313,15 @@ function buildFallbackSuggestions(session: ChatSearchSession): Suggestion[] {
     return sanitizeSuggestions(
       session.language === "zh"
         ? [
-            { label: "最近 30 天书签统计", action: "text" },
-            { label: "最近的书签", action: "timeFilter", payload: { days: 7 } },
-            { label: "功能介绍", action: "text" },
-          ]
+          { label: "最近 30 天书签统计", action: "text" },
+          { label: "最近的书签", action: "timeFilter", payload: { days: 7 } },
+          { label: "功能介绍", action: "text" },
+        ]
         : [
-            { label: "Bookmarks from last 30 days", action: "text" },
-            { label: "Recent bookmarks", action: "timeFilter", payload: { days: 7 } },
-            { label: "Feature introduction", action: "text" },
-          ],
+          { label: "Bookmarks from last 30 days", action: "text" },
+          { label: "Recent bookmarks", action: "timeFilter", payload: { days: 7 } },
+          { label: "Feature introduction", action: "text" },
+        ],
     );
   }
 
@@ -332,32 +329,32 @@ function buildFallbackSuggestions(session: ChatSearchSession): Suggestion[] {
     return sanitizeSuggestions(
       session.language === "zh"
         ? [
-            { label: "显示更多结果", action: "showMore" },
-            { label: "复制所有链接", action: "copyAllLinks" },
-            { label: "只看语义匹配", action: "semanticOnly" },
-            { label: "最近的书签", action: "timeFilter", payload: { days: 7 } },
-          ]
+          { label: "显示更多结果", action: "showMore" },
+          { label: "复制所有链接", action: "copyAllLinks" },
+          { label: "只看语义匹配", action: "semanticOnly" },
+          { label: "最近的书签", action: "timeFilter", payload: { days: 7 } },
+        ]
         : [
-            { label: "Show more results", action: "showMore" },
-            { label: "Copy all links", action: "copyAllLinks" },
-            { label: "Semantic matches only", action: "semanticOnly" },
-            { label: "Recent bookmarks", action: "timeFilter", payload: { days: 7 } },
-          ],
+          { label: "Show more results", action: "showMore" },
+          { label: "Copy all links", action: "copyAllLinks" },
+          { label: "Semantic matches only", action: "semanticOnly" },
+          { label: "Recent bookmarks", action: "timeFilter", payload: { days: 7 } },
+        ],
     );
   }
 
   return sanitizeSuggestions(
     session.language === "zh"
       ? [
-          { label: "换个关键词试试", action: "text" },
-          { label: "功能介绍", action: "text" },
-          { label: "搜索技巧", action: "text" },
-        ]
+        { label: "换个关键词试试", action: "text" },
+        { label: "功能介绍", action: "text" },
+        { label: "搜索技巧", action: "text" },
+      ]
       : [
-          { label: "Try another query", action: "text" },
-          { label: "Feature introduction", action: "text" },
-          { label: "Search tips", action: "text" },
-        ],
+        { label: "Try another query", action: "text" },
+        { label: "Feature introduction", action: "text" },
+        { label: "Search tips", action: "text" },
+      ],
   );
 }
 
@@ -589,6 +586,7 @@ class ChatSearchService {
           model: config.model,
           apiKey: config.apiKey,
           baseURL: config.baseURL,
+          apiMode: config.apiMode,
           temperature: 0.1,
           maxTokens: 900,
           schema: chatSearchResponseSchema,
@@ -613,8 +611,8 @@ class ChatSearchService {
         response.sources.length > 0
           ? response.sources
           : session.lastSearch?.bookmarkIds ||
-            session.lastStatistics?.bookmarkIds ||
-            [];
+          session.lastStatistics?.bookmarkIds ||
+          [];
       const bookmarks = await getBookmarksByIds(sourceIds);
       const searchResult =
         session.lastSearch?.searchResult ||

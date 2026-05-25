@@ -17,19 +17,19 @@ import type {
 const SearchPlannerRequestSchema = z.object({
   intent: z.enum(["query", "statistics", "help"]).describe("用户意图"),
   querySubtype: z
-    .enum(["time", "category", "tag", "semantic", "compound"])
-    .optional()
+    .string()
+    .nullable()
     .describe("查询子类型"),
   query: z.string().describe("原始查询文本"),
   refinedQuery: z.string().describe("提炼后的语义查询关键词"),
   filters: z.object({
-    categoryId: z.string().nullable().optional(),
-    tagsAny: z.array(z.string()).optional(),
-    domain: z.string().nullable().optional(),
-    timeRangeDays: z.number().nullable().optional(),
-    semantic: z.boolean().optional(),
+    categoryId: z.string().nullable(),
+    tagsAny: z.array(z.string()).nullable(),
+    domain: z.string().nullable(),
+    timeRangeDays: z.number().nullable(),
+    semantic: z.boolean().nullable(),
   }),
-  topK: z.number().min(1).max(50),
+  topK: z.number(),
 });
 
 export function createSearchQueryPlanner(

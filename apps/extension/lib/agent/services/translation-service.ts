@@ -20,6 +20,7 @@ class TranslationService {
         model: config.model,
         apiKey: config.apiKey,
         baseURL: config.baseURL,
+        apiMode: config.apiMode,
         temperature: 0.1,
         maxTokens: Math.min(config.maxTokens ?? 500, 500),
         schema: translationSchema,

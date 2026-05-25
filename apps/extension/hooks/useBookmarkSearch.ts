@@ -1,6 +1,6 @@
 /**
  * useBookmarkSearch - 书签搜索筛选 Hook
- * 从 MainContent.tsx 抽象的公共搜索能力
+ * 从 BookmarksPage.tsx 抽象的公共搜索能力
  */
 import { useState, useMemo, useCallback } from 'react';
 import type { LocalBookmark, LocalCategory, CustomFilter, FilterCondition } from '@/types';

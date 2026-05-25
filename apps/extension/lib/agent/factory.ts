@@ -17,6 +17,7 @@ export interface ResolvedAgentConfig {
   baseURL?: string;
   temperature?: number;
   maxTokens?: number;
+  apiMode?: 'chat' | 'responses';
 }
 
 export interface CreateExtensionAgentOptions {
@@ -64,6 +65,7 @@ export async function resolveAgentConfig(
       rawConfig.baseUrl?.trim() || getDefaultBaseUrl(rawConfig.provider) || undefined,
     temperature: rawConfig.temperature,
     maxTokens: rawConfig.maxTokens,
+    apiMode: rawConfig.apiMode,
   };
 }
 
@@ -111,6 +113,7 @@ export async function createExtensionAgent(
     model: config.model,
     apiKey: config.apiKey,
     baseURL: config.baseURL,
+    apiMode: config.apiMode,
     systemPrompt: options.systemPrompt,
     tools: options.tools,
     workspace: "HamHome browser extension",
