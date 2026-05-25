@@ -7,11 +7,12 @@ const CLARITY_PROJECT_ID = 'vg9k8vkmuz';
 
 export const metadata: Metadata = {
   metadataBase: new URL('https://hamhome.app'),
-  title: 'HamHome - AI 驱动的智能书签管理工具 | AI Bookmark Manager',
-  description: '让收藏不再积灰。HamHome 是一款以隐私保护为核心、完全本地存储的智能浏览器扩展，支持一键收藏、AI 内容总结、语义检索、智能分类以及书签快捷导入导出。',
+  title: 'HamHome - AI 驱动的浏览器工作空间 | Browser Workspace',
+  description: 'HamHome 是一款本地优先的浏览器工作空间，支持保存和恢复已打开的 Tab、自动分组，并通过 AI 管理书签与收藏内容。',
   keywords: [
-    '书签管理', '浏览器扩展', 'AI', '收藏夹', 'bookmark manager', 'browser extension',
-    '智能分类', '语义搜索', 'AI 标签', '本地存储', 'semantic search', 'tab manager'
+    '浏览器工作空间', '书签管理', 'Tab 管理', 'Tab 自动分组', '收藏管理', '浏览器扩展', 'AI',
+    'browser workspace', 'bookmark manager', 'tab manager', 'tab grouping', 'collections',
+    '智能分类', '语义搜索', 'AI 标签', '本地存储', 'semantic search'
   ],
   authors: [{ name: 'HamHome Team', url: 'https://github.com/bingoYB/ham_home' }],
   creator: 'HamHome',
@@ -35,8 +36,8 @@ export const metadata: Metadata = {
     apple: `${basePath}/icon/128.png`,
   },
   openGraph: {
-    title: 'HamHome - AI 驱动的新一代智能书签助手',
-    description: '让收藏不再积灰。支持一键收藏、AI 自动分类、语义检索。本地化存储保护隐私的浏览器扩展。',
+    title: 'HamHome - AI 驱动的浏览器工作空间',
+    description: '保存和恢复已打开的 Tab，自动完成 Tab 分组，并用 AI 管理书签与收藏内容。',
     url: 'https://hamhome.app',
     siteName: 'HamHome',
     images: [
@@ -44,7 +45,7 @@ export const metadata: Metadata = {
         url: `${basePath}/og-image.png`,
         width: 1200,
         height: 630,
-        alt: 'HamHome - 智能书签助手预览图',
+        alt: 'HamHome - 浏览器工作空间预览图',
       },
     ],
     locale: 'zh_CN',
@@ -52,8 +53,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'HamHome - AI 驱动的新一代智能书签助手',
-    description: '让收藏不再积灰。支持一键收藏、AI 自动分类、语义检索。本地化存储保护隐私的浏览器扩展。',
+    title: 'HamHome - AI 驱动的浏览器工作空间',
+    description: '保存和恢复已打开的 Tab，自动完成 Tab 分组，并用 AI 管理书签与收藏内容。',
     images: [`${basePath}/og-image.png`],
   },
   robots: {

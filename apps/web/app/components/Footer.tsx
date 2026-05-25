@@ -7,18 +7,19 @@ interface FooterProps {
 }
 
 export function Footer({ isEn }: FooterProps) {
+  const privacyLabel = isEn ? 'Privacy' : '隐私政策';
+
   return (
-    <footer className="border-t py-8 text-center text-sm text-muted-foreground">
-      <div className="container mx-auto flex flex-col items-center gap-3 px-4">
-        <p>
-          HamHome - {isEn ? "Don't let your bookmarks gather dust" : '让收藏不再积灰'} 🐹
-        </p>
-        <nav className="flex flex-wrap items-center justify-center gap-4">
-          <Link href="/" className="transition-colors hover:text-foreground">
-            {isEn ? 'Home' : '首页'}
-          </Link>
+    <footer className="border-t border-border/70 py-8 text-sm text-muted-foreground ">
+      <div className="container mx-auto flex w-full flex-col gap-4 px-4 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+        <p>HamHome - {isEn ? 'Smart Browser Workspace' : '智能浏览器工作空间'}</p>
+        <nav className="flex flex-wrap items-center gap-4">
+          <span>Chrome</span>
+          <span>Edge</span>
+          <span>Firefox</span>
+          <span>WebDAV</span>
           <Link href="/privacy-policy" className="transition-colors hover:text-foreground">
-            {isEn ? 'Privacy Policy' : '隐私权政策'}
+            {privacyLabel}
           </Link>
           <a
             href="https://github.com/bingoYB/ham_home"

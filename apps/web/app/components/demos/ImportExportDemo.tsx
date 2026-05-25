@@ -30,11 +30,11 @@ export function ImportExportDemo({ bookmarks, categories, isEn }: ImportExportDe
     description: isEn
       ? 'Sync browser bookmarks, preserve folder hierarchy, or run AI analysis during import.'
       : '支持浏览器书签导入、目录结构保留与导入时 AI 分析。',
-    exportTitle: isEn ? 'Export bookmarks' : '导出书签',
+    exportTitle: isEn ? 'Export bookmarks' : '导出数据',
     exportDesc: isEn
       ? 'Create JSON/HTML backups for migration and recovery.'
       : '导出 JSON/HTML 备份，便于迁移和恢复。',
-    importTitle: isEn ? 'Import bookmarks' : '导入书签',
+    importTitle: isEn ? 'Import bookmarks' : '导入数据',
     importDesc: isEn
       ? 'Import from file or directly read current browser bookmarks.'
       : '可从文件导入，或直接读取当前浏览器书签。',

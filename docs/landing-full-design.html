@@ -1,0 +1,957 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HamHome Landing Design</title>
+    <style>
+      :root {
+        --bg: #171513;
+        --bg-soft: #1e1a18;
+        --panel: #211d1b;
+        --panel-strong: #27211f;
+        --line: rgba(255, 255, 255, 0.08);
+        --text: #f5f4f2;
+        --muted: #a9adb8;
+        --orange: #ff742f;
+        --orange-soft: #ff8d55;
+        --violet: #818cf8;
+        --cyan: #2dd4bf;
+        --green: #34d399;
+        --amber: #f59e0b;
+        --max: 1680px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font-family:
+          Inter, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", Arial,
+          sans-serif;
+      }
+
+      body {
+        width: 1920px;
+      }
+
+      .page {
+        overflow: hidden;
+        background:
+          radial-gradient(circle at 12% 8%, rgba(255, 116, 47, 0.14), transparent 28%),
+          radial-gradient(circle at 82% 10%, rgba(129, 140, 248, 0.12), transparent 22%),
+          radial-gradient(circle at 84% 58%, rgba(45, 212, 191, 0.08), transparent 18%),
+          var(--bg);
+      }
+
+      .shell {
+        width: var(--max);
+        margin: 0 auto;
+      }
+
+      .nav {
+        height: 92px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border-bottom: 1px solid var(--line);
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+      }
+
+      .brand img {
+        width: 56px;
+        height: 56px;
+      }
+
+      .brand strong {
+        display: block;
+        font-size: 28px;
+        line-height: 1.1;
+      }
+
+      .brand span {
+        display: block;
+        margin-top: 4px;
+        color: var(--muted);
+        font-size: 16px;
+      }
+
+      .nav-actions {
+        display: flex;
+        align-items: center;
+        gap: 18px;
+        color: #d7dae1;
+        font-size: 16px;
+      }
+
+      .switch {
+        width: 56px;
+        height: 30px;
+        border-radius: 999px;
+        background: rgba(129, 140, 248, 0.95);
+        position: relative;
+      }
+
+      .switch::after {
+        content: "";
+        position: absolute;
+        right: 5px;
+        top: 5px;
+        width: 20px;
+        height: 20px;
+        border-radius: 50%;
+        background: #1c1a18;
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 10px;
+        height: 48px;
+        padding: 0 24px;
+        border-radius: 999px;
+        font-size: 18px;
+        font-weight: 600;
+      }
+
+      .button-primary {
+        background: var(--orange);
+        color: white;
+      }
+
+      .button-secondary {
+        background: rgba(45, 212, 191, 0.96);
+        color: #062722;
+      }
+
+      .button-violet {
+        background: var(--violet);
+        color: #10132a;
+      }
+
+      .hero {
+        min-height: 820px;
+        display: grid;
+        grid-template-columns: 0.9fr 1.1fr;
+        gap: 80px;
+        align-items: center;
+        padding: 54px 0 42px;
+      }
+
+      .eyebrow {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--orange-soft);
+        font-weight: 700;
+        font-size: 17px;
+      }
+
+      .hero h1 {
+        margin: 22px 0 20px;
+        font-size: 64px;
+        line-height: 1.12;
+        letter-spacing: 0;
+      }
+
+      .hero h1 span {
+        color: var(--orange);
+      }
+
+      .hero p {
+        max-width: 650px;
+        color: var(--muted);
+        font-size: 26px;
+        line-height: 1.55;
+      }
+
+      .hero-actions {
+        display: flex;
+        gap: 16px;
+        margin-top: 34px;
+      }
+
+      .hero-stage {
+        position: relative;
+        height: 650px;
+      }
+
+      .glass {
+        position: absolute;
+        border: 1px solid var(--line);
+        background: rgba(28, 24, 22, 0.9);
+        box-shadow:
+          0 20px 60px rgba(0, 0, 0, 0.34),
+          inset 0 1px 0 rgba(255, 255, 255, 0.03);
+      }
+
+      .save-panel {
+        right: 0;
+        top: 16px;
+        width: 530px;
+        border-radius: 28px;
+        padding: 16px;
+      }
+
+      .save-panel img {
+        width: 100%;
+        display: block;
+        border-radius: 20px;
+      }
+
+      .side-card {
+        left: 0;
+        bottom: 30px;
+        width: 520px;
+        border-radius: 26px;
+        padding: 14px;
+      }
+
+      .side-card img {
+        width: 100%;
+        display: block;
+        border-radius: 18px;
+      }
+
+      .floating-tag {
+        position: absolute;
+        left: 62px;
+        top: 22px;
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 12px 16px;
+        border-radius: 999px;
+        background: rgba(19, 53, 37, 0.96);
+        color: #8ff0c5;
+        font-weight: 700;
+      }
+
+      .stats {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 18px;
+        margin-bottom: 110px;
+      }
+
+      .stat {
+        border-top: 1px solid var(--line);
+        padding-top: 22px;
+      }
+
+      .stat strong {
+        display: block;
+        font-size: 34px;
+      }
+
+      .stat span {
+        display: block;
+        margin-top: 8px;
+        color: var(--muted);
+        font-size: 18px;
+      }
+
+      .section {
+        padding: 0 0 120px;
+      }
+
+      .section-head {
+        max-width: 850px;
+        margin-bottom: 42px;
+      }
+
+      .section-kicker {
+        color: var(--cyan);
+        font-size: 17px;
+        font-weight: 700;
+      }
+
+      .section h2 {
+        margin: 14px 0 18px;
+        font-size: 42px;
+        line-height: 1.2;
+      }
+
+      .section p {
+        color: var(--muted);
+        font-size: 21px;
+        line-height: 1.6;
+      }
+
+      .steps {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 24px;
+      }
+
+      .step,
+      .feature-card,
+      .privacy-card {
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        background: rgba(255, 255, 255, 0.02);
+      }
+
+      .step {
+        padding: 28px;
+      }
+
+      .step b {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 42px;
+        height: 42px;
+        border-radius: 14px;
+        background: rgba(255, 116, 47, 0.14);
+        color: var(--orange-soft);
+        font-size: 20px;
+      }
+
+      .step h3 {
+        margin: 22px 0 12px;
+        font-size: 25px;
+      }
+
+      .step p {
+        margin: 0;
+        font-size: 18px;
+      }
+
+      .showcase {
+        display: grid;
+        gap: 34px;
+      }
+
+      .showcase-row {
+        display: grid;
+        grid-template-columns: 0.9fr 1.1fr;
+        gap: 34px;
+        align-items: center;
+      }
+
+      .showcase-row.reverse {
+        grid-template-columns: 1.1fr 0.9fr;
+      }
+
+      .copy-panel {
+        padding: 18px 6px;
+      }
+
+      .copy-panel h3 {
+        margin: 0 0 18px;
+        font-size: 34px;
+      }
+
+      .copy-panel ul {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        display: grid;
+        gap: 16px;
+      }
+
+      .copy-panel li {
+        position: relative;
+        padding-left: 28px;
+        color: var(--muted);
+        font-size: 20px;
+        line-height: 1.5;
+      }
+
+      .copy-panel li::before {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 10px;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--green);
+      }
+
+      .media-frame {
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        padding: 16px;
+        background: rgba(255, 255, 255, 0.02);
+      }
+
+      .media-frame img {
+        display: block;
+        width: 100%;
+        border-radius: 20px;
+      }
+
+      .bookmark-management-frame {
+        display: grid;
+        grid-template-columns: 0.72fr 1.08fr;
+        gap: 16px;
+        align-items: stretch;
+      }
+
+      .bookmark-management-frame img {
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .workspace-frame {
+        min-height: 472px;
+        display: grid;
+        grid-template-columns: 0.82fr 1.18fr;
+        gap: 18px;
+        padding: 18px;
+        border: 1px solid var(--line);
+        border-radius: 28px;
+        background: rgba(255, 255, 255, 0.02);
+      }
+
+      .workspace-list,
+      .tab-board {
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        background: rgba(0, 0, 0, 0.18);
+      }
+
+      .workspace-list {
+        padding: 18px;
+      }
+
+      .workspace-list h4,
+      .tab-board h4 {
+        margin: 0 0 18px;
+        font-size: 18px;
+      }
+
+      .workspace-item {
+        padding: 16px;
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .workspace-item + .workspace-item {
+        margin-top: 14px;
+      }
+
+      .workspace-item strong {
+        display: block;
+        margin-bottom: 8px;
+        font-size: 18px;
+      }
+
+      .workspace-item span {
+        color: var(--muted);
+        font-size: 15px;
+      }
+
+      .tab-board {
+        padding: 18px;
+      }
+
+      .tab-group {
+        padding: 16px;
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.03);
+      }
+
+      .tab-group + .tab-group {
+        margin-top: 14px;
+      }
+
+      .tab-group header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        margin-bottom: 14px;
+      }
+
+      .tab-group strong {
+        font-size: 18px;
+      }
+
+      .tab-group em {
+        color: #8ff0c5;
+        font-size: 14px;
+        font-style: normal;
+      }
+
+      .tab-pills {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+      }
+
+      .tab-pill {
+        padding: 8px 10px;
+        border-radius: 999px;
+        background: rgba(129, 140, 248, 0.14);
+        color: #d8dcff;
+        font-size: 14px;
+      }
+
+      .feature-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 22px;
+      }
+
+      .feature-card {
+        min-height: 205px;
+        padding: 26px;
+      }
+
+      .feature-card .icon {
+        width: 44px;
+        height: 44px;
+        border-radius: 14px;
+        display: grid;
+        place-items: center;
+        font-size: 20px;
+        background: rgba(129, 140, 248, 0.14);
+        color: #b9c0ff;
+      }
+
+      .feature-card:nth-child(2) .icon {
+        background: rgba(45, 212, 191, 0.14);
+        color: #91f5e5;
+      }
+
+      .feature-card:nth-child(3) .icon {
+        background: rgba(52, 211, 153, 0.14);
+        color: #8ff0c5;
+      }
+
+      .feature-card:nth-child(4) .icon {
+        background: rgba(245, 158, 11, 0.14);
+        color: #ffd07a;
+      }
+
+      .feature-card:nth-child(5) .icon {
+        background: rgba(255, 116, 47, 0.14);
+        color: #ffae82;
+      }
+
+      .feature-card h3 {
+        margin: 18px 0 10px;
+        font-size: 24px;
+      }
+
+      .feature-card p {
+        margin: 0;
+        font-size: 18px;
+      }
+
+      .privacy {
+        display: grid;
+        grid-template-columns: 0.85fr 1.15fr;
+        gap: 30px;
+        align-items: stretch;
+      }
+
+      .privacy-copy {
+        padding-right: 24px;
+      }
+
+      .privacy-board {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+      }
+
+      .privacy-card {
+        padding: 24px;
+      }
+
+      .privacy-card.large {
+        grid-column: span 2;
+      }
+
+      .privacy-card strong {
+        display: block;
+        font-size: 24px;
+        margin-bottom: 10px;
+      }
+
+      .privacy-card p {
+        margin: 0;
+        font-size: 18px;
+      }
+
+      .meter {
+        height: 10px;
+        margin-top: 18px;
+        border-radius: 999px;
+        overflow: hidden;
+        background: rgba(255, 255, 255, 0.06);
+      }
+
+      .meter span {
+        display: block;
+        height: 100%;
+        width: 64%;
+        background: linear-gradient(90deg, var(--cyan), var(--violet));
+      }
+
+      .chips {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 18px;
+      }
+
+      .chip {
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.05);
+        color: #dde0e7;
+        font-size: 15px;
+      }
+
+      .cta {
+        padding-bottom: 110px;
+      }
+
+      .cta-band {
+        border-top: 1px solid var(--line);
+        padding-top: 44px;
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 24px;
+      }
+
+      .cta-band h2 {
+        margin: 0 0 10px;
+        font-size: 42px;
+      }
+
+      .cta-band p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 20px;
+      }
+
+      .cta-actions {
+        display: flex;
+        gap: 14px;
+      }
+
+      .footer {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        color: var(--muted);
+        padding: 28px 0 42px;
+        border-top: 1px solid var(--line);
+        font-size: 16px;
+      }
+
+      .browser-list {
+        display: flex;
+        gap: 18px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="page">
+      <header class="shell nav">
+        <div class="brand">
+          <img src="../apps/extension/assets/logo.png" alt="HamHome" />
+          <div>
+            <strong>HamHome</strong>
+            <span>智能书签助手</span>
+          </div>
+        </div>
+        <div class="nav-actions">
+          <span>文</span>
+          <span>EN</span>
+          <span>☼</span>
+          <span class="switch"></span>
+          <span>☾</span>
+          <span>GitHub</span>
+          <span class="button button-violet">↓ 下载</span>
+        </div>
+      </header>
+
+      <main>
+        <section class="shell hero">
+          <div>
+            <div class="eyebrow">AI Bookmark Workspace</div>
+            <h1><span>HamHome</span><br />AI 驱动的书签管理器</h1>
+            <p>
+              支持 AI 对话搜索、智能分类、侧边栏管理、工作空间保存，以及浏览器书签一键导入导出。
+            </p>
+            <div class="hero-actions">
+              <span class="button button-primary">↓ 下载安装</span>
+              <span class="button button-secondary">GitHub</span>
+            </div>
+          </div>
+
+          <div class="hero-stage">
+            <div class="floating-tag">✦ AI 分析完成</div>
+            <div class="glass save-panel">
+              <img src="./screenshot/ch/save-panel.png" alt="保存面板" />
+            </div>
+            <div class="glass side-card">
+              <img src="./screenshot/ch/side-panel.png" alt="侧边栏面板" />
+            </div>
+          </div>
+        </section>
+
+        <section class="shell stats">
+          <div class="stat">
+            <strong>AI 自动整理</strong>
+            <span>摘要、分类、标签一次完成</span>
+          </div>
+          <div class="stat">
+            <strong>语义化搜索</strong>
+            <span>像聊天一样找回网页</span>
+          </div>
+          <div class="stat">
+            <strong>工作空间</strong>
+            <span>保存并恢复整组标签页</span>
+          </div>
+          <div class="stat">
+            <strong>导入导出</strong>
+            <span>备份、迁移和跨浏览器切换</span>
+          </div>
+        </section>
+
+        <section class="shell section">
+          <div class="section-head">
+            <div class="section-kicker">从收藏到找回</div>
+            <h2>不是把链接堆起来，而是把浏览过程整理成系统</h2>
+            <p>
+              HamHome 把保存、理解、检索和迁移串成一条连续路径，让书签真正能被再次使用。
+            </p>
+          </div>
+          <div class="steps">
+            <article class="step">
+              <b>01</b>
+              <h3>一键保存</h3>
+              <p>读取页面内容，自动生成摘要、推荐分类与标签，减少手工整理。</p>
+            </article>
+            <article class="step">
+              <b>02</b>
+              <h3>持续管理</h3>
+              <p>侧边栏、卡片视图、批量操作、预设筛选共同维护你的知识库。</p>
+            </article>
+            <article class="step">
+              <b>03</b>
+              <h3>随时找回</h3>
+              <p>关键词、语义检索、AI 对话搜索一起工作，找到“记得大概”的内容。</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="shell section">
+          <div class="section-head">
+            <div class="section-kicker">核心体验</div>
+            <h2>三种高频场景，覆盖每天都会发生的操作</h2>
+          </div>
+
+          <div class="showcase">
+            <div class="showcase-row">
+              <div class="copy-panel">
+                <h3>保存时，AI 已经先整理好了</h3>
+                <ul>
+                  <li>自动生成标题摘要，快速判断内容价值</li>
+                  <li>按页面上下文推荐分类与标签</li>
+                  <li>支持自带 API Key，也能配置隐私域名跳过分析</li>
+                </ul>
+              </div>
+              <div class="media-frame">
+                <img src="./screenshot/ch/save-panel.png" alt="保存体验" />
+              </div>
+            </div>
+
+            <div class="showcase-row reverse">
+              <div class="media-frame bookmark-management-frame">
+                <img src="./screenshot/ch/side-panel.png" alt="侧边栏体验" />
+                <img src="./screenshot/ch/mng-page.png" alt="书签管理页" />
+              </div>
+              <div class="copy-panel">
+                <h3>收藏管理，从随手调用到集中整理都连贯</h3>
+                <ul>
+                  <li>任意页面都能通过侧边栏快速调出书签</li>
+                  <li>集中管理页支持卡片 / 列表切换、筛选与批量操作</li>
+                  <li>对话式搜索能继续追问、缩小结果范围</li>
+                </ul>
+              </div>
+            </div>
+
+            <div class="showcase-row">
+              <div class="copy-panel">
+                <h3>把当前浏览现场，直接收成可恢复的工作空间</h3>
+                <ul>
+                  <li>保存当前窗口，保留页面组合与原生 Tab Groups</li>
+                  <li>按规则或 AI 自动完成 Tab 分组，减少手工整理</li>
+                  <li>适合研究资料、项目上下文和周期性浏览任务</li>
+                </ul>
+              </div>
+              <div class="workspace-frame">
+                <div class="workspace-list">
+                  <h4>工作空间</h4>
+                  <div class="workspace-item">
+                    <strong>竞品研究</strong>
+                    <span>12 个页面 · 3 个分组 · 最近更新 今天</span>
+                  </div>
+                  <div class="workspace-item">
+                    <strong>前端重构</strong>
+                    <span>8 个页面 · 2 个分组 · 最近更新 昨天</span>
+                  </div>
+                  <div class="workspace-item">
+                    <strong>周末阅读</strong>
+                    <span>6 个页面 · 1 个分组 · 最近更新 3 天前</span>
+                  </div>
+                </div>
+                <div class="tab-board">
+                  <h4>自动 Tab 分组</h4>
+                  <div class="tab-group">
+                    <header>
+                      <strong>AI 与产品</strong>
+                      <em>AI 已分组</em>
+                    </header>
+                    <div class="tab-pills">
+                      <span class="tab-pill">OpenAI 文档</span>
+                      <span class="tab-pill">竞品分析</span>
+                      <span class="tab-pill">用户访谈</span>
+                    </div>
+                  </div>
+                  <div class="tab-group">
+                    <header>
+                      <strong>前端开发</strong>
+                      <em>规则命中</em>
+                    </header>
+                    <div class="tab-pills">
+                      <span class="tab-pill">React</span>
+                      <span class="tab-pill">Tailwind</span>
+                      <span class="tab-pill">GitHub PR</span>
+                    </div>
+                  </div>
+                  <div class="tab-group">
+                    <header>
+                      <strong>待整理</strong>
+                      <em>建议转书签</em>
+                    </header>
+                    <div class="tab-pills">
+                      <span class="tab-pill">行业报告</span>
+                      <span class="tab-pill">收藏夹</span>
+                      <span class="tab-pill">备忘页面</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="shell section">
+          <div class="section-head">
+            <div class="section-kicker">更多能力</div>
+            <h2>书签之外，把整个浏览工作流一起收好</h2>
+          </div>
+          <div class="feature-grid">
+            <article class="feature-card">
+              <div class="icon">⇄</div>
+              <h3>WebDAV 同步</h3>
+              <p>在多设备间同步书签、设置、工作空间与分组配置。</p>
+            </article>
+            <article class="feature-card">
+              <div class="icon">▤</div>
+              <h3>网页快照</h3>
+              <p>本地保存正文和页面快照，原网页失效后仍可回看。</p>
+            </article>
+            <article class="feature-card">
+              <div class="icon">⌕</div>
+              <h3>语义检索</h3>
+              <p>不记得标题也没关系，输入意思接近的话也能找回来。</p>
+            </article>
+            <article class="feature-card">
+              <div class="icon">⌘</div>
+              <h3>分类方案</h3>
+              <p>内置模板，也支持让 AI 根据使用场景生成分类结构。</p>
+            </article>
+            <article class="feature-card">
+              <div class="icon">◫</div>
+              <h3>自定义筛选</h3>
+              <p>把复杂查询保存成预设，重复查找时一步直达。</p>
+            </article>
+            <article class="feature-card">
+              <div class="icon">↥</div>
+              <h3>导入导出</h3>
+              <p>兼容 Chrome、Firefox、Edge 标准文件，迁移更轻松。</p>
+            </article>
+          </div>
+        </section>
+
+        <section class="shell section privacy">
+          <div class="privacy-copy">
+            <div class="section-kicker">隐私优先</div>
+            <h2>AI 有边界，数据也该可控</h2>
+            <p>
+              HamHome 提供细粒度存储管理、隐私域名黑名单和可控的数据清理。
+              你可以享受 AI 效率，也能决定哪些内容不进入分析流程。
+            </p>
+          </div>
+          <div class="privacy-board">
+            <article class="privacy-card">
+              <strong>本地存储</strong>
+              <p>Chrome Storage + IndexedDB，书签、快照、向量数据分项可见。</p>
+              <div class="meter"><span></span></div>
+            </article>
+            <article class="privacy-card">
+              <strong>隐私域名</strong>
+              <p>银行、邮箱、后台等敏感站点可直接跳过 AI 分析。</p>
+              <div class="chips">
+                <span class="chip">mail.example.com</span>
+                <span class="chip">bank.example.com</span>
+              </div>
+            </article>
+            <article class="privacy-card large">
+              <strong>同步不等于失控</strong>
+              <p>
+                WebDAV 支持加密同步、状态提示和远程数据清理，适合在多设备之间迁移，又不牺牲控制权。
+              </p>
+            </article>
+          </div>
+        </section>
+
+        <section class="shell cta">
+          <div class="cta-band">
+            <div>
+              <h2>让收藏不再沉底</h2>
+              <p>支持 Chrome、Edge、Firefox。现在开始，把浏览器变成真正可用的知识入口。</p>
+            </div>
+            <div class="cta-actions">
+              <span class="button button-primary">↓ 下载安装</span>
+              <span class="button button-secondary">查看 GitHub</span>
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer class="shell footer">
+        <span>HamHome - 智能书签助手</span>
+        <div class="browser-list">
+          <span>Chrome</span>
+          <span>Edge</span>
+          <span>Firefox</span>
+          <span>WebDAV</span>
+        </div>
+      </footer>
+    </div>
+  </body>
+</html>

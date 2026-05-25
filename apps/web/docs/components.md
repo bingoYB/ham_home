@@ -7,6 +7,12 @@ app/components/
 ├── Header.tsx          # 导航栏组件
 ├── Footer.tsx          # 页脚组件
 ├── PrivacyPolicyContent.tsx # 隐私权政策内容组件
+├── LandingActionButtons.tsx # 首页下载与 GitHub 按钮组
+├── LandingOverview.tsx # 首页能力摘要与三步工作流
+├── LandingCapabilities.tsx # 更多能力网格
+├── LandingPrivacy.tsx  # 隐私优先说明区
+├── LandingCta.tsx      # 首页底部行动区
+├── FeatureHeroBanner.tsx # 首页首屏 Hero
 ├── FeatureSection.tsx  # 功能区块容器 (垂直布局)
 ├── FeatureShowcase.tsx # 功能展示区 (垂直排列各功能区块)
 ├── index.ts            # 导出入口
@@ -14,7 +20,7 @@ app/components/
     ├── SaveBookmarkDemo.tsx    # 保存书签演示
     ├── BookmarkPanelDemo.tsx   # 书签面板演示
     ├── BookmarkListMngDemo.tsx # 书签管理演示
-    ├── WorkspaceDemo.tsx       # 工作空间与 Tab 分组演示
+    ├── WorkspaceDemo.tsx       # 工作空间与 Tab 自动分组演示
     ├── CategoriesDemo.tsx      # 分类方案演示
     ├── AIChatSearchDemo.tsx    # AI 对话搜索演示
     ├── ImportExportDemo.tsx    # 导入导出演示
@@ -61,9 +67,33 @@ app/components/
 
 ---
 
+## HomePage
+
+首页页面组件，负责组合导航、Hero、能力摘要、功能展示区、更多能力、隐私优先、底部 CTA 和页脚。
+
+### Props
+
+无
+
+### Usage
+
+```tsx
+<HomePage />
+```
+
+### 行为说明
+
+- 页面根容器使用 `home-page-shell`，并应用设计稿中的深色基底与三层径向渐变背景
+- 根据当前主题和语言偏好渲染对应内容
+- 使用 `LandingOverview` 承接首屏下方的能力摘要与“从收藏到找回”三步路径
+- 使用 `LandingCapabilities`、`LandingPrivacy`、`LandingCta` 补齐设计稿下半部分内容
+- 背景层只负责页面级视觉，不承载业务逻辑
+
+---
+
 ## Footer
 
-页脚组件，显示品牌标语，并提供首页、隐私权政策和 GitHub 入口。
+页脚组件，显示品牌标语、支持平台标签、隐私权政策入口和 GitHub 入口。
 
 ### Props
 
@@ -80,9 +110,152 @@ app/components/
 ### 行为说明
 
 - 始终显示品牌标语
-- 提供首页链接 `/`
+- 展示 Chrome、Edge、Firefox、WebDAV 支持项
 - 提供隐私权政策链接 `/privacy-policy`
 - 提供 GitHub 外链入口
+
+---
+
+## FeatureHeroBanner
+
+首页首屏 Hero 组件，展示 HamHome 品牌、主标题、价值描述、下载入口、GitHub 入口和产品预览图。
+
+### Props
+
+| name | type | required | default | description |
+|------|------|----------|---------|-------------|
+| isEn | boolean | ✓ | - | 当前是否为英文模式 |
+| isDark | boolean | ✓ | - | 当前是否为深色主题，用于切换预览图 |
+
+### Usage
+
+```tsx
+<FeatureHeroBanner isEn={isEn} isDark={isDark} />
+```
+
+### 行为说明
+
+- 根据语言切换标题与描述
+- 根据主题切换深色或浅色产品预览图
+- 下载和 GitHub 操作复用 `LandingActionButtons`
+
+---
+
+## LandingActionButtons
+
+首页复用按钮组，封装推荐下载入口与 GitHub 外链入口。
+
+### Props
+
+| name | type | required | default | description |
+|------|------|----------|---------|-------------|
+| isEn | boolean | ✓ | - | 当前是否为英文模式 |
+| className | string | ✗ | - | 按钮组额外样式 |
+| downloadLabel | string | ✗ | 根据语言生成 | 下载按钮文案 |
+| githubLabel | string | ✗ | GitHub | GitHub 按钮文案 |
+
+### Usage
+
+```tsx
+<LandingActionButtons isEn={isEn} downloadLabel="下载安装" />
+```
+
+### 行为说明
+
+- 下载按钮复用 `openRecommendedDownload()`，自动根据当前浏览器打开推荐渠道
+- GitHub 按钮打开项目仓库新窗口
+
+---
+
+## LandingOverview
+
+首页首屏下方概览组件，展示四个核心能力摘要，并说明“收藏、管理、找回”的三步路径。
+
+### Props
+
+| name | type | required | default | description |
+|------|------|----------|---------|-------------|
+| isEn | boolean | ✓ | - | 当前是否为英文模式 |
+
+### Usage
+
+```tsx
+<LandingOverview isEn={isEn} />
+```
+
+### 行为说明
+
+- 根据语言切换能力摘要和三步路径文案
+- 四个能力摘要为静态展示，不包含交互
+
+---
+
+## LandingCapabilities
+
+更多能力网格组件，用于展示 WebDAV 同步、网页快照、语义检索、分类方案、自定义筛选和导入导出。
+
+### Props
+
+| name | type | required | default | description |
+|------|------|----------|---------|-------------|
+| isEn | boolean | ✓ | - | 当前是否为英文模式 |
+
+### Usage
+
+```tsx
+<LandingCapabilities isEn={isEn} />
+```
+
+### 行为说明
+
+- 使用六个静态能力卡片，按语言切换标题和描述
+- 每个卡片使用 Lucide 图标和不同强调色
+
+---
+
+## LandingPrivacy
+
+隐私优先说明组件，展示本地存储、隐私域名和 WebDAV 可控同步。
+
+### Props
+
+| name | type | required | default | description |
+|------|------|----------|---------|-------------|
+| isEn | boolean | ✓ | - | 当前是否为英文模式 |
+
+### Usage
+
+```tsx
+<LandingPrivacy isEn={isEn} />
+```
+
+### 行为说明
+
+- 根据语言切换隐私说明文案
+- 使用静态存储进度条和示例域名芯片表达可控范围
+
+---
+
+## LandingCta
+
+首页底部行动区组件，承接下载和 GitHub 查看两个主要操作。
+
+### Props
+
+| name | type | required | default | description |
+|------|------|----------|---------|-------------|
+| isEn | boolean | ✓ | - | 当前是否为英文模式 |
+
+### Usage
+
+```tsx
+<LandingCta isEn={isEn} />
+```
+
+### 行为说明
+
+- 复用 `LandingActionButtons`，保证 Hero 与底部 CTA 的下载行为一致
+- 按语言切换标题、描述和按钮文案
 
 ---
 
@@ -108,8 +281,8 @@ app/components/
 <FeatureSection
   id="ai-save"
   icon={<Sparkles className="h-5 w-5" />}
-  title="AI 智能书签收藏"
-  description="一键保存书签，AI 自动生成摘要..."
+  title="AI 智能收藏"
+  description="将值得保留的页面沉淀为结构化收藏..."
   alternate
 >
   <SaveBookmarkDemo ... />
@@ -146,8 +319,8 @@ app/components/
 
 ### 包含的功能区块（垂直排列）
 
-1. **AI 智能书签收藏** - SaveBookmarkDemo
-2. **工作空间与 Tab 分组** - WorkspaceDemo
+1. **工作空间与 Tab 自动分组** - WorkspaceDemo
+2. **AI 智能收藏** - SaveBookmarkDemo
 3. **侧边栏书签面板** - BookmarkPanelDemo
 4. **全功能书签管理** - BookmarkListMngDemo
 5. **智能分类方案** - CategoriesDemo
@@ -264,7 +437,7 @@ app/components/
 
 ## WorkspaceDemo
 
-工作空间与 Tab 分组演示组件，展示标签页管理、AI智能分组与云同步等功能。
+工作空间与 Tab 自动分组演示组件，展示标签页管理、AI 智能分组与云同步等功能。
 
 ### Props
 

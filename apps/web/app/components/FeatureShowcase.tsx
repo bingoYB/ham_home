@@ -27,12 +27,21 @@ export function FeatureShowcase({
 }: FeatureShowcaseProps) {
   const features = [
     {
+      id: 'workspace-manage',
+      icon: <MonitorDot className="h-5 w-5" />,
+      title: isEn ? 'Workspaces & Auto Tab Grouping' : '工作空间与 Tab 自动分组',
+      description: isEn
+        ? 'Save the tabs already open in your browser, restore them later, and automatically group active sessions by rules or AI.'
+        : '保存浏览器中已打开的 Tab，稍后随时恢复，并通过规则或 AI 自动整理当前会话。',
+      content: <WorkspaceDemo isEn={isEn} />,
+    },
+    {
       id: 'ai-save',
       icon: <Sparkles className="h-5 w-5" />,
-      title: isEn ? 'AI-Powered Bookmark Saving' : 'AI 智能书签收藏',
+      title: isEn ? 'AI-Powered Collections' : 'AI 智能收藏',
       description: isEn
-        ? 'One-click save with AI that automatically generates summaries, suggests categories, and recommends tags. All analysis runs locally for maximum privacy.'
-        : '一键保存书签，AI 自动生成摘要、智能推荐分类与标签。所有分析均在本地运行，保护你的隐私。',
+        ? 'Turn valuable pages into structured collections with AI-generated summaries, smart categories, tags, and local-first privacy.'
+        : '将值得保留的页面沉淀为结构化收藏，AI 自动生成摘要、分类和标签，并坚持本地优先。',
       content: (
         <SaveBookmarkDemo
           pageContent={pageContent}
@@ -41,15 +50,6 @@ export function FeatureShowcase({
           isEn={isEn}
         />
       ),
-    },
-    {
-      id: 'workspace-manage',
-      icon: <MonitorDot className="h-5 w-5" />,
-      title: isEn ? 'Workspace & Tab Groups' : '工作空间与 Tab 分组',
-      description: isEn
-        ? 'Seamlessly manage your browser tabs. Group by topics with AI, save as workspaces or bookmarks, and sync across devices.'
-        : '无缝管理浏览器标签页。支持 AI 智能话题分组、一键保存工作区或转为书签，并在多设备间自动同步。',
-      content: <WorkspaceDemo isEn={isEn} />,
     },
     {
       id: 'sidebar-panel',

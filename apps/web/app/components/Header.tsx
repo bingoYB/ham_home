@@ -128,7 +128,7 @@ export function Header({ isDark, isEn, onToggleTheme, onToggleLanguage }: Header
           <div>
             <span className="text-xl font-bold block">HamHome</span>
             <span className="text-xs text-muted-foreground block">
-              {isEn ? 'Smart Bookmark Assistant' : '智能书签助手'}
+              {isEn ? 'Smart Browser Workspace' : '智能浏览器工作空间'}
             </span>
           </div>
         </div>
