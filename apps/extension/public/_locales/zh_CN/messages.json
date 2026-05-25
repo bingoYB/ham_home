@@ -1,10 +1,10 @@
 {
   "extName": {
-    "message": "HamHome - 智能书签助手",
+    "message": "HamHome - 智能浏览器工作空间",
     "description": "扩展名称"
   },
   "extDescription": {
-    "message": "让收藏不再积灰，AI 驱动的智能书签管理工具",
+    "message": "保存 Tab、自动分组，并用 AI 管理书签与收藏内容",
     "description": "扩展描述"
   },
   "commandSaveBookmark": {

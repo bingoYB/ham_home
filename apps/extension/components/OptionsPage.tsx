@@ -2,2452 +2,304 @@
  * OptionsPage 设置页面
  * 迁移自 design-example，整合现有设置功能
  */
-import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import {
-  Sparkles,
   Globe,
   Database,
-  ChevronDown,
-  CheckCircle2,
-  Loader2,
-  Download,
-  Trash2,
-  Plus,
-  ExternalLink,
-  Check,
-  ChevronsUpDown,
-  Search,
-  RefreshCw,
-  AlertTriangle,
+  Sparkles,
 } from "lucide-react";
 import {
-  Button,
-  Input,
-  Label,
-  Switch,
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-  CommandSeparator,
-  cn,
 } from "@hamhome/ui";
-import { useBookmarks } from "@/contexts/BookmarkContext";
-import { useLanguage } from "@/hooks/useLanguage";
-import { useShortcuts } from "@/hooks/useShortcuts";
-import { useRelativeTime } from "@/hooks/useRelativeTime";
-import { configStorage } from "@/lib/storage/config-storage";
-import { CustomFilterDialog } from "@/components/bookmarkPanel/CustomFilterDialog";
-import {
-  getBrowserSpecificURL,
-  isFirefox,
-  safeCreateTab,
-} from "@/utils/browser-api";
-import { snapshotStorage } from "@/lib/storage/snapshot-storage";
-import {
-  agentConfigService,
-  getDefaultModel,
-  getProviderModels,
-  isEmbeddingSupported,
-  getDefaultEmbeddingModel,
-  PROVIDER_DEFAULTS,
-  EMBEDDING_PROVIDER_DEFAULTS,
-} from "@/lib/agent";
-import { getBackgroundService } from "@/lib/services";
-import type { QueueProgress } from "@/lib/embedding/embedding-queue";
-import type { VectorStoreStats } from "@/lib/storage/vector-store";
-import type {
-  CustomFilter,
-  FilterCondition,
-  AIProvider,
-  EmbeddingConfig,
-} from "@/types";
-import { browser } from "wxt/browser";
-import { syncEngine } from "@/lib/sync/sync-engine";
+import { useOptionsPage } from "@/hooks/useOptionsPage";
+import { AITab } from "./options/AITab";
+import { GeneralTab } from "./options/GeneralTab";
+import { StorageTab } from "./options/StorageTab";
+import { OptionsDialogs } from "./options/OptionsDialogs";
 
 export function OptionsPage() {
-  const { t } = useTranslation(["common", "settings"]);
-  const { language, switchLanguage, availableLanguages } = useLanguage();
-  const { shortcuts, refresh: refreshShortcuts } = useShortcuts();
   const {
+    t,
+    language,
+    switchLanguage,
+    availableLanguages,
+    shortcuts,
+    refreshShortcuts,
     aiConfig,
     appSettings,
     syncConfig,
     syncStatus,
     storageInfo,
+    activeTab,
+    handleTabChange,
+    isAdvancedOpen,
+    setIsAdvancedOpen,
+    isTesting,
+    showClearDialog,
+    setShowClearDialog,
+    showClearBookmarkDialog,
+    setShowClearBookmarkDialog,
+    showClearSnapshotDialog,
+    setShowClearSnapshotDialog,
+    showClearRemoteDialog,
+    setShowClearRemoteDialog,
+    isClearingBookmarks,
+    isClearingSnapshots,
+    isClearingRemote,
+    relativeSyncTime,
+    isClearingAll,
+    testResult,
+    newTag,
+    setNewTag,
+    customFilters,
+    filterDialogOpen,
+    setFilterDialogOpen,
+    editingFilter,
+    setEditingFilter,
+    deleteFilterTarget,
+    setDeleteFilterTarget,
+    localApiKey,
+    setLocalApiKey,
+    localBaseUrl,
+    setLocalBaseUrl,
+    localModel,
+    setLocalModel,
+    modelSelectorOpen,
+    setModelSelectorOpen,
+    remoteModels,
+    isFetchingModels,
+    modelFetchResult,
+    embeddingConfig,
+    localEmbeddingApiKey,
+    setLocalEmbeddingApiKey,
+    localEmbeddingBaseUrl,
+    setLocalEmbeddingBaseUrl,
+    localEmbeddingModel,
+    setLocalEmbeddingModel,
+    embeddingTestResult,
+    isEmbeddingTesting,
+    vectorStats,
+    isLoadingStats,
+    isRebuilding,
+    rebuildProgress,
+    showFullRebuildDialog,
+    setShowFullRebuildDialog,
+    showClearVectorsDialog,
+    setShowClearVectorsDialog,
+    isClearing,
+    snapshotStats,
+    handleAutoSaveSnapshotChange,
+    formatBytes,
+    localWebdavUrl,
+    setLocalWebdavUrl,
+    localWebdavUser,
+    setLocalWebdavUser,
+    localWebdavPwd,
+    setLocalWebdavPwd,
+    localWebdavE2e,
+    setLocalWebdavE2e,
+    isSyncing,
+    setIsSyncing,
     updateAIConfig,
     updateAppSettings,
     updateSyncConfig,
-    clearAllData,
-    clearBookmarkData,
-    exportData,
-  } = useBookmarks();
-
-  const [activeTab, setActiveTab] = useState(() => {
-    const hash = window.location.hash;
-    if (hash.includes("?")) {
-      const qs = hash.split("?")[1];
-      const tab = new URLSearchParams(qs).get("tab");
-      if (tab && (tab === "ai" || tab === "general" || tab === "storage")) {
-        return tab;
-      }
-    }
-    return "ai";
-  });
-
-  // 监听路由参数变化更新 Tab
-  useEffect(() => {
-    const handleHashChange = () => {
-      const hash = window.location.hash;
-      if (hash.includes("?")) {
-        const qs = hash.split("?")[1];
-        const tab = new URLSearchParams(qs).get("tab");
-        if (tab && (tab === "ai" || tab === "general" || tab === "storage")) {
-          setActiveTab(tab);
-        }
-      }
-    };
-    window.addEventListener("hashchange", handleHashChange);
-    return () => window.removeEventListener("hashchange", handleHashChange);
-  }, []);
-
-  const handleTabChange = (value: string) => {
-    setActiveTab(value);
-    const hashBase = window.location.hash.split("?")[0] || "#settings";
-    window.location.hash = `${hashBase}?tab=${value}`;
-  };
-
-  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
-  const [isTesting, setIsTesting] = useState(false);
-  const [showClearDialog, setShowClearDialog] = useState(false);
-  const [showClearBookmarkDialog, setShowClearBookmarkDialog] = useState(false);
-  const [showClearSnapshotDialog, setShowClearSnapshotDialog] = useState(false);
-  const [showClearRemoteDialog, setShowClearRemoteDialog] = useState(false);
-  const [isClearingBookmarks, setIsClearingBookmarks] = useState(false);
-  const [isClearingSnapshots, setIsClearingSnapshots] = useState(false);
-  const [isClearingRemote, setIsClearingRemote] = useState(false);
-  const [showCustomFilters, setShowCustomFilters] = useState(false);
-  const [selectedFilter, setSelectedFilter] = useState<CustomFilter | null>(
-    null,
-  );
-
-  const relativeSyncTime = useRelativeTime(
-    syncStatus?.lastSyncTime || undefined,
-  );
-
-  // 初始化加载数据
-  const [isClearingAll, setIsClearingAll] = useState(false);
-  const [testResult, setTestResult] = useState<{
-    status: "success" | "error" | "warning";
-    message: string;
-  } | null>(null);
-  const [newTag, setNewTag] = useState("");
-
-  // 自定义筛选器管理状态
-  const [customFilters, setCustomFilters] = useState<CustomFilter[]>([]);
-  const [filterDialogOpen, setFilterDialogOpen] = useState(false);
-  const [editingFilter, setEditingFilter] = useState<CustomFilter | null>(null);
-  const [deleteFilterTarget, setDeleteFilterTarget] =
-    useState<CustomFilter | null>(null);
-
-  // 本地状态用于输入框，避免光标跳动
-  const [localApiKey, setLocalApiKey] = useState("");
-  const [localBaseUrl, setLocalBaseUrl] = useState("");
-  const [localModel, setLocalModel] = useState("");
-  const [modelSelectorOpen, setModelSelectorOpen] = useState(false);
-  const [remoteModels, setRemoteModels] = useState<string[]>([]);
-  const [isFetchingModels, setIsFetchingModels] = useState(false);
-  const [modelFetchResult, setModelFetchResult] = useState<{
-    status: "success" | "error";
-    message: string;
-  } | null>(null);
-
-  // Embedding 配置状态
-  const [embeddingConfig, setEmbeddingConfig] = useState<EmbeddingConfig>({
-    enabled: false,
-    provider: "openai",
-    model: "text-embedding-3-small",
-    batchSize: 16,
-  });
-  const [localEmbeddingApiKey, setLocalEmbeddingApiKey] = useState("");
-  const [localEmbeddingBaseUrl, setLocalEmbeddingBaseUrl] = useState("");
-  const [localEmbeddingModel, setLocalEmbeddingModel] = useState("");
-  const [embeddingTestResult, setEmbeddingTestResult] = useState<{
-    status: "success" | "error";
-    message: string;
-  } | null>(null);
-  const [isEmbeddingTesting, setIsEmbeddingTesting] = useState(false);
-  const [vectorStats, setVectorStats] = useState<VectorStoreStats | null>(null);
-  const [isLoadingStats, setIsLoadingStats] = useState(false);
-  const [isRebuilding, setIsRebuilding] = useState(false);
-  const [rebuildProgress, setRebuildProgress] = useState<QueueProgress | null>(
-    null,
-  );
-  const [showFullRebuildDialog, setShowFullRebuildDialog] = useState(false);
-  const [showClearVectorsDialog, setShowClearVectorsDialog] = useState(false);
-  const [isClearing, setIsClearing] = useState(false);
-  const [snapshotStats, setSnapshotStats] = useState<{
-    count: number;
-    totalSize: number;
-  } | null>(null);
-
-  const handleAutoSaveSnapshotChange = (checked: boolean) => {
-    updateAppSettings({
-      autoSaveSnapshot: checked,
-    });
-  };
-
-  // 辅助函数：格式化字节大小
-  const formatBytes = (bytes: number) => {
-    if (bytes === 0) return "0 B";
-    const k = 1024;
-    const sizes = ["B", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
-  };
-
-  // WebDAV 本地输入状态
-  const [localWebdavUrl, setLocalWebdavUrl] = useState("");
-  const [localWebdavUser, setLocalWebdavUser] = useState("");
-  const [localWebdavPwd, setLocalWebdavPwd] = useState("");
-  const [localWebdavE2e, setLocalWebdavE2e] = useState("");
-  const [isSyncing, setIsSyncing] = useState(false);
-
-  // 同步 aiConfig 到本地状态
-  useEffect(() => {
-    setLocalApiKey(aiConfig.apiKey || "");
-    setLocalBaseUrl(aiConfig.baseUrl || "");
-    setLocalModel(aiConfig.model || "");
-  }, [aiConfig.apiKey, aiConfig.baseUrl, aiConfig.model]);
-
-  useEffect(() => {
-    setRemoteModels([]);
-    setModelFetchResult(null);
-  }, [aiConfig.provider, localApiKey, localBaseUrl]);
-
-  // 同步 WebDAVConfig 到本地状态
-  useEffect(() => {
-    setLocalWebdavUrl(syncConfig?.url || "");
-    setLocalWebdavUser(syncConfig?.username || "");
-    setLocalWebdavPwd(syncConfig?.password || "");
-    setLocalWebdavE2e(syncConfig?.e2ePassword || "");
-  }, [
-    syncConfig?.url,
-    syncConfig?.username,
-    syncConfig?.password,
-    syncConfig?.e2ePassword,
-  ]);
-
-  // 加载自定义筛选器
-  useEffect(() => {
-    const loadCustomFilters = async () => {
-      try {
-        const filters = await configStorage.getCustomFilters();
-        setCustomFilters(filters);
-      } catch (error) {
-        console.error("[OptionsPage] Failed to load custom filters:", error);
-      }
-    };
-    loadCustomFilters();
-  }, []);
-
-  // 加载 Embedding 配置
-  useEffect(() => {
-    const loadEmbeddingConfig = async () => {
-      try {
-        const config = await configStorage.getEmbeddingConfig();
-        setEmbeddingConfig(config);
-        setLocalEmbeddingApiKey(config.apiKey || "");
-        setLocalEmbeddingBaseUrl(config.baseUrl || "");
-        setLocalEmbeddingModel(config.model || "");
-      } catch (error) {
-        console.error("[OptionsPage] Failed to load embedding config:", error);
-      }
-    };
-    loadEmbeddingConfig();
-  }, []);
-
-  // 加载向量统计信息（通过 background service）
-  const loadVectorStats = useCallback(async () => {
-    // 只在 embedding 功能启用时加载统计
-    if (!embeddingConfig.enabled) {
-      setVectorStats(null);
-      return;
-    }
-    setIsLoadingStats(true);
-    try {
-      const bgService = getBackgroundService();
-      const stats = await bgService.getVectorStats();
-      setVectorStats(stats);
-    } catch (error) {
-      console.error("[OptionsPage] Failed to load vector stats:", error);
-      setVectorStats(null);
-    } finally {
-      setIsLoadingStats(false);
-    }
-  }, [embeddingConfig.enabled]);
-
-  useEffect(() => {
-    loadVectorStats();
-  }, [loadVectorStats]);
-
-  // 监听 background service 的 embedding 进度消息
-  useEffect(() => {
-    const handleMessage = (message: {
-      type: string;
-      payload?: QueueProgress;
-    }) => {
-      if (message.type === "EMBEDDING_PROGRESS" && message.payload) {
-        const progress = message.payload;
-        setRebuildProgress(progress);
-
-        // 当进度达到 100% 时，刷新统计并重置状态
-        if (progress.percentage >= 100) {
-          setIsRebuilding(false);
-          setRebuildProgress(null);
-          loadVectorStats();
-        }
-      }
-    };
-
-    browser.runtime.onMessage.addListener(handleMessage);
-    return () => {
-      browser.runtime.onMessage.removeListener(handleMessage);
-    };
-  }, [loadVectorStats]);
-
-  // 加载快照统计信息
-  const loadSnapshotStats = useCallback(async () => {
-    try {
-      const stats = await snapshotStorage.getStorageUsage();
-      setSnapshotStats(stats);
-    } catch (error) {
-      console.error("[OptionsPage] Failed to load snapshot stats:", error);
-      setSnapshotStats(null);
-    }
-  }, []);
-
-  useEffect(() => {
-    loadSnapshotStats();
-  }, [loadSnapshotStats]);
-
-  const handleTestConnection = async () => {
-    setIsTesting(true);
-    setTestResult(null);
-
-    try {
-      // 确保最新配置已保存到 storage
-      await updateAIConfig({});
-
-      // 执行真实连接测试
-      const result = await agentConfigService.testConnection();
-
-      if (result.success) {
-        setTestResult({ status: "success", message: result.message });
-      } else {
-        setTestResult({ status: "error", message: result.message });
-      }
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "连接失败，请检查配置";
-      setTestResult({ status: "error", message });
-    } finally {
-      setIsTesting(false);
-    }
-  };
-
-  const handleFetchModels = async () => {
-    setIsFetchingModels(true);
-    setModelFetchResult(null);
-    setModelSelectorOpen(true);
-
-    try {
-      const result = await agentConfigService.listAvailableModels({
-        provider: aiConfig.provider,
-        apiKey: localApiKey.trim(),
-        baseUrl: localBaseUrl.trim(),
-      });
-
-      setRemoteModels(result.models);
-      setModelFetchResult({
-        status: "success",
-        message: t("settings:settings.ai.fetchModelsSuccess", {
-          count: result.models.length,
-        }),
-      });
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : t("common:common.error");
-
-      setRemoteModels([]);
-      setModelFetchResult({
-        status: "error",
-        message: t("settings:settings.ai.fetchModelsFailed", {
-          error: message,
-        }),
-      });
-    } finally {
-      setIsFetchingModels(false);
-    }
-  };
-
-  const recommendedModels = getProviderModels(aiConfig.provider).filter(
-    (model) => !remoteModels.includes(model),
-  );
-
-  const renderModelOption = (model: string) => (
-    <CommandItem
-      key={model}
-      value={model}
-      onSelect={(value) => {
-        setLocalModel(value);
-        updateAIConfig({ model: value });
-        setModelSelectorOpen(false);
-      }}
-    >
-      <Check
-        className={cn(
-          "mr-2 h-4 w-4",
-          localModel === model ? "opacity-100" : "opacity-0",
-        )}
-      />
-      {model}
-    </CommandItem>
-  );
-
-  const handleClearData = async () => {
-    setShowClearDialog(false);
-    setIsClearingAll(true);
-    try {
-      // 清除书签/分类数据
-      await clearAllData();
-      // 清除快照
-      await snapshotStorage.clearAllSnapshots();
-      await loadSnapshotStats();
-      // 清除向量
-      const bgService = getBackgroundService();
-      await bgService.clearVectorStore();
-      await loadVectorStats();
-    } catch (error) {
-      console.error("[OptionsPage] Failed to clear all data:", error);
-    } finally {
-      setIsClearingAll(false);
-    }
-  };
-
-  const handleClearBookmarkData = async () => {
-    setShowClearBookmarkDialog(false);
-    setIsClearingBookmarks(true);
-    try {
-      await clearBookmarkData();
-    } catch (error) {
-      console.error("[OptionsPage] Failed to clear bookmark data:", error);
-    } finally {
-      setIsClearingBookmarks(false);
-    }
-  };
-
-  const handleClearSnapshotData = async () => {
-    setShowClearSnapshotDialog(false);
-    setIsClearingSnapshots(true);
-    try {
-      await snapshotStorage.clearAllSnapshots();
-      await loadSnapshotStats();
-    } catch (error) {
-      console.error("[OptionsPage] Failed to clear snapshots:", error);
-    } finally {
-      setIsClearingSnapshots(false);
-    }
-  };
-
-  const handleClearRemoteData = async () => {
-    setShowClearRemoteDialog(false);
-    setIsClearingRemote(true);
-    try {
-      await syncEngine.clearRemoteData();
-    } catch (error) {
-      console.error("[OptionsPage] Failed to clear remote data:", error);
-    } finally {
-      setIsClearingRemote(false);
-    }
-  };
-
-  const handleExport = (format: "json" | "html") => {
-    exportData(format);
-  };
-
-  const handleAddTag = () => {
-    if (newTag.trim()) {
-      const currentTags = aiConfig.presetTags || [];
-      if (!currentTags.includes(newTag.trim())) {
-        updateAIConfig({ presetTags: [...currentTags, newTag.trim()] });
-        setNewTag("");
-      }
-    }
-  };
-
-  const handleRemoveTag = (indexToRemove: number) => {
-    const currentTags = aiConfig.presetTags || [];
-    updateAIConfig({
-      presetTags: currentTags.filter((_, index) => index !== indexToRemove),
-    });
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      e.preventDefault();
-      handleAddTag();
-    }
-  };
-
-  // Embedding 配置更新
-  const updateEmbeddingConfig = async (updates: Partial<EmbeddingConfig>) => {
-    try {
-      const updated = await configStorage.setEmbeddingConfig(updates);
-      setEmbeddingConfig(updated);
-      // 配置保存后，background service 会自动加载新配置
-    } catch (error) {
-      console.error("[OptionsPage] Failed to update embedding config:", error);
-    }
-  };
-
-  // 测试 Embedding 连接（通过 background service）
-  const handleTestEmbeddingConnection = async () => {
-    setIsEmbeddingTesting(true);
-    setEmbeddingTestResult(null);
-
-    try {
-      // 确保最新配置已保存
-      await updateEmbeddingConfig({});
-
-      // 通过 background service 测试连接
-      const bgService = getBackgroundService();
-      const result = await bgService.testEmbeddingConnection();
-
-      if (result.success) {
-        setEmbeddingTestResult({
-          status: "success",
-          message: t("settings:settings.ai.embedding.testSuccess", {
-            dimensions: result.dimensions,
-          }),
-        });
-      } else {
-        setEmbeddingTestResult({
-          status: "error",
-          message: t("settings:settings.ai.embedding.testFailed", {
-            error: result.error,
-          }),
-        });
-      }
-    } catch (error) {
-      setEmbeddingTestResult({
-        status: "error",
-        message: t("settings:settings.ai.embedding.testFailed", {
-          error: error instanceof Error ? error.message : "Unknown error",
-        }),
-      });
-    } finally {
-      setIsEmbeddingTesting(false);
-    }
-  };
-
-  // 增量重建向量索引（直接执行，不需要确认）
-  const handleIncrementalRebuild = async () => {
-    setIsRebuilding(true);
-    setRebuildProgress(null);
-
-    try {
-      const bgService = getBackgroundService();
-      // 增量重建（只对未覆盖的书签生成向量）
-      await bgService.startEmbeddingRebuildIncremental();
-
-      // 注意：进度更新通过消息监听器接收（见 useEffect）
-      // 当队列完成时，消息会触发 loadVectorStats
-    } catch (error) {
-      console.error(
-        "[OptionsPage] Failed to start incremental rebuild:",
-        error,
-      );
-      setIsRebuilding(false);
-      setRebuildProgress(null);
-    }
-  };
-
-  // 全量重建向量索引（需要确认，会删除所有向量）
-  const handleFullRebuild = async () => {
-    setShowFullRebuildDialog(false);
-    setIsRebuilding(true);
-    setRebuildProgress(null);
-
-    try {
-      const bgService = getBackgroundService();
-      // 全量重建（清空现有向量 + 重新生成所有）
-      await bgService.startEmbeddingRebuild();
-
-      // 注意：进度更新通过消息监听器接收（见 useEffect）
-      // 当队列完成时，消息会触发 loadVectorStats
-    } catch (error) {
-      console.error("[OptionsPage] Failed to start full rebuild:", error);
-      setIsRebuilding(false);
-      setRebuildProgress(null);
-    }
-  };
-
-  // 清除向量数据（通过 background service）
-  const handleClearVectors = async () => {
-    setShowClearVectorsDialog(false);
-    setIsClearing(true);
-
-    try {
-      const bgService = getBackgroundService();
-      await bgService.clearVectorStore();
-      await loadVectorStats();
-    } catch (error) {
-      console.error("[OptionsPage] Failed to clear vectors:", error);
-    } finally {
-      setIsClearing(false);
-    }
-  };
-
-  // 筛选器管理函数
-  const handleAddFilter = () => {
-    setEditingFilter(null);
-    setFilterDialogOpen(true);
-  };
-
-  const handleEditFilter = (filter: CustomFilter) => {
-    setEditingFilter(filter);
-    setFilterDialogOpen(true);
-  };
-
-  const handleSaveFilter = async (
-    name: string,
-    conditions: FilterCondition[],
-  ) => {
-    try {
-      if (editingFilter) {
-        // 更新现有筛选器
-        await configStorage.updateCustomFilter(editingFilter.id, {
-          name,
-          conditions,
-        });
-        setCustomFilters((prev) =>
-          prev.map((f) =>
-            f.id === editingFilter.id
-              ? { ...f, name, conditions, updatedAt: Date.now() }
-              : f,
-          ),
-        );
-      } else {
-        // 创建新筛选器
-        const newFilter: CustomFilter = {
-          id: `filter_${Date.now()}`,
-          name,
-          conditions,
-          createdAt: Date.now(),
-          updatedAt: Date.now(),
-        };
-        await configStorage.addCustomFilter(newFilter);
-        setCustomFilters((prev) => [...prev, newFilter]);
-      }
-      setFilterDialogOpen(false);
-      setEditingFilter(null);
-    } catch (error) {
-      console.error("[OptionsPage] Failed to save custom filter:", error);
-    }
-  };
-
-  const handleDeleteFilter = async () => {
-    if (!deleteFilterTarget) return;
-    try {
-      await configStorage.deleteCustomFilter(deleteFilterTarget.id);
-      setCustomFilters((prev) =>
-        prev.filter((f) => f.id !== deleteFilterTarget.id),
-      );
-      setDeleteFilterTarget(null);
-    } catch (error) {
-      console.error("[OptionsPage] Failed to delete custom filter:", error);
-    }
-  };
+    updateEmbeddingConfig,
+    onTestConnection: handleTestConnection,
+    onFetchModels: handleFetchModels,
+    recommendedModels,
+    onClearAllData: handleClearData,
+    onClearBookmarkData: handleClearBookmarkData,
+    onClearSnapshotData: handleClearSnapshotData,
+    onClearRemoteData: handleClearRemoteData,
+    onExport: handleExport,
+    onAddTag: handleAddTag,
+    onRemoveTag: handleRemoveTag,
+    onKeyDown: handleKeyDown,
+    onTestEmbeddingConnection: handleTestEmbeddingConnection,
+    onIncrementalRebuild: handleIncrementalRebuild,
+    onFullRebuild: handleFullRebuild,
+    onClearVectors: handleClearVectors,
+    onAddFilter: handleAddFilter,
+    onEditFilter: handleEditFilter,
+    onSaveFilter: handleSaveFilter,
+    onDeleteFilter: handleDeleteFilter,
+  } = useOptionsPage();
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-6">
+    <div className="w-full max-w-4xl mx-auto p-6 space-y-6">
+      <div className="flex items-center gap-3">
+        <Globe className="h-6 w-6 text-primary" />
+        <h1 className="text-2xl font-bold tracking-tight">
+          {t("settings:settings.title")}
+        </h1>
+      </div>
+
       <Tabs
         value={activeTab}
         onValueChange={handleTabChange}
         className="w-full"
       >
         <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="ai" className="gap-2">
+          <TabsTrigger value="ai" className="flex items-center gap-2">
             <Sparkles className="h-4 w-4" />
             {t("settings:settings.tabs.ai")}
           </TabsTrigger>
-          <TabsTrigger value="general" className="gap-2">
+          <TabsTrigger value="general" className="flex items-center gap-2">
             <Globe className="h-4 w-4" />
             {t("settings:settings.tabs.general")}
           </TabsTrigger>
-          <TabsTrigger value="storage" className="gap-2">
+          <TabsTrigger value="storage" className="flex items-center gap-2">
             <Database className="h-4 w-4" />
             {t("settings:settings.tabs.storage")}
           </TabsTrigger>
         </TabsList>
 
-        {/* AI 配置标签页 */}
         <TabsContent value="ai" className="space-y-6 mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("settings:settings.ai.title")}</CardTitle>
-              <CardDescription>
-                {t("settings:settings.ai.description")}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="space-y-2">
-                <Label htmlFor="provider">
-                  {t("settings:settings.ai.provider")}
-                </Label>
-                <Select
-                  value={aiConfig.provider}
-                  onValueChange={(value: AIProvider) => {
-                    const defaultModel = getDefaultModel(value);
-                    const defaultBaseUrl =
-                      PROVIDER_DEFAULTS[value]?.baseUrl || "";
-                    setLocalModel(defaultModel);
-                    setLocalBaseUrl(defaultBaseUrl);
-                    updateAIConfig({
-                      provider: value,
-                      model: defaultModel,
-                      baseUrl: defaultBaseUrl,
-                    });
-                  }}
-                >
-                  <SelectTrigger id="provider">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="openai">
-                      {t("settings:settings.providers.openai")}
-                    </SelectItem>
-                    <SelectItem value="anthropic">
-                      {t("settings:settings.providers.anthropic")}
-                    </SelectItem>
-                    <SelectItem value="google">
-                      {t("settings:settings.providers.google")}
-                    </SelectItem>
-                    <SelectItem value="azure">
-                      {t("settings:settings.providers.azure")}
-                    </SelectItem>
-                    <SelectItem value="deepseek">
-                      {t("settings:settings.providers.deepseek")}
-                    </SelectItem>
-                    <SelectItem value="groq">
-                      {t("settings:settings.providers.groq")}
-                    </SelectItem>
-                    <SelectItem value="mistral">
-                      {t("settings:settings.providers.mistral")}
-                    </SelectItem>
-                    <SelectItem value="moonshot">
-                      {t("settings:settings.providers.moonshot")}
-                    </SelectItem>
-                    <SelectItem value="zhipu">
-                      {t("settings:settings.providers.zhipu")}
-                    </SelectItem>
-                    <SelectItem value="hunyuan">
-                      {t("settings:settings.providers.hunyuan")}
-                    </SelectItem>
-                    <SelectItem value="nvidia">
-                      {t("settings:settings.providers.nvidia")}
-                    </SelectItem>
-                    <SelectItem value="siliconflow">
-                      {t("settings:settings.providers.siliconflow")}
-                    </SelectItem>
-                    <SelectItem value="ollama">
-                      {t("settings:settings.providers.ollama")}
-                    </SelectItem>
-                    <SelectItem value="custom">
-                      {t("settings:settings.providers.custom")}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="apiKey">{t("settings:settings.apiKey")}</Label>
-                <Input
-                  id="apiKey"
-                  type="password"
-                  placeholder={t("settings:settings.ai.apiKeyPlaceholder")}
-                  value={localApiKey}
-                  onChange={(e) => setLocalApiKey(e.target.value)}
-                  onBlur={(e) => updateAIConfig({ apiKey: e.target.value })}
-                />
-                <p className="text-xs text-muted-foreground">
-                  {t("settings:settings.ai.apiKeyDesc")}
-                </p>
-              </div>
-
-              {/* Base URL 始终显示 */}
-              <div className="space-y-2">
-                <Label htmlFor="baseUrl">
-                  {t("settings:settings.ai.baseUrl")}
-                </Label>
-                <Input
-                  id="baseUrl"
-                  type="url"
-                  placeholder={t("settings:settings.ai.baseUrlPlaceholder")}
-                  value={localBaseUrl}
-                  onChange={(e) => setLocalBaseUrl(e.target.value)}
-                  onBlur={(e) => updateAIConfig({ baseUrl: e.target.value })}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-3">
-                  <Label htmlFor="model" onClick={(e) => e.preventDefault()}>
-                    {t("settings:settings.ai.model")}
-                  </Label>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={handleFetchModels}
-                    disabled={isFetchingModels}
-                  >
-                    {isFetchingModels ? (
-                      <>
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        {t("settings:settings.ai.fetchingModels")}
-                      </>
-                    ) : (
-                      <>
-                        <RefreshCw className="mr-2 h-4 w-4" />
-                        {t("settings:settings.ai.fetchModels")}
-                      </>
-                    )}
-                  </Button>
-                </div>
-                <Popover
-                  open={modelSelectorOpen}
-                  onOpenChange={setModelSelectorOpen}
-                >
-                  <PopoverTrigger asChild>
-                    <div className="relative">
-                      <Input
-                        id="model"
-                        placeholder={t("settings:settings.ai.modelPlaceholder")}
-                        value={localModel}
-                        onChange={(e) => setLocalModel(e.target.value)}
-                        onBlur={(e) => {
-                          // 延迟更新配置，允许点击下拉选项
-                          setTimeout(() => {
-                            updateAIConfig({ model: e.target.value });
-                          }, 150);
-                        }}
-                        className="pr-8"
-                      />
-                      <ChevronsUpDown className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 opacity-50 pointer-events-none" />
-                    </div>
-                  </PopoverTrigger>
-                  <PopoverContent
-                    className="w-(--radix-popover-trigger-width) p-0"
-                    align="start"
-                    onOpenAutoFocus={(e) => e.preventDefault()}
-                  >
-                    <Command>
-                      <CommandInput
-                        placeholder={t(
-                          "settings:settings.ai.searchModelsPlaceholder",
-                        )}
-                      />
-                      <CommandList>
-                        <CommandEmpty>
-                          {t("settings:settings.ai.modelListEmpty")}
-                        </CommandEmpty>
-                        {isFetchingModels && (
-                          <CommandGroup>
-                            <CommandItem disabled>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              {t("settings:settings.ai.fetchingModels")}
-                            </CommandItem>
-                          </CommandGroup>
-                        )}
-                        {remoteModels.length > 0 && (
-                          <CommandGroup
-                            heading={t("settings:settings.ai.remoteModels")}
-                          >
-                            {remoteModels.map(renderModelOption)}
-                          </CommandGroup>
-                        )}
-                        {remoteModels.length > 0 &&
-                          recommendedModels.length > 0 && <CommandSeparator />}
-                        {recommendedModels.length > 0 && (
-                          <CommandGroup
-                            heading={t(
-                              "settings:settings.ai.recommendedModels",
-                            )}
-                          >
-                            {recommendedModels.map(renderModelOption)}
-                          </CommandGroup>
-                        )}
-                      </CommandList>
-                    </Command>
-                  </PopoverContent>
-                </Popover>
-                {modelFetchResult && (
-                  <p
-                    className={cn(
-                      "text-xs",
-                      modelFetchResult.status === "success"
-                        ? "text-muted-foreground"
-                        : "text-destructive",
-                    )}
-                  >
-                    {modelFetchResult.message}
-                  </p>
-                )}
-              </div>
-
-              {/* 测试连接 */}
-              <div className="flex gap-2">
-                <Button
-                  onClick={handleTestConnection}
-                  disabled={isTesting || !aiConfig.apiKey}
-                  className="bg-primary hover:bg-primary/90"
-                >
-                  {isTesting ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {t("settings:settings.ai.testing")}
-                    </>
-                  ) : (
-                    <>
-                      <CheckCircle2 className="mr-2 h-4 w-4" />
-                      {t("settings:settings.ai.testConnection")}
-                    </>
-                  )}
-                </Button>
-              </div>
-
-              {/* 测试结果显示 */}
-              {testResult && (
-                <div
-                  className={`p-3 rounded-lg border ${
-                    testResult.status === "success"
-                      ? "bg-green-50 border-green-200 text-green-800"
-                      : testResult.status === "warning"
-                        ? "bg-yellow-50 border-yellow-200 text-yellow-800"
-                        : "bg-red-50 border-red-200 text-red-800"
-                  }`}
-                >
-                  {testResult.message}
-                </div>
-              )}
-
-              {/* 高级参数折叠面板 */}
-              <Collapsible
-                open={isAdvancedOpen}
-                onOpenChange={setIsAdvancedOpen}
-              >
-                <CollapsibleTrigger className="flex items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground">
-                  <ChevronDown
-                    className={`h-4 w-4 transition-transform ${isAdvancedOpen ? "rotate-180" : ""}`}
-                  />
-                  {t("settings:settings.ai.advancedOptions")}
-                </CollapsibleTrigger>
-                <CollapsibleContent className="space-y-4 mt-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="temperature">
-                      {t("settings:settings.temperature")}:{" "}
-                      {aiConfig.temperature || 0.3}
-                    </Label>
-                    <input
-                      id="temperature"
-                      type="range"
-                      min="0"
-                      max="2"
-                      step="0.1"
-                      value={aiConfig.temperature || 0.3}
-                      onChange={(e) =>
-                        updateAIConfig({
-                          temperature: parseFloat(e.target.value),
-                        })
-                      }
-                      className="w-full accent-primary"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      {t("settings:settings.messages.temperatureDesc")}
-                    </p>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="maxTokens">
-                      {t("settings:settings.maxTokens")}
-                    </Label>
-                    <Input
-                      id="maxTokens"
-                      type="number"
-                      min="100"
-                      max="4000"
-                      value={aiConfig.maxTokens || 1000}
-                      onChange={(e) =>
-                        updateAIConfig({ maxTokens: parseInt(e.target.value) })
-                      }
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      {t("settings:settings.messages.maxTokensDesc")}
-                    </p>
-                  </div>
-                </CollapsibleContent>
-              </Collapsible>
-
-              {/* AI 功能开关 */}
-              <div className="space-y-4 pt-4 border-t">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>{t("settings:settings.ai.smartCategory")}</Label>
-                    <p className="text-sm text-muted-foreground">
-                      {t("settings:settings.ai.smartCategoryDesc")}
-                    </p>
-                  </div>
-                  <Switch
-                    checked={aiConfig.enableSmartCategory}
-                    onCheckedChange={(checked) =>
-                      updateAIConfig({ enableSmartCategory: checked })
-                    }
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>{t("settings:settings.ai.tagSuggestion")}</Label>
-                    <p className="text-sm text-muted-foreground">
-                      {t("settings:settings.ai.tagSuggestionDesc")}
-                    </p>
-                  </div>
-                  <Switch
-                    checked={aiConfig.enableTagSuggestion}
-                    onCheckedChange={(checked) =>
-                      updateAIConfig({ enableTagSuggestion: checked })
-                    }
-                  />
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>{t("settings:settings.ai.translation")}</Label>
-                    <p className="text-sm text-muted-foreground">
-                      {t("settings:settings.ai.translationDesc")}
-                    </p>
-                  </div>
-                  <Switch
-                    checked={aiConfig.enableTranslation}
-                    onCheckedChange={(checked) =>
-                      updateAIConfig({ enableTranslation: checked })
-                    }
-                  />
-                </div>
-              </div>
-
-              {/* 预设标签配置 */}
-              <div className="space-y-4 pt-4 border-t">
-                <div>
-                  <Label className="text-base font-semibold mb-3 block">
-                    {t("settings:settings.ai.presetTags")}
-                  </Label>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    {t("settings:settings.ai.presetTagsDesc")}
-                  </p>
-
-                  {/* 标签输入 */}
-                  <div className="space-y-2 mb-4">
-                    <Label htmlFor="tagInput">
-                      {t("settings:settings.ai.addTag")}
-                    </Label>
-                    <div className="flex gap-2">
-                      <Input
-                        id="tagInput"
-                        value={newTag}
-                        onChange={(e) => setNewTag(e.target.value)}
-                        onKeyDown={handleKeyDown}
-                        placeholder={t(
-                          "settings:settings.ai.addTagPlaceholder",
-                        )}
-                        className="flex-1"
-                      />
-                      <Button
-                        onClick={handleAddTag}
-                        variant="outline"
-                        size="sm"
-                        disabled={!newTag.trim()}
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-
-                  {/* 标签列表 */}
-                  {(aiConfig.presetTags || []).length > 0 ? (
-                    <div className="space-y-2">
-                      <Label>
-                        {t("settings:settings.ai.configuredTags")} (
-                        {(aiConfig.presetTags || []).length})
-                      </Label>
-                      <div className="flex flex-wrap gap-2 p-3 bg-muted rounded-md">
-                        {(aiConfig.presetTags || []).map(
-                          (tag: string, index: number) => (
-                            <div
-                              key={index}
-                              className="flex items-center gap-2 bg-background text-foreground px-3 py-1 rounded-md text-sm border"
-                            >
-                              <span>{tag}</span>
-                              <button
-                                onClick={() => handleRemoveTag(index)}
-                                className="hover:text-destructive transition-colors ml-1"
-                                aria-label={t("settings:settings.ai.removeTag")}
-                              >
-                                <Trash2 className="h-3 w-3" />
-                              </button>
-                            </div>
-                          ),
-                        )}
-                      </div>
-                    </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground p-3 bg-muted rounded-md">
-                      {t("settings:settings.ai.noTags")}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Embedding 语义搜索配置 */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Search className="h-5 w-5" />
-                {t("settings:settings.ai.embedding.title")}
-              </CardTitle>
-              <CardDescription>
-                {t("settings:settings.ai.embedding.description")}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* 启用/禁用开关 */}
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>{t("settings:settings.ai.embedding.enabled")}</Label>
-                  <p className="text-sm text-muted-foreground">
-                    {t("settings:settings.ai.embedding.enabledDesc")}
-                  </p>
-                </div>
-                <Switch
-                  checked={embeddingConfig.enabled}
-                  onCheckedChange={(checked) =>
-                    updateEmbeddingConfig({ enabled: checked })
-                  }
-                />
-              </div>
-
-              {embeddingConfig.enabled && (
-                <>
-                  {/* Provider 选择 */}
-                  <div className="space-y-2">
-                    <Label>
-                      {t("settings:settings.ai.embedding.provider")}
-                    </Label>
-                    <Select
-                      value={embeddingConfig.provider}
-                      onValueChange={(value: AIProvider) => {
-                        const defaultModel = getDefaultEmbeddingModel(value);
-                        const defaultBaseUrl =
-                          EMBEDDING_PROVIDER_DEFAULTS[value]?.baseUrl || "";
-                        setLocalEmbeddingModel(defaultModel);
-                        setLocalEmbeddingBaseUrl(defaultBaseUrl);
-                        updateEmbeddingConfig({
-                          provider: value,
-                          model: defaultModel,
-                          baseUrl: defaultBaseUrl,
-                        });
-                      }}
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem
-                          value="openai"
-                          disabled={!isEmbeddingSupported("openai")}
-                        >
-                          {t("settings:settings.providers.openai")}
-                          {!isEmbeddingSupported("openai") && " ⚠️"}
-                        </SelectItem>
-                        <SelectItem
-                          value="google"
-                          disabled={!isEmbeddingSupported("google")}
-                        >
-                          {t("settings:settings.providers.google")}
-                          {!isEmbeddingSupported("google") && " ⚠️"}
-                        </SelectItem>
-                        <SelectItem
-                          value="azure"
-                          disabled={!isEmbeddingSupported("azure")}
-                        >
-                          {t("settings:settings.providers.azure")}
-                          {!isEmbeddingSupported("azure") && " ⚠️"}
-                        </SelectItem>
-                        <SelectItem
-                          value="mistral"
-                          disabled={!isEmbeddingSupported("mistral")}
-                        >
-                          {t("settings:settings.providers.mistral")}
-                          {!isEmbeddingSupported("mistral") && " ⚠️"}
-                        </SelectItem>
-                        <SelectItem
-                          value="zhipu"
-                          disabled={!isEmbeddingSupported("zhipu")}
-                        >
-                          {t("settings:settings.providers.zhipu")}
-                          {!isEmbeddingSupported("zhipu") && " ⚠️"}
-                        </SelectItem>
-                        <SelectItem
-                          value="hunyuan"
-                          disabled={!isEmbeddingSupported("hunyuan")}
-                        >
-                          {t("settings:settings.providers.hunyuan")}
-                          {!isEmbeddingSupported("hunyuan") && " ⚠️"}
-                        </SelectItem>
-                        <SelectItem
-                          value="nvidia"
-                          disabled={!isEmbeddingSupported("nvidia")}
-                        >
-                          {t("settings:settings.providers.nvidia")}
-                          {!isEmbeddingSupported("nvidia") && " ⚠️"}
-                        </SelectItem>
-                        <SelectItem
-                          value="siliconflow"
-                          disabled={!isEmbeddingSupported("siliconflow")}
-                        >
-                          {t("settings:settings.providers.siliconflow")}
-                          {!isEmbeddingSupported("siliconflow") && " ⚠️"}
-                        </SelectItem>
-                        <SelectItem
-                          value="ollama"
-                          disabled={!isEmbeddingSupported("ollama")}
-                        >
-                          {t("settings:settings.providers.ollama")}
-                          {!isEmbeddingSupported("ollama") && " ⚠️"}
-                        </SelectItem>
-                        <SelectItem
-                          value="custom"
-                          disabled={!isEmbeddingSupported("custom")}
-                        >
-                          {t("settings:settings.providers.custom")}
-                        </SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {!isEmbeddingSupported(embeddingConfig.provider) && (
-                      <p className="text-xs text-destructive flex items-center gap-1">
-                        <AlertTriangle className="h-3 w-3" />
-                        {t(
-                          "settings:settings.ai.embedding.providerNotSupported",
-                        )}
-                      </p>
-                    )}
-                  </div>
-
-                  {/* API Key */}
-                  {embeddingConfig.provider !== "ollama" && (
-                    <div className="space-y-2">
-                      <Label>
-                        {t("settings:settings.ai.embedding.apiKey")}
-                      </Label>
-                      <Input
-                        type="password"
-                        placeholder={t(
-                          "settings:settings.ai.embedding.apiKeyPlaceholder",
-                        )}
-                        value={localEmbeddingApiKey}
-                        onChange={(e) =>
-                          setLocalEmbeddingApiKey(e.target.value)
-                        }
-                        onBlur={(e) =>
-                          updateEmbeddingConfig({ apiKey: e.target.value })
-                        }
-                      />
-                      <p className="text-xs text-muted-foreground">
-                        {t("settings:settings.ai.embedding.apiKeyDesc")}
-                      </p>
-                    </div>
-                  )}
-
-                  {/* Base URL 始终显示 */}
-                  <div className="space-y-2">
-                    <Label>{t("settings:settings.ai.embedding.baseUrl")}</Label>
-                    <Input
-                      type="url"
-                      placeholder={t(
-                        "settings:settings.ai.embedding.baseUrlPlaceholder",
-                      )}
-                      value={localEmbeddingBaseUrl}
-                      onChange={(e) => setLocalEmbeddingBaseUrl(e.target.value)}
-                      onBlur={(e) =>
-                        updateEmbeddingConfig({ baseUrl: e.target.value })
-                      }
-                    />
-                  </div>
-
-                  {/* Model */}
-                  <div className="space-y-2">
-                    <Label>{t("settings:settings.ai.embedding.model")}</Label>
-                    <Input
-                      placeholder={t(
-                        "settings:settings.ai.embedding.modelPlaceholder",
-                      )}
-                      value={localEmbeddingModel}
-                      onChange={(e) => setLocalEmbeddingModel(e.target.value)}
-                      onBlur={(e) =>
-                        updateEmbeddingConfig({ model: e.target.value })
-                      }
-                    />
-                  </div>
-
-                  {/* Batch Size */}
-                  <div className="space-y-2">
-                    <Label>
-                      {t("settings:settings.ai.embedding.batchSize")}:{" "}
-                      {embeddingConfig.batchSize || 16}
-                    </Label>
-                    <input
-                      type="range"
-                      min="4"
-                      max="64"
-                      step="4"
-                      value={embeddingConfig.batchSize || 16}
-                      onChange={(e) =>
-                        updateEmbeddingConfig({
-                          batchSize: parseInt(e.target.value),
-                        })
-                      }
-                      className="w-full accent-primary"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      {t("settings:settings.ai.embedding.batchSizeDesc")}
-                    </p>
-                  </div>
-
-                  {/* 测试连接 - 与 AI 配置样式保持一致 */}
-                  <div className="flex gap-2">
-                    <Button
-                      onClick={handleTestEmbeddingConnection}
-                      disabled={
-                        isEmbeddingTesting ||
-                        (!embeddingConfig.apiKey &&
-                          embeddingConfig.provider !== "ollama")
-                      }
-                      className="bg-primary hover:bg-primary/90"
-                    >
-                      {isEmbeddingTesting ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          {t("settings:settings.ai.embedding.testing")}
-                        </>
-                      ) : (
-                        <>
-                          <CheckCircle2 className="mr-2 h-4 w-4" />
-                          {t("settings:settings.ai.embedding.testConnection")}
-                        </>
-                      )}
-                    </Button>
-                  </div>
-
-                  {/* 测试结果 */}
-                  {embeddingTestResult && (
-                    <div
-                      className={`p-3 rounded-lg border ${
-                        embeddingTestResult.status === "success"
-                          ? "bg-green-50 border-green-200 text-green-800 dark:bg-green-900/20 dark:border-green-800 dark:text-green-200"
-                          : "bg-red-50 border-red-200 text-red-800 dark:bg-red-900/20 dark:border-red-800 dark:text-red-200"
-                      }`}
-                    >
-                      {embeddingTestResult.message}
-                    </div>
-                  )}
-
-                  {/* 向量索引状态 */}
-                  <div className="space-y-4 pt-4 border-t">
-                    <div className="flex items-center justify-between">
-                      <Label className="text-base font-semibold">
-                        {t("settings:settings.ai.embedding.stats.title")}
-                      </Label>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={loadVectorStats}
-                        disabled={isLoadingStats}
-                      >
-                        <RefreshCw
-                          className={cn(
-                            "h-4 w-4",
-                            isLoadingStats && "animate-spin",
-                          )}
-                        />
-                      </Button>
-                    </div>
-
-                    {isLoadingStats ? (
-                      <p className="text-sm text-muted-foreground">
-                        {t("settings:settings.ai.embedding.stats.calculating")}
-                      </p>
-                    ) : vectorStats ? (
-                      <div className="grid grid-cols-3 gap-4">
-                        <div className="p-3 rounded-lg bg-muted">
-                          <p className="text-xs text-muted-foreground mb-1">
-                            {t(
-                              "settings:settings.ai.embedding.stats.vectorCount",
-                            )}
-                          </p>
-                          <p className="text-lg font-semibold">
-                            {vectorStats.count}
-                          </p>
-                        </div>
-                        <div className="p-3 rounded-lg bg-muted">
-                          <p className="text-xs text-muted-foreground mb-1">
-                            {t("settings:settings.ai.embedding.stats.coverage")}
-                          </p>
-                          <p className="text-lg font-semibold">
-                            {storageInfo.bookmarkCount > 0
-                              ? `${Math.round((vectorStats.count / storageInfo.bookmarkCount) * 100)}%`
-                              : "-"}
-                          </p>
-                        </div>
-                        <div className="p-3 rounded-lg bg-muted">
-                          <p className="text-xs text-muted-foreground mb-1">
-                            {t(
-                              "settings:settings.ai.embedding.stats.storageSize",
-                            )}
-                          </p>
-                          <p className="text-lg font-semibold">
-                            {(vectorStats.estimatedSize / 1024).toFixed(1)} KB
-                          </p>
-                        </div>
-                      </div>
-                    ) : null}
-
-                    {/* 重建/清除操作 - 统一按钮样式 */}
-                    <div className="flex gap-2">
-                      <Button
-                        onClick={handleIncrementalRebuild}
-                        disabled={
-                          isRebuilding ||
-                          isClearing ||
-                          !!(
-                            vectorStats &&
-                            storageInfo.bookmarkCount > 0 &&
-                            vectorStats.count >= storageInfo.bookmarkCount
-                          )
-                        }
-                        className="bg-primary hover:bg-primary/90"
-                      >
-                        {isRebuilding ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            {rebuildProgress
-                              ? t(
-                                  "settings:settings.ai.embedding.actions.rebuildProgress",
-                                  {
-                                    completed: rebuildProgress.completed,
-                                    total: rebuildProgress.total,
-                                  },
-                                )
-                              : t(
-                                  "settings:settings.ai.embedding.actions.rebuilding",
-                                )}
-                          </>
-                        ) : (
-                          <>
-                            <RefreshCw className="mr-2 h-4 w-4" />
-                            {t(
-                              "settings:settings.ai.embedding.actions.rebuildIncremental",
-                            )}
-                          </>
-                        )}
-                      </Button>
-                      <Button
-                        onClick={() => setShowFullRebuildDialog(true)}
-                        disabled={isRebuilding || isClearing}
-                        variant="secondary"
-                      >
-                        <RefreshCw className="mr-2 h-4 w-4" />
-                        {t(
-                          "settings:settings.ai.embedding.actions.rebuildFull",
-                        )}
-                      </Button>
-                      <Button
-                        onClick={() => setShowClearVectorsDialog(true)}
-                        disabled={
-                          isRebuilding ||
-                          isClearing ||
-                          (vectorStats?.count ?? 0) === 0
-                        }
-                        variant="destructive"
-                      >
-                        {isClearing ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            {t(
-                              "settings:settings.ai.embedding.actions.clearing",
-                            )}
-                          </>
-                        ) : (
-                          <>
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            {t("settings:settings.ai.embedding.actions.clear")}
-                          </>
-                        )}
-                      </Button>
-                    </div>
-                  </div>
-                </>
-              )}
-            </CardContent>
-          </Card>
+          <AITab
+            aiConfig={aiConfig}
+            embeddingConfig={embeddingConfig}
+            localApiKey={localApiKey}
+            localBaseUrl={localBaseUrl}
+            localModel={localModel}
+            modelSelectorOpen={modelSelectorOpen}
+            isFetchingModels={isFetchingModels}
+            remoteModels={remoteModels}
+            modelFetchResult={modelFetchResult}
+            isTesting={isTesting}
+            testResult={testResult}
+            isAdvancedOpen={isAdvancedOpen}
+            newTag={newTag}
+            recommendedModels={recommendedModels}
+            vectorStats={vectorStats}
+            isLoadingStats={isLoadingStats}
+            isRebuilding={isRebuilding}
+            rebuildProgress={rebuildProgress}
+            isClearing={isClearing}
+            localEmbeddingApiKey={localEmbeddingApiKey}
+            localEmbeddingBaseUrl={localEmbeddingBaseUrl}
+            localEmbeddingModel={localEmbeddingModel}
+            isEmbeddingTesting={isEmbeddingTesting}
+            embeddingTestResult={embeddingTestResult}
+            setLocalApiKey={setLocalApiKey}
+            setLocalBaseUrl={setLocalBaseUrl}
+            setLocalModel={setLocalModel}
+            setModelSelectorOpen={setModelSelectorOpen}
+            setIsAdvancedOpen={setIsAdvancedOpen}
+            setNewTag={setNewTag}
+            setLocalEmbeddingApiKey={setLocalEmbeddingApiKey}
+            setLocalEmbeddingBaseUrl={setLocalEmbeddingBaseUrl}
+            setLocalEmbeddingModel={setLocalEmbeddingModel}
+            updateAIConfig={updateAIConfig}
+            updateEmbeddingConfig={updateEmbeddingConfig}
+            onTestConnection={handleTestConnection}
+            onFetchModels={handleFetchModels}
+            onAddTag={handleAddTag}
+            onRemoveTag={handleRemoveTag}
+            onKeyDown={handleKeyDown}
+            onTestEmbeddingConnection={handleTestEmbeddingConnection}
+            onIncrementalRebuild={handleIncrementalRebuild}
+            onFullRebuild={() => setShowFullRebuildDialog(true)}
+            onClearVectors={() => setShowClearVectorsDialog(true)}
+            showFullRebuildDialog={showFullRebuildDialog}
+            showClearVectorsDialog={showClearVectorsDialog}
+            setShowFullRebuildDialog={setShowFullRebuildDialog}
+            setShowClearVectorsDialog={setShowClearVectorsDialog}
+            formatBytes={formatBytes}
+          />
         </TabsContent>
 
-        {/* 通用设置标签页 */}
         <TabsContent value="general" className="space-y-6 mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("settings:settings.general.title")}</CardTitle>
-              <CardDescription>
-                {t("settings:settings.general.description")}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* 语言设置 - 使用 useLanguage hook 实现即时切换 */}
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>{t("settings:settings.language")}</Label>
-                  <p className="text-sm text-muted-foreground">
-                    {t("settings:settings.descriptions.language")}
-                  </p>
-                </div>
-                <Select value={language} onValueChange={switchLanguage}>
-                  <SelectTrigger className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableLanguages.map((lng) => (
-                      <SelectItem key={lng} value={lng}>
-                        {t(`common:common.languages.${lng}`)}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>
-                    {t("settings:settings.general.autoSaveSnapshot")}
-                  </Label>
-                  <p className="text-sm text-muted-foreground">
-                    {t("settings:settings.general.autoSaveSnapshotDesc")}
-                  </p>
-                </div>
-                <Switch
-                  checked={appSettings.autoSaveSnapshot}
-                  onCheckedChange={handleAutoSaveSnapshotChange}
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>
-                    {t("settings:settings.general.enableOmniboxSearch")}
-                  </Label>
-                  <p className="text-sm text-muted-foreground">
-                    {t("settings:settings.general.enableOmniboxSearchDesc")}
-                  </p>
-                </div>
-                <Switch
-                  checked={appSettings.enableOmniboxSearch}
-                  onCheckedChange={(checked) =>
-                    updateAppSettings({ enableOmniboxSearch: checked })
-                  }
-                />
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="theme">{t("settings:settings.theme")}</Label>
-                  <p className="text-sm text-muted-foreground">
-                    {t("settings:settings.descriptions.theme")}
-                  </p>
-                </div>
-                <Select
-                  value={appSettings.theme}
-                  onValueChange={(value: "system" | "light" | "dark") =>
-                    updateAppSettings({ theme: value })
-                  }
-                >
-                  <SelectTrigger id="theme" className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="system">
-                      {t("settings:settings.themeOptions.system")}
-                    </SelectItem>
-                    <SelectItem value="light">
-                      {t("settings:settings.themeOptions.light")}
-                    </SelectItem>
-                    <SelectItem value="dark">
-                      {t("settings:settings.themeOptions.dark")}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="space-y-0.5">
-                    <Label>{t("settings:settings.general.shortcut")}</Label>
-                    <p className="text-sm text-muted-foreground">
-                      {isFirefox()
-                        ? t("settings:settings.general.shortcutDescFirefox")
-                        : t("settings:settings.general.shortcutDesc")}
-                    </p>
-                  </div>
-                  <Button
-                    variant="outline"
-                    onClick={async () => {
-                      const url = getBrowserSpecificURL("shortcuts");
-                      await safeCreateTab(url);
-                      // 延迟刷新，等待用户从设置页返回
-                      setTimeout(refreshShortcuts, 500);
-                    }}
-                  >
-                    <span>{t("settings:settings.general.shortcutButton")}</span>
-                    <ExternalLink className="h-4 w-4 ml-2" />
-                  </Button>
-                </div>
-
-                {/* 当前快捷键配置显示 */}
-                {shortcuts.length > 0 && (
-                  <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
-                    <p className="text-sm font-medium text-muted-foreground">
-                      {t("settings:settings.general.currentShortcuts")}
-                    </p>
-                    <div className="space-y-3">
-                      {shortcuts.map((shortcut) => (
-                        <div
-                          key={shortcut.name}
-                          className="flex items-center justify-between gap-4"
-                        >
-                          <span className="text-sm text-foreground">
-                            {shortcut.description}
-                          </span>
-                          {shortcut.shortcut ? (
-                            <div className="flex items-center gap-1">
-                              {shortcut.formattedShortcut
-                                .split(" + ")
-                                .map((key, idx) => (
-                                  <kbd
-                                    key={idx}
-                                    className="inline-flex items-center justify-center min-w-[28px] h-7 px-2 text-xs font-medium font-mono bg-background border border-border rounded-md shadow-sm"
-                                  >
-                                    {key}
-                                  </kbd>
-                                ))}
-                            </div>
-                          ) : (
-                            <span className="text-xs text-muted-foreground italic">
-                              {t("settings:settings.general.shortcutNotSet")}
-                            </span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label htmlFor="panelPosition">
-                    {t("settings:settings.general.panelPosition")}
-                  </Label>
-                  <p className="text-sm text-muted-foreground">
-                    {t("settings:settings.general.panelPositionDesc")}
-                  </p>
-                </div>
-                <Select
-                  value={appSettings.panelPosition}
-                  onValueChange={(value: "left" | "right") =>
-                    updateAppSettings({ panelPosition: value })
-                  }
-                >
-                  <SelectTrigger id="panelPosition" className="w-32">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="left">
-                      {t("settings:settings.general.panelPositionOptions.left")}
-                    </SelectItem>
-                    <SelectItem value="right">
-                      {t(
-                        "settings:settings.general.panelPositionOptions.right",
-                      )}
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* 自定义筛选器管理 */}
-              <div className="space-y-4 pt-4 border-t">
-                <div>
-                  <Label className="text-base font-semibold mb-1 block">
-                    {t("settings:settings.general.customFilters.title")}
-                  </Label>
-                  <p className="text-sm text-muted-foreground mb-4">
-                    {t("settings:settings.general.customFilters.description")}
-                  </p>
-                </div>
-
-                {customFilters.length === 0 ? (
-                  <div className="p-6 border border-dashed rounded-lg text-center bg-muted/30">
-                    <p className="text-sm text-muted-foreground mb-2">
-                      {t("settings:settings.general.customFilters.noFilters")}
-                    </p>
-                    <p className="text-xs text-muted-foreground mb-4">
-                      {t(
-                        "settings:settings.general.customFilters.noFiltersDesc",
-                      )}
-                    </p>
-                    <Button
-                      onClick={handleAddFilter}
-                      variant="outline"
-                      size="sm"
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      {t("settings:settings.general.customFilters.addFilter")}
-                    </Button>
-                  </div>
-                ) : (
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm text-muted-foreground">
-                        {customFilters.length}{" "}
-                        {t("settings:settings.general.customFilters.title")}
-                      </span>
-                      <Button
-                        onClick={handleAddFilter}
-                        variant="outline"
-                        size="sm"
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        {t("settings:settings.general.customFilters.addFilter")}
-                      </Button>
-                    </div>
-                    <div className="space-y-2">
-                      {customFilters.map((filter) => (
-                        <div
-                          key={filter.id}
-                          className="flex items-center justify-between p-3 border rounded-lg bg-muted/30 hover:bg-muted/50 transition-colors"
-                        >
-                          <div className="flex-1 min-w-0">
-                            <p className="text-sm font-medium truncate">
-                              {filter.name}
-                            </p>
-                            <p className="text-xs text-muted-foreground mt-1">
-                              {t(
-                                "settings:settings.general.customFilters.conditionsCount",
-                                {
-                                  count: filter.conditions.length,
-                                },
-                              )}
-                            </p>
-                          </div>
-                          <div className="flex items-center gap-2 ml-4">
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleEditFilter(filter)}
-                              className="h-8 px-2"
-                            >
-                              {t(
-                                "settings:settings.general.customFilters.edit",
-                              )}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setDeleteFilterTarget(filter)}
-                              className="h-8 px-2 text-destructive hover:text-destructive"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </CardContent>
-          </Card>
-
+          <GeneralTab
+            language={language}
+            switchLanguage={(lng: string) => switchLanguage(lng as import("@/types").Language)}
+            availableLanguages={availableLanguages}
+            appSettings={appSettings}
+            updateAppSettings={updateAppSettings}
+            shortcuts={shortcuts}
+            refreshShortcuts={refreshShortcuts}
+            customFilters={customFilters}
+            onAddFilter={handleAddFilter}
+            onEditFilter={handleEditFilter}
+            onDeleteFilter={setDeleteFilterTarget}
+            handleAutoSaveSnapshotChange={handleAutoSaveSnapshotChange}
+          />
         </TabsContent>
 
-        {/* 存储管理标签页 */}
         <TabsContent value="storage" className="space-y-6 mt-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("settings:settings.storage.title")}</CardTitle>
-              <CardDescription>
-                {t("settings:settings.storage.description")}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* 数据概览：三列网格 */}
-              <div className="space-y-3">
-                <h4 className="text-sm font-medium text-muted-foreground">
-                  {t("settings:settings.storage.dataOverview")}
-                </h4>
-                <div className="grid grid-cols-3 gap-3">
-                  {/* 书签 & 分类 */}
-                  <div className="flex flex-col p-4 rounded-lg border bg-muted/30 gap-3">
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-foreground">
-                        {t("settings:settings.storage.bookmarkData.title")}
-                      </p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {t("settings:settings.storage.bookmarkData.count", {
-                          bookmarks: storageInfo.bookmarkCount,
-                          categories: storageInfo.categoryCount,
-                        })}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {t("settings:settings.storage.bookmarkData.size", {
-                          size: storageInfo.storageSize,
-                        })}
-                      </p>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowClearBookmarkDialog(true)}
-                      disabled={
-                        isClearingBookmarks ||
-                        isClearingAll ||
-                        (storageInfo.bookmarkCount === 0 &&
-                          storageInfo.categoryCount === 0)
-                      }
-                      className="w-full text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
-                    >
-                      {isClearingBookmarks ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-                      ) : (
-                        <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-                      )}
-                      {t("settings:settings.storage.bookmarkData.clear")}
-                    </Button>
-                  </div>
-
-                  {/* 网页快照 */}
-                  <div className="flex flex-col p-4 rounded-lg border bg-muted/30 gap-3">
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-foreground">
-                        {t("settings:settings.storage.snapshotData.title")}
-                      </p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {t("settings:settings.storage.snapshotData.count", {
-                          count: snapshotStats?.count || 0,
-                        })}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {t("settings:settings.storage.snapshotData.size", {
-                          size: formatBytes(snapshotStats?.totalSize || 0),
-                        })}
-                      </p>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowClearSnapshotDialog(true)}
-                      disabled={
-                        isClearingSnapshots ||
-                        isClearingAll ||
-                        !snapshotStats?.count
-                      }
-                      className="w-full text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
-                    >
-                      {isClearingSnapshots ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-                      ) : (
-                        <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-                      )}
-                      {t("settings:settings.storage.snapshotData.clear")}
-                    </Button>
-                  </div>
-
-                  {/* 语义向量索引 */}
-                  <div className="flex flex-col p-4 rounded-lg border bg-muted/30 gap-3">
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-foreground">
-                        {t("settings:settings.storage.vectorData.title")}
-                      </p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {embeddingConfig.enabled
-                          ? t("settings:settings.storage.vectorData.count", {
-                              count: vectorStats?.count || 0,
-                            })
-                          : t("settings:settings.storage.notEnabled")}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-0.5">
-                        {embeddingConfig.enabled
-                          ? t("settings:settings.storage.vectorData.size", {
-                              size: formatBytes(
-                                vectorStats?.estimatedSize || 0,
-                              ),
-                            })
-                          : "—"}
-                      </p>
-                    </div>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setShowClearVectorsDialog(true)}
-                      disabled={
-                        isRebuilding ||
-                        isClearing ||
-                        isClearingAll ||
-                        !embeddingConfig.enabled ||
-                        (vectorStats?.count ?? 0) === 0
-                      }
-                      className="w-full text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
-                    >
-                      {isClearing ? (
-                        <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5" />
-                      ) : (
-                        <Trash2 className="h-3.5 w-3.5 mr-1.5" />
-                      )}
-                      {t("settings:settings.storage.vectorData.clear")}
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* 数据导出 */}
-              <div className="pt-4 border-t space-y-3">
-                <h4 className="text-sm font-medium text-foreground">
-                  {t("settings:settings.storage.dataExport")}
-                </h4>
-                <div className="flex gap-2">
-                  <Button
-                    onClick={() => handleExport("json")}
-                    variant="outline"
-                    className="flex-1"
-                  >
-                    <Download className="mr-2 h-4 w-4" />
-                    {t("settings:settings.storage.exportJSON")}
-                  </Button>
-                  <Button
-                    onClick={() => handleExport("html")}
-                    variant="outline"
-                    className="flex-1"
-                  >
-                    <Download className="mr-2 h-4 w-4" />
-                    {t("settings:settings.storage.exportHTML")}
-                  </Button>
-                </div>
-              </div>
-
-              {/* 危险区 */}
-              <div className="pt-4 border-t space-y-3">
-                <div>
-                  <h4 className="text-sm font-medium text-foreground">
-                    {t("settings:settings.storage.dangerZone")}
-                  </h4>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {t("settings:settings.storage.clearAllDesc")}
-                  </p>
-                </div>
-                <Button
-                  onClick={() => setShowClearDialog(true)}
-                  variant="destructive"
-                  className="w-full"
-                  disabled={isClearingAll}
-                >
-                  {isClearingAll ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {t("settings:settings.storage.clearAllData")}...
-                    </>
-                  ) : (
-                    <>
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      {t("settings:settings.storage.clearAllData")}
-                    </>
-                  )}
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* 数据同步区块（放在存储管理内）*/}
-          <Card>
-            <CardHeader>
-              <CardTitle>{t("settings:settings.sync.config.title")}</CardTitle>
-              <CardDescription>
-                {t("settings:settings.sync.config.description")}
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              {/* 启用/禁用开关 */}
-              <div className="flex items-center justify-between">
-                <div className="space-y-0.5">
-                  <Label>{t("settings:settings.sync.config.enabled")}</Label>
-                  <p className="text-sm text-muted-foreground">
-                    {t("settings:settings.sync.config.enabledDesc")}
-                  </p>
-                </div>
-                <Switch
-                  checked={syncConfig.enabled}
-                  onCheckedChange={(checked) =>
-                    updateSyncConfig({ enabled: checked })
-                  }
-                />
-              </div>
-
-              {syncConfig.enabled && (
-                <div className="space-y-4 pt-4 border-t">
-                  <div className="space-y-2">
-                    <Label>{t("settings:settings.sync.config.url")}</Label>
-                    <Input
-                      type="url"
-                      placeholder="https://example.com/webdav/"
-                      value={localWebdavUrl}
-                      onChange={(e) => setLocalWebdavUrl(e.target.value)}
-                      onBlur={(e) => updateSyncConfig({ url: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>
-                        {t("settings:settings.sync.config.username")}
-                      </Label>
-                      <Input
-                        type="text"
-                        placeholder="username"
-                        value={localWebdavUser}
-                        onChange={(e) => setLocalWebdavUser(e.target.value)}
-                        onBlur={(e) =>
-                          updateSyncConfig({ username: e.target.value })
-                        }
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label>
-                        {t("settings:settings.sync.config.password")}
-                      </Label>
-                      <Input
-                        type="password"
-                        placeholder="password"
-                        value={localWebdavPwd}
-                        onChange={(e) => setLocalWebdavPwd(e.target.value)}
-                        onBlur={(e) =>
-                          updateSyncConfig({ password: e.target.value })
-                        }
-                      />
-                    </div>
-                  </div>
-
-                  <div className="space-y-2 hidden">
-                    <Label className="flex items-center gap-2">
-                      {t("settings:settings.sync.config.e2ePassword")}{" "}
-                      <Sparkles className="h-3 w-3 text-muted-foreground" />
-                    </Label>
-                    <Input
-                      type="password"
-                      placeholder={t(
-                        "settings:settings.sync.config.e2ePasswordDesc",
-                      )}
-                      value={localWebdavE2e}
-                      onChange={(e) => setLocalWebdavE2e(e.target.value)}
-                      onBlur={(e) =>
-                        updateSyncConfig({ e2ePassword: e.target.value })
-                      }
-                      disabled
-                    />
-                  </div>
-
-                  <div className="flex gap-2 pt-2">
-                    <Button
-                      onClick={async () => {
-                        setIsSyncing(true);
-                        try {
-                          await syncEngine.doSync();
-                        } catch (err) {
-                          console.error("Manual sync failed", err);
-                        } finally {
-                          setIsSyncing(false);
-                        }
-                      }}
-                      disabled={
-                        isSyncing ||
-                        syncStatus.status === "syncing" ||
-                        !syncConfig.url ||
-                        !syncConfig.username ||
-                        !syncConfig.password
-                      }
-                      className="bg-primary hover:bg-primary/90"
-                    >
-                      {isSyncing || syncStatus.status === "syncing" ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          {t("settings:settings.sync.config.syncingBtn")}
-                        </>
-                      ) : (
-                        <>
-                          <RefreshCw className="mr-2 h-4 w-4" />
-                          {t("settings:settings.sync.config.syncBtn")}
-                        </>
-                      )}
-                    </Button>
-
-                    <Button
-                      onClick={() => setShowClearRemoteDialog(true)}
-                      variant="destructive"
-                      disabled={
-                        isClearingRemote ||
-                        isSyncing ||
-                        syncStatus.status === "syncing" ||
-                        !syncConfig.url ||
-                        !syncConfig.username ||
-                        !syncConfig.password
-                      }
-                    >
-                      {isClearingRemote ? (
-                        <>
-                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                          {t(
-                            "settings:settings.sync.config.clearingRemoteBtn",
-                            "清除中...",
-                          )}
-                        </>
-                      ) : (
-                        <>
-                          <Trash2 className="mr-2 h-4 w-4" />
-                          {t(
-                            "settings:settings.sync.config.clearRemoteBtn",
-                            "清除远端数据",
-                          )}
-                        </>
-                      )}
-                    </Button>
-                  </div>
-
-                  {/* 同步状态展示 */}
-                  <div className="mt-4 p-4 rounded-lg bg-muted text-sm space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">
-                        {t("settings:settings.sync.config.statusLabel")}
-                      </span>
-                      <span
-                        className={
-                          syncStatus.status === "error"
-                            ? "text-destructive font-bold"
-                            : syncStatus.status === "syncing"
-                              ? "text-blue-500"
-                              : "text-green-600"
-                        }
-                      >
-                        {syncStatus.status === "error"
-                          ? t("settings:settings.sync.config.statusError")
-                          : syncStatus.status === "syncing"
-                            ? t("settings:settings.sync.config.statusSyncing")
-                            : t("settings:settings.sync.config.statusIdle")}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">
-                        {t("settings:settings.sync.config.lastSyncLabel")}
-                      </span>
-                      <span>
-                        {syncStatus.lastSyncTime > 0
-                          ? relativeSyncTime
-                          : t("settings:settings.sync.config.neverSynced")}
-                      </span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-muted-foreground">
-                        {t("settings:settings.sync.config.remoteVersionLabel")}
-                      </span>
-                      <span className="font-mono text-xs text-muted-foreground">
-                        {syncStatus.syncVersion || "-"}
-                      </span>
-                    </div>
-                    {syncStatus.errorMessage && (
-                      <div className="mt-2 text-destructive p-2 bg-red-50 dark:bg-red-900/10 rounded-md border border-red-100 dark:border-red-900/30">
-                        <AlertTriangle className="inline-block mr-1 h-3 w-3" />
-                        {syncStatus.errorMessage}
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
+          <StorageTab
+            storageInfo={storageInfo}
+            snapshotStats={snapshotStats}
+            vectorStats={vectorStats}
+            embeddingConfig={embeddingConfig}
+            syncConfig={syncConfig ?? { enabled: false, url: '', username: '' }}
+            syncStatus={syncStatus}
+            localWebdavUrl={localWebdavUrl}
+            localWebdavUser={localWebdavUser}
+            localWebdavPwd={localWebdavPwd}
+            localWebdavE2e={localWebdavE2e}
+            isSyncing={isSyncing}
+            isClearingBookmarks={isClearingBookmarks}
+            isClearingSnapshots={isClearingSnapshots}
+            isClearingAll={isClearingAll}
+            isRebuilding={isRebuilding}
+            isClearing={isClearing}
+            isClearingRemote={isClearingRemote}
+            relativeSyncTime={relativeSyncTime}
+            setLocalWebdavUrl={setLocalWebdavUrl}
+            setLocalWebdavUser={setLocalWebdavUser}
+            setLocalWebdavPwd={setLocalWebdavPwd}
+            setLocalWebdavE2e={setLocalWebdavE2e}
+            updateSyncConfig={updateSyncConfig}
+            setIsSyncing={setIsSyncing}
+            onClearBookmarkData={() => setShowClearBookmarkDialog(true)}
+            onClearSnapshotData={() => setShowClearSnapshotDialog(true)}
+            onClearVectors={() => setShowClearVectorsDialog(true)}
+            onExport={handleExport}
+            onClearAllData={() => setShowClearDialog(true)}
+            onClearRemoteData={() => setShowClearRemoteDialog(true)}
+            formatBytes={formatBytes}
+          />
         </TabsContent>
       </Tabs>
 
-      {/* 清除所有数据确认对话框 */}
-      <AlertDialog open={showClearDialog} onOpenChange={setShowClearDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t("settings:settings.storage.confirmClearAll")}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("settings:settings.storage.clearAllWarning")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>
-              {t("settings:settings.dialogs.cancel")}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleClearData}
-              className="bg-destructive hover:bg-destructive/90"
-            >
-              {t("settings:settings.dialogs.confirm")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* 清除书签数据确认对话框 */}
-      <AlertDialog
-        open={showClearBookmarkDialog}
-        onOpenChange={setShowClearBookmarkDialog}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t("settings:settings.storage.bookmarkData.confirmTitle")}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("settings:settings.storage.bookmarkData.confirmWarning")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>
-              {t("settings:settings.dialogs.cancel")}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleClearBookmarkData}
-              className="bg-destructive hover:bg-destructive/90"
-            >
-              {t("settings:settings.dialogs.confirm")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* 清除快照数据确认对话框 */}
-      <AlertDialog
-        open={showClearSnapshotDialog}
-        onOpenChange={setShowClearSnapshotDialog}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t("settings:settings.storage.snapshotData.confirmTitle")}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("settings:settings.storage.snapshotData.confirmWarning")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>
-              {t("settings:settings.dialogs.cancel")}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleClearSnapshotData}
-              className="bg-destructive hover:bg-destructive/90"
-            >
-              {t("settings:settings.dialogs.confirm")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* 清除远端数据确认对话框 */}
-      <AlertDialog
-        open={showClearRemoteDialog}
-        onOpenChange={setShowClearRemoteDialog}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t(
-                "settings:settings.sync.config.clearRemoteConfirmTitle",
-                "清除远端数据",
-              )}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t(
-                "settings:settings.sync.config.clearRemoteConfirmDesc",
-                "确定要清除 WebDAV 远端的所有同步数据吗？此操作无法撤销。清除后如有需要可以再重新同步。",
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>
-              {t("settings:settings.dialogs.cancel")}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleClearRemoteData}
-              className="bg-destructive hover:bg-destructive/90"
-            >
-              {t("settings:settings.dialogs.confirm")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* 删除筛选器确认对话框 */}
-      <AlertDialog
-        open={!!deleteFilterTarget}
-        onOpenChange={(open) => !open && setDeleteFilterTarget(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t("settings:settings.general.customFilters.deleteConfirm")}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("settings:settings.general.customFilters.deleteWarning", {
-                name: deleteFilterTarget?.name,
-              })}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>
-              {t("settings:settings.dialogs.cancel")}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteFilter}
-              className="bg-destructive hover:bg-destructive/90"
-            >
-              {t("settings:settings.dialogs.confirm")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* 自定义筛选器弹窗 */}
-      <CustomFilterDialog
-        open={filterDialogOpen}
-        onOpenChange={(open) => {
-          setFilterDialogOpen(open);
-          if (!open) {
-            setEditingFilter(null);
-          }
-        }}
-        onSave={handleSaveFilter}
+      <OptionsDialogs
+        t={t}
+        showClearDialog={showClearDialog}
+        setShowClearDialog={setShowClearDialog}
+        handleClearData={handleClearData}
+        showClearBookmarkDialog={showClearBookmarkDialog}
+        setShowClearBookmarkDialog={setShowClearBookmarkDialog}
+        handleClearBookmarkData={handleClearBookmarkData}
+        showClearSnapshotDialog={showClearSnapshotDialog}
+        setShowClearSnapshotDialog={setShowClearSnapshotDialog}
+        handleClearSnapshotData={handleClearSnapshotData}
+        showClearRemoteDialog={showClearRemoteDialog}
+        setShowClearRemoteDialog={setShowClearRemoteDialog}
+        handleClearRemoteData={handleClearRemoteData}
+        deleteFilterTarget={deleteFilterTarget}
+        setDeleteFilterTarget={setDeleteFilterTarget}
+        handleDeleteFilter={handleDeleteFilter}
+        filterDialogOpen={filterDialogOpen}
+        setFilterDialogOpen={setFilterDialogOpen}
+        handleSaveFilter={handleSaveFilter}
         editingFilter={editingFilter}
+        setEditingFilter={setEditingFilter}
+        showFullRebuildDialog={showFullRebuildDialog}
+        setShowFullRebuildDialog={setShowFullRebuildDialog}
+        handleFullRebuild={handleFullRebuild}
+        showClearVectorsDialog={showClearVectorsDialog}
+        setShowClearVectorsDialog={setShowClearVectorsDialog}
+        handleClearVectors={handleClearVectors}
+        isClearingAll={isClearingAll}
+        isClearingBookmarks={isClearingBookmarks}
+        isClearingSnapshots={isClearingSnapshots}
+        isClearingRemote={isClearingRemote}
+        isRebuilding={isRebuilding}
+        isClearing={isClearing}
       />
-
-      {/* 全量重建向量索引确认对话框 */}
-      <AlertDialog
-        open={showFullRebuildDialog}
-        onOpenChange={setShowFullRebuildDialog}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t("settings:settings.ai.embedding.dialogs.fullRebuildTitle")}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("settings:settings.ai.embedding.dialogs.fullRebuildWarning")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>
-              {t("settings:settings.dialogs.cancel")}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleFullRebuild}
-              className="bg-destructive hover:bg-destructive/90"
-            >
-              {t("settings:settings.ai.embedding.actions.rebuildFull")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {/* 清除向量数据确认对话框 */}
-      <AlertDialog
-        open={showClearVectorsDialog}
-        onOpenChange={setShowClearVectorsDialog}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t("settings:settings.ai.embedding.dialogs.clearTitle")}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("settings:settings.ai.embedding.dialogs.clearWarning")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>
-              {t("settings:settings.dialogs.cancel")}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleClearVectors}
-              className="bg-destructive hover:bg-destructive/90"
-            >
-              {t("settings:settings.ai.embedding.actions.clear")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

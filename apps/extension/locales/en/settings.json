@@ -1,7 +1,7 @@
 {
   "settings": {
     "title": "Settings",
-    "description": "Manage your bookmark tool preferences",
+    "description": "Manage your browser workspace preferences",
     "tabs": {
       "ai": "AI Config",
       "general": "General",
@@ -20,8 +20,8 @@
     "modelName": "Model Name",
     "temperature": "Temperature (Creativity)",
     "maxTokens": "Max Tokens",
-    "importBookmarks": "Import Bookmarks",
-    "exportBookmarks": "Export Bookmarks",
+    "importBookmarks": "Import Data",
+    "exportBookmarks": "Export Data",
     "about": "About",
     "sections": {
       "general": "General",
@@ -36,7 +36,7 @@
     },
     "buttons": {
       "import": "Choose File to Import",
-      "export": "Export All Bookmarks",
+      "export": "Export All Data",
       "reset": "Reset to Default",
       "clear": "Clear All Data"
     },
@@ -92,7 +92,20 @@
       "modelListEmpty": "No matching models",
       "remoteModels": "Official /models",
       "recommendedModels": "Recommended",
+      "advanced": "Advanced Settings",
       "advancedOptions": "Advanced Options",
+      "apiMode": "API Version",
+      "apiModeDefault": "Auto-detect (Recommended)",
+      "apiModeChat": "Chat API (Legacy)",
+      "apiModeResponses": "Responses API (New)",
+      "maxTokens": "Max Tokens",
+      "temperature": "Temperature",
+      "apiKey": "API Key",
+      "baseUrl": "Base URL",
+      "noApiKeyNeeded": "No API Key Needed",
+      "searchModel": "Search model name",
+      "noModelFound": "No matching models found",
+      "customModelPlaceholder": "Enter custom model name and press Enter",
       "smartCategory": "Smart Category Recommendation",
       "smartCategoryDesc": "Automatically recommend bookmark categories",
       "tagSuggestion": "Tag Suggestion",
@@ -129,14 +142,21 @@
         "testing": "Testing...",
         "testSuccess": "Connection successful, dimensions: {{dimensions}}",
         "testFailed": "Connection failed: {{error}}",
-        "stats": {
+        "status": {
           "title": "Vector Index Status",
+          "description": "View and manage the status of the bookmark vector index",
           "vectorCount": "Indexed Bookmarks",
+          "unit": "vectors",
           "coverage": "Coverage",
           "storageSize": "Storage Used",
           "calculating": "Calculating..."
         },
+        "progress": {
+          "title": "Index Rebuilding Progress",
+          "description": "Generating vectors for bookmarks, this may take a while..."
+        },
         "actions": {
+          "refresh": "Refresh Status",
           "rebuild": "Rebuild Vector Index",
           "rebuildIncremental": "Incremental Rebuild",
           "rebuildFull": "Full Rebuild",
@@ -144,6 +164,15 @@
           "rebuildProgress": "{{completed}}/{{total}}",
           "clear": "Clear Vector Data",
           "clearing": "Clearing..."
+        },
+        "rebuild": {
+          "fullTitle": "Confirm Full Rebuild",
+          "fullDesc": "This will delete all existing vectors and regenerate embeddings for all bookmarks. This is used for switching models or fixing data. This may take a while, continue?",
+          "confirm": "Confirm Rebuild"
+        },
+        "clear": {
+          "title": "Confirm Clear Vector Data",
+          "desc": "This will delete all bookmark vectors, semantic search will be temporarily unavailable. Confirm clear?"
         },
         "dialogs": {
           "rebuildTitle": "Confirm Rebuild Vector Index",
@@ -168,16 +197,22 @@
         "title": "Bookmarks & Categories",
         "count": "{{bookmarks}} bookmarks / {{categories}} categories",
         "size": "~{{size}} (estimated)",
-        "clear": "Clear Bookmark Data",
+        "clear": "Clear Data",
         "clearDesc": "Delete all bookmarks and categories, keeping AI config and settings",
         "confirmTitle": "Confirm Clear Bookmark Data",
         "confirmWarning": "This will delete all bookmarks and categories. AI config and app settings will be kept. This action cannot be undone!"
+      },
+      "workspaceData": {
+        "title": "Workspaces",
+        "count": "{{count}} workspaces",
+        "size": "Combined with bookmarks",
+        "clear": "Clear Data"
       },
       "snapshotData": {
         "title": "Web Snapshots",
         "count": "{{count}} snapshots",
         "size": "{{size}}",
-        "clear": "Clear Snapshots",
+        "clear": "Clear Data",
         "clearDesc": "Delete all locally saved web snapshots to free up storage",
         "confirmTitle": "Confirm Clear Snapshots",
         "confirmWarning": "This will delete all locally saved web snapshots. Your bookmarks will not be affected. This action cannot be undone!"
@@ -186,7 +221,7 @@
         "title": "Semantic Vector Index",
         "count": "{{count}} vectors",
         "size": "{{size}}",
-        "clear": "Clear Vector Data",
+        "clear": "Clear Data",
         "clearDesc": "Clear the semantic search vector index (can be rebuilt anytime)",
         "confirmTitle": "Confirm Clear Vector Data",
         "confirmWarning": "This will clear all vector indexes. Semantic search will be temporarily unavailable and can be rebuilt in AI settings."
@@ -196,16 +231,16 @@
       "exportHTML": "Export as HTML",
       "dangerZone": "Danger Zone",
       "clearAllData": "Clear All Business Data",
-      "clearAllDesc": "Clear bookmarks, categories, snapshots, and vectors (AI config and settings will be kept)",
+      "clearAllDesc": "Clear bookmarks, categories, workspaces, snapshots, and vectors (AI config and settings will be kept)",
       "confirmClearAll": "Confirm Clear All Data",
-      "clearAllWarning": "This will delete all bookmarks, categories, snapshots, and vector indexes. AI config, tag settings, and WebDAV config will be kept. This action cannot be undone!",
+      "clearAllWarning": "This will delete all bookmarks, categories, workspaces, snapshots, and vector indexes. AI config, tag settings, and WebDAV config will be kept. This action cannot be undone!",
       "notEnabled": "Not enabled"
     },
     "about": {
       "title": "About",
       "description": "About HamHome",
-      "subtitle": "Intelligent Bookmark Management Tool",
-      "intro": "HamHome is a local-first intelligent bookmark manager that helps you save, organize, search, and curate web content, with AI features that improve classification and retrieval.",
+      "subtitle": "AI-Powered Browser Workspace",
+      "intro": "HamHome is a local-first browser workspace for saving and restoring open tabs, automatically grouping active sessions, and organizing bookmarks and collections with AI so both in-progress browsing and long-term saves stay easier to manage.",
       "versionLabel": "Version",
       "versionValue": "HamHome v{{version}}",
       "versionHint": "Shows the version of the extension currently installed",
@@ -222,7 +257,7 @@
     },
     "dialogs": {
       "confirmClear": "Confirm Clear All Data",
-      "clearWarning": "This will delete all bookmarks, categories, snapshots, and vector data. AI config and app settings will be kept. This action cannot be undone!",
+      "clearWarning": "This will delete all bookmarks, categories, workspaces, snapshots, and vector data. AI config and app settings will be kept. This action cannot be undone!",
       "cancel": "Cancel",
       "confirm": "Confirm Clear"
     },
@@ -260,7 +295,7 @@
       "aiErrorTitle": "AI Analysis Failed for Some Bookmarks",
       "aiErrorDesc": "AI API calls failed. Bookmarks were imported as 'Uncategorized' without summaries. Please check your AI config or network status.",
       "export": {
-        "title": "Export Bookmarks",
+        "title": "Export Data",
         "description": "Export your bookmark data as a backup file",
         "jsonFormat": "JSON Format",
         "jsonSubtitle": "Full data backup",
@@ -271,7 +306,7 @@
         "currentStats": "Currently have {{bookmarkCount}} bookmarks, {{categoryCount}} categories"
       },
       "import": {
-        "title": "Import Bookmarks",
+        "title": "Import Data",
         "description": "Import bookmark data from a file",
         "selectFile": "Click to select file",
         "supportedFormats": "Supports JSON and HTML formats",

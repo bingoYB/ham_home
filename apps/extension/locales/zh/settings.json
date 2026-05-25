@@ -1,7 +1,7 @@
 {
   "settings": {
     "title": "设置",
-    "description": "管理你的书签工具偏好设置",
+    "description": "管理你的浏览器工作空间偏好设置",
     "tabs": {
       "ai": "AI 配置",
       "general": "通用设置",
@@ -20,8 +20,8 @@
     "modelName": "模型名称",
     "temperature": "temperature",
     "maxTokens": "最大 Token 数",
-    "importBookmarks": "导入书签",
-    "exportBookmarks": "导出书签",
+    "importBookmarks": "导入数据",
+    "exportBookmarks": "导出数据",
     "about": "关于",
     "sections": {
       "general": "通用",
@@ -92,7 +92,20 @@
       "modelListEmpty": "没有匹配的模型",
       "remoteModels": "官方 /models",
       "recommendedModels": "预设推荐",
+      "advanced": "高级设置",
       "advancedOptions": "高级参数",
+      "apiMode": "请求版本",
+      "apiModeDefault": "自动检测 (推荐)",
+      "apiModeChat": "Chat API (旧版)",
+      "apiModeResponses": "Responses API (新版)",
+      "maxTokens": "最大 Token 数",
+      "temperature": "Temperature (随机性)",
+      "apiKey": "API 密钥",
+      "baseUrl": "Base URL",
+      "noApiKeyNeeded": "不需要 API Key",
+      "searchModel": "搜索模型名称",
+      "noModelFound": "没有找到匹配的模型",
+      "customModelPlaceholder": "输入自定义模型名称并按回车",
       "smartCategory": "智能分类推荐",
       "smartCategoryDesc": "自动推荐书签分类",
       "tagSuggestion": "标签推荐",
@@ -129,14 +142,21 @@
         "testing": "测试中...",
         "testSuccess": "连接成功，向量维度: {{dimensions}}",
         "testFailed": "连接失败: {{error}}",
-        "stats": {
+        "status": {
           "title": "向量索引状态",
+          "description": "查看和管理书签的向量索引状态",
           "vectorCount": "已索引书签",
+          "unit": "个向量",
           "coverage": "覆盖率",
           "storageSize": "存储占用",
           "calculating": "计算中..."
         },
+        "progress": {
+          "title": "索引构建进度",
+          "description": "正在为书签生成向量，这可能需要一些时间..."
+        },
         "actions": {
+          "refresh": "刷新状态",
           "rebuild": "重建向量索引",
           "rebuildIncremental": "增量重建索引",
           "rebuildFull": "全量重建索引",
@@ -144,6 +164,15 @@
           "rebuildProgress": "{{completed}}/{{total}}",
           "clear": "清除向量数据",
           "clearing": "清除中..."
+        },
+        "rebuild": {
+          "fullTitle": "确认全量重建索引",
+          "fullDesc": "这将删除所有现有向量并重新为所有书签生成 Embedding。此操作用于切换模型或修复数据。过程可能较慢，是否继续？",
+          "confirm": "确认重建"
+        },
+        "clear": {
+          "title": "确认清除向量数据",
+          "desc": "这将删除所有书签的向量索引，语义搜索功能将暂时不可用。确认清除？"
         },
         "dialogs": {
           "rebuildTitle": "确认重建向量索引",
@@ -173,6 +202,12 @@
         "confirmTitle": "确认清除书签数据",
         "confirmWarning": "此操作将删除所有书签和分类数据，AI 配置和应用设置将被保留。此操作无法撤销！"
       },
+      "workspaceData": {
+        "title": "工作空间",
+        "count": "{{count}} 个工作空间",
+        "size": "与书签合并计算",
+        "clear": "清除工作空间"
+      },
       "snapshotData": {
         "title": "网页快照",
         "count": "{{count}} 个快照",
@@ -196,16 +231,16 @@
       "exportHTML": "导出为 HTML",
       "dangerZone": "危险操作",
       "clearAllData": "清除所有业务数据",
-      "clearAllDesc": "清除书签、分类、快照及向量数据（AI 配置和应用设置将被保留）",
+      "clearAllDesc": "清除书签、分类、工作空间、快照及向量数据（AI 配置和应用设置将被保留）",
       "confirmClearAll": "确认清除所有数据",
-      "clearAllWarning": "此操作将删除所有书签、分类、网页快照和向量索引。AI 配置、标签设置、WebDAV 配置等个人设置将被保留。此操作无法撤销！",
+      "clearAllWarning": "此操作将删除所有书签、分类、工作空间、网页快照和向量索引。AI 配置、标签设置、WebDAV 配置等个人设置将被保留。此操作无法撤销！",
       "notEnabled": "未启用"
     },
     "about": {
       "title": "关于",
       "description": "关于 HamHome",
-      "subtitle": "智能书签管理工具",
-      "intro": "HamHome 是一款本地优先的智能书签管理工具，帮助你保存、分类、检索和整理网页内容，并通过 AI 能力提升归档与搜索效率。",
+      "subtitle": "AI 驱动的浏览器工作空间",
+      "intro": "HamHome 是一款AI驱动的浏览器工作空间管理器，支持保存和恢复已打开的 Tab、自动分组，并通过 AI 管理书签与收藏内容，让进行中的浏览和长期沉淀都更容易整理。",
       "versionLabel": "当前版本",
       "versionValue": "HamHome v{{version}}",
       "versionHint": "显示当前已安装的扩展版本号",
@@ -222,7 +257,7 @@
     },
     "dialogs": {
       "confirmClear": "确认清除所有数据",
-      "clearWarning": "此操作将删除所有书签、分类、快照和向量数据。AI 配置和应用设置将被保留。此操作无法撤销！",
+      "clearWarning": "此操作将删除所有书签、分类、工作空间、快照和向量数据。AI 配置和应用设置将被保留。此操作无法撤销！",
       "cancel": "取消",
       "confirm": "确认清除"
     },
@@ -260,7 +295,7 @@
       "aiErrorTitle": "部分书签 AI 分析出错",
       "aiErrorDesc": "AI 接口调用失败，书签已作为「未分类」导入，且未生成摘要。请检查 AI 配置或网络状态后再试。",
       "export": {
-        "title": "导出书签",
+        "title": "导出数据",
         "description": "将你的书签数据导出为文件备份",
         "jsonFormat": "JSON 格式",
         "jsonSubtitle": "完整数据备份",
@@ -271,7 +306,7 @@
         "currentStats": "当前共有 {{bookmarkCount}} 个书签，{{categoryCount}} 个分类"
       },
       "import": {
-        "title": "导入书签",
+        "title": "导入数据",
         "description": "从文件导入书签数据",
         "selectFile": "点击选择文件",
         "supportedFormats": "支持 JSON 和 HTML 格式",
