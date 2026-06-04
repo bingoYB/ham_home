@@ -14,6 +14,9 @@ export function AIChatPanel(props: AIChatPanelProps) {
     () => ({
       aiAnswer: t("ai:search.aiAnswer"),
       close: t("ai:search.close"),
+      newSession: t("ai:search.newSession"),
+      deleteSession: t("ai:search.deleteSession"),
+      sessionSelect: t("ai:search.sessionSelect"),
       aiPlaceholder: t("ai:search.aiPlaceholder"),
       sources: t("ai:search.sources"),
       retry: t("ai:status.retry"),

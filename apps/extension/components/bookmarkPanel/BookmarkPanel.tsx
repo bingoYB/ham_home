@@ -8,9 +8,9 @@ import { cn, toast } from "@hamhome/ui";
 import { BookmarkHeader } from "./BookmarkHeader";
 import { BookmarkListView } from "./BookmarkListView";
 import { PinnedSection } from "./PinnedSection";
-import { AIChatPanel } from "@/components/aiSearch";
+import { GlobalAgentLauncher } from "@/components/agent/GlobalAgentLauncher";
 import { useBookmarkSearch } from "@/hooks/useBookmarkSearch";
-import { useConversationalSearch } from "@/hooks/useConversationalSearch";
+import { useGlobalAgent } from "@/hooks/useGlobalAgent";
 import { nanoid } from "nanoid";
 import { configStorage } from "@/lib/storage/config-storage";
 import type {
@@ -19,7 +19,6 @@ import type {
   PanelPosition,
   FilterCondition,
   CustomFilter,
-  Suggestion,
 } from "@/types";
 
 export interface BookmarkPanelProps {
@@ -51,25 +50,8 @@ export function BookmarkPanel({
 
   const { t } = useTranslation(["bookmark", "ai"]);
 
-  // AI 对话式搜索
-  const {
-    query: aiQuery,
-    setQuery: setAIQuery,
-    messages: aiMessages,
-    currentAnswer: aiCurrentAnswer,
-    status: aiStatus,
-    error: aiError,
-    results: aiResults,
-    suggestions: aiSuggestions,
-    highlightedBookmarkId,
-    setHighlightedBookmarkId,
-    handleSearch: handleAISearch,
-    handleSuggestion: handleAISuggestion,
-    closeChat: closeAIChat,
-    isChatOpen: isAIChatOpen,
-    resultBookmarkIds: aiResultBookmarkIds,
-  } = useConversationalSearch();
-
+  // 全局 AI Agent
+  const { isOpen: isAIChatOpen, sources: aiSources } = useGlobalAgent();
   // 加载自定义筛选器
   useEffect(() => {
     const loadCustomFilters = async () => {
@@ -113,27 +95,14 @@ export function BookmarkPanel({
 
   // 根据 AI 对话是否打开决定显示的书签列表
   const filteredBookmarks = useMemo(() => {
-    if (isAIChatOpen && aiResults.length > 0) {
+    if (isAIChatOpen && aiSources.length > 0) {
       // AI 对话模式下，按 AI 结果排序显示
-      const aiBookmarkIds = aiResults.map((r) => r.bookmarkId);
+      const aiBookmarkIds = aiSources.map((r) => r.bookmarkId);
       return bookmarks.filter((b) => aiBookmarkIds.includes(b.id));
     }
     return keywordFilteredBookmarks;
-  }, [isAIChatOpen, aiResults, bookmarks, keywordFilteredBookmarks]);
+  }, [isAIChatOpen, aiSources, bookmarks, keywordFilteredBookmarks]);
 
-  // 处理引用点击 - 滚动到对应书签
-  const handleSourceClick = useCallback(
-    (bookmarkId: string) => {
-      setHighlightedBookmarkId(bookmarkId);
-      const element = bookmarkRefs.current.get(bookmarkId);
-      if (element) {
-        element.scrollIntoView({ behavior: "smooth", block: "center" });
-        // 3秒后清除高亮
-        setTimeout(() => setHighlightedBookmarkId(null), 3000);
-      }
-    },
-    [setHighlightedBookmarkId],
-  );
 
   // 提取所有唯一标签
   const allTags = useMemo(() => {
@@ -217,65 +186,6 @@ export function BookmarkPanel({
     setSelectedCustomFilterId(filterId || undefined);
   }, []);
 
-  // 处理 AI 建议点击
-  const handleAISuggestionClick = useCallback(
-    async (suggestion: Suggestion) => {
-      const { action, payload } = suggestion;
-
-      switch (action) {
-        case "navigate": {
-          if (payload?.view && typeof payload.view === "string") {
-            onOpenSettings?.(payload.view);
-          }
-          break;
-        }
-
-        case "copyAllLinks": {
-          const links = aiResultBookmarkIds
-            .map((id) => bookmarks.find((b) => b.id === id)?.url)
-            .filter(Boolean)
-            .join("\n");
-
-          if (links) {
-            await navigator.clipboard.writeText(links);
-            toast.success(t("ai:suggestion.copySuccess"), {
-              duration: 2000,
-            });
-          }
-          break;
-        }
-
-        case "batchAddTags":
-        case "batchMoveCategory": {
-          // 侧边栏目前暂不支持批量操作，提示用户去设置页面
-          toast.info(t("ai:search.suggestions.narrowSearch"), {
-            duration: 3000,
-          });
-          break;
-        }
-
-        case "showMore":
-        case "timeFilter":
-        case "domainFilter":
-        case "categoryFilter":
-        case "semanticOnly":
-        case "keywordOnly":
-        case "findDuplicates":
-        case "text":
-        default: {
-          await handleAISuggestion(suggestion);
-          break;
-        }
-      }
-    },
-    [
-      aiResultBookmarkIds,
-      bookmarks,
-      handleAISuggestion,
-      onOpenSettings,
-      t,
-    ],
-  );
 
   return (
     <>
@@ -342,30 +252,15 @@ export function BookmarkPanel({
           categories={categories}
           searchQuery={searchQuery}
           hasFilters={hasFilters}
-          highlightedBookmarkId={highlightedBookmarkId}
           bookmarkRefs={bookmarkRefs}
           onOpenBookmark={handleOpenBookmark}
-          className="flex-1 min-h-0 pb-8"
+          className="flex-1 min-h-0 pb-2"
         />
 
-        {/* AI 对话面板（合并搜索栏和对话窗口） */}
-        <AIChatPanel
-          className="px-2 w-full"
-          isOpen={isAIChatOpen}
-          onClose={closeAIChat}
-          query={aiQuery}
-          onQueryChange={setAIQuery}
-          onSubmit={handleAISearch}
-          messages={aiMessages}
-          currentAnswer={aiCurrentAnswer}
-          status={aiStatus}
-          error={aiError}
-          sources={aiResults}
-          onSourceClick={handleSourceClick}
-          suggestions={aiSuggestions}
-          onSuggestionClick={handleAISuggestionClick}
-          onRetry={handleAISearch}
-        />
+        {/* 全局 AI Agent 入口 */}
+        <div className="shrink-0 p-3 border-t bg-background/50 backdrop-blur-md">
+          <GlobalAgentLauncher inline />
+        </div>
       </div>
     </>
   );

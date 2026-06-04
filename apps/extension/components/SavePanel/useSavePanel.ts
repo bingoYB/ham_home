@@ -2,7 +2,7 @@
  * useSavePanel Hook
  * 保存面板的业务逻辑层
  */
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   bookmarkStorage,
   configStorage,
@@ -16,7 +16,12 @@ import { obsidianSyncService } from "@/lib/services/obsidian-sync-service";
 import { createMarkdownContent } from "defuddle/full";
 import type { PageContent, LocalBookmark, LocalCategory } from "@/types";
 import type { AIStatusType } from "./AIStatus";
-import { parseCategoryPath } from "../common/CategoryTree";
+import {
+  buildCategoryTree,
+  flattenTree,
+  matchCategoryByPath,
+  parseCategoryPath,
+} from "../common/CategoryTree";
 
 export type SavePanelSnapshotStatus =
   | "idle"
@@ -84,6 +89,37 @@ interface UseSavePanelResult {
   deleteBookmark: () => Promise<void>;
 }
 
+interface SavePanelFormState {
+  url: string;
+  title: string;
+  description: string;
+  categoryId: string | null;
+  tags: string[];
+}
+
+function createInitialFormState(
+  pageContent: PageContent,
+  existingBookmark: LocalBookmark | null,
+): SavePanelFormState {
+  if (existingBookmark) {
+    return {
+      url: existingBookmark.url,
+      title: existingBookmark.title,
+      description: existingBookmark.description,
+      categoryId: existingBookmark.categoryId,
+      tags: existingBookmark.tags,
+    };
+  }
+
+  return {
+    url: pageContent.url,
+    title: pageContent.title,
+    description: "",
+    categoryId: null,
+    tags: [],
+  };
+}
+
 export function useSavePanel({
   pageContent,
   existingBookmark,
@@ -98,16 +134,22 @@ export function useSavePanel({
   }, [pageContent.content, pageContent.htmlContent, pageContent.url]);
 
   // 表单状态
-  const [url, setUrl] = useState(pageContent.url);
-  const [title, setTitle] = useState(pageContent.title);
-  const [description, setDescription] = useState("");
-  const [categoryId, setCategoryId] = useState<string | null>(null);
-  const [tags, setTags] = useState<string[]>([]);
+  const initialFormState = useMemo(
+    () => createInitialFormState(pageContent, existingBookmark),
+    [pageContent, existingBookmark],
+  );
+  const [url, setUrl] = useState(initialFormState.url);
+  const [title, setTitle] = useState(initialFormState.title);
+  const [description, setDescription] = useState(initialFormState.description);
+  const [categoryId, setCategoryId] = useState<string | null>(
+    initialFormState.categoryId,
+  );
+  const [tags, setTags] = useState<string[]>(initialFormState.tags);
 
   // 选项数据
   const [categories, setCategories] = useState<LocalCategory[]>([]);
   const [allTags, setAllTags] = useState<string[]>([]);
-  const [dataLoaded, setDataLoaded] = useState(false);
+  const categoriesRef = useRef<LocalCategory[]>([]);
 
   // AI 状态
   const [aiStatus, setAIStatus] = useState<AIStatusType>("idle");
@@ -129,29 +171,6 @@ export function useSavePanel({
     useState<SavePanelObsidianStatus>("idle");
   const [obsidianError, setObsidianError] = useState<string | null>(null);
 
-  // 加载分类和标签列表
-  useEffect(() => {
-    const loadData = async () => {
-      const [cats, existingTags, settings] = await Promise.all([
-        bookmarkStorage.getCategories(),
-        bookmarkStorage.getAllTags(),
-        configStorage.getSettings(),
-      ]);
-      setCategories(cats);
-      setAllTags(existingTags);
-      
-      // Use initialSaveSnapshot if provided, otherwise fallback to settings
-      if (initialSaveSnapshot !== undefined) {
-        setSaveSnapshotState(initialSaveSnapshot);
-      } else {
-        setSaveSnapshotState(settings.autoSaveSnapshot);
-      }
-      
-      setDataLoaded(true);
-    };
-    loadData();
-  }, [initialSaveSnapshot]);
-
   const setSaveSnapshot = useCallback((value: boolean) => {
     setSaveSnapshotState(value);
     setSnapshotStatus("idle");
@@ -162,29 +181,6 @@ export function useSavePanel({
       setSyncToObsidian(false);
     }
   }, []);
-
-  // 如果已存在书签，填充现有数据
-  useEffect(() => {
-    if (existingBookmark) {
-      setUrl(existingBookmark.url);
-      setTitle(existingBookmark.title);
-      setDescription(existingBookmark.description);
-      setCategoryId(existingBookmark.categoryId);
-      setTags(existingBookmark.tags);
-    }
-  }, [existingBookmark]);
-
-  // 自动触发 AI 分析（仅新书签）
-  // 等待数据加载完成后再执行
-  useEffect(() => {
-    if (!dataLoaded) {
-      return;
-    }
-    if (!existingBookmark && (markdown || pageContent.textContent)) {
-      runAIAnalysis();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dataLoaded]);
 
   /**
    * 执行 AI 分析的公共逻辑
@@ -218,7 +214,7 @@ export function useSavePanel({
             await applyAnalysisResultWithSetters(
               cachedResult,
               config,
-              categories,
+              categoriesRef.current,
               setTitle,
               setDescription,
               setTags,
@@ -237,7 +233,7 @@ export function useSavePanel({
         const existingTags = await bookmarkStorage.getAllTags();
         const result = await backgroundService.analyzeBookmark({
           pageContent: { ...pageContent, content: markdown },
-          userCategories: categories,
+          userCategories: categoriesRef.current,
           existingTags,
         });
 
@@ -251,7 +247,7 @@ export function useSavePanel({
         await applyAnalysisResultWithSetters(
           result,
           config,
-          categories,
+          categoriesRef.current,
           setTitle,
           setDescription,
           setTags,
@@ -267,8 +263,49 @@ export function useSavePanel({
         setAIError(err instanceof Error ? err.message : "分析失败");
       }
     },
-    [pageContent, categories, existingBookmark],
+    [pageContent, existingBookmark, markdown],
   );
+
+  // 加载分类和标签列表，并在数据可用后直接触发新书签 AI 分析
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadData = async () => {
+      const [cats, existingTags, settings] = await Promise.all([
+        bookmarkStorage.getCategories(),
+        bookmarkStorage.getAllTags(),
+        configStorage.getSettings(),
+      ]);
+
+      if (cancelled) return;
+
+      categoriesRef.current = cats;
+      setCategories(cats);
+      setAllTags(existingTags);
+
+      if (initialSaveSnapshot !== undefined) {
+        setSaveSnapshotState(initialSaveSnapshot);
+      } else {
+        setSaveSnapshotState(settings.autoSaveSnapshot);
+      }
+
+      if (!existingBookmark && (markdown || pageContent.textContent)) {
+        await performAIAnalysis(false);
+      }
+    };
+
+    loadData();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    existingBookmark,
+    initialSaveSnapshot,
+    markdown,
+    pageContent.textContent,
+    performAIAnalysis,
+  ]);
 
   /**
    * AI 分析 - 一次调用完成标题、摘要、分类、标签生成
@@ -337,7 +374,11 @@ export function useSavePanel({
       if (finalCategory) {
         setCategoryId(finalCategory.id);
         if (newCategories.length > 0) {
-          setCategories((prev) => [...prev, ...newCategories]);
+          setCategories((prev) => {
+            const next = [...prev, ...newCategories];
+            categoriesRef.current = next;
+            return next;
+          });
         }
         setAiRecommendedCategory(null);
       }
@@ -546,6 +587,20 @@ function shouldUseMarkdownSnapshot(
   return !!pageContent.isReaderable;
 }
 
+function findExistingCategoryId(
+  categoryName: string,
+  categories: LocalCategory[],
+): string | null {
+  const pathMatch = matchCategoryByPath(
+    categoryName,
+    flattenTree(buildCategoryTree(categories)),
+  );
+  if (pathMatch) return pathMatch.id;
+
+  const nameMatch = matchCategoryByName(categoryName, categories);
+  return nameMatch.matched ? nameMatch.categoryId : null;
+}
+
 /**
  * 简单匹配分类名称（精确 + 模糊）
  * 优先匹配叶子节点（子分类），避免只匹配到父节点
@@ -602,9 +657,9 @@ async function applyAnalysisResultWithSetters(
 
   // 查找匹配的分类（仅在启用智能分类时）
   if (config.enableSmartCategory && result.category) {
-    const matchResult = matchCategoryByName(result.category, categories);
-    if (matchResult.matched) {
-      setCategoryId(matchResult.categoryId);
+    const matchedCategoryId = findExistingCategoryId(result.category, categories);
+    if (matchedCategoryId) {
+      setCategoryId(matchedCategoryId);
       setAiRecommendedCategory(null);
     } else {
       // 分类不在用户已有分类中，设为未分类，并记录推荐分类

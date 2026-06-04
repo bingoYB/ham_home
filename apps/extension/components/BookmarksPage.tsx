@@ -46,14 +46,13 @@ import {
   BatchTagDialog,
   BatchMoveCategoryDialog,
 } from "@/components/bookmarkListMng";
-import { SearchInputArea, AIChatPanel } from "@/components/aiSearch";
+import { SearchInputArea } from "@/components/aiSearch";
 import { useSnapshot } from "@/hooks/useSnapshot";
 import { FilterDropdownMenu } from "@/components/bookmarkPanel/FilterPopover";
 import { CustomFilterDialog } from "@/components/bookmarkPanel/CustomFilterDialog";
 import { useBookmarkSearch } from "@/hooks/useBookmarkSearch";
 import { useBookmarkSelection } from "@/hooks/useBookmarkSelection";
 import { useMasonryLayout } from "@/hooks/useMasonryLayout";
-import { useConversationalSearch } from "@/hooks/useConversationalSearch";
 import { useVirtualBookmarkList } from "@/hooks/useVirtualBookmarkList";
 import { useBatchAITask } from "@/hooks/useBatchAITask";
 import { getCategoryPath, formatDate } from "@/utils/bookmark-utils";
@@ -64,7 +63,6 @@ import type {
   LocalBookmark,
   CustomFilter,
   FilterCondition,
-  Suggestion,
 } from "@/types";
 
 type ViewMode = "grid" | "list";
@@ -74,7 +72,7 @@ interface BookmarksPageProps {
   onViewChange?: (view: string) => void;
 }
 
-export function BookmarksPage({ currentView, onViewChange }: BookmarksPageProps) {
+export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
   const { t, i18n } = useTranslation(["common", "bookmark", "ai"]);
   const { bookmarks, categories, allTags, deleteBookmark, refreshBookmarks } =
     useBookmarks();
@@ -89,30 +87,8 @@ export function BookmarksPage({ currentView, onViewChange }: BookmarksPageProps)
     new Set(),
   );
 
-  // 书签卡片引用（用于滚动定位）- grid 视图使用
-  const bookmarkRefsForGrid = useRef<Map<string, HTMLElement>>(new Map());
-
   // 瀑布流组件引用（用于触发重排）
   const masonryRef = useRef<MasonryRef | null>(null);
-
-  // AI 对话式搜索
-  const {
-    query: aiQuery,
-    setQuery: setAIQuery,
-    messages: aiMessages,
-    currentAnswer: aiCurrentAnswer,
-    status: aiStatus,
-    error: aiError,
-    results: aiResults,
-    suggestions: aiSuggestions,
-    highlightedBookmarkId,
-    setHighlightedBookmarkId,
-    handleSearch: handleAISearch,
-    handleSuggestion: handleAISuggestion,
-    closeChat: closeAIChat,
-    isChatOpen: isAIChatOpen,
-    resultBookmarkIds: aiResultBookmarkIds,
-  } = useConversationalSearch();
 
   // 加载自定义筛选器
   useEffect(() => {
@@ -180,24 +156,8 @@ export function BookmarksPage({ currentView, onViewChange }: BookmarksPageProps)
   // 视图模式
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
 
-  // 根据 AI 对话是否打开决定显示的书签列表
-  const filteredBookmarks = useMemo(() => {
-    if (isAIChatOpen && aiResults.length > 0) {
-      // AI 对话模式下，在 AI 结果的基础上应用其他筛选条件
-      // 创建一个已筛选书签的 Set，用于快速查找
-      const filteredBookmarkIds = new Set(
-        keywordFilteredBookmarks.map((b) => b.id),
-      );
-
-      // 保持 AI 结果的相关性排序，只保留满足其他筛选条件的书签
-      return aiResults
-        .map((r) => r.bookmarkId)
-        .filter((id) => filteredBookmarkIds.has(id))
-        .map((id) => bookmarks.find((b) => b.id === id))
-        .filter((b): b is LocalBookmark => b !== undefined);
-    }
-    return keywordFilteredBookmarks;
-  }, [isAIChatOpen, aiResults, keywordFilteredBookmarks, bookmarks]);
+  // 当前书签列表由关键词、分类、标签、时间和自定义筛选器共同决定。
+  const filteredBookmarks = keywordFilteredBookmarks;
 
   // 处理关键词搜索查询变化
   const handleKeywordQueryChange = useCallback(
@@ -249,109 +209,12 @@ export function BookmarksPage({ currentView, onViewChange }: BookmarksPageProps)
     parentRef: virtualListParentRef,
     virtualItems,
     totalSize: virtualListTotalSize,
-    scrollToBookmark,
     bookmarkRefs: virtualBookmarkRefs,
   } = useVirtualBookmarkList({
     items: filteredBookmarks,
     estimateSize: 104, // 88px content + 16px gap
     overscan: 5,
   });
-
-  // 处理引用点击 - 滚动到对应书签
-  const handleSourceClick = useCallback(
-    (bookmarkId: string) => {
-      setHighlightedBookmarkId(bookmarkId);
-      if (viewMode === "list") {
-        // 列表视图使用虚拟列表滚动
-        scrollToBookmark(bookmarkId);
-      } else {
-        // 网格视图使用 ref 滚动
-        const element = bookmarkRefsForGrid.current.get(bookmarkId);
-        if (element) {
-          element.scrollIntoView({ behavior: "smooth", block: "center" });
-        }
-      }
-      // 3秒后清除高亮
-      setTimeout(() => setHighlightedBookmarkId(null), 3000);
-    },
-    [setHighlightedBookmarkId, viewMode, scrollToBookmark],
-  );
-
-  // 处理 AI 建议点击
-  const handleAISuggestionClick = useCallback(
-    async (suggestion: Suggestion) => {
-      const { action, payload } = suggestion;
-
-      switch (action) {
-        case "navigate": {
-          if (payload?.view && typeof payload.view === "string") {
-            onViewChange?.(payload.view);
-          }
-          break;
-        }
-
-        case "copyAllLinks": {
-          // 复制所有链接
-          const links = aiResultBookmarkIds
-            .map((id) => bookmarks.find((b) => b.id === id)?.url)
-            .filter(Boolean)
-            .join("\n");
-
-          if (links) {
-            await navigator.clipboard.writeText(links);
-            toast.success(t("ai:suggestion.copySuccess"), {
-              position: "top-center",
-            });
-          }
-          break;
-        }
-
-        case "batchAddTags": {
-          // 批量打标签 - 先选中所有 AI 结果书签，再打开弹窗
-          for (const id of aiResultBookmarkIds) {
-            if (!selectedIds.has(id)) {
-              toggleSelect(id);
-            }
-          }
-          setShowBatchTagDialog(true);
-          break;
-        }
-
-        case "batchMoveCategory": {
-          // 批量移动分类 - 先选中所有 AI 结果书签，再打开弹窗
-          for (const id of aiResultBookmarkIds) {
-            if (!selectedIds.has(id)) {
-              toggleSelect(id);
-            }
-          }
-          setShowBatchMoveCategoryDialog(true);
-          break;
-        }
-
-        case "showMore":
-        case "timeFilter":
-        case "domainFilter":
-        case "categoryFilter":
-        case "semanticOnly":
-        case "keywordOnly":
-        case "findDuplicates":
-        case "text":
-        default: {
-          await handleAISuggestion(suggestion);
-          break;
-        }
-      }
-    },
-    [
-      aiResultBookmarkIds,
-      bookmarks,
-      selectedIds,
-      toggleSelect,
-      handleAISuggestion,
-      toast,
-      t,
-    ],
-  );
 
   // 批量打标签弹窗状态
   const [showBatchTagDialog, setShowBatchTagDialog] = useState(false);
@@ -748,31 +611,10 @@ export function BookmarksPage({ currentView, onViewChange }: BookmarksPageProps)
         </div>
 
         {/* 筛选状态和批量操作 */}
-        {(hasFilters ||
-          selectedIds.size > 0 ||
-          (isAIChatOpen && aiResults.length > 0)) && (
+        {(hasFilters || selectedIds.size > 0) && (
           <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/50">
             {/* 左侧：当前分类和筛选标签 */}
             <div className="flex items-center gap-2 flex-wrap">
-              {/* AI 搜索筛选指示器 */}
-              {isAIChatOpen && aiResults.length > 0 && (
-                <Badge
-                  variant="secondary"
-                  className="text-xs px-2 py-1 gap-1.5 cursor-pointer bg-linear-to-r from-blue-500/90 to-cyan-500/90 dark:from-blue-600/80 dark:to-cyan-600/80 text-white border-0 shadow-sm group/ai"
-                >
-                  <Sparkles className="h-3 w-3" />
-                  {t("ai:search.aiFiltered", { count: aiResults.length })}
-                  <X
-                    className="h-3 w-3 hover:bg-white/20 rounded-full cursor-pointer"
-                    style={{ pointerEvents: "auto" }}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      closeAIChat();
-                      deselectAll();
-                    }}
-                  />
-                </Badge>
-              )}
               {selectedCategory !== "all" && (
                 <Badge
                   variant="secondary"
@@ -1023,16 +865,13 @@ export function BookmarksPage({ currentView, onViewChange }: BookmarksPageProps)
               return (
                 <div
                   key={bm.id}
-                  ref={(el) => {
-                    if (el) bookmarkRefsForGrid.current.set(bm.id, el);
-                  }}
                 >
                   <BookmarkCard
                     bookmark={bm}
                     categoryName={getBookmarkCategoryPath(bm.categoryId)}
                     formattedDate={formatBookmarkDate(bm.createdAt)}
                     isSelected={selectedIds.has(bm.id)}
-                    isHighlighted={highlightedBookmarkId === bm.id}
+                    isHighlighted={false}
                     onToggleSelect={() => toggleSelect(bm.id)}
                     onOpen={() => openBookmark(bm.url)}
                     onEdit={() => setEditingBookmark(bm)}
@@ -1083,7 +922,7 @@ export function BookmarksPage({ currentView, onViewChange }: BookmarksPageProps)
                     categoryName={getBookmarkCategoryPath(bookmark.categoryId)}
                     formattedDate={formatBookmarkDate(bookmark.createdAt)}
                     isSelected={selectedIds.has(bookmark.id)}
-                    isHighlighted={highlightedBookmarkId === bookmark.id}
+                    isHighlighted={false}
                     onToggleSelect={() => toggleSelect(bookmark.id)}
                     onOpen={() => openBookmark(bookmark.url)}
                     onEdit={() => setEditingBookmark(bookmark)}
@@ -1156,27 +995,6 @@ export function BookmarksPage({ currentView, onViewChange }: BookmarksPageProps)
         selectedCount={selectedIds.size}
         categories={categories}
         onConfirm={handleBatchMoveCategory}
-      />
-
-      {/* AI 对话面板（sticky 吸底） */}
-      <AIChatPanel
-        isOpen={isAIChatOpen}
-        onClose={() => {
-          closeAIChat();
-          deselectAll();
-        }}
-        query={aiQuery}
-        onQueryChange={setAIQuery}
-        onSubmit={handleAISearch}
-        messages={aiMessages}
-        currentAnswer={aiCurrentAnswer}
-        status={aiStatus}
-        error={aiError}
-        sources={aiResults}
-        onSourceClick={handleSourceClick}
-        suggestions={aiSuggestions}
-        onSuggestionClick={handleAISuggestionClick}
-        onRetry={handleAISearch}
       />
     </div>
   );

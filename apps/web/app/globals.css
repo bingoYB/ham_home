@@ -3,22 +3,62 @@
 @source "../../../packages/ui/src/**/*.{js,ts,jsx,tsx}";
 @source "../../../packages/ui-business/src/**/*.{js,ts,jsx,tsx}";
 
+/* ========================================
+   Design System — "Warm Workshop" Editorial
+   ======================================== */
+
+@theme inline {
+  --font-display: 'DM Serif Display', Georgia, serif;
+  --font-body: 'Noto Sans SC', system-ui, sans-serif;
+
+  --color-brand: #ff5b24;
+  --color-brand-light: #ff8c5a;
+  --color-brand-dark: #d94a1a;
+  --color-brand-glow: #ff5b2433;
+
+  --color-deep-green: #1a3a2a;
+  --color-deep-green-light: #2dd4bf;
+  --color-warm-cream: #faf6f1;
+  --color-warm-dark: #1c1917;
+}
+
+/* ========================================
+   Noise Texture Overlay
+   ======================================== */
+
+.noise-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  opacity: 0.35;
+  pointer-events: none;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  background-repeat: repeat;
+  background-size: 128px 128px;
+  mix-blend-mode: overlay;
+}
+
+.dark .noise-overlay::before {
+  opacity: 0.15;
+}
+
+/* ========================================
+   Home Page Shell — Warm Editorial Background
+   ======================================== */
+
 .home-page-shell {
-  background-color: var(--background);
-  background-image: radial-gradient(73% 147%, #EADFDF 59%, #ECE2DF 100%), radial-gradient(91% 146%, rgba(255,255,255,0.50) 47%, rgba(0,0,0,0.50) 100%);
-  background-blend-mode: screen;
+  background-color: var(--color-warm-cream);
+  background-image:
+    radial-gradient(ellipse 80% 60% at 30% 20%, rgba(255, 140, 90, 0.08) 0%, transparent 70%),
+    radial-gradient(ellipse 60% 50% at 80% 80%, rgba(45, 212, 191, 0.06) 0%, transparent 70%);
 }
 
 .dark .home-page-shell {
-  background-color: var(--background);
-  background:
-    linear-gradient(to bottom, #2d2c2c 0%, #3f3f3f 40%, #1c1c1c 150%),
-    linear-gradient(
-      to top,
-      rgba(255, 255, 255, 0.4) 0%,
-      rgba(0, 0, 0, 0.25) 200%
-    );
-  background-blend-mode: multiply;
+  background-color: var(--color-warm-dark);
+  background-image:
+    radial-gradient(ellipse 80% 60% at 20% 10%, rgba(255, 91, 36, 0.08) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 80% 90%, rgba(45, 212, 191, 0.04) 0%, transparent 60%);
 }
 
 /* fix scroll area viewport display issue */

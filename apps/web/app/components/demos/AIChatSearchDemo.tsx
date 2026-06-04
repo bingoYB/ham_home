@@ -14,6 +14,9 @@ import type { Bookmark } from '@/data/mock-bookmarks';
 interface DemoTexts {
   aiAnswer: string;
   close: string;
+  newSession: string;
+  deleteSession: string;
+  sessionSelect: string;
   aiPlaceholder: string;
   sources: string;
   dismiss: string;
@@ -50,6 +53,9 @@ function getTexts(isEn: boolean): DemoTexts {
     return {
       aiAnswer: 'AI Answer',
       close: 'Close',
+      newSession: 'New chat',
+      deleteSession: 'Delete chat',
+      sessionSelect: 'Switch chat',
       aiPlaceholder: 'Ask AI about your bookmarks...',
       sources: 'Sources',
       dismiss: 'Dismiss',
@@ -93,6 +99,9 @@ function getTexts(isEn: boolean): DemoTexts {
   return {
     aiAnswer: 'AI 回答',
     close: '关闭',
+    newSession: '新对话',
+    deleteSession: '删除对话',
+    sessionSelect: '切换对话',
     aiPlaceholder: '用自然语言询问你的书签...',
     sources: '信息来源',
     dismiss: '关闭',
@@ -160,6 +169,9 @@ export function AIChatSearchDemo({ bookmarks, isEn, className, onSourceClick }: 
     () => ({
       aiAnswer: texts.aiAnswer,
       close: texts.close,
+      newSession: texts.newSession,
+      deleteSession: texts.deleteSession,
+      sessionSelect: texts.sessionSelect,
       aiPlaceholder: texts.aiPlaceholder,
       sources: texts.sources,
       retry: texts.status.retry,

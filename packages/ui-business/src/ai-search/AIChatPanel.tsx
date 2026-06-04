@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef } from "react";
-import { Bot, X } from "lucide-react";
+import { Bot, Plus, Trash2, X } from "lucide-react";
 import { Button, ScrollArea, cn } from "@hamhome/ui";
 import { AIChatMessage } from "./AIChatMessage";
 import { AIChatSearchBar } from "./AIChatSearchBar";
 import { AIChatSources } from "./AIChatSources";
 import { AIChatStatusIndicator } from "./AIChatStatusIndicator";
 import { AIChatSuggestions } from "./AIChatSuggestions";
-import type { AIChatLabels, AISearchStatus, ChatMessage, Source, Suggestion } from "./types";
+import type { AIChatLabels, AIChatSession, AISearchStatus, ChatMessage, Source, Suggestion } from "./types";
 
 export interface AIChatPanelProps {
   isOpen: boolean;
@@ -23,6 +23,11 @@ export interface AIChatPanelProps {
   suggestions?: Suggestion[];
   onSuggestionClick?: (suggestion: Suggestion) => void;
   onRetry?: () => void;
+  sessions?: AIChatSession[];
+  currentSessionId?: string | null;
+  onSessionChange?: (sessionId: string) => void;
+  onCreateSession?: () => void;
+  onDeleteSession?: (sessionId: string) => void;
   className?: string;
   labels: AIChatLabels;
 }
@@ -42,6 +47,11 @@ export function AIChatPanel({
   suggestions = [],
   onSuggestionClick,
   onRetry,
+  sessions = [],
+  currentSessionId,
+  onSessionChange,
+  onCreateSession,
+  onDeleteSession,
   className,
   labels,
 }: AIChatPanelProps) {
@@ -115,15 +125,54 @@ export function AIChatPanel({
               <Bot className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
               <span className="font-medium">{labels.aiAnswer}</span>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={onClose}
-              title={labels.close}
-            >
-              <X className="h-4 w-4" />
-            </Button>
+            <div className="flex min-w-0 items-center gap-1">
+              {sessions.length > 0 && currentSessionId && (
+                <select
+                  aria-label={labels.sessionSelect}
+                  title={labels.sessionSelect}
+                  value={currentSessionId}
+                  onChange={(event) => onSessionChange?.(event.target.value)}
+                  className="h-7 max-w-36 rounded-md border border-border bg-background px-2 text-xs outline-none"
+                >
+                  {sessions.map((session) => (
+                    <option key={session.id} value={session.id}>
+                      {session.title}
+                    </option>
+                  ))}
+                </select>
+              )}
+              {onCreateSession && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={onCreateSession}
+                  title={labels.newSession}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+              )}
+              {currentSessionId && onDeleteSession && sessions.length > 1 && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  onClick={() => onDeleteSession(currentSessionId)}
+                  title={labels.deleteSession}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={onClose}
+                title={labels.close}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
 
           <ScrollArea className="flex-1 min-h-0">
