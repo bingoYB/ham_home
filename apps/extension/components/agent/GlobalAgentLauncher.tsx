@@ -163,7 +163,7 @@ function MessageBubble({
           "max-w-[88%] px-4 py-2.5 text-sm leading-relaxed shadow-sm transition-all",
           isUser
             ? "rounded-2xl rounded-tr-sm bg-gradient-to-br from-indigo-500 to-blue-600 text-white shadow-indigo-500/20"
-            : "rounded-2xl rounded-tl-sm border border-border/40 bg-muted/40 text-foreground backdrop-blur-sm",
+            : "rounded-2xl rounded-tl-sm border border-indigo-100 dark:border-indigo-900/50 bg-gradient-to-br from-indigo-50/80 to-blue-50/80 dark:from-indigo-950/40 dark:to-blue-950/40 text-foreground shadow-sm backdrop-blur-md",
         )}
       >
         {!isUser && <ProcessSteps steps={message.steps} title={processTitle} />}
@@ -400,7 +400,7 @@ export function GlobalAgentLauncher({ inline = false }: { inline?: boolean }) {
               <div className="flex justify-start animate-in fade-in duration-300">
                 <div className="flex items-center gap-2 rounded-2xl rounded-tl-sm border border-border/40 bg-muted/40 px-4 py-2.5 text-sm text-muted-foreground backdrop-blur-sm">
                   <Loader2 className="h-4 w-4 animate-spin text-indigo-500" />
-                  <span>{t(`search.status.${agent.status}`)}</span>
+                  <span>{t(`agent.status.${agent.status}`)}</span>
                 </div>
               </div>
             )}

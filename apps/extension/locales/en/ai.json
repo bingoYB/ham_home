@@ -70,7 +70,12 @@
     "placeholder": "Ask about features, settings, or bookmarks...",
     "send": "Send",
     "process": "Process",
-    "sources": "Related bookmarks"
+    "sources": "Related bookmarks",
+    "status": {
+      "thinking": "Agent is thinking...",
+      "searching": "Agent is processing...",
+      "writing": "Agent is formulating answer..."
+    }
   },
   "settings": {
     "provider": "Provider",

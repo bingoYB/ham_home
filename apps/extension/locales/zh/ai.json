@@ -70,7 +70,12 @@
     "placeholder": "问插件功能、配置项或书签...",
     "send": "发送",
     "process": "执行过程",
-    "sources": "相关书签"
+    "sources": "相关书签",
+    "status": {
+      "thinking": "Agent 思考中...",
+      "searching": "Agent 处理中...",
+      "writing": "Agent 整理回答中..."
+    }
   },
   "settings": {
     "provider": "服务商",
