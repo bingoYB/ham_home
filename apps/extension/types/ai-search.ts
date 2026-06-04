@@ -53,6 +53,42 @@ export interface Suggestion {
 export type AISearchStatus = 'idle' | 'thinking' | 'searching' | 'writing' | 'done' | 'error';
 
 /**
+ * Agent 执行过程步骤，用于在对话窗口渲染中间过程。
+ *
+ * 示例：
+ * ```ts
+ * const step: AgentProcessStep = {
+ *   id: 'tool_1',
+ *   type: 'tool',
+ *   title: 'search_bookmarks',
+ *   status: 'completed',
+ * };
+ * ```
+ */
+export interface AgentProcessStep {
+  /** 前端列表渲染使用的稳定 ID */
+  id: string;
+  /** 步骤类型 */
+  type: 'iteration' | 'skill' | 'tool' | 'message';
+  /** 用户可读标题 */
+  title: string;
+  /** 可选说明或摘要 */
+  content?: string;
+  /** 当前步骤状态 */
+  status: 'running' | 'completed' | 'failed';
+  /** 关联的工具名称 */
+  toolName?: string;
+  /** 工具入参，已脱敏 */
+  input?: unknown;
+  /** 工具输出摘要，已截断 */
+  output?: unknown;
+  /** 失败原因 */
+  error?: string;
+  /** 创建时间 */
+  timestamp: number;
+}
+
+/**
  * 引用源（关联的书签）
  */
 export interface Source {
@@ -94,6 +130,7 @@ export interface ChatMessage {
   content: string;
   timestamp: number;
   sources?: Source[];
+  steps?: AgentProcessStep[];
 }
 
 /**

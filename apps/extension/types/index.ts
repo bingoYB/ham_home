@@ -5,7 +5,7 @@
 
 // AI 对话式搜索类型
 export * from "./ai-search";
-import type { Suggestion, SuggestionActionType } from "./ai-search";
+import type { ChatMessage, Suggestion, SuggestionActionType } from "./ai-search";
 
 // ============ 书签相关 ============
 
@@ -101,6 +101,7 @@ export interface AIConfig {
   model?: string;
   temperature?: number;
   maxTokens?: number;
+  apiMode?: "chat" | "responses"; // 请求模式，主要用于 OpenAI 兼容的 provider
   enableTranslation: boolean; // 是否启用翻译
   enableSmartCategory: boolean; // 是否启用智能分类
   enableTagSuggestion: boolean; // 是否启用标签推荐
@@ -755,6 +756,24 @@ export interface ConversationalSearchSession {
   lastQuery?: string;
   /** 最近多轮对话历史 */
   history: Array<{ role: "user" | "assistant"; text: string }>;
+}
+
+/**
+ * 对话式搜索 session 摘要，用于 session 列表与切换。
+ */
+export interface ChatSearchSessionSummary {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/**
+ * 对话式搜索 session 快照，包含可展示消息与结构化检索状态。
+ */
+export interface ChatSearchSessionSnapshot extends ChatSearchSessionSummary {
+  state: ConversationalSearchSession;
+  messages: ChatMessage[];
 }
 
 /**

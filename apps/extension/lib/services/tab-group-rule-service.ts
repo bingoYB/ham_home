@@ -1,6 +1,7 @@
-import { generateStructuredObject } from "@hamhome/agent";
+import type { JsonSchema } from "@browser-agent-sdk/agent";
 import { z } from "zod";
 import type { TabGroupRule, TabGroupRuleColor, TabGroupRuleMatchResult } from "@/types";
+import { runExtensionCommand } from "@/lib/agent/command-runner";
 import { assertAgentConfigured, resolveAgentConfig } from "@/lib/agent/factory";
 import { containsPrivateContent } from "@/lib/privacy/privacy-detector";
 import { tabGroupRulesStorage } from "@/lib/storage/tab-group-rules-storage";
@@ -20,14 +21,26 @@ const TAB_GROUP_COLORS = [
 ] as const;
 
 const aiTabGroupSuggestionSchema = z.object({
-  groupTitle: z.string().nullable(),
-  title: z.string().nullable(),
-  group: z.string().nullable(),
-  answer: z.string().nullable(),
-  color: z.string().nullable(),
+  groupTitle: z.string().nullable().optional(),
+  title: z.string().nullable().optional(),
+  group: z.string().nullable().optional(),
+  answer: z.string().nullable().optional(),
+  color: z.string().nullable().optional(),
 });
 
 type AITabGroupSuggestion = z.infer<typeof aiTabGroupSuggestionSchema>;
+
+const aiTabGroupSuggestionOutputSchema: JsonSchema = {
+  type: "object",
+  properties: {
+    groupTitle: {},
+    title: {},
+    group: {},
+    answer: {},
+    color: {},
+  },
+  additionalProperties: false,
+};
 
 function normalizeDomain(value: string): string {
   return value.trim().toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "");
@@ -219,28 +232,29 @@ async function suggestAITabGroup(input: {
   const config = await resolveAgentConfig();
   assertAgentConfigured(config.rawConfig);
 
-  const result = await generateStructuredObject({
-    provider: config.provider,
-    model: config.model,
-    apiKey: config.apiKey,
-    baseURL: config.baseURL,
-    apiMode: config.apiMode,
+  const result = await runExtensionCommand<Record<string, never>, AITabGroupSuggestion>({
+    config,
     temperature: 0.1,
-    maxTokens: 180,
-    schema: aiTabGroupSuggestionSchema,
-    system:
+    maxIterations: 1,
+    systemPrompt:
       config.language === "zh"
         ? "你是浏览器 Tab 自动分组助手。你会根据 URL、标题、描述和现有分组，选择最合适的分组名称。优先复用已有分组，只有没有合适分组时才创建简短的新分组。"
         : "You are a browser tab grouping assistant. Choose the most suitable group title from URL, title, description, and existing groups. Prefer existing groups; create a concise new group only when needed.",
-    prompt: buildAITabGroupPrompt({
-      url: input.url,
-      title: input.title,
-      description: input.description,
-      existingGroups: input.existingGroups,
-    }),
+    command: {
+      name: "suggestTabGroup",
+      description: "Suggest a native browser tab group title and color.",
+      outputSchema: aiTabGroupSuggestionOutputSchema,
+      prompt: buildAITabGroupPrompt({
+        url: input.url,
+        title: input.title,
+        description: input.description,
+        existingGroups: input.existingGroups,
+      }),
+    },
+    input: {},
   });
 
-  return normalizeAITabGroupSuggestion(result.object);
+  return normalizeAITabGroupSuggestion(aiTabGroupSuggestionSchema.parse(result.output));
 }
 
 class TabGroupRuleService {

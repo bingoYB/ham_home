@@ -23,6 +23,9 @@
     "aiAnswer": "AI Answer",
     "sources": "Sources",
     "close": "Close",
+    "newSession": "New chat",
+    "deleteSession": "Delete chat",
+    "sessionSelect": "Switch chat",
     "aiFiltered": "AI Results ({{count}})",
     "status": {
       "thinking": "AI is thinking...",
@@ -54,6 +57,20 @@
         "semanticQuery": "Find me bookmarks about frontend development"
       }
     }
+  },
+  "agent": {
+    "entry": "Agent",
+    "open": "Open global assistant",
+    "title": "HamHome Agent",
+    "newSession": "New chat",
+    "deleteSession": "Delete chat",
+    "sessionSelect": "Switch chat",
+    "close": "Close",
+    "empty": "Ask about extension features, bookmarks, data summaries, or safe settings changes.",
+    "placeholder": "Ask about features, settings, or bookmarks...",
+    "send": "Send",
+    "process": "Process",
+    "sources": "Related bookmarks"
   },
   "settings": {
     "provider": "Provider",

@@ -23,6 +23,9 @@
     "aiAnswer": "AI 回答",
     "sources": "信息来源",
     "close": "关闭",
+    "newSession": "新对话",
+    "deleteSession": "删除对话",
+    "sessionSelect": "切换对话",
     "aiFiltered": "AI 搜索结果（{{count}} 个）",
     "status": {
       "thinking": "AI 正在思考...",
@@ -54,6 +57,20 @@
         "semanticQuery": "帮我找到关于前端开发的书签"
       }
     }
+  },
+  "agent": {
+    "entry": "Agent",
+    "open": "打开全局助手",
+    "title": "HamHome Agent",
+    "newSession": "新对话",
+    "deleteSession": "删除对话",
+    "sessionSelect": "切换对话",
+    "close": "关闭",
+    "empty": "可以问我插件功能、书签内容、数据统计，也可以让我调整安全配置项。",
+    "placeholder": "问插件功能、配置项或书签...",
+    "send": "发送",
+    "process": "执行过程",
+    "sources": "相关书签"
   },
   "settings": {
     "provider": "服务商",

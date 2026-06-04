@@ -6,10 +6,12 @@ import type {
   SemanticSearchResult,
 } from "@/lib/search/semantic-retriever";
 import type { ChatSearchTurnResult } from "@/lib/agent/services/chat-search-service";
+import type { GlobalAgentTurnResult } from "@/lib/agent/services/global-agent-service";
 import type {
   AnalysisResult,
   BookmarkEmbedding,
-  ConversationalSearchSession,
+  ChatSearchSessionSnapshot,
+  ChatSearchSessionSummary,
   ConversationalSearchTurnInput,
   Language,
   LocalBookmark,
@@ -69,8 +71,22 @@ export interface IBackgroundService {
   getShortcuts(): Promise<ShortcutCommand[]>;
   chatSearchRunTurn(
     input: ConversationalSearchTurnInput,
-    state: ConversationalSearchSession,
+    sessionId?: string,
   ): Promise<ChatSearchTurnResult>;
+  chatSearchListSessions(): Promise<ChatSearchSessionSummary[]>;
+  chatSearchCreateSession(title?: string): Promise<ChatSearchSessionSnapshot>;
+  chatSearchGetSession(sessionId?: string): Promise<ChatSearchSessionSnapshot>;
+  chatSearchClearSession(sessionId: string): Promise<ChatSearchSessionSnapshot>;
+  chatSearchDeleteSession(sessionId: string): Promise<ChatSearchSessionSummary[]>;
+  globalAgentRunTurn(
+    input: ConversationalSearchTurnInput,
+    sessionId?: string,
+  ): Promise<GlobalAgentTurnResult>;
+  globalAgentListSessions(): Promise<ChatSearchSessionSummary[]>;
+  globalAgentCreateSession(title?: string): Promise<ChatSearchSessionSnapshot>;
+  globalAgentGetSession(sessionId?: string): Promise<ChatSearchSessionSnapshot>;
+  globalAgentClearSession(sessionId: string): Promise<ChatSearchSessionSnapshot>;
+  globalAgentDeleteSession(sessionId: string): Promise<ChatSearchSessionSummary[]>;
   analyzeBookmark(options: {
     pageContent: PageContent;
     userCategories?: LocalCategory[];

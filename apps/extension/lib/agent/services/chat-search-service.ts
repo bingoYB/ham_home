@@ -1,8 +1,10 @@
-import { ToolRegistry, generateStructuredObject } from "@hamhome/agent";
+import { InMemory, type JsonSchema } from "@browser-agent-sdk/agent";
 import { z } from "zod";
 import { createLogger } from "@hamhome/utils";
 import type {
   ChatSearchResponse,
+  ChatSearchSessionSnapshot,
+  ChatSearchSessionSummary,
   ConversationalSearchSession,
   ConversationalSearchTurnInput,
   LocalBookmark,
@@ -12,8 +14,13 @@ import type {
   SuggestionActionType,
 } from "@/types";
 import { bookmarkStorage } from "@/lib/storage";
+import { runExtensionCommand } from "../command-runner";
 import { getAgentErrorMessage } from "../errors";
 import { createExtensionAgent } from "../factory";
+import {
+  ChatSearchSessionStore,
+  createInitialChatSearchState,
+} from "./chat-search-session-store";
 import {
   createChatSearchTools,
   getChatSearchLanguage,
@@ -45,14 +52,38 @@ const chatSearchResponseSchema = z.object({
     z.object({
       label: z.string(),
       action: suggestionActionEnum,
-      payload: z.record(z.string(), z.unknown()).nullable(),
+      payload: z.record(z.string(), z.unknown()).nullable().optional(),
     }),
   ),
 });
 
 type ChatSearchResponseOutput = z.infer<typeof chatSearchResponseSchema>;
 
+const chatSearchResponseOutputSchema: JsonSchema = {
+  type: "object",
+  properties: {
+    answer: { type: "string" },
+    sources: { type: "array", items: { type: "string" } },
+    nextSuggestions: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: {
+          label: { type: "string" },
+          action: { type: "string" },
+          payload: {},
+        },
+        required: ["label", "action"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["answer", "sources", "nextSuggestions"],
+  additionalProperties: false,
+};
+
 export interface ChatSearchTurnResult {
+  session: ChatSearchSessionSnapshot;
   displayText: string;
   response: ChatSearchResponse;
   bookmarks: LocalBookmark[];
@@ -88,24 +119,6 @@ async function getBookmarksByIds(ids: string[]): Promise<LocalBookmark[]> {
     ids.map((id) => bookmarkStorage.getBookmarkById(id)),
   );
   return bookmarks.filter((bookmark): bookmark is LocalBookmark => !!bookmark);
-}
-
-function buildAgentInputMessages(
-  state: ConversationalSearchSession,
-  turnRequest: ChatSearchTurnRequest,
-) {
-  const historyMessages = state.history.slice(-10).map((message) => ({
-    role: message.role,
-    content: message.text,
-  }));
-
-  return [
-    ...historyMessages,
-    {
-      role: "user" as const,
-      content: turnRequest.agentInput,
-    },
-  ];
 }
 
 function createDisplayTextFromInput(input: ConversationalSearchTurnInput): string {
@@ -284,6 +297,20 @@ function sanitizeSuggestions(input: Suggestion[] | undefined): Suggestion[] {
       action: suggestion.action,
       ...(suggestion.payload ? { payload: suggestion.payload } : {}),
     }));
+}
+
+function normalizeChatSearchResponse(
+  output: ChatSearchResponseOutput,
+): ChatSearchResponse {
+  return {
+    answer: output.answer,
+    sources: output.sources,
+    nextSuggestions: output.nextSuggestions.map((suggestion) => ({
+      label: suggestion.label,
+      action: suggestion.action,
+      ...(suggestion.payload ? { payload: suggestion.payload } : {}),
+    })),
+  };
 }
 
 function findLatestObservation<T>(
@@ -475,7 +502,7 @@ function buildFallbackChatSearchResponse(
 
   const parsed = chatSearchResponseSchema.safeParse(fallbackResponse);
   if (parsed.success) {
-    return parsed.data as ChatSearchResponse;
+    return normalizeChatSearchResponse(parsed.data);
   }
 
   return {
@@ -524,20 +551,39 @@ function buildNextState(
 }
 
 export function createInitialState(): ConversationalSearchSession {
-  return {
-    filters: {},
-    seenBookmarkIds: [],
-    lastSelectedBookmarkIds: [],
-    history: [],
-  };
+  return createInitialChatSearchState();
 }
 
 export const createInitialSession = createInitialState;
 
-class ChatSearchService {
+export class ChatSearchService {
+  constructor(
+    private readonly sessionStore = new ChatSearchSessionStore(),
+  ) {}
+
+  async listSessions(): Promise<ChatSearchSessionSummary[]> {
+    return this.sessionStore.listSessions();
+  }
+
+  async createSession(title?: string): Promise<ChatSearchSessionSnapshot> {
+    return this.sessionStore.createSession(title);
+  }
+
+  async getSession(sessionId?: string): Promise<ChatSearchSessionSnapshot> {
+    return this.sessionStore.getSessionSnapshot(sessionId);
+  }
+
+  async clearSession(sessionId: string): Promise<ChatSearchSessionSnapshot> {
+    return this.sessionStore.clearSession(sessionId);
+  }
+
+  async deleteSession(sessionId: string): Promise<ChatSearchSessionSummary[]> {
+    return this.sessionStore.deleteSession(sessionId);
+  }
+
   async runTurn(
     input: ConversationalSearchTurnInput,
-    state: ConversationalSearchSession,
+    sessionId?: string,
   ): Promise<ChatSearchTurnResult> {
     const language = await getChatSearchLanguage();
     const resolvedTurn = resolveTurnInput(input, language);
@@ -548,6 +594,11 @@ class ChatSearchService {
       );
     }
 
+    const persistedSession = await this.sessionStore.ensureSession(
+      sessionId,
+      resolvedTurn.displayText,
+    );
+    const state = persistedSession.state;
     const session: ChatSearchSession = {
       turn: resolvedTurn.turnRequest,
       state,
@@ -560,44 +611,50 @@ class ChatSearchService {
       observations: [],
     };
 
-    const toolRegistry = new ToolRegistry();
-    toolRegistry.registerTools((await createChatSearchTools(session)) as any);
-
     try {
+      const runtimeMemory = new InMemory({ maxMessages: 80 });
+      await this.sessionStore.seedRuntimeMemory(persistedSession.id, runtimeMemory);
+      const tools = await createChatSearchTools(session);
       const { agent, config } = await createExtensionAgent({
         name: "bookmark-chat-search",
+        sessionId: persistedSession.id,
+        memory: runtimeMemory,
         systemPrompt:
           language === "zh"
             ? "你是 HamHome 的书签对话编排 Agent。你的职责是识别用户意图、调用合适的工具收集信息，并在信息充分后结束 tool loop。不要凭空回答；需要更多信息时继续调用工具。"
             : "You are HamHome's bookmark conversation orchestration agent. Your job is to identify user intent, call the right tools, and stop only after enough grounded information has been gathered. Never answer from unstated assumptions.",
-        tools: toolRegistry,
+        tools,
+        maxIterations: 8,
       });
 
-      await agent.run(buildAgentInputMessages(state, resolvedTurn.turnRequest), {
+      await agent.run(resolvedTurn.turnRequest.agentInput, {
         maxIterations: 8,
         temperature: 0.2,
-        maxTokens: config.maxTokens ?? 1200,
+        invocationMode: config.invocationMode,
       });
 
       let response: ChatSearchResponse;
       try {
-        const formatted = await generateStructuredObject({
-          provider: config.provider,
-          model: config.model,
-          apiKey: config.apiKey,
-          baseURL: config.baseURL,
-          apiMode: config.apiMode,
+        const formatted = await runExtensionCommand<Record<string, never>, ChatSearchResponseOutput>({
+          config,
           temperature: 0.1,
-          maxTokens: 900,
-          schema: chatSearchResponseSchema,
-          system:
+          maxIterations: 1,
+          systemPrompt:
             language === "zh"
               ? "你是 HamHome 的搜索结果整理器。你会接收工具执行结果，并把它们整理成可直接展示给用户的最终 JSON。不要添加任何未被工具证实的信息。"
               : "You are HamHome's search result formatter. You will receive grounded tool outputs and convert them into final display-ready JSON. Do not add unsupported claims.",
-          prompt: buildFormatterPrompt(session),
+          command: {
+            name: "formatChatSearchResponse",
+            description: "Format grounded chat search observations for display.",
+            outputSchema: chatSearchResponseOutputSchema,
+            prompt: buildFormatterPrompt(session),
+          },
+          input: {},
         });
 
-        response = formatted.object as ChatSearchResponseOutput;
+        response = normalizeChatSearchResponse(
+          chatSearchResponseSchema.parse(formatted.output),
+        );
       } catch (formatError) {
         logger.warn("Structured formatter failed, using fallback response", {
           error: getAgentErrorMessage(formatError, "formatter failed"),
@@ -626,15 +683,29 @@ class ChatSearchService {
         response,
         sourceIds,
       );
+      await this.sessionStore.appendTurn(
+        persistedSession.id,
+        resolvedTurn.displayText,
+        response.answer,
+      );
+      const savedSession = await this.sessionStore.saveState(
+        persistedSession.id,
+        newState,
+        persistedSession.messages.length === 0
+          ? resolvedTurn.displayText
+          : persistedSession.title,
+      );
 
       logger.debug("Chat search turn completed", {
         intent: session.intent,
         sourceCount: sourceIds.length,
         observationCount: session.observations.length,
         turnSource: session.turn.source,
+        sessionId: persistedSession.id,
       });
 
       return {
+        session: savedSession,
         displayText: resolvedTurn.displayText,
         response,
         bookmarks,
@@ -648,14 +719,14 @@ class ChatSearchService {
 
   async search(
     userInput: string,
-    state: ConversationalSearchSession,
+    sessionId?: string,
   ): Promise<ChatSearchTurnResult> {
     return this.runTurn(
       {
         type: "message",
         text: userInput,
       },
-      state,
+      sessionId,
     );
   }
 }

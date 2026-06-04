@@ -2,11 +2,11 @@
  * useConversationalSearch - AI 对话式搜索 Hook
  * 封装 AI 对话状态与统一回合执行逻辑
  */
-import { useState, useCallback, useRef } from "react";
+import { useState, useCallback, useEffect } from "react";
 import type {
   AISearchStatus,
   ChatMessage,
-  ConversationalSearchSession,
+  ChatSearchSessionSummary,
   ConversationalSearchTurnInput,
   Source,
   Suggestion,
@@ -52,13 +52,23 @@ export interface UseConversationalSearchReturn {
   /** 执行建议动作 */
   handleSuggestion: (suggestion: Suggestion) => Promise<void>;
   /** 清除对话 */
-  clearConversation: () => void;
+  clearConversation: () => Promise<void>;
   /** 关闭对话窗口 */
   closeChat: () => void;
   /** 对话窗口是否打开 */
   isChatOpen: boolean;
   /** 当前结果的书签 ID 列表（用于批量操作） */
   resultBookmarkIds: string[];
+  /** 可切换的对话 session 列表 */
+  sessions: ChatSearchSessionSummary[];
+  /** 当前对话 session ID */
+  currentSessionId: string | null;
+  /** 切换对话 session */
+  switchSession: (sessionId: string) => Promise<void>;
+  /** 新建对话 session */
+  createSession: () => Promise<void>;
+  /** 删除对话 session */
+  deleteSession: (sessionId: string) => Promise<void>;
 }
 
 /**
@@ -88,15 +98,6 @@ async function simulateStreamingOutput(
   });
 }
 
-function createInitialSessionState(): ConversationalSearchSession {
-  return {
-    filters: {},
-    seenBookmarkIds: [],
-    lastSelectedBookmarkIds: [],
-    history: [],
-  };
-}
-
 /**
  * AI 对话式搜索 Hook
  */
@@ -113,10 +114,42 @@ export function useConversationalSearch(): UseConversationalSearchReturn {
   );
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [resultBookmarkIds, setResultBookmarkIds] = useState<string[]>([]);
+  const [sessions, setSessions] = useState<ChatSearchSessionSummary[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
 
-  const conversationSessionRef = useRef<ConversationalSearchSession>(
-    createInitialSessionState(),
-  );
+  const loadSession = useCallback(async (sessionId?: string) => {
+    const backgroundService = getBackgroundService();
+    const snapshot = await backgroundService.chatSearchGetSession(sessionId);
+    setCurrentSessionId(snapshot.id);
+    setMessages(snapshot.messages);
+    setResults([]);
+    setSuggestions([]);
+    setResultBookmarkIds(snapshot.state.lastSelectedBookmarkIds);
+    return snapshot;
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadSessions() {
+      try {
+        const backgroundService = getBackgroundService();
+        const loadedSessions = await backgroundService.chatSearchListSessions();
+        if (cancelled) return;
+        setSessions(loadedSessions);
+        await loadSession(loadedSessions[0]?.id);
+      } catch (err) {
+        if (!cancelled) {
+          console.error("[useConversationalSearch] Failed to load sessions:", err);
+        }
+      }
+    }
+
+    loadSessions();
+    return () => {
+      cancelled = true;
+    };
+  }, [loadSession]);
 
   const applyTurn = useCallback(async (input: ConversationalSearchTurnInput) => {
     const displayText =
@@ -146,16 +179,20 @@ export function useConversationalSearch(): UseConversationalSearchReturn {
       const backgroundService = getBackgroundService();
 
       const {
+        session,
         response,
         bookmarks: resultBookmarks,
         searchResult,
-        newState,
       } = await backgroundService.chatSearchRunTurn(
         input,
-        conversationSessionRef.current,
+        currentSessionId || undefined,
       );
 
-      conversationSessionRef.current = newState;
+      setCurrentSessionId(session.id);
+      setSessions((prev) => {
+        const next = [session, ...prev.filter((item) => item.id !== session.id)];
+        return next.sort((a, b) => b.updatedAt - a.updatedAt);
+      });
 
       const scoreMap = new Map(
         searchResult.items.map((item) => [
@@ -206,7 +243,7 @@ export function useConversationalSearch(): UseConversationalSearchReturn {
       setError(err instanceof Error ? err.message : "Search failed");
       setStatus("error");
     }
-  }, []);
+  }, [currentSessionId]);
 
   const handleSearch = useCallback(async () => {
     if (!query.trim()) {
@@ -233,7 +270,19 @@ export function useConversationalSearch(): UseConversationalSearchReturn {
     [applyTurn],
   );
 
-  const clearConversation = useCallback(() => {
+  const clearConversation = useCallback(async () => {
+    if (currentSessionId) {
+      try {
+        const backgroundService = getBackgroundService();
+        const snapshot = await backgroundService.chatSearchClearSession(currentSessionId);
+        setSessions((prev) =>
+          prev.map((item) => (item.id === snapshot.id ? snapshot : item)),
+        );
+      } catch (err) {
+        console.error("[useConversationalSearch] Failed to clear session:", err);
+      }
+    }
+
     setMessages([]);
     setCurrentAnswer("");
     setResults([]);
@@ -243,13 +292,49 @@ export function useConversationalSearch(): UseConversationalSearchReturn {
     setError(null);
     setHighlightedBookmarkId(null);
     setQuery("");
-    conversationSessionRef.current = createInitialSessionState();
-  }, []);
+  }, [currentSessionId]);
 
   const closeChat = useCallback(() => {
     setIsChatOpen(false);
-    clearConversation();
-  }, [clearConversation]);
+  }, []);
+
+  const switchSession = useCallback(
+    async (sessionId: string) => {
+      setStatus("idle");
+      setError(null);
+      setCurrentAnswer("");
+      await loadSession(sessionId);
+      setIsChatOpen(true);
+    },
+    [loadSession],
+  );
+
+  const createSession = useCallback(async () => {
+    const backgroundService = getBackgroundService();
+    const snapshot = await backgroundService.chatSearchCreateSession();
+    setSessions((prev) => [snapshot, ...prev]);
+    setCurrentSessionId(snapshot.id);
+    setMessages([]);
+    setResults([]);
+    setSuggestions([]);
+    setResultBookmarkIds([]);
+    setQuery("");
+    setStatus("idle");
+    setError(null);
+    setIsChatOpen(true);
+  }, []);
+
+  const deleteSession = useCallback(
+    async (sessionId: string) => {
+      const backgroundService = getBackgroundService();
+      const updatedSessions = await backgroundService.chatSearchDeleteSession(sessionId);
+      setSessions(updatedSessions);
+      if (currentSessionId === sessionId) {
+        await loadSession(updatedSessions[0]?.id);
+      }
+    },
+    [currentSessionId, loadSession],
+  );
 
   return {
     query,
@@ -268,5 +353,10 @@ export function useConversationalSearch(): UseConversationalSearchReturn {
     closeChat,
     isChatOpen,
     resultBookmarkIds,
+    sessions,
+    currentSessionId,
+    switchSession,
+    createSession,
+    deleteSession,
   };
 }

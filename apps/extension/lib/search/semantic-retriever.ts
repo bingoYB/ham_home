@@ -119,6 +119,7 @@ class SemanticRetriever {
     query: string,
     options: SemanticSearchOptions = {},
   ): Promise<SemanticSearchResult> {
+    const startTime = performance.now();
     const { topK = 20, minScore = 0.3, excludeIds = [], filterIds } = options;
 
     // 检查是否可用
@@ -203,8 +204,10 @@ class SemanticRetriever {
       matchReason: `语义相似度: ${(result.score * 100).toFixed(1)}%`,
     }));
 
-    logger.debug("Semantic search completed", {
+    const duration = performance.now() - startTime;
+    logger.info("Semantic search completed", {
       query: query.slice(0, 50),
+      durationMs: Number(duration.toFixed(2)),
       searchedCount: filteredEmbeddings.length,
       resultCount: items.length,
       topScore: items[0]?.score,

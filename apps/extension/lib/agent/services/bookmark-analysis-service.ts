@@ -1,5 +1,5 @@
-import { generateStructuredObject } from "@hamhome/agent";
 import { z } from "zod";
+import type { JsonSchema } from "@browser-agent-sdk/agent";
 import {
   buildCategoryTree,
   formatCategoryHierarchy,
@@ -16,6 +16,7 @@ import {
 import { getAgentErrorMessage } from "../errors";
 import { fetchPageContentForAI } from "../fetch-page-content";
 import { assertAgentConfigured, resolveAgentConfig } from "../factory";
+import { runExtensionCommand } from "../command-runner";
 
 const bookmarkAnalysisSchema = z.object({
   title: z.string(),
@@ -25,6 +26,18 @@ const bookmarkAnalysisSchema = z.object({
 });
 
 type BookmarkAnalysisOutput = z.infer<typeof bookmarkAnalysisSchema>;
+
+const bookmarkAnalysisOutputSchema: JsonSchema = {
+  type: "object",
+  properties: {
+    title: { type: "string" },
+    summary: { type: "string" },
+    category: { type: "string" },
+    tags: { type: "array", items: { type: "string" } },
+  },
+  required: ["title", "summary", "category", "tags"],
+  additionalProperties: false,
+};
 
 export interface EnhancedAnalyzeInput {
   pageContent: PageContent;
@@ -61,20 +74,19 @@ class BookmarkAnalysisService {
     const pageContent = input.pageContent;
 
     try {
-      const result = await generateStructuredObject({
-        provider: config.provider,
-        model: config.model,
-        apiKey: config.apiKey,
-        baseURL: config.baseURL,
-        apiMode: config.apiMode,
+      const result = await runExtensionCommand<Record<string, never>, BookmarkAnalysisOutput>({
+        config,
         temperature: config.temperature ?? 0.2,
-        maxTokens: config.maxTokens ?? 900,
-        schema: bookmarkAnalysisSchema,
-        system:
+        maxIterations: 1,
+        systemPrompt:
           config.language === "zh"
             ? "你是 HamHome 的书签分析 Agent。你必须根据给定页面上下文生成结构化书签分析结果，不允许编造页面中不存在的信息。若已有分类可匹配，优先复用已有分类名称；若需要新分类，输出简洁的分类名或层级路径。"
             : "You are HamHome's bookmark analysis agent. Produce grounded structured bookmark analysis only from the provided page context. Prefer existing category names when possible. If a new category is needed, keep it concise.",
-        prompt: [
+        command: {
+          name: "analyzeBookmark",
+          description: "Analyze a web page and return bookmark metadata.",
+          outputSchema: bookmarkAnalysisOutputSchema,
+          prompt: [
           `language: ${config.language}`,
           `url: ${pageContent.url}`,
           `title: ${pageContent.title}`,
@@ -87,10 +99,12 @@ class BookmarkAnalysisService {
           config.language === "zh"
             ? "输出要求：title 为最终保存标题，summary 为 1-3 句摘要，category 为最合适分类，tags 为不重复的简短标签。"
             : "Output requirements: title should be the saved title, summary should be a 1-3 sentence summary, category should be the best fit, tags should be short deduplicated labels.",
-        ].join("\n\n"),
+          ].join("\n\n"),
+        },
+        input: {},
       });
 
-      const output = result.object as BookmarkAnalysisOutput;
+      const output = bookmarkAnalysisSchema.parse(result.output);
 
       return {
         title: output.title.trim(),

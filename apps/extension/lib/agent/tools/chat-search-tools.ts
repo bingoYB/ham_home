@@ -1,4 +1,4 @@
-import { z } from "zod";
+import type { AgentTool, JsonSchema } from "@browser-agent-sdk/agent";
 import { createLogger } from "@hamhome/utils";
 import { bookmarkStorage, configStorage } from "@/lib/storage";
 import { hybridRetriever } from "@/lib/search/hybrid-retriever";
@@ -429,38 +429,61 @@ function buildStatisticsOutput(
   return output;
 }
 
-export async function createChatSearchTools(session: ChatSearchSession) {
+const emptyParameters: JsonSchema = {
+  type: "object",
+  properties: {},
+};
+
+const filterParameters: JsonSchema = {
+  type: "object",
+  properties: {
+    categoryId: {},
+    tagsAny: { type: "array", items: { type: "string" } },
+    domain: {},
+    timeRangeDays: {},
+    includeContent: { type: "boolean" },
+    retrievalMode: { type: "string", enum: ["hybrid", "semantic", "keyword"] },
+    semantic: { type: "boolean" },
+  },
+};
+
+/**
+ * 创建对话搜索工具集合，供 Browser Agent SDK 在单个搜索回合内调用。
+ */
+export async function createChatSearchTools(
+  session: ChatSearchSession,
+): Promise<AgentTool[]> {
   const categoriesMap = await resolveCategoriesMap();
 
-  const tools = {
-    search_bookmarks: {
+  const tools: AgentTool[] = [
+    {
+      name: "search_bookmarks",
       description:
         "Search bookmarks using keyword and semantic retrieval. Use this for most bookmark lookup questions.",
-      inputSchema: z.object({
-        query: z.string().trim().optional(),
-        topK: z.number().int().min(1).max(20).optional(),
-        filters: z
-          .object({
-            categoryId: z.string().nullable().optional(),
-            tagsAny: z.array(z.string()).optional(),
-            domain: z.string().nullable().optional(),
-            timeRangeDays: z.number().int().min(1).max(3650).nullable().optional(),
-            includeContent: z.boolean().optional(),
-            retrievalMode: z.enum(["hybrid", "semantic", "keyword"]).optional(),
-            semantic: z.boolean().optional(),
-          })
-          .partial()
-          .optional(),
-      }),
+      parameters: {
+        type: "object",
+        properties: {
+          query: { type: "string" },
+          topK: { type: "number" },
+          filters: filterParameters,
+        },
+      },
       async execute(input: {
         query?: string;
         topK?: number;
         filters?: Partial<SearchFilters>;
+        [key: string]: any;
       }) {
+        const filters = input.filters || {};
+        // Rescue parameters that the LLM mistakenly put at the root
+        if (input.retrievalMode) filters.retrievalMode = input.retrievalMode;
+        if (typeof input.semantic === "boolean") filters.semantic = input.semantic;
+        if (input.timeRangeDays) filters.timeRangeDays = input.timeRangeDays;
+
         const snapshot = await performSearch(session, {
           query: input.query,
           topK: input.topK,
-          filters: input.filters,
+          filters,
         });
 
         const output = {
@@ -489,13 +512,17 @@ export async function createChatSearchTools(session: ChatSearchSession) {
         return output;
       },
     },
-    continue_search: {
+    {
+      name: "continue_search",
       description:
         "Continue the current search and exclude bookmarks that were already shown before.",
-      inputSchema: z.object({
-        topK: z.number().int().min(1).max(20).optional(),
-      }),
-      async execute(input: { topK?: number }) {
+      parameters: {
+        type: "object",
+        properties: {
+          topK: { type: "number" },
+        },
+      },
+      async execute(input: { topK?: number; [key: string]: any }) {
         const snapshot = await performSearch(session, {
           topK: input.topK || 10,
           excludeSeen: true,
@@ -517,24 +544,26 @@ export async function createChatSearchTools(session: ChatSearchSession) {
         return output;
       },
     },
-    apply_filter: {
+    {
+      name: "apply_filter",
       description:
         "Apply or refine structured filters such as time range, category, tags, domain, or semantic-only mode.",
-      inputSchema: z.object({
-        filters: z.object({
-          categoryId: z.string().nullable().optional(),
-          tagsAny: z.array(z.string()).optional(),
-          domain: z.string().nullable().optional(),
-          timeRangeDays: z.number().int().min(1).max(3650).nullable().optional(),
-          includeContent: z.boolean().optional(),
-          retrievalMode: z.enum(["hybrid", "semantic", "keyword"]).optional(),
-          semantic: z.boolean().optional(),
-        }),
-        topK: z.number().int().min(1).max(20).optional(),
-      }),
-      async execute(input: { filters: Partial<SearchFilters>; topK?: number }) {
+      parameters: {
+        type: "object",
+        properties: {
+          filters: filterParameters,
+          topK: { type: "number" },
+        },
+        required: ["filters"],
+      },
+      async execute(input: { filters: Partial<SearchFilters>; topK?: number; [key: string]: any }) {
+        const filters = input.filters || {};
+        if (input.retrievalMode) filters.retrievalMode = input.retrievalMode;
+        if (typeof input.semantic === "boolean") filters.semantic = input.semantic;
+        if (input.timeRangeDays) filters.timeRangeDays = input.timeRangeDays;
+
         const snapshot = await performSearch(session, {
-          filters: input.filters,
+          filters,
           topK: input.topK,
         });
 
@@ -554,12 +583,18 @@ export async function createChatSearchTools(session: ChatSearchSession) {
         return output;
       },
     },
-    get_bookmarks_by_ids: {
+    {
+      name: "get_bookmarks_by_ids",
       description:
         "Fetch full bookmark details for specific bookmark ids after search results are known.",
-      inputSchema: z.object({
-        ids: z.array(z.string()).min(1).max(20),
-      }),
+      parameters: {
+        type: "object",
+        properties: {
+          ids: { type: "array", items: { type: "string" } },
+        },
+        required: ["ids"],
+        additionalProperties: false,
+      },
       async execute(input: { ids: string[] }) {
         const bookmarks = await getBookmarksByIds(input.ids);
         const output = bookmarks.map((bookmark) => ({
@@ -579,9 +614,10 @@ export async function createChatSearchTools(session: ChatSearchSession) {
         return output;
       },
     },
-    get_categories: {
+    {
+      name: "get_categories",
       description: "List the current bookmark categories for category-aware answers.",
-      inputSchema: z.object({}),
+      parameters: emptyParameters,
       async execute() {
         const output = Array.from(categoriesMap.values()).map((category) => ({
           id: category.id,
@@ -593,19 +629,21 @@ export async function createChatSearchTools(session: ChatSearchSession) {
         return output;
       },
     },
-    get_existing_tags: {
+    {
+      name: "get_existing_tags",
       description: "List existing bookmark tags.",
-      inputSchema: z.object({}),
+      parameters: emptyParameters,
       async execute() {
         const output = await bookmarkStorage.getAllTags();
         session.observations.push({ tool: "get_existing_tags", output });
         return output;
       },
     },
-    get_search_context: {
+    {
+      name: "get_search_context",
       description:
         "Inspect the current conversation state, history summary, and active filters before planning the next tool call.",
-      inputSchema: z.object({}),
+      parameters: emptyParameters,
       async execute() {
         const output = {
           lastQuery: session.state.lastQuery || "",
@@ -620,21 +658,27 @@ export async function createChatSearchTools(session: ChatSearchSession) {
         return output;
       },
     },
-    get_extension_shortcuts: {
+    {
+      name: "get_extension_shortcuts",
       description: "Get extension keyboard shortcuts and related help content.",
-      inputSchema: z.object({}),
+      parameters: emptyParameters,
       async execute() {
         const output = await getExtensionShortcuts();
         session.observations.push({ tool: "get_extension_shortcuts", output });
         return output;
       },
     },
-    get_help_content: {
+    {
+      name: "get_help_content",
       description:
         "Fetch grounded help content about settings, privacy, features, shortcuts, and search tips.",
-      inputSchema: z.object({
-        topic: z.string().optional(),
-      }),
+      parameters: {
+        type: "object",
+        properties: {
+          topic: { type: "string" },
+        },
+        additionalProperties: false,
+      },
       async execute(input: { topic?: string }) {
         const topic = matchHelpTopic(input.topic || session.turn.displayText);
         const output =
@@ -656,11 +700,16 @@ export async function createChatSearchTools(session: ChatSearchSession) {
         return output;
       },
     },
-    get_statistics: {
+    {
+      name: "get_statistics",
       description: "Compute simple bookmark statistics for a recent time range.",
-      inputSchema: z.object({
-        timeRangeDays: z.number().int().min(1).max(3650).optional(),
-      }),
+      parameters: {
+        type: "object",
+        properties: {
+          timeRangeDays: { type: "number" },
+        },
+        additionalProperties: false,
+      },
       async execute(input: { timeRangeDays?: number }) {
         const timeRangeDays = input.timeRangeDays || 7;
         const cutoffTime = Date.now() - timeRangeDays * 24 * 60 * 60 * 1000;
@@ -691,27 +740,11 @@ export async function createChatSearchTools(session: ChatSearchSession) {
         return output;
       },
     },
-    open_view: {
-      description:
-        "Resolve a view name that the UI can navigate to later, such as settings, privacy, categories, import-export, or tags.",
-      inputSchema: z.object({
-        view: z.enum(["settings", "privacy", "categories", "import-export", "tags"]),
-      }),
-      async execute(input: {
-        view: "settings" | "privacy" | "categories" | "import-export" | "tags";
-      }) {
-        const output = {
-          acknowledged: true,
-          view: input.view,
-        };
-        session.observations.push({ tool: "open_view", output });
-        return output;
-      },
-    },
-  } as const;
+
+  ];
 
   logger.debug("Chat search tools created", {
-    toolNames: Object.keys(tools),
+    toolNames: tools.map((tool) => tool.name),
     language: session.language,
   });
 
