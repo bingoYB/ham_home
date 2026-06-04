@@ -18,6 +18,7 @@ import { EmbeddingConfigCard } from "./EmbeddingConfig";
 import type { AIConfig, AIProvider, EmbeddingConfig } from "@/types";
 import type { VectorStoreStats } from "@/lib/storage/vector-store";
 import type { QueueProgress } from "@/lib/embedding/embedding-queue";
+import { getDefaultBaseUrl, getDefaultModel } from "@/lib/agent/provider-config";
 
 interface AITabProps {
   aiConfig: AIConfig;
@@ -134,7 +135,13 @@ export function AITab({
         <CardContent className="space-y-6">
           <ProviderSelect
             value={aiConfig.provider}
-            onChange={(value: AIProvider) => updateAIConfig({ provider: value })}
+            onChange={(value: AIProvider) => {
+              const defaultBaseUrl = getDefaultBaseUrl(value);
+              const defaultModel = getDefaultModel(value);
+              setLocalBaseUrl(defaultBaseUrl);
+              setLocalModel(defaultModel);
+              updateAIConfig({ provider: value, baseUrl: defaultBaseUrl, model: defaultModel });
+            }}
           />
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -155,7 +162,7 @@ export function AITab({
                 value={localBaseUrl}
                 onChange={(e) => setLocalBaseUrl(e.target.value)}
                 onBlur={(e) => updateAIConfig({ baseUrl: e.target.value })}
-                placeholder="https://api.openai.com/v1"
+                placeholder={getDefaultBaseUrl(aiConfig.provider) || "https://api.openai.com/v1"}
               />
             </div>
           </div>
