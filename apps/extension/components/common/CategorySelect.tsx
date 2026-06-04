@@ -4,7 +4,7 @@
  * 基于通用 TreeSelect 组件封装
  */
 import * as React from 'react';
-import { useMemo, useEffect } from 'react';
+import { useMemo } from 'react';
 import { ChevronDown, FolderOpen, Sparkles } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Button, cn } from '@hamhome/ui';
@@ -62,13 +62,6 @@ export function CategorySelect({
 
   // 是否显示 AI 推荐提示（匹配不到时显示）
   const showAIRecommendation = aiRecommendedCategory && !matchedAICategory && !value;
-
-  // 如果 AI 推荐匹配到了，自动选中
-  useEffect(() => {
-    if (matchedAICategory && !value) {
-      onChange(matchedAICategory.id);
-    }
-  }, [matchedAICategory, value, onChange]);
 
   // 处理选择：将内部 ID 转换为外部 value
   const handleChange = (id: string | null) => {

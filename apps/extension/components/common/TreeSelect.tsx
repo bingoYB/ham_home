@@ -141,6 +141,53 @@ function flattenVisibleTree<T extends BaseTreeNode>(
   return result;
 }
 
+function getFilteredTreeNodes<T extends BaseTreeNode>(
+  nodes: T[],
+  flatNodes: T[],
+  search: string,
+  filterFn?: (nodes: T[], flatNodes: T[], search: string) => T[]
+): T[] {
+  if (!search.trim()) return nodes;
+  if (filterFn) return filterFn(nodes, flatNodes, search);
+
+  const searchLower = search.toLowerCase();
+  const matchedIds = new Set<string>();
+  flatNodes.forEach((node) => {
+    if (node.name.toLowerCase().includes(searchLower)) {
+      matchedIds.add(node.id);
+      let current = node;
+      while (current.parentId && typeof current.parentId === "string") {
+        matchedIds.add(current.parentId);
+        const parent = flatNodes.find((n) => n.id === current.parentId);
+        if (!parent) break;
+        current = parent;
+      }
+    }
+  });
+
+  const filter = (items: T[]): T[] =>
+    items
+      .filter((node) => matchedIds.has(node.id))
+      .map((node) => ({ ...node, children: filter(node.children as T[]) }));
+  return filter(nodes);
+}
+
+function getVisibleItems<T extends BaseTreeNode>(
+  filteredNodes: T[],
+  prependOptions: PrependOption[],
+  expandedIds: Set<string>,
+  isSearching: boolean
+): VisibleItem<T>[] {
+  return [
+    ...prependOptions.map<VisibleItem<T>>((option) => ({
+      id: option.id,
+      type: "option",
+      option,
+    })),
+    ...flattenVisibleTree(filteredNodes, expandedIds, isSearching),
+  ];
+}
+
 function composeEventHandlers<E extends { defaultPrevented: boolean }>(
   theirHandler: ((event: E) => void) | undefined,
   ourHandler: (event: E) => void
@@ -283,29 +330,7 @@ export function TreeSelect<T extends BaseTreeNode>({
 
   // 过滤后的树
   const filteredNodes = useMemo(() => {
-    if (!search.trim()) return nodes;
-    if (filterFn) return filterFn(nodes, flatNodes, search);
-    // 默认过滤逻辑：名称匹配
-    const searchLower = search.toLowerCase();
-    const matchedIds = new Set<string>();
-    flatNodes.forEach((node) => {
-      if (node.name.toLowerCase().includes(searchLower)) {
-        matchedIds.add(node.id);
-        // 添加所有父节点
-        let current = node;
-        while (current.parentId && typeof current.parentId === "string") {
-          matchedIds.add(current.parentId);
-          const parent = flatNodes.find((n) => n.id === current.parentId);
-          if (!parent) break;
-          current = parent;
-        }
-      }
-    });
-    const filter = (items: T[]): T[] =>
-      items
-        .filter((n) => matchedIds.has(n.id))
-        .map((n) => ({ ...n, children: filter(n.children as T[]) }));
-    return filter(nodes);
+    return getFilteredTreeNodes(nodes, flatNodes, search, filterFn);
   }, [nodes, flatNodes, search, filterFn]);
 
   // 当前选中的节点
@@ -323,22 +348,54 @@ export function TreeSelect<T extends BaseTreeNode>({
   }, [value, prependOptions]);
 
   const visibleItems = useMemo(() => {
-    return [
-      ...prependOptions.map<VisibleItem<T>>((option) => ({
-        id: option.id,
-        type: "option",
-        option,
-      })),
-      ...flattenVisibleTree(filteredNodes, expandedIds, isSearching),
-    ];
+    return getVisibleItems(filteredNodes, prependOptions, expandedIds, isSearching);
   }, [prependOptions, filteredNodes, expandedIds, isSearching]);
 
-  const getInitialHighlightedId = useCallback(() => {
-    if (value && visibleItems.some((item) => item.id === value)) {
+  const getInitialHighlightedId = useCallback((items = visibleItems) => {
+    if (value && items.some((item) => item.id === value)) {
       return value;
     }
-    return visibleItems[0]?.id ?? null;
+    return items[0]?.id ?? null;
   }, [value, visibleItems]);
+
+  const getVisibleItemsForSearch = useCallback(
+    (nextSearch: string) => {
+      const nextIsSearching = nextSearch.trim().length > 0;
+      const nextFilteredNodes = getFilteredTreeNodes(
+        nodes,
+        flatNodes,
+        nextSearch,
+        filterFn
+      );
+      return getVisibleItems(
+        nextFilteredNodes,
+        prependOptions,
+        expandedIds,
+        nextIsSearching
+      );
+    },
+    [nodes, flatNodes, filterFn, prependOptions, expandedIds]
+  );
+
+  const updateSearch = useCallback(
+    (nextSearch: string) => {
+      const nextVisibleItems = getVisibleItemsForSearch(nextSearch);
+      const nextIsSearching = nextSearch.trim().length > 0;
+      setSearch(nextSearch);
+      setHighlightedId((prev) => {
+        if (nextIsSearching) {
+          return nextVisibleItems[0]?.id ?? null;
+        }
+
+        if (prev && nextVisibleItems.some((item) => item.id === prev)) {
+          return prev;
+        }
+
+        return getInitialHighlightedId(nextVisibleItems);
+      });
+    },
+    [getVisibleItemsForSearch, getInitialHighlightedId]
+  );
 
   // 展开/收起
   const toggleExpand = useCallback((id: string, e: React.MouseEvent) => {
@@ -545,11 +602,20 @@ export function TreeSelect<T extends BaseTreeNode>({
 
       if (!open && isPrintableKey) {
         event.preventDefault();
+        const nextVisibleItems = getVisibleItemsForSearch(event.key);
         setSearch(event.key);
-        openPopover();
+        openPopover(nextVisibleItems[0]?.id ?? null);
       }
     },
-    [disabled, open, value, visibleItems, openPopover, moveHighlight]
+    [
+      disabled,
+      open,
+      value,
+      visibleItems,
+      openPopover,
+      moveHighlight,
+      getVisibleItemsForSearch,
+    ]
   );
 
   const handleOpenChange = useCallback(
@@ -575,22 +641,6 @@ export function TreeSelect<T extends BaseTreeNode>({
 
     return () => cancelAnimationFrame(frameId);
   }, [open, highlightedId]);
-
-  useEffect(() => {
-    if (!open) return;
-
-    setHighlightedId((prev) => {
-      if (isSearching) {
-        return visibleItems[0]?.id ?? null;
-      }
-
-      if (prev && visibleItems.some((item) => item.id === prev)) {
-        return prev;
-      }
-
-      return getInitialHighlightedId();
-    });
-  }, [open, isSearching, visibleItems, getInitialHighlightedId]);
 
   // 默认触发器
   const defaultTrigger = (
@@ -659,7 +709,7 @@ export function TreeSelect<T extends BaseTreeNode>({
             <input
               ref={searchInputRef}
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => updateSearch(e.target.value)}
               onKeyDown={handleInputKeyDown}
               placeholder={searchPlaceholder}
               className="flex h-9 w-full bg-transparent px-2 text-sm outline-none placeholder:text-muted-foreground"

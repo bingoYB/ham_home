@@ -44,3 +44,4 @@ tsconfig.tsbuildinfo
 docs/blog/
 
 temp  
+.agents
