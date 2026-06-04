@@ -1,11 +1,14 @@
 import type { AgentTool } from "@browser-agent-sdk/agent";
 import { browser } from "wxt/browser";
 import { bookmarkStorage, configStorage } from "@/lib/storage";
+import { syncConfigStorage } from "@/lib/sync/sync-config-storage";
 import { getExtensionURL } from "@/utils/browser-api";
 import type { ChatSearchSession } from "./chat-search-tools";
 import { createChatSearchTools } from "./chat-search-tools";
 import { sanitizeSafeSettingsUpdate } from "./safe-settings";
 import { createListHamHomeFeaturesTool } from "../skills/hamhome-feature-skill";
+import { createRuleManagementTools } from "./rule-management-tools";
+import { createBookmarkManagementTools } from "./bookmark-management-tools";
 
 const OPENABLE_VIEWS = [
   "all",
@@ -33,10 +36,11 @@ function hasPatch(value: Record<string, unknown>): boolean {
 }
 
 async function getSafeSettingsSnapshot() {
-  const [settings, aiConfig, embeddingConfig] = await Promise.all([
+  const [settings, aiConfig, embeddingConfig, webdavConfig] = await Promise.all([
     configStorage.getSettings(),
     configStorage.getAIConfig(),
     configStorage.getEmbeddingConfig(),
+    syncConfigStorage.getConfig(),
   ]);
 
   return {
@@ -46,6 +50,8 @@ async function getSafeSettingsSnapshot() {
       model: aiConfig.model,
       temperature: aiConfig.temperature,
       maxTokens: aiConfig.maxTokens,
+      apiMode: aiConfig.apiMode,
+      language: aiConfig.language,
       enableTranslation: aiConfig.enableTranslation,
       enableSmartCategory: aiConfig.enableSmartCategory,
       enableTagSuggestion: aiConfig.enableTagSuggestion,
@@ -63,6 +69,13 @@ async function getSafeSettingsSnapshot() {
       batchSize: embeddingConfig.batchSize,
       hasApiKey: !!embeddingConfig.apiKey?.trim(),
       hasBaseUrl: !!embeddingConfig.baseUrl?.trim(),
+    },
+    webdavConfig: {
+      enabled: webdavConfig.enabled,
+      url: webdavConfig.url,
+      hasUsername: !!webdavConfig.username?.trim(),
+      hasPassword: !!webdavConfig.password?.trim(),
+      hasE2EPassword: !!webdavConfig.e2ePassword?.trim(),
     },
   };
 }
@@ -99,10 +112,14 @@ export async function createGlobalAgentTools(
   session: ChatSearchSession,
 ): Promise<AgentTool[]> {
   const searchTools = await createChatSearchTools(session);
+  const ruleTools = createRuleManagementTools();
+  const bookmarkTools = createBookmarkManagementTools();
 
   return [
     createListHamHomeFeaturesTool(),
     ...searchTools,
+    ...ruleTools,
+    ...bookmarkTools,
     {
       name: "get_safe_plugin_settings",
       description:
@@ -122,9 +139,54 @@ export async function createGlobalAgentTools(
       parameters: {
         type: "object",
         properties: {
-          settings: { type: "object" },
-          aiConfig: { type: "object" },
-          embeddingConfig: { type: "object" },
+          settings: {
+            type: "object",
+            properties: {
+              theme: { type: "string", enum: ["light", "dark", "system"] },
+              language: { type: "string", enum: ["zh", "en"] },
+              autoSaveSnapshot: { type: "boolean" },
+              enableOmniboxSearch: { type: "boolean" },
+              defaultCategory: { type: "string", nullable: true },
+              panelPosition: { type: "string", enum: ["left", "right"] },
+            },
+            additionalProperties: false,
+          },
+          aiConfig: {
+            type: "object",
+            properties: {
+              provider: { type: "string" },
+              model: { type: "string" },
+              temperature: { type: "number", minimum: 0, maximum: 2 },
+              maxTokens: { type: "integer", minimum: 1, maximum: 8000 },
+              apiMode: { type: "string", enum: ["chat", "responses"] },
+              language: { type: "string", enum: ["zh", "en"] },
+              enableTranslation: { type: "boolean" },
+              enableSmartCategory: { type: "boolean" },
+              enableTagSuggestion: { type: "boolean" },
+              presetTags: { type: "array", items: { type: "string" } },
+              autoDetectPrivacy: { type: "boolean" },
+            },
+            additionalProperties: false,
+          },
+          embeddingConfig: {
+            type: "object",
+            properties: {
+              enabled: { type: "boolean" },
+              provider: { type: "string" },
+              model: { type: "string" },
+              dimensions: { type: "integer", minimum: 1 },
+              batchSize: { type: "integer", minimum: 1, maximum: 128 },
+            },
+            additionalProperties: false,
+          },
+          webdavConfig: {
+            type: "object",
+            properties: {
+              enabled: { type: "boolean" },
+              url: { type: "string" },
+            },
+            additionalProperties: false,
+          },
         },
         additionalProperties: false,
       },
@@ -132,7 +194,7 @@ export async function createGlobalAgentTools(
       async execute(input) {
         const sanitized = sanitizeSafeSettingsUpdate(input);
 
-        const [settings, aiConfig, embeddingConfig] = await Promise.all([
+        const [settings, aiConfig, embeddingConfig, webdavConfig] = await Promise.all([
           hasPatch(sanitized.settings as Record<string, unknown>)
             ? configStorage.setSettings(sanitized.settings)
             : configStorage.getSettings(),
@@ -142,6 +204,9 @@ export async function createGlobalAgentTools(
           hasPatch(sanitized.embeddingConfig as Record<string, unknown>)
             ? configStorage.setEmbeddingConfig(sanitized.embeddingConfig)
             : configStorage.getEmbeddingConfig(),
+          hasPatch(sanitized.webdavConfig as Record<string, unknown>)
+            ? syncConfigStorage.setConfig(sanitized.webdavConfig)
+            : syncConfigStorage.getConfig(),
         ]);
 
         return {
@@ -149,6 +214,7 @@ export async function createGlobalAgentTools(
             settings: sanitized.settings,
             aiConfig: sanitized.aiConfig,
             embeddingConfig: sanitized.embeddingConfig,
+            webdavConfig: sanitized.webdavConfig,
           },
           rejected: sanitized.rejected,
           nextStep:
@@ -162,6 +228,8 @@ export async function createGlobalAgentTools(
               model: aiConfig.model,
               temperature: aiConfig.temperature,
               maxTokens: aiConfig.maxTokens,
+              apiMode: aiConfig.apiMode,
+              language: aiConfig.language,
               enableTranslation: aiConfig.enableTranslation,
               enableSmartCategory: aiConfig.enableSmartCategory,
               enableTagSuggestion: aiConfig.enableTagSuggestion,
@@ -173,6 +241,10 @@ export async function createGlobalAgentTools(
               model: embeddingConfig.model,
               dimensions: embeddingConfig.dimensions,
               batchSize: embeddingConfig.batchSize,
+            },
+            webdavConfig: {
+              enabled: webdavConfig.enabled,
+              url: webdavConfig.url,
             },
           },
         };

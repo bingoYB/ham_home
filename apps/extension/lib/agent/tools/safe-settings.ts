@@ -5,16 +5,18 @@ import type {
   LocalSettings,
   PanelPosition,
   ThemeMode,
+  WebDAVConfig,
 } from "@/types";
 
 type SafeSettingsPatch = Partial<{
   settings: Record<string, unknown>;
   aiConfig: Record<string, unknown>;
   embeddingConfig: Record<string, unknown>;
+  webdavConfig: Record<string, unknown>;
 }>;
 
 interface RejectedSetting {
-  scope: "settings" | "aiConfig" | "embeddingConfig";
+  scope: "settings" | "aiConfig" | "embeddingConfig" | "webdavConfig";
   key: string;
   reason: string;
 }
@@ -23,6 +25,7 @@ export interface SanitizedSafeSettingsUpdate {
   settings: Partial<LocalSettings>;
   aiConfig: Partial<AIConfig>;
   embeddingConfig: Partial<EmbeddingConfig>;
+  webdavConfig: Partial<WebDAVConfig>;
   rejected: RejectedSetting[];
 }
 
@@ -49,9 +52,9 @@ const SENSITIVE_KEYS = new Set([
   "apiKey",
   "baseUrl",
   "privacyDomains",
-  "url",
   "username",
   "password",
+  "e2ePassword",
   "shortcut",
   "panelShortcut",
 ]);
@@ -124,6 +127,7 @@ export function sanitizeSafeSettingsUpdate(
   const settings: Partial<LocalSettings> = {};
   const aiConfig: Partial<AIConfig> = {};
   const embeddingConfig: Partial<EmbeddingConfig> = {};
+  const webdavConfig: Partial<WebDAVConfig> = {};
 
   const rawSettings = isObject(patch.settings) ? patch.settings : {};
   inspectUnknownKeys(
@@ -191,6 +195,8 @@ export function sanitizeSafeSettingsUpdate(
       "enableTagSuggestion",
       "presetTags",
       "autoDetectPrivacy",
+      "apiMode",
+      "language",
     ]),
   );
 
@@ -204,6 +210,18 @@ export function sanitizeSafeSettingsUpdate(
     aiConfig.model = rawAIConfig.model.trim();
   } else if ("model" in rawAIConfig) {
     reject(rejected, "aiConfig", "model", "model must be a non-empty string");
+  }
+
+  if (rawAIConfig.apiMode === "chat" || rawAIConfig.apiMode === "responses") {
+    aiConfig.apiMode = rawAIConfig.apiMode as "chat" | "responses";
+  } else if ("apiMode" in rawAIConfig) {
+    reject(rejected, "aiConfig", "apiMode", "apiMode must be chat or responses");
+  }
+
+  if (LANGUAGES.has(rawAIConfig.language as string)) {
+    aiConfig.language = rawAIConfig.language as LocalSettings["language"];
+  } else if ("language" in rawAIConfig) {
+    reject(rejected, "aiConfig", "language", "language must be zh or en");
   }
 
   if (
@@ -297,5 +315,25 @@ export function sanitizeSafeSettingsUpdate(
     reject(rejected, "embeddingConfig", "batchSize", "batchSize must be an integer between 1 and 128");
   }
 
-  return { settings, aiConfig, embeddingConfig, rejected };
+  const rawWebdavConfig = isObject(patch.webdavConfig) ? patch.webdavConfig : {};
+  inspectUnknownKeys(
+    rejected,
+    "webdavConfig",
+    rawWebdavConfig,
+    new Set(["enabled", "url"]),
+  );
+
+  if (isBoolean(rawWebdavConfig.enabled)) {
+    webdavConfig.enabled = rawWebdavConfig.enabled;
+  } else if ("enabled" in rawWebdavConfig) {
+    reject(rejected, "webdavConfig", "enabled", "value must be boolean");
+  }
+  
+  if (isString(rawWebdavConfig.url) && rawWebdavConfig.url.trim()) {
+    webdavConfig.url = rawWebdavConfig.url.trim();
+  } else if ("url" in rawWebdavConfig) {
+    reject(rejected, "webdavConfig", "url", "url must be a non-empty string");
+  }
+
+  return { settings, aiConfig, embeddingConfig, webdavConfig, rejected };
 }
