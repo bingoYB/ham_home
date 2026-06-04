@@ -141,7 +141,24 @@ function safeJsonSummary(value: unknown, maxLength = 600): string {
   }
 }
 
-function createProcessStepRecorder() {
+function getFriendlyIterationName(iteration: number, language: "zh" | "en") {
+  return language === "zh" ? `思考与分析 (第 ${iteration} 轮)` : `Thinking & Planning (Round ${iteration})`;
+}
+
+function getFriendlyToolName(toolName: string, language: "zh" | "en") {
+  const map: Record<string, Record<"zh" | "en", string>> = {
+    "update_safe_plugin_settings": { zh: "更新插件配置", en: "Update plugin settings" },
+    "get_safe_plugin_settings": { zh: "读取插件配置", en: "Read plugin settings" },
+    "search_bookmarks": { zh: "检索书签数据", en: "Search bookmarks" },
+    "get_hamhome_feature_detail": { zh: "查阅功能文档", en: "Read feature docs" },
+    "skill_view": { zh: "调用功能助手", en: "Call feature assistant" },
+    "open_extension_view": { zh: "打开功能页面", en: "Open extension page" },
+    "get_system_stats": { zh: "读取系统状态", en: "Read system stats" },
+  };
+  return map[toolName]?.[language] || toolName;
+}
+
+function createProcessStepRecorder(language: "zh" | "en") {
   const steps: AgentProcessStep[] = [];
   const runningToolIds = new Map<string, string[]>();
 
@@ -166,7 +183,7 @@ function createProcessStepRecorder() {
     if (!stepId) {
       addStep({
         type: "tool",
-        title: toolName,
+        title: getFriendlyToolName(toolName, language),
         toolName,
         status: update.status || "completed",
         ...update,
@@ -185,7 +202,7 @@ function createProcessStepRecorder() {
     if (event.type === "agent.iteration.started") {
       addStep({
         type: "iteration",
-        title: `Iteration ${event.iteration}`,
+        title: getFriendlyIterationName(event.iteration, language),
         status: "completed",
       });
       return;
@@ -204,7 +221,7 @@ function createProcessStepRecorder() {
     if (event.type === "tool.call.started") {
       const step = addStep({
         type: "tool",
-        title: event.toolName,
+        title: getFriendlyToolName(event.toolName, language),
         toolName: event.toolName,
         input: safeJsonSummary(event.input, 280),
         status: "running",
@@ -293,8 +310,8 @@ function buildSystemPrompt(language: "zh" | "en"): string {
   return [
     "You are HamHome's global browser extension management agent.",
     "Responsibilities: explain extension features, read feature details when needed, search and summarize bookmarks, inspect local data, open extension pages, and update allowlisted safe settings.",
-    "Workflow: identify the user's goal, call tools for grounded facts, use skill_view or get_hamhome_feature_detail for feature questions, use search/stat tools for bookmark questions, and read safe settings before update_safe_plugin_settings for configuration requests.",
-    "Safety: never fill or reveal API keys, base URLs, privacy domains, sync credentials, or browser shortcuts. Explain why and open the relevant settings page when useful.",
+    "Workflow: identify the user's goal, call tools for grounded facts, use skill_view or get_hamhome_feature_detail for feature questions, use search/stat tools for bookmark questions, and read safe settings before using update_safe_plugin_settings for configuration requests.",
+    "Safety: never fill, reveal, or update API keys, base URLs, privacy domains, sync credentials, or browser shortcuts. When encountering requests for these sensitive settings, explain why you cannot change them and use open_extension_view to open the settings page so the user can configure them manually.",
     "Answer concisely from tool results. State what was changed or opened. Ask for the next step only when required.",
   ].join("\n");
 }
@@ -363,7 +380,7 @@ export class GlobalAgentService {
       const runtimeMemory = new InMemory({ maxMessages: 100 });
       await this.sessionStore.seedRuntimeMemory(persistedSession.id, runtimeMemory);
       const tools = await createGlobalAgentTools(orchestrationSession);
-      const recorder = createProcessStepRecorder();
+      const recorder = createProcessStepRecorder(language);
       const { agent, config } = await createExtensionAgent({
         name: "hamhome-global-agent",
         sessionId: persistedSession.id,
