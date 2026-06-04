@@ -225,7 +225,7 @@ class BackgroundServiceImpl implements IBackgroundService {
 
   async openOptionsPage(view: string = "settings"): Promise<void> {
     try {
-      const url = browser.runtime.getURL(`app.html#${view}`);
+      const url = browser.runtime.getURL("/app.html") + `#${view}`;
       await browser.tabs.create({ url });
     } catch (error) {
       console.error("[BackgroundService] openOptionsPage error:", error);
