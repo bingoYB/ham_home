@@ -9,7 +9,6 @@ import {
   ChevronDown,
   ChevronRight,
   Loader2,
-  MessageCircle,
   Plus,
   Send,
   Sparkles,

@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from "react";
 import { snapshotStorage } from "@/lib/storage/snapshot-storage";
 import { getBackgroundService } from "@/lib/services";
 import type { VectorStoreStats } from "@/lib/storage/vector-store";
-import type { EmbeddingConfig } from "@/types";
 
 export interface SnapshotStats {
   count: number;
