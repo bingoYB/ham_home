@@ -297,6 +297,47 @@ class TabGroupRuleService {
         return false;
       }
 
+      try {
+        const allTabs = await api.tabs.query({ windowId });
+        const targetUrlObj = new URL(url);
+        const targetDomainPath = targetUrlObj.hostname + targetUrlObj.pathname;
+        const targetDomain = targetUrlObj.hostname;
+
+        const groupedTabs = allTabs.filter(
+          (t) => t.id !== tabId && t.groupId != null && t.groupId !== -1 && t.url,
+        );
+
+        const exactMatchTab = groupedTabs.find((t) => {
+          try {
+            const u = new URL(t.url!);
+            return u.hostname + u.pathname === targetDomainPath;
+          } catch {
+            return false;
+          }
+        });
+
+        let matchedGroupId = exactMatchTab?.groupId;
+
+        if (matchedGroupId == null) {
+          const domainMatchTab = groupedTabs.find((t) => {
+            try {
+              const u = new URL(t.url!);
+              return u.hostname === targetDomain;
+            } catch {
+              return false;
+            }
+          });
+          matchedGroupId = domainMatchTab?.groupId;
+        }
+
+        if (matchedGroupId != null && matchedGroupId !== -1) {
+          await api.tabs.group({ tabIds: tabId, groupId: matchedGroupId });
+          return true;
+        }
+      } catch (error) {
+        console.error("Failed to match existing grouped tab", error);
+      }
+
       const existingGroups = await getExistingGroups(windowId);
       const cacheKey = getAIGroupCacheKey(url);
       const cachedSuggestion = cacheKey
