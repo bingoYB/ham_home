@@ -1,6 +1,11 @@
 import type { JsonSchema } from "@browser-agent-sdk/agent";
 import { z } from "zod";
-import type { TabGroupRule, TabGroupRuleColor, TabGroupRuleMatchResult } from "@/types";
+import type {
+  TabGroupPageMetadata,
+  TabGroupRule,
+  TabGroupRuleColor,
+  TabGroupRuleMatchResult,
+} from "@/types";
 import { runExtensionCommand } from "@/lib/agent/command-runner";
 import { assertAgentConfigured, resolveAgentConfig } from "@/lib/agent/factory";
 import { containsPrivateContent } from "@/lib/privacy/privacy-detector";
@@ -21,6 +26,7 @@ const TAB_GROUP_COLORS = [
 ] as const;
 
 const aiTabGroupSuggestionSchema = z.object({
+  reuseExistingGroup: z.boolean().nullable().optional(),
   groupTitle: z.string().nullable().optional(),
   title: z.string().nullable().optional(),
   group: z.string().nullable().optional(),
@@ -29,10 +35,16 @@ const aiTabGroupSuggestionSchema = z.object({
 });
 
 type AITabGroupSuggestion = z.infer<typeof aiTabGroupSuggestionSchema>;
+type AITabGroupDecision = {
+  groupTitle: string;
+  color: TabGroupRuleColor;
+  reuseExistingGroup: boolean;
+};
 
 const aiTabGroupSuggestionOutputSchema: JsonSchema = {
   type: "object",
   properties: {
+    reuseExistingGroup: { type: "boolean" },
     groupTitle: {},
     title: {},
     group: {},
@@ -151,19 +163,55 @@ async function getExistingGroups(windowId: number) {
   return api.tabGroups.query({ windowId });
 }
 
+function appendPromptLine(lines: string[], label: string, value?: string): void {
+  const normalized = value?.trim();
+  if (normalized) {
+    lines.push(`${label}: ${normalized}`);
+  }
+}
+
+function buildPageMetadataPrompt(metadata?: TabGroupPageMetadata): string[] {
+  if (!metadata) return [];
+
+  const lines: string[] = [];
+  appendPromptLine(lines, "Page Title", metadata.pageTitle);
+  appendPromptLine(lines, "Meta Description", metadata.metaDescription);
+  appendPromptLine(lines, "Keywords", metadata.keywords);
+  appendPromptLine(lines, "Open Graph Title", metadata.openGraphTitle);
+  appendPromptLine(lines, "Open Graph Description", metadata.openGraphDescription);
+  appendPromptLine(lines, "Open Graph Site Name", metadata.openGraphSiteName);
+  appendPromptLine(lines, "Open Graph Type", metadata.openGraphType);
+  appendPromptLine(lines, "Twitter Title", metadata.twitterTitle);
+  appendPromptLine(lines, "Twitter Description", metadata.twitterDescription);
+  appendPromptLine(lines, "Canonical URL", metadata.canonicalUrl);
+  appendPromptLine(lines, "Language", metadata.language);
+
+  const headings = metadata.headings
+    ?.map((heading) => heading.trim())
+    .filter(Boolean)
+    .slice(0, 3)
+    .join(" | ");
+  appendPromptLine(lines, "Headings", headings);
+
+  return lines.length ? ["", "Page metadata:", ...lines] : [];
+}
+
 function buildAITabGroupPrompt(input: {
   url: string;
   title?: string;
   description?: string;
+  metadata?: TabGroupPageMetadata;
   existingGroups: Awaited<ReturnType<typeof getExistingGroups>>;
 }): string {
   const existingGroupsText = input.existingGroups
     .map((group) => `- ${group.title || "(untitled)"}${group.color ? ` (${group.color})` : ""}`)
     .join("\n") || "- none";
+  const metadataLines = buildPageMetadataPrompt(input.metadata);
 
   return [
     "Analyze the browser tab and choose the best native browser tab group.",
-    "Prefer an existing group when it is a reasonable semantic fit. Create a short new group title only when none fits.",
+    "IMPORTANT: Reuse an existing group ONLY if it is a strong semantic match. If the tab's content is unrelated to all existing groups, you MUST create a concise new group title. Do not force unrelated tabs into existing groups.",
+    "Set reuseExistingGroup to true only when groupTitle exactly names a strongly related existing group. Otherwise set reuseExistingGroup to false and use a new title that is different from every existing group title.",
     "Return JSON only that matches the schema.",
     "",
     "Existing tab groups:",
@@ -173,6 +221,7 @@ function buildAITabGroupPrompt(input: {
     `URL: ${input.url}`,
     `Title: ${input.title || ""}`,
     `Description: ${input.description || ""}`,
+    ...metadataLines,
   ].join("\n");
 }
 
@@ -202,7 +251,7 @@ function getRandomColor(): TabGroupRuleColor {
 
 function normalizeAITabGroupSuggestion(
   suggestion: AITabGroupSuggestion,
-): { groupTitle: string; color: TabGroupRuleColor } {
+): AITabGroupDecision {
   const rawTitle =
     suggestion.groupTitle ??
     suggestion.title ??
@@ -220,6 +269,7 @@ function normalizeAITabGroupSuggestion(
   return {
     groupTitle,
     color: aiColor ?? textColor ?? getRandomColor(),
+    reuseExistingGroup: suggestion.reuseExistingGroup === true,
   };
 }
 
@@ -227,8 +277,9 @@ async function suggestAITabGroup(input: {
   url: string;
   title?: string;
   description?: string;
+  metadata?: TabGroupPageMetadata;
   existingGroups: Awaited<ReturnType<typeof getExistingGroups>>;
-}): Promise<{ groupTitle: string; color: TabGroupRuleColor }> {
+}): Promise<AITabGroupDecision> {
   const config = await resolveAgentConfig();
   assertAgentConfigured(config.rawConfig);
 
@@ -238,8 +289,8 @@ async function suggestAITabGroup(input: {
     maxIterations: 1,
     systemPrompt:
       config.language === "zh"
-        ? "你是浏览器 Tab 自动分组助手。你会根据 URL、标题、描述和现有分组，选择最合适的分组名称。优先复用已有分组，只有没有合适分组时才创建简短的新分组。"
-        : "You are a browser tab grouping assistant. Choose the most suitable group title from URL, title, description, and existing groups. Prefer existing groups; create a concise new group only when needed.",
+        ? "你是浏览器 Tab 自动分组助手。请根据 URL、标题和描述，为该网页选择或创建一个最合适的分组名称。\n重要：如果现有分组中有语义高度匹配的，请直接使用该分组名称，并把 reuseExistingGroup 设为 true；如果现有分组都与该网页内容不相关，请务必创建一个不同于现有分组的简短新分组名称，并把 reuseExistingGroup 设为 false。绝不要把不相关的网页强行分入现有分组。"
+        : "You are a browser tab grouping assistant. Based on the URL, title, and description, choose or create the most suitable group title.\nIMPORTANT: If an existing group is a strong semantic match, reuse it and set reuseExistingGroup to true. If existing groups are unrelated to the tab's content, you MUST create a concise new group title that differs from existing group titles and set reuseExistingGroup to false. Do NOT force unrelated tabs into existing groups.",
     command: {
       name: "suggestTabGroup",
       description: "Suggest a native browser tab group title and color.",
@@ -248,6 +299,7 @@ async function suggestAITabGroup(input: {
         url: input.url,
         title: input.title,
         description: input.description,
+        metadata: input.metadata,
         existingGroups: input.existingGroups,
       }),
     },
@@ -280,10 +332,26 @@ class TabGroupRuleService {
     url?: string,
     windowId?: number,
     title?: string,
-    options?: { allowAI?: boolean; description?: string },
+    options?: {
+      allowAI?: boolean;
+      description?: string;
+      metadata?: TabGroupPageMetadata;
+      isDomainChanged?: boolean;
+      isNewTab?: boolean;
+    },
   ): Promise<boolean> {
     const api = getChromeTabGroupsApi();
     if (!api || !url || windowId == null) return false;
+
+    try {
+      const currentTab = await api.tabs.get(tabId);
+      const isGrouped = currentTab.groupId != null && currentTab.groupId !== api.tabGroups.TAB_GROUP_ID_NONE;
+      if (isGrouped && !options?.isDomainChanged && !options?.isNewTab) {
+        return false;
+      }
+    } catch {
+      // ignore
+    }
 
     const rules = await tabGroupRulesStorage.getRules();
     const result = this.findMatchingRule(rules, url, title);
@@ -297,47 +365,6 @@ class TabGroupRuleService {
         return false;
       }
 
-      try {
-        const allTabs = await api.tabs.query({ windowId });
-        const targetUrlObj = new URL(url);
-        const targetDomainPath = targetUrlObj.hostname + targetUrlObj.pathname;
-        const targetDomain = targetUrlObj.hostname;
-
-        const groupedTabs = allTabs.filter(
-          (t) => t.id !== tabId && t.groupId != null && t.groupId !== -1 && t.url,
-        );
-
-        const exactMatchTab = groupedTabs.find((t) => {
-          try {
-            const u = new URL(t.url!);
-            return u.hostname + u.pathname === targetDomainPath;
-          } catch {
-            return false;
-          }
-        });
-
-        let matchedGroupId = exactMatchTab?.groupId;
-
-        if (matchedGroupId == null) {
-          const domainMatchTab = groupedTabs.find((t) => {
-            try {
-              const u = new URL(t.url!);
-              return u.hostname === targetDomain;
-            } catch {
-              return false;
-            }
-          });
-          matchedGroupId = domainMatchTab?.groupId;
-        }
-
-        if (matchedGroupId != null && matchedGroupId !== -1) {
-          await api.tabs.group({ tabIds: tabId, groupId: matchedGroupId });
-          return true;
-        }
-      } catch (error) {
-        console.error("Failed to match existing grouped tab", error);
-      }
-
       const existingGroups = await getExistingGroups(windowId);
       const cacheKey = getAIGroupCacheKey(url);
       const cachedSuggestion = cacheKey
@@ -347,6 +374,7 @@ class TabGroupRuleService {
         url,
         title,
         description: options.description,
+        metadata: options.metadata,
         existingGroups,
       });
       const aiExistingGroup =
@@ -366,6 +394,7 @@ class TabGroupRuleService {
           url: cacheKey,
           groupTitle: suggestion.groupTitle,
           color: suggestion.color,
+          reuseExistingGroup: Boolean(aiExistingGroup),
         });
       }
 

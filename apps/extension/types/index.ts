@@ -446,10 +446,26 @@ export interface TabGroupAutoGroupSettings {
   aiAutoGroupEnabled: boolean;
 }
 
+export interface TabGroupPageMetadata {
+  pageTitle?: string;
+  metaDescription?: string;
+  keywords?: string;
+  openGraphTitle?: string;
+  openGraphDescription?: string;
+  openGraphSiteName?: string;
+  openGraphType?: string;
+  twitterTitle?: string;
+  twitterDescription?: string;
+  canonicalUrl?: string;
+  language?: string;
+  headings?: string[];
+}
+
 export interface TabGroupAICacheEntry {
   url: string;
   groupTitle: string;
   color: TabGroupRuleColor;
+  reuseExistingGroup?: boolean;
   updatedAt: number;
 }
 
