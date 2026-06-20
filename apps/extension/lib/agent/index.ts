@@ -7,7 +7,6 @@ export * from "./skills/hamhome-feature-skill";
 export * from "./services/agent-config-service";
 export * from "./services/bookmark-analysis-service";
 export * from "./services/category-generation-service";
-export * from "./services/chat-search-service";
 export * from "./services/global-agent-service";
 export * from "./services/translation-service";
 export * from "./tools/global-agent-tools";

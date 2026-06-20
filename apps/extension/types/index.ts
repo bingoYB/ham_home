@@ -465,7 +465,6 @@ export interface TabGroupAICacheEntry {
   url: string;
   groupTitle: string;
   color: TabGroupRuleColor;
-  reuseExistingGroup?: boolean;
   updatedAt: number;
 }
 
@@ -838,7 +837,7 @@ export interface SearchRequest {
 export interface SearchResultItem {
   /** 书签 ID */
   bookmarkId: string;
-  /** 综合评分 */
+  /** 相关性评分 */
   score: number;
   /** 关键词评分 */
   keywordScore?: number;

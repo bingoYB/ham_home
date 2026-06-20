@@ -2,8 +2,10 @@
  * useBookmarkSearch - 书签搜索筛选 Hook
  * 从 BookmarksPage.tsx 抽象的公共搜索能力
  */
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo, useCallback, useEffect } from 'react';
 import type { LocalBookmark, LocalCategory, CustomFilter, FilterCondition } from '@/types';
+
+const SEMANTIC_SEARCH_MIN_SCORE = 0.3;
 
 /**
  * 时间范围筛选类型
@@ -161,6 +163,129 @@ function applyCustomFilter(bookmark: LocalBookmark, filter: CustomFilter): boole
   return filter.conditions.every((condition) => applyFilterCondition(bookmark, condition));
 }
 
+function matchesSearchQuery(bookmark: LocalBookmark, query: string): boolean {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return true;
+
+  return (
+    bookmark.title.toLowerCase().includes(normalizedQuery) ||
+    bookmark.description.toLowerCase().includes(normalizedQuery) ||
+    bookmark.url.toLowerCase().includes(normalizedQuery) ||
+    bookmark.tags.some((tag) => tag.toLowerCase().includes(normalizedQuery))
+  );
+}
+
+function matchesBookmarkFilters(
+  bookmark: LocalBookmark,
+  selectedTags: string[],
+  selectedCategory: string,
+  timeBounds: { start: number; end: number } | null,
+  customFilter: CustomFilter | null,
+): boolean {
+  if (selectedTags.length > 0) {
+    const hasAllTags = selectedTags.every((tag) => bookmark.tags.includes(tag));
+    if (!hasAllTags) return false;
+  }
+
+  if (selectedCategory !== 'all') {
+    if (selectedCategory === 'uncategorized') {
+      if (bookmark.categoryId) return false;
+    } else if (bookmark.categoryId !== selectedCategory) {
+      return false;
+    }
+  }
+
+  if (timeBounds) {
+    if (bookmark.createdAt < timeBounds.start || bookmark.createdAt > timeBounds.end) {
+      return false;
+    }
+  }
+
+  if (customFilter && !applyCustomFilter(bookmark, customFilter)) {
+    return false;
+  }
+
+  return true;
+}
+
+interface MergeBookmarkSearchResultsOptions {
+  bookmarks: LocalBookmark[];
+  searchQuery: string;
+  semanticBookmarkIds: string[];
+  selectedTags: string[];
+  selectedCategory: string;
+  timeRange: TimeRange;
+  customFilter: CustomFilter | null;
+}
+
+export function mergeBookmarkSearchResults({
+  bookmarks,
+  searchQuery,
+  semanticBookmarkIds,
+  selectedTags,
+  selectedCategory,
+  timeRange,
+  customFilter,
+}: MergeBookmarkSearchResultsOptions): LocalBookmark[] {
+  const timeBounds = getTimeRangeBounds(timeRange);
+  const baseFilteredBookmarks = bookmarks.filter((bookmark) =>
+    matchesBookmarkFilters(
+      bookmark,
+      selectedTags,
+      selectedCategory,
+      timeBounds,
+      customFilter,
+    ),
+  );
+
+  const normalizedQuery = searchQuery.trim();
+  if (!normalizedQuery) {
+    return baseFilteredBookmarks.sort((a, b) => b.createdAt - a.createdAt);
+  }
+
+  const keywordMatches = baseFilteredBookmarks
+    .filter((bookmark) => matchesSearchQuery(bookmark, normalizedQuery))
+    .sort((a, b) => b.createdAt - a.createdAt);
+  const keywordIds = new Set(keywordMatches.map((bookmark) => bookmark.id));
+  const bookmarkById = new Map(
+    baseFilteredBookmarks.map((bookmark) => [bookmark.id, bookmark]),
+  );
+  const semanticMatches = semanticBookmarkIds
+    .filter((id) => !keywordIds.has(id))
+    .map((id) => bookmarkById.get(id))
+    .filter((bookmark): bookmark is LocalBookmark => Boolean(bookmark));
+
+  return [...keywordMatches, ...semanticMatches];
+}
+
+async function searchSemanticBookmarkIds(
+  query: string,
+  bookmarkCount: number,
+): Promise<string[]> {
+  const { isContentScriptContext } = await import('@/utils/browser-api');
+
+  if (isContentScriptContext()) {
+    const { getBackgroundService } = await import('@/lib/services');
+    const bgService = getBackgroundService();
+    const result = await bgService.semanticSearch(query, {
+      topK: bookmarkCount,
+      minScore: SEMANTIC_SEARCH_MIN_SCORE,
+    });
+    return result.items.map((item) => item.bookmarkId);
+  }
+
+  const { semanticRetriever } = await import('@/lib/search/semantic-retriever');
+  if (!(await semanticRetriever.isAvailable())) {
+    return [];
+  }
+
+  const result = await semanticRetriever.search(query, {
+    topK: bookmarkCount,
+    minScore: SEMANTIC_SEARCH_MIN_SCORE,
+  });
+  return result.items.map((item) => item.bookmarkId);
+}
+
 /**
  * 书签搜索筛选 Hook
  */
@@ -176,57 +301,58 @@ export function useBookmarkSearch({
   const [timeRange, setTimeRange] = useState<TimeRange>(
     initialState.timeRange || { type: 'all' }
   );
+  const [semanticBookmarkIds, setSemanticBookmarkIds] = useState<string[]>([]);
 
-  // 过滤书签
+  useEffect(() => {
+    const query = searchQuery.trim();
+    if (!query) {
+      setSemanticBookmarkIds([]);
+      return;
+    }
+
+    let cancelled = false;
+
+    async function runSemanticSearch() {
+      try {
+        const ids = await searchSemanticBookmarkIds(query, bookmarks.length);
+        if (!cancelled) {
+          setSemanticBookmarkIds(ids);
+        }
+      } catch (error) {
+        console.warn('[useBookmarkSearch] Semantic search failed, fallback to keyword search', error);
+        if (!cancelled) {
+          setSemanticBookmarkIds([]);
+        }
+      }
+    }
+
+    const timer = window.setTimeout(runSemanticSearch, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [bookmarks.length, searchQuery]);
+
   const filteredBookmarks = useMemo(() => {
-    const timeBounds = getTimeRangeBounds(timeRange);
-
-    return bookmarks
-      .filter((b) => {
-        // 关键词搜索
-        if (searchQuery) {
-          const query = searchQuery.toLowerCase();
-          const matchesSearch =
-            b.title.toLowerCase().includes(query) ||
-            b.description.toLowerCase().includes(query) ||
-            b.url.toLowerCase().includes(query) ||
-            b.tags.some((t) => t.toLowerCase().includes(query));
-          if (!matchesSearch) return false;
-        }
-
-        // 标签筛选
-        if (selectedTags.length > 0) {
-          const hasAllTags = selectedTags.every((tag) => b.tags.includes(tag));
-          if (!hasAllTags) return false;
-        }
-
-        // 分类筛选
-        if (selectedCategory !== 'all') {
-          if (selectedCategory === 'uncategorized') {
-            if (b.categoryId) return false;
-          } else if (b.categoryId !== selectedCategory) {
-            return false;
-          }
-        }
-
-        // 时间范围筛选
-        if (timeBounds) {
-          if (b.createdAt < timeBounds.start || b.createdAt > timeBounds.end) {
-            return false;
-          }
-        }
-
-        // 自定义筛选器
-        if (customFilter) {
-          if (!applyCustomFilter(b, customFilter)) {
-            return false;
-          }
-        }
-
-        return true;
-      })
-      .sort((a, b) => b.createdAt - a.createdAt);
-  }, [bookmarks, searchQuery, selectedTags, selectedCategory, timeRange, customFilter]);
+    return mergeBookmarkSearchResults({
+      bookmarks,
+      searchQuery,
+      semanticBookmarkIds,
+      selectedTags,
+      selectedCategory,
+      timeRange,
+      customFilter,
+    });
+  }, [
+    bookmarks,
+    searchQuery,
+    semanticBookmarkIds,
+    selectedTags,
+    selectedCategory,
+    timeRange,
+    customFilter,
+  ]);
 
   // 切换标签选择
   const toggleTagSelection = useCallback((tag: string) => {

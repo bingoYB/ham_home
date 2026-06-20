@@ -1056,46 +1056,6 @@ import { GlobalAgentLauncher } from "@/components/agent/GlobalAgentLauncher";
 
 ---
 
-### AIChatPanel
-
-旧版 AI 对话面板组件，合并了搜索栏和对话窗口，使用 sticky 布局吸附在底部。插件 app 页面现在使用 `GlobalAgentLauncher` 作为全局入口，本组件保留给旧书签搜索组件和共享 UI 演示。
-UI 复用 `@hamhome/ui-business/ai-search` 的 `AIChatPanel`，Extension 侧负责将 i18n 文案映射为 `AIChatLabels`。
-
-| Prop              | Type                              | Required | Default | Description          |
-| ----------------- | --------------------------------- | -------- | ------- | -------------------- |
-| isOpen            | `boolean`                         | ✓        | -       | 是否展开对话窗口     |
-| onClose           | `() => void`                      | ✓        | -       | 关闭回调             |
-| query             | `string`                          | ✓        | -       | 搜索值               |
-| onQueryChange     | `(val: string) => void`           | ✓        | -       | 搜索值变化回调       |
-| onSubmit          | `() => void`                      | ✓        | -       | 搜索提交回调         |
-| messages          | `ChatMessage[]`                   | ✓        | -       | 对话历史             |
-| currentAnswer     | `string`                          | ✓        | -       | 当前正在生成的回答   |
-| status            | `AISearchStatus`                  | ✓        | -       | 当前状态             |
-| error             | `string \| null`                  | -        | -       | 错误信息             |
-| sources           | `Source[]`                        | ✓        | -       | 当前回答的引用源     |
-| onSourceClick     | `(bookmarkId: string) => void`    | ✓        | -       | 点击引用回调         |
-| suggestions       | `string[]`                        | -        | `[]`    | 后续建议             |
-| sessions          | `ChatSearchSessionSummary[]`      | -        | `[]`    | 可切换的对话列表     |
-| currentSessionId  | `string \| null`                  | -        | -       | 当前对话 ID          |
-| onSessionChange   | `(sessionId: string) => void`     | -        | -       | 切换对话回调         |
-| onCreateSession   | `() => void`                      | -        | -       | 新建对话回调         |
-| onDeleteSession   | `(sessionId: string) => void`     | -        | -       | 删除对话回调         |
-| onSuggestionClick | `(suggestion: string) => void`    | -        | -       | 后续建议点击回调     |
-| onRetry           | `() => void`                      | -        | -       | 重试回调             |
-| className         | `string`                          | -        | -       | 自定义样式类         |
-
-**子组件：**
-
-该组件由以下子组件组成，可单独使用：
-
-- `AIChatSearchBar` - 搜索输入栏
-- `AIChatStatusIndicator` - 状态指示器
-- `AIChatSources` - 引用源列表
-- `AIChatSuggestions` - 后续建议
-- `AIChatMessage` - 消息组件
-
----
-
 ### AIChatSearchBar
 
 AI 搜索输入栏组件，包含输入框和提交按钮。搜索栏最大宽度 720px，居中显示。
@@ -1200,44 +1160,9 @@ AI 消息组件，显示单条对话消息（用户或助手）。
 - 用户消息显示在右侧，助手消息显示在左侧
 - 自动解析消息内容中的 `[1]`、`[2]` 等引用标记并转换为可点击按钮
 
-**用法示例：**
-
-```tsx
-<AIChatPanel
-  isOpen={isAIChatOpen}
-  onClose={closeAIChat}
-  query={aiQuery}
-  onQueryChange={setAIQuery}
-  onSubmit={handleAISearch}
-  messages={aiMessages}
-  currentAnswer={aiCurrentAnswer}
-  status={aiStatus}
-  error={aiError}
-  sources={aiResults}
-  onSourceClick={handleSourceClick}
-  suggestions={aiSuggestions}
-  onSuggestionClick={(suggestion) => {
-    setAIQuery(suggestion);
-    handleAISearch();
-  }}
-  onRetry={handleAISearch}
-/>
-```
-
-**行为说明：**
-
-- 使用 `sticky bottom-0` 布局，始终吸附在滚动容器底部
-- 搜索输入栏始终可见，对话窗口在搜索后展开
-- 对话窗口最大高度为 50vh，超出时内部滚动
-- 回答中的 `[1]`、`[2]` 等引用标记可点击跳转
-- 点击引用会触发 `onSourceClick` 回调，滚动定位到对应书签
-- 支持流式输出动画显示
-
----
-
 ### AIAnswerPanel（已弃用）
 
-AI 回答面板组件，展示 AI 回答、引用源和后续建议。已被 `AIChatPanel` 替代，保留用于向后兼容。
+AI 回答面板组件，展示 AI 回答、引用源和后续建议。已被全局 `GlobalAgentLauncher` 入口替代，保留用于向后兼容。
 
 | Prop              | Type                              | Required | Default | Description          |
 | ----------------- | --------------------------------- | -------- | ------- | -------------------- |
@@ -1475,95 +1400,6 @@ interface ChatMessage {
 ```tsx
 const { messages, currentSteps, submit } = useGlobalAgent();
 ```
-
----
-
-### useConversationalSearch
-
-旧版 AI 对话式搜索 Hook，封装 AI 对话状态机、Browser Agent SDK session 持久化与检索逻辑。插件 app 页面现在使用 `useGlobalAgent`；该 Hook 保留给旧书签搜索组件。
-
-**返回值：**
-
-| Property                 | Type                              | Description            |
-| ------------------------ | --------------------------------- | ---------------------- |
-| query                    | `string`                          | 查询文本               |
-| setQuery                 | `(query: string) => void`         | 设置查询               |
-| messages                 | `ChatMessage[]`                   | 对话历史               |
-| currentAnswer            | `string`                          | 当前正在生成的回答     |
-| status                   | `AISearchStatus`                  | AI 状态                |
-| error                    | `string \| null`                  | 错误信息               |
-| results                  | `Source[]`                        | 当前回答的引用源       |
-| suggestions              | `Suggestion[]`                    | 后续建议               |
-| highlightedBookmarkId    | `string \| null`                  | 高亮的书签 ID          |
-| setHighlightedBookmarkId | `(id: string \| null) => void`    | 设置高亮书签           |
-| handleSearch             | `() => Promise<void>`             | 执行搜索               |
-| handleSuggestion         | `(suggestion: Suggestion) => Promise<void>` | 执行结构化建议动作 |
-| clearConversation        | `() => Promise<void>`             | 清除当前对话 session   |
-| closeChat                | `() => void`                      | 关闭对话窗口           |
-| isChatOpen               | `boolean`                         | 对话窗口是否打开       |
-| resultBookmarkIds        | `string[]`                        | 当前结果书签 ID        |
-| sessions                 | `ChatSearchSessionSummary[]`      | 可切换的对话列表       |
-| currentSessionId         | `string \| null`                  | 当前对话 session ID    |
-| switchSession            | `(sessionId: string) => Promise<void>` | 切换对话 session |
-| createSession            | `() => Promise<void>`             | 新建对话 session       |
-| deleteSession            | `(sessionId: string) => Promise<void>` | 删除对话 session |
-
-**ChatMessage 类型：**
-
-```ts
-interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: number;
-  sources?: Source[];
-  steps?: AgentProcessStep[];
-}
-```
-
-**用法示例：**
-
-```tsx
-const {
-  query,
-  setQuery,
-  messages,
-  currentAnswer,
-  status,
-  results,
-  suggestions,
-  highlightedBookmarkId,
-  setHighlightedBookmarkId,
-  handleSearch,
-  handleSuggestion,
-  closeChat,
-  isChatOpen,
-  sessions,
-  currentSessionId,
-  switchSession,
-  createSession,
-} = useConversationalSearch();
-
-// 处理引用点击 - 滚动到对应书签
-const handleSourceClick = (bookmarkId: string) => {
-  setHighlightedBookmarkId(bookmarkId);
-  // 滚动定位...
-};
-```
-
-**行为说明：**
-
-- 调用 `handleSearch()` 打开对话窗口并执行 AI 搜索
-- `handleSearch()` 与 `handleSuggestion()` 都会进入统一的 `chatSearchService.runTurn()` 回合流程：
-  1. 将用户文本或 suggestion action 解析为当前回合输入
-  2. agent 读取搜索上下文、历史、过滤条件、分类、标签、快捷键等工具信息
-  3. agent 自主调用 `search_bookmarks`、`apply_filter`、`continue_search` 等工具完成检索编排
-  4. formatter 基于工具结果生成最终回答、引用源和下一步建议
-- 支持连续对话，过滤条件、已展示结果、最近几轮历史和 session 列表会持久化保存
-- 支持创建、切换、删除和清空对话 session
-- 支持流式输出动画
-- 搜索类 suggestion 会直接执行结构化动作，而不是仅把文案塞回输入框
-- 关闭对话窗口不会清除持久化对话；调用 `clearConversation()` 才会清空当前 session
-- AI 未配置或调用失败时直接返回错误，不再静默回退
 
 ---
 
@@ -2478,7 +2314,8 @@ await vectorStore.clearAll();
 
 - `createHamHomeFeatureSkill()` 提供插件功能总览文档，SDK 会注入 `skill_view`
 - `get_hamhome_feature_detail` 用于递进读取功能明细、配置方式和能力边界
-- `createGlobalAgentTools()` 提供功能清单、书签搜索、数据摘要、打开插件页面和安全配置工具
+- `get_extension_shortcuts` 实时读取浏览器快捷键配置
+- `createGlobalAgentTools()` 提供功能清单、书签搜索、快捷键读取、数据摘要、打开插件页面和安全配置工具
 - `update_safe_plugin_settings` 只允许白名单字段；`apiKey`、`baseUrl`、`privacyDomains`、同步凭据和快捷键会被拒绝并引导用户打开设置页
 - SDK 事件会被转成 `AgentProcessStep[]`，供 `GlobalAgentLauncher` 渲染中间过程
 

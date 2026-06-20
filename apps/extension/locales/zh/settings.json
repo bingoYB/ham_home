@@ -140,7 +140,7 @@
         "batchSizeDesc": "每批处理的书签数量（建议 8-32）",
         "testConnection": "测试连接",
         "testing": "测试中...",
-        "testSuccess": "连接成功，向量维度: {{dimensions}}",
+        "testSuccess": "连接成功",
         "testFailed": "连接失败: {{error}}",
         "status": {
           "title": "向量索引状态",

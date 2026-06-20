@@ -22,10 +22,6 @@ import {
 } from "@/lib/agent";
 import { getExtensionURL, type ShortcutCommand } from "@/utils/browser-api";
 import {
-  chatSearchService,
-  type ChatSearchTurnResult,
-} from "@/lib/agent/services/chat-search-service";
-import {
   globalAgentService,
   type GlobalAgentTurnResult,
 } from "@/lib/agent/services/global-agent-service";
@@ -428,33 +424,6 @@ class BackgroundServiceImpl implements IBackgroundService {
       console.error("[BackgroundService] Failed to get shortcuts:", error);
       return [];
     }
-  }
-
-  async chatSearchRunTurn(
-    input: ConversationalSearchTurnInput,
-    sessionId?: string,
-  ): Promise<ChatSearchTurnResult> {
-    return chatSearchService.runTurn(input, sessionId);
-  }
-
-  async chatSearchListSessions() {
-    return chatSearchService.listSessions();
-  }
-
-  async chatSearchCreateSession(title?: string) {
-    return chatSearchService.createSession(title);
-  }
-
-  async chatSearchGetSession(sessionId?: string) {
-    return chatSearchService.getSession(sessionId);
-  }
-
-  async chatSearchClearSession(sessionId: string) {
-    return chatSearchService.clearSession(sessionId);
-  }
-
-  async chatSearchDeleteSession(sessionId: string) {
-    return chatSearchService.deleteSession(sessionId);
   }
 
   async globalAgentRunTurn(

@@ -140,7 +140,7 @@
         "batchSizeDesc": "Number of bookmarks per batch (recommended 8-32)",
         "testConnection": "Test Connection",
         "testing": "Testing...",
-        "testSuccess": "Connection successful, dimensions: {{dimensions}}",
+        "testSuccess": "Connection successful",
         "testFailed": "Connection failed: {{error}}",
         "status": {
           "title": "Vector Index Status",

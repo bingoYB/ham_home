@@ -3,11 +3,6 @@
  */
 
 /**
- * AI 搜索模式
- */
-export type SearchMode = 'keyword' | 'chat';
-
-/**
  * 建议操作类型
  * - text: 文本建议，点击后填入输入框
  * - copyAllLinks: 复制所有链接
@@ -131,42 +126,4 @@ export interface ChatMessage {
   timestamp: number;
   sources?: Source[];
   steps?: AgentProcessStep[];
-}
-
-/**
- * useConversationalSearch Hook 返回类型
- */
-export interface ConversationalSearchState {
-  /** 当前搜索模式 */
-  mode: SearchMode;
-  /** 切换模式 */
-  toggleMode: () => void;
-  /** 设置模式 */
-  setMode: (mode: SearchMode) => void;
-  /** 查询文本 */
-  query: string;
-  /** 设置查询 */
-  setQuery: (query: string) => void;
-  /** AI 回答（流式输出） */
-  answer: string;
-  /** AI 状态 */
-  status: AISearchStatus;
-  /** 错误信息 */
-  error: string | null;
-  /** 检索结果（书签列表） */
-  results: Source[];
-  /** 后续建议 */
-  suggestions: Suggestion[];
-  /** 高亮的书签 ID */
-  highlightedBookmarkId: string | null;
-  /** 设置高亮书签 */
-  setHighlightedBookmarkId: (id: string | null) => void;
-  /** 执行搜索 */
-  handleSearch: () => Promise<void>;
-  /** 清除结果 */
-  clearResults: () => void;
-  /** 关闭 AI 面板 */
-  closePanel: () => void;
-  /** AI 面板是否打开 */
-  isPanelOpen: boolean;
 }

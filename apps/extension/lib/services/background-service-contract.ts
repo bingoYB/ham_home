@@ -5,7 +5,6 @@ import type {
   SemanticSearchOptions,
   SemanticSearchResult,
 } from "@/lib/search/semantic-retriever";
-import type { ChatSearchTurnResult } from "@/lib/agent/services/chat-search-service";
 import type { GlobalAgentTurnResult } from "@/lib/agent/services/global-agent-service";
 import type {
   AnalysisResult,
@@ -69,15 +68,6 @@ export interface IBackgroundService {
     coverage: number;
   }>;
   getShortcuts(): Promise<ShortcutCommand[]>;
-  chatSearchRunTurn(
-    input: ConversationalSearchTurnInput,
-    sessionId?: string,
-  ): Promise<ChatSearchTurnResult>;
-  chatSearchListSessions(): Promise<ChatSearchSessionSummary[]>;
-  chatSearchCreateSession(title?: string): Promise<ChatSearchSessionSnapshot>;
-  chatSearchGetSession(sessionId?: string): Promise<ChatSearchSessionSnapshot>;
-  chatSearchClearSession(sessionId: string): Promise<ChatSearchSessionSnapshot>;
-  chatSearchDeleteSession(sessionId: string): Promise<ChatSearchSessionSummary[]>;
   globalAgentRunTurn(
     input: ConversationalSearchTurnInput,
     sessionId?: string,

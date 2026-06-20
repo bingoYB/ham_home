@@ -59,9 +59,7 @@ describe("TabGroupRuleService AI auto grouping", () => {
   it("reuses an existing group when AI returns an existing group title", async () => {
     mocks.runExtensionCommand.mockResolvedValue({
       output: {
-        reuseExistingGroup: false,
         groupTitle: "工作",
-        color: "green",
       },
     });
 
@@ -100,9 +98,7 @@ describe("TabGroupRuleService AI auto grouping", () => {
   it("reuses an existing group when AI explicitly chooses a matching group", async () => {
     mocks.runExtensionCommand.mockResolvedValue({
       output: {
-        reuseExistingGroup: true,
         groupTitle: "工作",
-        color: "green",
       },
     });
 
@@ -141,9 +137,7 @@ describe("TabGroupRuleService AI auto grouping", () => {
   it("includes page metadata in the AI grouping prompt", async () => {
     mocks.runExtensionCommand.mockResolvedValue({
       output: {
-        reuseExistingGroup: false,
         groupTitle: "烹饪",
-        color: "green",
       },
     });
 
@@ -175,12 +169,166 @@ describe("TabGroupRuleService AI auto grouping", () => {
     );
 
     const prompt = mocks.runExtensionCommand.mock.calls[0]?.[0]?.command.prompt;
+    const outputSchema = mocks.runExtensionCommand.mock.calls[0]?.[0]?.command.outputSchema;
 
-    expect(prompt).toContain("Page metadata:");
-    expect(prompt).toContain("Page Title: 番茄浓汤食谱 - 家常菜谱");
-    expect(prompt).toContain("Keywords: 食谱, 番茄, 汤");
-    expect(prompt).toContain("Open Graph Site Name: 厨房日记");
-    expect(prompt).toContain("Open Graph Type: article");
-    expect(prompt).toContain("Headings: 番茄浓汤 | 食材 | 步骤");
+    expect(prompt).toContain("页面元数据:");
+    expect(prompt).toContain("页面标题: 番茄浓汤食谱 - 家常菜谱");
+    expect(prompt).toContain("关键词: 食谱, 番茄, 汤");
+    expect(prompt).toContain("Open Graph 站点名: 厨房日记");
+    expect(prompt).toContain("Open Graph 类型: article");
+    expect(prompt).toContain("标题层级: 番茄浓汤 | 食材 | 步骤");
+    expect(prompt).not.toContain("reuseExistingGroup");
+    expect(outputSchema.properties).not.toHaveProperty("reuseExistingGroup");
+  });
+
+  it("only asks AI for a group title and chooses new group color locally", async () => {
+    const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0.42);
+    mocks.runExtensionCommand.mockResolvedValue({
+      output: {
+        groupTitle: "烹饪",
+      },
+    });
+
+    const { tabGroupRuleService } = await import("../tab-group-rule-service");
+
+    await tabGroupRuleService.autoGroupTab(
+      12,
+      "https://cooking.example/recipes/soup",
+      1,
+      "番茄浓汤食谱",
+      {
+        allowAI: true,
+        description: "家常汤品做法",
+      },
+    );
+
+    const prompt = mocks.runExtensionCommand.mock.calls[0]?.[0]?.command.prompt;
+    const outputSchema = mocks.runExtensionCommand.mock.calls[0]?.[0]?.command.outputSchema;
+    const chromeMock = (globalThis as typeof globalThis & {
+      chrome: {
+        tabs: { group: ReturnType<typeof vi.fn> };
+        tabGroups: { update: ReturnType<typeof vi.fn> };
+      };
+    }).chrome;
+
+    expect(prompt).toContain("现有标签组:\n- 工作");
+    expect(prompt).not.toContain("(blue)");
+    expect(outputSchema.properties).toEqual({ groupTitle: {} });
+    expect(chromeMock.tabs.group).toHaveBeenCalledWith({ tabIds: 12 });
+    expect(chromeMock.tabGroups.update).toHaveBeenCalledWith(
+      100,
+      expect.objectContaining({
+        title: "烹饪",
+        color: "yellow",
+        collapsed: false,
+      }),
+    );
+    expect(mocks.setAIGroupCache).toHaveBeenCalledWith(
+      "https://cooking.example/recipes/soup",
+      expect.objectContaining({
+        groupTitle: "烹饪",
+        color: "yellow",
+      }),
+    );
+
+    randomSpy.mockRestore();
+  });
+
+  it("instructs AI to keep group titles short", async () => {
+    mocks.runExtensionCommand.mockResolvedValue({
+      output: {
+        groupTitle: "烹饪",
+      },
+    });
+
+    const { tabGroupRuleService } = await import("../tab-group-rule-service");
+
+    await tabGroupRuleService.autoGroupTab(
+      12,
+      "https://cooking.example/recipes/soup",
+      1,
+      "番茄浓汤食谱",
+      {
+        allowAI: true,
+        description: "家常汤品做法",
+      },
+    );
+
+    const systemPrompt = mocks.runExtensionCommand.mock.calls[0]?.[0]?.systemPrompt;
+
+    expect(systemPrompt).toContain("中文不超过 5 个字");
+    expect(systemPrompt).toContain("英文不超过 2 个单词");
+  });
+
+  it("trims overlong AI group titles before grouping and caching", async () => {
+    const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0.42);
+    mocks.runExtensionCommand.mockResolvedValueOnce({
+      output: {
+        groupTitle: "番茄浓汤菜谱",
+      },
+    });
+
+    const { tabGroupRuleService } = await import("../tab-group-rule-service");
+
+    await tabGroupRuleService.autoGroupTab(
+      12,
+      "https://cooking.example/recipes/soup",
+      1,
+      "番茄浓汤食谱",
+      {
+        allowAI: true,
+      },
+    );
+
+    mocks.runExtensionCommand.mockResolvedValueOnce({
+      output: {
+        groupTitle: "Machine Learning Research",
+      },
+    });
+
+    await tabGroupRuleService.autoGroupTab(
+      13,
+      "https://ai.example/research",
+      1,
+      "Machine Learning Research",
+      {
+        allowAI: true,
+      },
+    );
+
+    const chromeMock = (globalThis as typeof globalThis & {
+      chrome: {
+        tabGroups: { update: ReturnType<typeof vi.fn> };
+      };
+    }).chrome;
+
+    expect(chromeMock.tabGroups.update).toHaveBeenNthCalledWith(
+      1,
+      100,
+      expect.objectContaining({
+        title: "番茄浓汤菜",
+        color: "yellow",
+      }),
+    );
+    expect(chromeMock.tabGroups.update).toHaveBeenNthCalledWith(
+      2,
+      100,
+      expect.objectContaining({
+        title: "Machine Learning",
+        color: "yellow",
+      }),
+    );
+    expect(mocks.setAIGroupCache).toHaveBeenNthCalledWith(
+      1,
+      "https://cooking.example/recipes/soup",
+      expect.objectContaining({ groupTitle: "番茄浓汤菜" }),
+    );
+    expect(mocks.setAIGroupCache).toHaveBeenNthCalledWith(
+      2,
+      "https://ai.example/research",
+      expect.objectContaining({ groupTitle: "Machine Learning" }),
+    );
+
+    randomSpy.mockRestore();
   });
 });
