@@ -323,7 +323,9 @@
         "fetchPageContentDesc": "访问书签 URL 获取页面内容以获得更准确的 AI 分析结果（较慢）",
         "fromBrowser": "从浏览器导入",
         "fromBrowserDesc": "直接读取当前浏览器的书签数据",
-        "browserBookmarkCount": "浏览器中共有 {{count}} 个书签"
+        "browserBookmarkCount": "浏览器中共有 {{count}} 个书签",
+        "cancelImport": "停止导入",
+        "importCancelled": "导入已停止"
       },
       "syncBrowser": {
         "title": "同步到浏览器书签栏",

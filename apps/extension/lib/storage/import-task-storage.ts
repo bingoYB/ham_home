@@ -1,4 +1,4 @@
-import { nanoid } from 'nanoid';
+import { nanoid } from "nanoid";
 
 export interface ImportTaskOptions {
   preserveFolders: boolean;
@@ -14,7 +14,7 @@ export interface BookmarkToImport {
 
 export interface HtmlImportTaskPayload {
   id: string;
-  source: 'file' | 'browser';
+  source: "file" | "browser";
   options: ImportTaskOptions;
   bookmarksToImport: BookmarkToImport[];
   total: number;
@@ -23,7 +23,7 @@ export interface HtmlImportTaskPayload {
 
 export interface HtmlImportTaskProgress {
   taskId: string;
-  status: 'running' | 'failed';
+  status: "running" | "failed" | "cancelled";
   currentIndex: number;
   imported: number;
   skipped: number;
@@ -41,17 +41,25 @@ export interface HtmlImportTask {
   progress: HtmlImportTaskProgress;
 }
 
-const htmlImportTaskPayloadItem = storage.defineItem<HtmlImportTaskPayload | null>('local:htmlImportTaskPayload', {
-  fallback: null,
-});
+const htmlImportTaskPayloadItem =
+  storage.defineItem<HtmlImportTaskPayload | null>(
+    "local:htmlImportTaskPayload",
+    {
+      fallback: null,
+    },
+  );
 
-const htmlImportTaskProgressItem = storage.defineItem<HtmlImportTaskProgress | null>('local:htmlImportTaskProgress', {
-  fallback: null,
-});
+const htmlImportTaskProgressItem =
+  storage.defineItem<HtmlImportTaskProgress | null>(
+    "local:htmlImportTaskProgress",
+    {
+      fallback: null,
+    },
+  );
 
 class ImportTaskStorage {
   async createHtmlTask(input: {
-    source: 'file' | 'browser';
+    source: "file" | "browser";
     options: ImportTaskOptions;
     bookmarksToImport: BookmarkToImport[];
     categoriesCreated: number;
@@ -70,7 +78,7 @@ class ImportTaskStorage {
 
     const progress: HtmlImportTaskProgress = {
       taskId: id,
-      status: 'running',
+      status: "running",
       currentIndex: 0,
       imported: 0,
       skipped: 0,
@@ -108,7 +116,7 @@ class ImportTaskStorage {
   }
 
   async updateHtmlProgress(
-    updater: (progress: HtmlImportTaskProgress) => HtmlImportTaskProgress
+    updater: (progress: HtmlImportTaskProgress) => HtmlImportTaskProgress,
   ): Promise<HtmlImportTaskProgress | null> {
     const progress = await htmlImportTaskProgressItem.getValue();
     if (!progress) return null;
@@ -122,10 +130,17 @@ class ImportTaskStorage {
     return updated;
   }
 
+  async cancelHtmlTask(): Promise<void> {
+    await this.updateHtmlProgress((progress) => ({
+      ...progress,
+      status: "cancelled",
+    }));
+  }
+
   async markHtmlTaskFailed(error: string): Promise<void> {
     await this.updateHtmlProgress((progress) => ({
       ...progress,
-      status: 'failed',
+      status: "failed",
       error,
     }));
   }

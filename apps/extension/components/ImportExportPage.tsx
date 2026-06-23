@@ -20,6 +20,7 @@ import {
   HelpCircle,
 } from "lucide-react";
 import {
+  Button,
   Card,
   CardContent,
   CardDescription,
@@ -69,6 +70,8 @@ export function ImportExportPage() {
     resumeWatchers,
   } = useBookmarks();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // 取消导入的信号 flag，由 handleCancelImport 置为 true
+  const cancelledRef = useRef(false);
   const {
     getBookmarks: getChromeBookmarks,
     loading: loadingBrowserBookmarks,
@@ -89,6 +92,7 @@ export function ImportExportPage() {
     message: string;
     details?: string;
     aiError?: { message: string };
+    cancelled?: boolean;
   } | null>(null);
 
   // 同步到浏览器状态 & 选项
@@ -190,6 +194,12 @@ export function ImportExportPage() {
     await exportData("html");
   };
 
+  // 取消正在进行的 HTML 导入任务
+  const handleCancelImport = async () => {
+    cancelledRef.current = true;
+    await importTaskStorage.cancelHtmlTask();
+  };
+
   // 触发文件选择
   const triggerFileInput = () => {
     fileInputRef.current?.click();
@@ -203,7 +213,10 @@ export function ImportExportPage() {
         return;
       }
 
-      if (task.progress.status === "failed") {
+      if (
+        task.progress.status === "failed" ||
+        task.progress.status === "cancelled"
+      ) {
         await importTaskStorage.clearHtmlTask();
         return;
       }
@@ -259,6 +272,7 @@ export function ImportExportPage() {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    cancelledRef.current = false;
     setImporting(true);
     setImportResult(null);
 
@@ -300,6 +314,7 @@ export function ImportExportPage() {
 
   // 从浏览器导入
   const handleBrowserImport = async () => {
+    cancelledRef.current = false;
     setImporting(true);
     setImportResult(null);
 
@@ -455,11 +470,13 @@ export function ImportExportPage() {
     }
 
     if (Array.isArray(data.workspaceCategories)) {
-      const sortedWorkspaceCategories = [...data.workspaceCategories].sort((a, b) => {
-        if (a.parentId === null && b.parentId !== null) return -1;
-        if (a.parentId !== null && b.parentId === null) return 1;
-        return 0;
-      });
+      const sortedWorkspaceCategories = [...data.workspaceCategories].sort(
+        (a, b) => {
+          if (a.parentId === null && b.parentId !== null) return -1;
+          if (a.parentId !== null && b.parentId === null) return 1;
+          return 0;
+        },
+      );
       const pending = [...sortedWorkspaceCategories];
       let round = 0;
 
@@ -472,13 +489,17 @@ export function ImportExportPage() {
             ? (workspaceCategoryIdMap.get(category.parentId) ?? null)
             : null;
 
-          if (category.parentId && !workspaceCategoryIdMap.has(category.parentId)) {
+          if (
+            category.parentId &&
+            !workspaceCategoryIdMap.has(category.parentId)
+          ) {
             stillPending.push(category);
             continue;
           }
 
           const existing = allWorkspaceCategories.find(
-            (item) => item.name === category.name && item.parentId === newParentId,
+            (item) =>
+              item.name === category.name && item.parentId === newParentId,
           );
 
           if (existing) {
@@ -522,7 +543,9 @@ export function ImportExportPage() {
     }
 
     if (data.tabGroupAutoGroupSettings) {
-      await tabGroupRulesStorage.setAutoGroupSettings(data.tabGroupAutoGroupSettings);
+      await tabGroupRulesStorage.setAutoGroupSettings(
+        data.tabGroupAutoGroupSettings,
+      );
     }
 
     // 批量添加 embedding 任务（在 background 中执行）
@@ -833,6 +856,10 @@ export function ImportExportPage() {
       batchStart < task.payload.bookmarksToImport.length;
       batchStart += BATCH_SIZE
     ) {
+      // 每批次开始前检查取消信号
+      if (cancelledRef.current) {
+        break;
+      }
       batchIndex++;
       const batchLoopStart = performance.now();
       const batch = task.payload.bookmarksToImport.slice(
@@ -1031,6 +1058,29 @@ export function ImportExportPage() {
     }
 
     setImportProgress(null);
+
+    // 任务被取消时，展示已处理的进度并提前返回
+    if (cancelledRef.current) {
+      await importTaskStorage.clearHtmlTask();
+      setImportResult({
+        success: false,
+        cancelled: true,
+        message: t("settings.importExport.import.importCancelled", {
+          ns: "settings",
+        }),
+        details: buildHTMLImportDetails(
+          {
+            imported,
+            skipped,
+            duplicateSkipped,
+            categoriesCreated,
+            aiProcessed,
+          },
+          options,
+        ),
+      });
+      return;
+    }
 
     // 批量添加 embedding 任务（在 background 中执行）
     if (importedBookmarkIds.length > 0) {
@@ -1357,13 +1407,27 @@ export function ImportExportPage() {
           {/* 导入进度 */}
           {importing && importProgress && (
             <div className="mt-4 p-4 rounded-lg bg-muted">
-              <div className="flex items-center gap-3 mb-3">
-                <Loader2 className="h-5 w-5 text-primary animate-spin" />
-                <span className="text-sm font-medium">
-                  {t("settings.importExport.import.importing", {
-                    ns: "settings",
-                  })}
-                </span>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <Loader2 className="h-5 w-5 text-primary animate-spin" />
+                  <span className="text-sm font-medium">
+                    {t("settings.importExport.import.importing", {
+                      ns: "settings",
+                    })}
+                  </span>
+                </div>
+                {enableAIAnalysis && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={handleCancelImport}
+                    className="h-7 text-xs"
+                  >
+                    {t("settings.importExport.import.cancelImport", {
+                      ns: "settings",
+                    })}
+                  </Button>
+                )}
               </div>
               <Progress
                 value={(importProgress.current / importProgress.total) * 100}
@@ -1391,8 +1455,23 @@ export function ImportExportPage() {
             </div>
           )}
 
+          {/* 取消结果提示 */}
+          {importResult && !importResult.success && importResult.cancelled && (
+            <div className="mt-4 p-4 rounded-lg flex items-start gap-3 bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-200">
+              <AlertCircle className="h-5 w-5 mt-0.5" />
+              <div>
+                <p className="font-medium">{importResult.message}</p>
+                {importResult.details && (
+                  <p className="text-sm opacity-80 mt-1">
+                    {importResult.details}
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* 导入结果 */}
-          {importResult && (
+          {importResult && !importResult.cancelled && (
             <div
               className={`mt-4 p-4 rounded-lg flex items-start gap-3 ${
                 importResult.success
