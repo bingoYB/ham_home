@@ -403,7 +403,7 @@ export function WorkspacesPage() {
       <DragOverlay dropAnimation={null}>
         {dragOverlayPage ? (
           <div className="flex min-h-14.5 w-75 items-center gap-3 rounded-md border bg-background px-3 py-2 shadow-xl ring-2 ring-primary/30">
-            <WorkspacePageFavicon favicon={dragOverlayPage.favicon} className="h-7 w-7" />
+            <WorkspacePageFavicon favicon={dragOverlayPage.favicon} url={dragOverlayPage.url} className="h-7 w-7" />
             <span className="min-w-0 flex-1">
               <span className="line-clamp-2 text-sm font-medium leading-snug">
                 {dragOverlayPage.title}

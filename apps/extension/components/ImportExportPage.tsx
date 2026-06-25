@@ -32,6 +32,7 @@ import {
   HoverCardContent,
   HoverCardTrigger,
 } from "@hamhome/ui";
+import { getFavicon } from "@hamhome/utils";
 import { useBookmarks } from "@/contexts/BookmarkContext";
 import { bookmarkStorage } from "@/lib/storage/bookmark-storage";
 import { workspaceStorage } from "@/lib/storage/workspace-storage";
@@ -963,9 +964,7 @@ export function ImportExportPage() {
       const readyItems = preprocessed.filter((p) => p.status === "ready");
       const bookmarkInputs = readyItems.map((p) => {
         const hostname = safeGetHostname(p.bm.url);
-        const favicon = hostname
-          ? `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`
-          : "";
+        const favicon = hostname ? getFavicon(hostname) : "";
         return {
           url: p.bm.url,
           title: p.bm.title,

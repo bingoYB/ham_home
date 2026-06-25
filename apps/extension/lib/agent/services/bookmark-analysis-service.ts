@@ -1,5 +1,6 @@
 import { z } from "zod";
 import type { JsonSchema } from "@browser-agent-sdk/agent";
+import { getFavicon } from "@hamhome/utils";
 import {
   buildCategoryTree,
   formatCategoryHierarchy,
@@ -151,9 +152,7 @@ class BookmarkAnalysisService {
         htmlContent: "",
         textContent: content,
         excerpt: options.description || "",
-        favicon: hostname
-          ? `https://www.google.com/s2/favicons?domain=${hostname}&sz=32`
-          : "",
+        favicon: hostname ? getFavicon(hostname) : "",
         metadata: {},
         isReaderable: !!content,
       },

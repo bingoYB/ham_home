@@ -27,6 +27,7 @@ import type {
   Workspace,
   WorkspaceCategory,
   TabGroupRule,
+  TabGroupAutoGroupSettings,
 } from '@/types';
 import { nanoid } from 'nanoid';
 import pLimit from 'p-limit';
@@ -196,6 +197,29 @@ export class SyncEngine {
     }
   }
 
+  private areSettingsEqual(local: LocalSettings, remote: RemoteSettings): boolean {
+    return (
+      local.autoSaveSnapshot === remote.autoSaveSnapshot &&
+      local.enableOmniboxSearch === remote.enableOmniboxSearch &&
+      local.defaultCategory === remote.defaultCategory &&
+      local.theme === remote.theme &&
+      local.language === remote.language &&
+      local.shortcut === remote.shortcut &&
+      local.panelPosition === remote.panelPosition &&
+      local.panelShortcut === remote.panelShortcut
+    );
+  }
+
+  private areAutoGroupSettingsEqual(
+    local: TabGroupAutoGroupSettings,
+    remote: TabGroupAutoGroupSettings,
+  ): boolean {
+    return (
+      local.aiAutoGroupEnabled === remote.aiAutoGroupEnabled &&
+      local.aiAutoGroupInstructions === remote.aiAutoGroupInstructions
+    );
+  }
+
   private async syncSettings() {
     console.log('Syncing settings...');
     const localSettings = await configStorage.getSettings();
@@ -212,11 +236,21 @@ export class SyncEngine {
     if (!remoteSettings) {
       // Remote empty, push local
       await webdavClientAdapter.putJSON(SETTINGS_JSON, localSettings);
-    } else {
-      // Simplistic Settings Merge: We'll assume Remote wins if exists for now, 
-      // or you can add a local timestamp to Settings.
-      // For simplicity: download remote settings and apply
-      await configStorage.setSettings(remoteSettings as Partial<LocalSettings>);
+      return;
+    }
+
+    if (localSettings.updatedAt > remoteSettings.updatedAt) {
+      await webdavClientAdapter.putJSON(SETTINGS_JSON, localSettings);
+      return;
+    }
+
+    if (localSettings.updatedAt < remoteSettings.updatedAt) {
+      await configStorage.importRawSettings(remoteSettings);
+      return;
+    }
+
+    if (!this.areSettingsEqual(localSettings, remoteSettings)) {
+      await webdavClientAdapter.putJSON(SETTINGS_JSON, localSettings);
     }
   }
 
@@ -473,14 +507,23 @@ export class SyncEngine {
       }
     }
 
-    if (remoteRaw) {
-      await tabGroupRulesStorage.setAutoGroupSettings(remoteAutoGroupSettings);
+    const autoGroupSettingsChanged =
+      localAutoGroupSettings.updatedAt > remoteAutoGroupSettings.updatedAt ||
+      (
+        localAutoGroupSettings.updatedAt === remoteAutoGroupSettings.updatedAt &&
+        !this.areAutoGroupSettingsEqual(localAutoGroupSettings, remoteAutoGroupSettings)
+      );
+
+    if (localAutoGroupSettings.updatedAt < remoteAutoGroupSettings.updatedAt) {
+      await tabGroupRulesStorage.importRawAutoGroupSettings(remoteAutoGroupSettings);
     }
 
-    if (changed) {
+    if (changed || autoGroupSettingsChanged) {
       await webdavClientAdapter.putJSON(TAB_GROUP_CONFIG_JSON, {
         rules: mergedRules,
-        autoGroupSettings: localAutoGroupSettings,
+        autoGroupSettings: autoGroupSettingsChanged
+          ? localAutoGroupSettings
+          : remoteAutoGroupSettings,
       });
     }
   }

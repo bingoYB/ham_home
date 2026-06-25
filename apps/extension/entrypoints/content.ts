@@ -8,6 +8,7 @@
 import { browser } from "wxt/browser";
 import { Readability, isProbablyReaderable } from "@mozilla/readability";
 import Defuddle from "defuddle";
+import { getFavicon as getFaviconUrl } from "@hamhome/utils";
 import type { PageContent, PageMetadata } from "@/types";
 import "../style.css";
 import { registerSingleFileTestHelpers, handleExtractSingleFileHtmlResponse } from "@/utils/single-file-capture";
@@ -167,7 +168,7 @@ async function extractPageContent(): Promise<PageContent | null> {
         textContent: "",
         htmlContent,
         excerpt: metadata.description || metadata.ogDescription || "",
-        favicon: getFavicon(),
+        favicon: getPageFavicon(),
         metadata,
         isReaderable: false,
       };
@@ -188,7 +189,7 @@ async function extractPageContent(): Promise<PageContent | null> {
       textContent: cleanedTextContent,
       excerpt:
         article.excerpt || metadata.description || metadata.ogDescription || "",
-      favicon: getFavicon(),
+      favicon: getPageFavicon(),
       metadata: {
         ...metadata,
         siteName: metadata.siteName || article.siteName || undefined,
@@ -227,22 +228,8 @@ function extractCleanHtml(): string {
 /**
  * 获取页面 favicon
  */
-function getFavicon(): string {
-  // 优先尝试获取明确定义的图标
-  const iconLinks =
-    document.querySelectorAll<HTMLLinkElement>('link[rel*="icon"]');
-  for (const link of iconLinks) {
-    if (link.href) return link.href;
-  }
-
-  // Apple touch icon 作为备选
-  const appleIcon = document.querySelector<HTMLLinkElement>(
-    'link[rel="apple-touch-icon"]',
-  );
-  if (appleIcon?.href) return appleIcon.href;
-
-  // 使用 Google favicon 服务作为 fallback
-  return `https://www.google.com/s2/favicons?domain=${window.location.hostname}&sz=32`;
+function getPageFavicon(): string {
+  return getFaviconUrl(window.location.href);
 }
 
 

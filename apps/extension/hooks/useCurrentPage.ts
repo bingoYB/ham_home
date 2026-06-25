@@ -4,6 +4,7 @@
  */
 import { useState, useEffect } from 'react';
 import { browser } from 'wxt/browser';
+import { getFavicon } from '@hamhome/utils';
 import type { PageContent } from '@/types';
 import { containsPrivateContent, isNonBookmarkableUrl } from '../lib/privacy';
 import { safeSendMessageToTab } from '@/utils/browser-api';
@@ -68,7 +69,7 @@ export function useCurrentPage(): UseCurrentPageResult {
           htmlContent: '',
           textContent: '',
           excerpt: '',
-          favicon: tab.favIconUrl || '',
+          favicon: getFavicon(tab.url),
           isPrivate: true,
           privacyReason: privacyCheck.reason,
         });
@@ -95,7 +96,7 @@ export function useCurrentPage(): UseCurrentPageResult {
           htmlContent: '',
           textContent: '',
           excerpt: '',
-          favicon: tab.favIconUrl || '',
+          favicon: getFavicon(tab.url),
           isPrivate: false,
         });
       }
@@ -122,7 +123,7 @@ export function useCurrentPage(): UseCurrentPageResult {
             htmlContent: '',
             textContent: '',
             excerpt: '',
-            favicon: tab.favIconUrl || '',
+            favicon: getFavicon(tab.url),
             isPrivate: privacyCheck.isPrivate,
             privacyReason: privacyCheck.reason,
           });

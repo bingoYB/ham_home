@@ -104,7 +104,6 @@ WXT 框架已提供以下兼容性支持：
    - `contextMenus` - 所有浏览器支持
    - `bookmarks` - 所有浏览器支持
    - `alarms` - 所有浏览器支持
-   - `favicon` - Chromium 支持，Firefox 中走安全回退
 
 2. **host_permissions** ✅
    - `<all_urls>` - 所有浏览器支持

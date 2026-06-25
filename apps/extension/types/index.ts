@@ -161,6 +161,7 @@ export interface LocalSettings {
   shortcut: string; // 快捷键配置
   panelPosition: PanelPosition; // 书签面板位置
   panelShortcut: string; // 面板快捷键
+  updatedAt: number; // 配置更新时间，用于 WebDAV 冲突合并
 }
 
 // ============ 快照相关 ============
@@ -444,6 +445,8 @@ export interface TabGroupRuleMatchResult {
 
 export interface TabGroupAutoGroupSettings {
   aiAutoGroupEnabled: boolean;
+  aiAutoGroupInstructions: string;
+  updatedAt: number;
 }
 
 export interface TabGroupPageMetadata {

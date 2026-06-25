@@ -136,7 +136,7 @@ export function WorkspaceSaveDialog({
                       tabGroups={filterWorkspaceTabGroups(preview?.tabGroups, windowPages)}
                       renderPage={(page) => (
                         <div className="flex min-h-12 min-w-0 items-center gap-2 rounded-[12px] bg-card border p-2">
-                          <WorkspacePageFavicon favicon={page.favicon} className="h-5 w-5" />
+                          <WorkspacePageFavicon favicon={page.favicon} url={page.url} className="h-5 w-5" />
                           <div className="min-w-0 flex-1">
                             <div className="truncate text-sm font-medium" title={page.title}>
                               {page.title}

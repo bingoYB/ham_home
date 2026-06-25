@@ -113,7 +113,7 @@ export function WorkspacePageTile({
         title={page.title + "\n" + page.url}
       />
       <div className="relative z-10 pointer-events-none shrink-0">
-        <WorkspacePageFavicon favicon={page.favicon} className="h-7 w-7" />
+        <WorkspacePageFavicon favicon={page.favicon} url={page.url} className="h-7 w-7" />
       </div>
       <span className="relative z-10 min-w-0 flex-1 pointer-events-none">
         <span className="block truncate text-sm font-medium leading-snug" >

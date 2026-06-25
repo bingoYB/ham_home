@@ -37,12 +37,14 @@ export type RemoteBookmarksFile = z.infer<typeof RemoteBookmarksFileSchema>;
 // Settings schema corresponds to LocalSettings from @/types
 export const RemoteSettingsSchema = z.object({
   autoSaveSnapshot: z.boolean(),
+  enableOmniboxSearch: z.boolean().default(true),
   defaultCategory: z.string().nullable(),
   theme: z.enum(['light', 'dark', 'system']),
   language: z.enum(['zh', 'en']),
   shortcut: z.string(),
   panelPosition: z.enum(['left', 'right']),
   panelShortcut: z.string(),
+  updatedAt: z.number().default(0),
 });
 
 export type RemoteSettings = z.infer<typeof RemoteSettingsSchema>;
@@ -187,11 +189,17 @@ export const RemoteTabGroupRuleSchema = z.object({
 
 export const RemoteTabGroupAutoGroupSettingsSchema = z.object({
   aiAutoGroupEnabled: z.boolean(),
+  aiAutoGroupInstructions: z.string().default(""),
+  updatedAt: z.number().default(0),
 });
 
 export const RemoteTabGroupConfigFileSchema = z.object({
   rules: z.array(RemoteTabGroupRuleSchema),
-  autoGroupSettings: RemoteTabGroupAutoGroupSettingsSchema,
+  autoGroupSettings: RemoteTabGroupAutoGroupSettingsSchema.default({
+    aiAutoGroupEnabled: false,
+    aiAutoGroupInstructions: "",
+    updatedAt: 0,
+  }),
 });
 
 export type RemoteTabGroupRule = z.infer<typeof RemoteTabGroupRuleSchema>;

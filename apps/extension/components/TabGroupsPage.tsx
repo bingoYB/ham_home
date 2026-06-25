@@ -8,7 +8,9 @@ import {
   CardHeader,
   CardTitle,
   Dialog,
+  Label,
   Switch,
+  Textarea,
 } from "@hamhome/ui";
 import { useTranslation } from "react-i18next";
 import { useTabGroupRules } from "@/hooks/useTabGroupRules";
@@ -20,6 +22,7 @@ export function TabGroupsPage() {
   const { t } = useTranslation("bookmark");
   const state = useTabGroupRules();
   const [ruleDialogOpen, setRuleDialogOpen] = useState(false);
+  const aiInstructionsId = "ai-tab-group-instructions";
 
   const openCreateDialog = () => {
     state.startCreateRule();
@@ -94,6 +97,24 @@ export function TabGroupsPage() {
             aria-label={t("tabGroups.aiAutoGroup.title")}
           />
         </CardHeader>
+        <CardContent className="space-y-2 pt-0">
+          <Label htmlFor={aiInstructionsId}>
+            {t("tabGroups.aiAutoGroup.instructionsLabel")}
+          </Label>
+          <Textarea
+            id={aiInstructionsId}
+            value={state.aiAutoGroupInstructions}
+            disabled={!state.supported}
+            maxLength={1000}
+            rows={3}
+            placeholder={t("tabGroups.aiAutoGroup.instructionsPlaceholder")}
+            onChange={(event) => state.updateAiAutoGroupInstructions(event.target.value)}
+            onBlur={state.saveAiAutoGroupInstructions}
+          />
+          <p className="text-xs text-muted-foreground">
+            {t("tabGroups.aiAutoGroup.instructionsHint")}
+          </p>
+        </CardContent>
       </Card>
 
       <Dialog open={ruleDialogOpen} onOpenChange={updateRuleDialogOpen}>

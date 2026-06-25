@@ -38,7 +38,10 @@ describe("TabGroupRuleService AI auto grouping", () => {
     vi.clearAllMocks();
 
     mocks.getRules.mockResolvedValue([]);
-    mocks.getAutoGroupSettings.mockResolvedValue({ aiAutoGroupEnabled: true });
+    mocks.getAutoGroupSettings.mockResolvedValue({
+      aiAutoGroupEnabled: true,
+      aiAutoGroupInstructions: "",
+    });
     mocks.getAIGroupCache.mockResolvedValue(null);
 
     (globalThis as typeof globalThis & { chrome?: unknown }).chrome = {
@@ -134,6 +137,49 @@ describe("TabGroupRuleService AI auto grouping", () => {
     );
   });
 
+  it("reuses a cached AI group for the same domain before asking AI", async () => {
+    mocks.getAIGroupCache.mockResolvedValueOnce({
+      url: "https://docs.example/project-plan",
+      groupTitle: "工作",
+      color: "blue",
+      updatedAt: 1,
+    });
+
+    const { tabGroupRuleService } = await import("../tab-group-rule-service");
+
+    const grouped = await tabGroupRuleService.autoGroupTab(
+      12,
+      "https://docs.example/release-notes",
+      1,
+      "发布说明",
+      {
+        allowAI: true,
+        description: "同一产品文档站点下的发布说明。",
+      },
+    );
+
+    const chromeMock = (globalThis as typeof globalThis & {
+      chrome: {
+        tabs: { group: ReturnType<typeof vi.fn> };
+        tabGroups: { update: ReturnType<typeof vi.fn> };
+      };
+    }).chrome;
+
+    expect(grouped).toBe(true);
+    expect(mocks.getAIGroupCache).toHaveBeenCalledWith("domain:docs.example");
+    expect(mocks.runExtensionCommand).not.toHaveBeenCalled();
+    expect(mocks.setAIGroupCache).not.toHaveBeenCalled();
+    expect(chromeMock.tabs.group).toHaveBeenCalledWith({ tabIds: 12, groupId: 7 });
+    expect(chromeMock.tabGroups.update).toHaveBeenCalledWith(
+      7,
+      expect.objectContaining({
+        title: "工作",
+        color: "blue",
+        collapsed: false,
+      }),
+    );
+  });
+
   it("includes page metadata in the AI grouping prompt", async () => {
     mocks.runExtensionCommand.mockResolvedValue({
       output: {
@@ -181,6 +227,46 @@ describe("TabGroupRuleService AI auto grouping", () => {
     expect(outputSchema.properties).not.toHaveProperty("reuseExistingGroup");
   });
 
+  it("includes custom grouping requirements in the AI prompt and cache key", async () => {
+    const customInstructions = "优先按项目分组；娱乐网站单独分组";
+    mocks.getAutoGroupSettings.mockResolvedValue({
+      aiAutoGroupEnabled: true,
+      aiAutoGroupInstructions: customInstructions,
+    });
+    mocks.runExtensionCommand.mockResolvedValue({
+      output: {
+        groupTitle: "项目",
+      },
+    });
+
+    const { tabGroupRuleService } = await import("../tab-group-rule-service");
+
+    await tabGroupRuleService.autoGroupTab(
+      12,
+      "https://docs.example/project-plan#intro",
+      1,
+      "项目计划",
+      {
+        allowAI: true,
+        description: "项目规划和协作文档。",
+      },
+    );
+
+    const prompt = mocks.runExtensionCommand.mock.calls[0]?.[0]?.command.prompt;
+    const cacheKey =
+      `domain:docs.example::instructions=${encodeURIComponent(customInstructions)}`;
+
+    expect(prompt).toContain("自定义分类要求:");
+    expect(prompt).toContain(customInstructions);
+    expect(mocks.getAIGroupCache).toHaveBeenCalledWith(cacheKey);
+    expect(mocks.setAIGroupCache).toHaveBeenCalledWith(
+      cacheKey,
+      expect.objectContaining({
+        groupTitle: "项目",
+      }),
+    );
+  });
+
   it("only asks AI for a group title and chooses new group color locally", async () => {
     const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0.42);
     mocks.runExtensionCommand.mockResolvedValue({
@@ -224,7 +310,7 @@ describe("TabGroupRuleService AI auto grouping", () => {
       }),
     );
     expect(mocks.setAIGroupCache).toHaveBeenCalledWith(
-      "https://cooking.example/recipes/soup",
+      "domain:cooking.example",
       expect.objectContaining({
         groupTitle: "烹饪",
         color: "yellow",
@@ -320,12 +406,12 @@ describe("TabGroupRuleService AI auto grouping", () => {
     );
     expect(mocks.setAIGroupCache).toHaveBeenNthCalledWith(
       1,
-      "https://cooking.example/recipes/soup",
+      "domain:cooking.example",
       expect.objectContaining({ groupTitle: "番茄浓汤菜" }),
     );
     expect(mocks.setAIGroupCache).toHaveBeenNthCalledWith(
       2,
-      "https://ai.example/research",
+      "domain:ai.example",
       expect.objectContaining({ groupTitle: "Machine Learning" }),
     );
 

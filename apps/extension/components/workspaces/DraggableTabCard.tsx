@@ -44,7 +44,7 @@ export function DraggableTabCard({ page }: DraggableTabCardProps) {
       onClick={handleClick}
       title={page.title + "\n" + page.url}
     >
-      <WorkspacePageFavicon favicon={page.favicon} className="h-6 w-6" />
+      <WorkspacePageFavicon favicon={page.favicon} url={page.url} className="h-6 w-6" />
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-medium leading-snug">
           {page.title}

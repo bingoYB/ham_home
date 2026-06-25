@@ -1,5 +1,29 @@
 /**
- * WorkspacePageFavicon - 保持兼容导出，底层使用共享 FaviconIcon
+ * WorkspacePageFavicon - 工作空间页面 favicon 展示
  */
-export { FaviconIcon as WorkspacePageFavicon } from "@hamhome/ui-business/workspace";
-export type { FaviconIconProps as WorkspacePageFaviconProps } from "@hamhome/ui-business/workspace";
+import {
+  FaviconIcon,
+  type FaviconIconProps,
+} from "@hamhome/ui-business/workspace";
+import { getSafeFaviconUrl } from "@/utils/bookmark-utils";
+
+export interface WorkspacePageFaviconProps
+  extends Omit<FaviconIconProps, "favicon"> {
+  favicon?: string;
+  url?: string;
+}
+
+export function WorkspacePageFavicon({
+  favicon,
+  url,
+  ...props
+}: WorkspacePageFaviconProps) {
+  const resolvedFavicon = url ? getSafeFaviconUrl(url, favicon) : favicon;
+
+  return (
+    <FaviconIcon
+      {...props}
+      favicon={resolvedFavicon ?? undefined}
+    />
+  );
+}
