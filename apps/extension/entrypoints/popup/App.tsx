@@ -56,6 +56,7 @@ export function App() {
           <ErrorState error={error} />
         ) : pageContent ? (
           <SavePanel
+            key={`${pageContent.url}:${existingBookmark?.id ?? "new"}`}
             pageContent={pageContent}
             existingBookmark={existingBookmark}
             onSaved={() => {

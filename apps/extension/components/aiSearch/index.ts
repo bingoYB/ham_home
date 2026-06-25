@@ -1,6 +1,3 @@
-export { AIChatPanel } from './AIChatPanel';
-export type { AIChatPanelProps } from './AIChatPanel';
-
 export { AIChatSearchBar } from './AIChatSearchBar';
 export type { AIChatSearchBarProps } from './AIChatSearchBar';
 

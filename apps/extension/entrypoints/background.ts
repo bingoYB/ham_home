@@ -16,7 +16,7 @@ import {
   safeCreateTab,
   getExtensionURL,
 } from "@/utils/browser-api";
-import type { Language } from "@/types";
+import type { Language, TabGroupPageMetadata } from "@/types";
 import { initApiModePersistence } from "@/lib/agent/api-mode-persistence";
 
 // 右键菜单 ID
@@ -26,6 +26,9 @@ const MANAGE_HAMHOME_CONTEXT_MENU_ID = "manage-hamhome";
 
 // 防止并发创建菜单
 let isCreatingContextMenu = false;
+
+// 缓存 tab 的域名，用于检测域名是否发生变化
+const tabDomainCache = new Map<number, string>();
 
 /**
  * SingleFile 后台资源获取（匹配官方 bg/fetch.js 的 fetchResource）
@@ -223,7 +226,7 @@ async function saveCurrentWindowWorkspaceFromBackground() {
 async function autoGroupTabFromRules(
   tabId: number,
   tab: { url?: string; pendingUrl?: string; title?: string; windowId?: number; pinned?: boolean },
-  options?: { allowAI?: boolean },
+  options?: { allowAI?: boolean; isDomainChanged?: boolean; isNewTab?: boolean },
 ) {
   if (tab.pinned) return;
 
@@ -235,32 +238,68 @@ async function autoGroupTabFromRules(
     });
     if (shouldSuppress) return;
 
-    const description = options?.allowAI
-      ? await getTabDescription(tabId)
+    const metadata = options?.allowAI
+      ? await getTabMetadata(tabId)
       : undefined;
+    const description =
+      metadata?.metaDescription ||
+      metadata?.openGraphDescription ||
+      metadata?.twitterDescription;
     await tabGroupRuleService.autoGroupTab(
       tabId,
       tab.url || tab.pendingUrl,
       tab.windowId,
       tab.title,
-      { allowAI: options?.allowAI, description },
+      {
+        allowAI: options?.allowAI,
+        description,
+        metadata,
+        isDomainChanged: options?.isDomainChanged,
+        isNewTab: options?.isNewTab,
+      },
     );
   } catch (error) {
     console.warn("[HamHome Background] 自动 Tab 分组失败:", error);
   }
 }
 
-async function getTabDescription(tabId: number): Promise<string | undefined> {
+async function getTabMetadata(tabId: number): Promise<TabGroupPageMetadata | undefined> {
   try {
     const [result] = await browser.scripting.executeScript({
       target: { tabId },
-      func: () =>
-        document
-          .querySelector('meta[name="description"], meta[property="og:description"]')
-          ?.getAttribute("content")
-          ?.trim() || "",
+      func: () => {
+        const getContent = (...selectors: string[]) =>
+          selectors
+            .map((selector) =>
+              document.querySelector(selector)?.getAttribute("content")?.trim() || "",
+            )
+            .find(Boolean) || "";
+
+        const getHref = (selector: string) =>
+          document.querySelector(selector)?.getAttribute("href")?.trim() || "";
+
+        const headings = Array.from(document.querySelectorAll("h1"))
+          .map((heading) => heading.textContent?.trim().replace(/\s+/g, " ") || "")
+          .filter(Boolean)
+          .slice(0, 3);
+
+        return {
+          pageTitle: document.title?.trim() || "",
+          metaDescription: getContent('meta[name="description"]'),
+          keywords: getContent('meta[name="keywords"]'),
+          openGraphTitle: getContent('meta[property="og:title"]'),
+          openGraphDescription: getContent('meta[property="og:description"]'),
+          openGraphSiteName: getContent('meta[property="og:site_name"]'),
+          openGraphType: getContent('meta[property="og:type"]'),
+          twitterTitle: getContent('meta[name="twitter:title"]'),
+          twitterDescription: getContent('meta[name="twitter:description"]'),
+          canonicalUrl: getHref('link[rel="canonical"]'),
+          language: document.documentElement.lang?.trim() || "",
+          headings,
+        };
+      },
     });
-    return typeof result?.result === "string" ? result.result : undefined;
+    return result?.result ?? undefined;
   } catch {
     return undefined;
   }
@@ -274,6 +313,8 @@ function escapeXml(unsafe: string) {
     .replace(/"/g, "&quot;")
     .replace(/'/g, "&apos;");
 }
+
+const newlyCreatedTabs = new Set<number>();
 
 export default defineBackground(() => {
   console.log("[HamHome Background] Service Worker 启动");
@@ -331,19 +372,47 @@ export default defineBackground(() => {
 
   browser.tabs.onCreated.addListener((tab) => {
     if (tab.id != null) {
+      newlyCreatedTabs.add(tab.id);
+      if (tab.url || tab.pendingUrl) {
+        try {
+          tabDomainCache.set(tab.id, new URL((tab.url || tab.pendingUrl)!).hostname);
+        } catch {}
+      }
       void autoGroupTabFromRules(tab.id, tab, { allowAI: false });
     }
   });
 
   browser.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    let isDomainChanged = false;
+    const currentUrl = changeInfo.url || tab.url;
+    if (currentUrl) {
+      try {
+        const currentDomain = new URL(currentUrl).hostname;
+        const previousDomain = tabDomainCache.get(tabId);
+        if (previousDomain && previousDomain !== currentDomain) {
+          isDomainChanged = true;
+        }
+        tabDomainCache.set(tabId, currentDomain);
+      } catch {}
+    }
+
     if (changeInfo.status === "complete" || changeInfo.url) {
       void autoGroupTabFromRules(tabId, {
         ...tab,
-        url: changeInfo.url || tab.url,
+        url: currentUrl,
       }, {
         allowAI: changeInfo.status === "complete",
+        isDomainChanged,
+        isNewTab: newlyCreatedTabs.has(tabId),
       });
+      if (changeInfo.status === "complete") {
+        newlyCreatedTabs.delete(tabId);
+      }
     }
+  });
+
+  browser.tabs.onRemoved.addListener((tabId) => {
+    tabDomainCache.delete(tabId);
   });
 
   // Service Worker 每次启动时创建右键菜单（确保菜单始终存在）

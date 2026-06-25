@@ -21,11 +21,13 @@ import {
   translationService,
 } from "@/lib/agent";
 import { getExtensionURL, type ShortcutCommand } from "@/utils/browser-api";
-import { chatSearchService, type ChatSearchTurnResult } from "@/lib/agent/services/chat-search-service";
+import {
+  globalAgentService,
+  type GlobalAgentTurnResult,
+} from "@/lib/agent/services/global-agent-service";
 import type {
   AnalysisResult,
   BookmarkEmbedding,
-  ConversationalSearchSession,
   ConversationalSearchTurnInput,
   LocalCategory,
   PageContent,
@@ -218,7 +220,12 @@ class BackgroundServiceImpl implements IBackgroundService {
   }
 
   async openOptionsPage(view: string = "settings"): Promise<void> {
-    await browser.tabs.create({ url: getExtensionURL(`app.html#${view}`) });
+    try {
+      const url = browser.runtime.getURL("/app.html") + `#${view}`;
+      await browser.tabs.create({ url });
+    } catch (error) {
+      console.error("[BackgroundService] openOptionsPage error:", error);
+    }
   }
 
   async openTab(url: string): Promise<void> {
@@ -419,11 +426,31 @@ class BackgroundServiceImpl implements IBackgroundService {
     }
   }
 
-  async chatSearchRunTurn(
+  async globalAgentRunTurn(
     input: ConversationalSearchTurnInput,
-    state: ConversationalSearchSession,
-  ): Promise<ChatSearchTurnResult> {
-    return chatSearchService.runTurn(input, state);
+    sessionId?: string,
+  ): Promise<GlobalAgentTurnResult> {
+    return globalAgentService.runTurn(input, sessionId);
+  }
+
+  async globalAgentListSessions() {
+    return globalAgentService.listSessions();
+  }
+
+  async globalAgentCreateSession(title?: string) {
+    return globalAgentService.createSession(title);
+  }
+
+  async globalAgentGetSession(sessionId?: string) {
+    return globalAgentService.getSession(sessionId);
+  }
+
+  async globalAgentClearSession(sessionId: string) {
+    return globalAgentService.clearSession(sessionId);
+  }
+
+  async globalAgentDeleteSession(sessionId: string) {
+    return globalAgentService.deleteSession(sessionId);
   }
 
   async analyzeBookmark(options: {

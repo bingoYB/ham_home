@@ -1,5 +1,6 @@
 import { nanoid } from "nanoid";
 import { browser } from "wxt/browser";
+import { getFavicon } from "@hamhome/utils";
 import { workspaceRestoreSuppressionStorage } from "@/lib/storage/workspace-restore-suppression-storage";
 import { workspaceStorage } from "@/lib/storage/workspace-storage";
 import type {
@@ -198,7 +199,7 @@ class WorkspaceService {
         title: tab.title || tab.url || "Untitled",
         url: tab.url!,
         domain: getDomain(tab.url!),
-        favicon: tab.favIconUrl,
+        favicon: getFavicon(tab.url!),
         pinned: tab.pinned,
         windowId: tab.windowId,
         tabId: tab.id,

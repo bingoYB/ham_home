@@ -12,6 +12,11 @@ import { fileURLToPath } from 'url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const COUNT = parseInt(process.argv[2] || '10000', 10);
 const FORMAT = process.argv[3] || 'html';
+const FAVICON_API_URL = 'https://cn.cravatar.com/favicon/api/index.php';
+
+function getFaviconUrl(domain) {
+  return `${FAVICON_API_URL}?url=${encodeURIComponent(domain)}`;
+}
 
 // 模拟数据池
 const domains = [
@@ -218,7 +223,7 @@ function generateJSON() {
       categoryId: cat.id,
       tags: [randomPick(['前端', '后端', '数据库', 'DevOps', 'AI', '设计', '工具', '学习', '开源', '资讯']),
              randomPick(['收藏', '待读', '精华', '入门', '进阶', '实战', '面试', '分享'])],
-      favicon: `https://www.google.com/s2/favicons?domain=${randomPick(domains)}&sz=32`,
+      favicon: getFaviconUrl(randomPick(domains)),
       hasSnapshot: false,
       createdAt: now,
       updatedAt: now,

@@ -11,6 +11,8 @@ const MAX_AI_CACHE_ENTRIES = 500;
 
 const DEFAULT_AUTO_GROUP_SETTINGS: TabGroupAutoGroupSettings = {
   aiAutoGroupEnabled: false,
+  aiAutoGroupInstructions: "",
+  updatedAt: 0,
 };
 
 const tabGroupRulesItem = storage.defineItem<TabGroupRule[]>(
@@ -36,6 +38,12 @@ const tabGroupAIGroupCacheItem = storage.defineItem<Record<string, TabGroupAICac
 
 function sortRules(rules: TabGroupRule[]): TabGroupRule[] {
   return [...rules].sort((a, b) => a.order - b.order || a.createdAt - b.createdAt);
+}
+
+function normalizeAutoGroupSettings(
+  settings?: Partial<TabGroupAutoGroupSettings> | null,
+): TabGroupAutoGroupSettings {
+  return { ...DEFAULT_AUTO_GROUP_SETTINGS, ...(settings ?? {}) };
 }
 
 class TabGroupRulesStorage {
@@ -85,14 +93,22 @@ class TabGroupRulesStorage {
 
   async getAutoGroupSettings(): Promise<TabGroupAutoGroupSettings> {
     const settings = await tabGroupAutoGroupSettingsItem.getValue();
-    return { ...DEFAULT_AUTO_GROUP_SETTINGS, ...settings };
+    return normalizeAutoGroupSettings(settings);
   }
 
   async setAutoGroupSettings(
     settings: Partial<TabGroupAutoGroupSettings>,
   ): Promise<TabGroupAutoGroupSettings> {
     const current = await this.getAutoGroupSettings();
-    const updated = { ...current, ...settings };
+    const updated = { ...current, ...settings, updatedAt: Date.now() };
+    await tabGroupAutoGroupSettingsItem.setValue(updated);
+    return updated;
+  }
+
+  async importRawAutoGroupSettings(
+    settings: TabGroupAutoGroupSettings,
+  ): Promise<TabGroupAutoGroupSettings> {
+    const updated = normalizeAutoGroupSettings(settings);
     await tabGroupAutoGroupSettingsItem.setValue(updated);
     return updated;
   }
@@ -113,7 +129,7 @@ class TabGroupRulesStorage {
     callback: (settings: TabGroupAutoGroupSettings) => void,
   ): () => void {
     return tabGroupAutoGroupSettingsItem.watch((settings) =>
-      callback({ ...DEFAULT_AUTO_GROUP_SETTINGS, ...(settings ?? {}) }),
+      callback(normalizeAutoGroupSettings(settings)),
     );
   }
 

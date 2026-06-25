@@ -69,7 +69,7 @@ export function WorkspaceCurrentTabsPanel({
         </Button>
       </div>
       <ScrollArea className="min-h-0 flex-1">
-        <div className="space-y-2 p-3">
+        <div className="space-y-2 p-3 pb-24">
           {loading && pages.length === 0 ? (
             <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
               {labels.currentTabsLoading}

@@ -4,7 +4,7 @@
  * 
  * 注意：此 Hook 可独立使用，不依赖 BookmarkContext
  */
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { configStorage } from '@/lib/storage';
 import type { Language } from '@/types';
@@ -45,6 +45,12 @@ export function useLanguage() {
   const { i18n } = useTranslation();
   const [language, setLanguage] = useState<Language>('zh');
   const [isLoading, setIsLoading] = useState(false);
+  const languageRef = useRef<Language>('zh');
+
+  const applyLanguage = useCallback((lng: Language) => {
+    languageRef.current = lng;
+    setLanguage(lng);
+  }, []);
 
   // 从多个来源确定当前语言，优先级：WXT Storage > localStorage > i18n.language > 'zh'
   const loadCurrentLanguage = useCallback(async (): Promise<Language> => {
@@ -87,19 +93,19 @@ export function useLanguage() {
       localStorage.setItem(I18N_STORAGE_KEY, currentLng);
       
       // 更新本地状态
-      setLanguage(currentLng);
+      applyLanguage(currentLng);
     };
     
     initLanguage();
-  }, [i18n, loadCurrentLanguage]);
+  }, [i18n, loadCurrentLanguage, applyLanguage]);
 
   // 监听 storage 变化（使用 WXT Storage watch）
   useEffect(() => {
     const unwatch = configStorage.watchSettings((settings) => {
       if (settings?.language) {
         const newLng = settings.language as Language;
-        if (['en', 'zh'].includes(newLng) && newLng !== language) {
-          setLanguage(newLng);
+        if (['en', 'zh'].includes(newLng) && newLng !== languageRef.current) {
+          applyLanguage(newLng);
           safeChangeLanguage(i18n, newLng);
           localStorage.setItem(I18N_STORAGE_KEY, newLng);
         }
@@ -107,7 +113,7 @@ export function useLanguage() {
     });
     
     return unwatch;
-  }, [language, i18n]);
+  }, [i18n, applyLanguage]);
 
   // 切换语言
   const switchLanguage = useCallback(async (lng: Language) => {
@@ -115,7 +121,7 @@ export function useLanguage() {
       setIsLoading(true);
       
       // 1. 更新本地状态
-      setLanguage(lng);
+      applyLanguage(lng);
       
       // 2. 更新 i18n
       await safeChangeLanguage(i18n, lng);
@@ -134,12 +140,12 @@ export function useLanguage() {
       console.error('Failed to switch language:', error);
       // 恢复之前的语言
       const fallbackLng = await loadCurrentLanguage();
-      setLanguage(fallbackLng);
+      applyLanguage(fallbackLng);
       await safeChangeLanguage(i18n, fallbackLng);
     } finally {
       setIsLoading(false);
     }
-  }, [i18n, loadCurrentLanguage]);
+  }, [i18n, loadCurrentLanguage, applyLanguage]);
 
   return {
     language,

@@ -6,6 +6,7 @@ import {
   DialogTitle,
 } from "@hamhome/ui";
 import { SavePanel } from "@/components/SavePanel";
+import { getSafeFaviconUrl } from "@/utils/bookmark-utils";
 import type { WorkspaceTabPage, PageContent } from "@/types";
 
 interface WorkspacePageBookmarkDialogProps {
@@ -28,7 +29,7 @@ export function WorkspacePageBookmarkDialog({
     htmlContent: "",
     textContent: "",
     excerpt: "",
-    favicon: page.favicon || "",
+    favicon: getSafeFaviconUrl(page.url, page.favicon) || "",
   };
 
   return (

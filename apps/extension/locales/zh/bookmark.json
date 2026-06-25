@@ -320,7 +320,10 @@
     "unsupported": "当前浏览器不支持 chrome.tabGroups API，规则可以保存，但不会自动执行。",
     "aiAutoGroup": {
       "title": "AI 自动分组",
-      "description": "开启后，新 Tab 会先匹配规则；未命中时将网址、标题和页面描述发送给 AI，自动加入已有分组或创建新分组。"
+      "description": "开启后，新 Tab 会先匹配规则；未命中时将网址、标题和页面描述发送给 AI，自动加入已有分组或创建新分组。",
+      "instructionsLabel": "自定义分类要求",
+      "instructionsPlaceholder": "例如：优先按项目分组；技术文档统一归到“开发”；购物、视频和社交网站不要合并到工作分组。",
+      "instructionsHint": "这段要求会作为 AI 自动分组的基础判断逻辑，仅在未命中手动规则时生效。"
     },
     "list": {
       "loading": "正在加载规则...",

@@ -320,7 +320,10 @@
     "unsupported": "This browser does not support the chrome.tabGroups API. Rules can be saved but will not run automatically.",
     "aiAutoGroup": {
       "title": "AI Auto Grouping",
-      "description": "When enabled, new tabs match rules first. If none match, the URL, title, and page description are sent to AI to join an existing group or create a new one."
+      "description": "When enabled, new tabs match rules first. If none match, the URL, title, and page description are sent to AI to join an existing group or create a new one.",
+      "instructionsLabel": "Custom grouping requirements",
+      "instructionsPlaceholder": "Example: prioritize project-based groups; put technical docs in Development; do not merge shopping, video, or social sites into work groups.",
+      "instructionsHint": "These requirements become the base AI grouping logic and only apply when no manual rule matches."
     },
     "list": {
       "loading": "Loading rules...",

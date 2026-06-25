@@ -22,6 +22,7 @@ import { EmbeddingSection } from "./EmbeddingSection";
 import type { EmbeddingConfig, AIProvider } from "@/types";
 import type { VectorStoreStats } from "@/lib/storage/vector-store";
 import type { QueueProgress } from "@/lib/embedding/embedding-queue";
+import { getDefaultBaseUrl, getDefaultEmbeddingModel } from "@/lib/agent/provider-config";
 
 interface EmbeddingConfigProps {
   embeddingConfig: EmbeddingConfig;
@@ -105,7 +106,14 @@ export function EmbeddingConfigCard({
             <Label>{t("settings:settings.ai.provider")}</Label>
             <Select
               value={embeddingConfig.provider}
-              onValueChange={(value) => updateEmbeddingConfig({ provider: value as AIProvider })}
+              onValueChange={(value) => {
+                const provider = value as AIProvider;
+                const defaultBaseUrl = getDefaultBaseUrl(provider);
+                const defaultModel = getDefaultEmbeddingModel(provider);
+                setLocalEmbeddingBaseUrl(defaultBaseUrl);
+                setLocalEmbeddingModel(defaultModel);
+                updateEmbeddingConfig({ provider, baseUrl: defaultBaseUrl, model: defaultModel });
+              }}
             >
               <SelectTrigger>
                 <SelectValue />
@@ -143,7 +151,7 @@ export function EmbeddingConfigCard({
                 value={localEmbeddingBaseUrl}
                 onChange={(e) => setLocalEmbeddingBaseUrl(e.target.value)}
                 onBlur={(e) => updateEmbeddingConfig({ baseUrl: e.target.value })}
-                placeholder={embeddingConfig.provider === "ollama" ? "http://localhost:11434" : "https://api.openai.com/v1"}
+                placeholder={getDefaultBaseUrl(embeddingConfig.provider) || "https://api.openai.com/v1"}
               />
             </div>
           </div>
@@ -154,7 +162,7 @@ export function EmbeddingConfigCard({
               value={localEmbeddingModel}
               onChange={(e) => setLocalEmbeddingModel(e.target.value)}
               onBlur={(e) => updateEmbeddingConfig({ model: e.target.value })}
-              placeholder={embeddingConfig.provider === "ollama" ? "nomic-embed-text" : "text-embedding-3-small"}
+              placeholder={getDefaultEmbeddingModel(embeddingConfig.provider) || "text-embedding-3-small"}
             />
           </div>
 

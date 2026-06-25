@@ -1,6 +1,7 @@
 /**
  * 书签相关工具函数
  */
+import { getFavicon } from '@hamhome/utils';
 import type { LocalCategory } from '@/types';
 
 /**
@@ -57,43 +58,12 @@ export const CATEGORY_COLOR = 'bg-emerald-500/15 text-emerald-600 border-emerald
 
 /**
  * 获取安全的 favicon URL，避免加载失败导致前端控制台出现 404/网络错误。
- * 在 Chromium 扩展中，可以利用 _favicon API 自动获取并由浏览器处理加载失败（回退为默认图标）。
+ * 除内嵌图片外，统一使用 Cravatar favicon API，避免浏览器内部图标代理地址在不同上下文中失效。
  */
-export async function getSafeFaviconUrl(url: string, fallbackFavicon?: string | null): Promise<string | null> {
-  // 如果是 base64 数据，直接返回，绝对不会导致网络报错
+export function getSafeFaviconUrl(url: string, fallbackFavicon?: string | null): string | null {
   if (fallbackFavicon && fallbackFavicon.startsWith('data:image')) {
     return fallbackFavicon;
   }
 
-  // content ui 里跳过 _favicon API
-  const isContentUI = typeof window !== 'undefined' && !window.location.protocol.startsWith('chrome-extension');
-
-  // 检查是否在支持 _favicon API 的扩展环境中运行
-  if (!isContentUI && typeof chrome !== 'undefined' && chrome.runtime?.id) {
-    try {
-      // Firefox 不支持 Chrome 的这个内部 API
-      const isFirefox = typeof navigator !== 'undefined' && navigator.userAgent.includes('Firefox');
-      if (!isFirefox) {
-        const faviconUrl = new URL(chrome.runtime.getURL('/_favicon/'));
-        faviconUrl.searchParams.set('pageUrl', url);
-        faviconUrl.searchParams.set('size', '32');
-        
-        const targetUrl = faviconUrl.toString();
-        
-        // _favicon API 之后增加一步： fetch 下url , 查看是否能正常访问，不行再返回 fallbackFavicon
-        try {
-          const res = await fetch(targetUrl);
-          if (res.ok) {
-            return targetUrl;
-          }
-        } catch (err) {
-          // fetch 失败（例如网络错误），忽略并走后续 fallback
-        }
-      }
-    } catch {
-      // 忽略可能的解析错误
-    }
-  }
-
-  return fallbackFavicon || null;
+  return getFavicon(url) || null;
 }

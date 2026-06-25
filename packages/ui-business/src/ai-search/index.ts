@@ -19,6 +19,7 @@ export {
 } from "./ai-search-utils";
 export type {
   AIChatLabels,
+  AIChatSession,
   AISearchStatus,
   ChatMessage,
   Source,

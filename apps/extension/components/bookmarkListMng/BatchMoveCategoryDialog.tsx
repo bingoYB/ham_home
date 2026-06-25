@@ -1,7 +1,7 @@
 /**
  * 批量迁移分类弹窗组件
  */
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FolderOpen, Loader2 } from 'lucide-react';
 import {
@@ -35,19 +35,16 @@ export function BatchMoveCategoryDialog({
   const [categoryId, setCategoryId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // 弹窗关闭时重置状态
-  useEffect(() => {
-    if (!open) {
-      setCategoryId(null);
-      setSaving(false);
-    }
-  }, [open]);
+  const resetDialogState = () => {
+    setCategoryId(null);
+    setSaving(false);
+  };
 
   const handleConfirm = async () => {
     setSaving(true);
     try {
       await onConfirm(categoryId);
-      setCategoryId(null);
+      resetDialogState();
       onOpenChange(false);
     } catch (error) {
       console.error('[BatchMoveCategoryDialog] Failed to move bookmarks:', error);
@@ -56,15 +53,16 @@ export function BatchMoveCategoryDialog({
     }
   };
 
-  const handleClose = () => {
-    if (!saving) {
-      setCategoryId(null);
-      onOpenChange(false);
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (saving && !nextOpen) return;
+    if (!nextOpen) {
+      resetDialogState();
     }
+    onOpenChange(nextOpen);
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>{t('bookmark:bookmark.batch.moveCategory')}</DialogTitle>
@@ -91,7 +89,7 @@ export function BatchMoveCategoryDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose} disabled={saving}>
+          <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={saving}>
             {t('common:common.cancel')}
           </Button>
           <Button onClick={handleConfirm} disabled={saving}>

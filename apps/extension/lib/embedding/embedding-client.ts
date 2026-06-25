@@ -2,12 +2,13 @@
  * Embedding 客户端封装
  * 基于 OpenAI-compatible Embedding 能力
  */
-import { createEmbeddingClient as createAgentEmbeddingClient } from "@hamhome/agent";
+import { createEmbeddingClient as createAgentEmbeddingClient } from "@browser-agent-sdk/agent";
 import {
   EMBEDDING_PROVIDER_DEFAULTS,
   getDefaultEmbeddingModel,
   getEmbeddingModelKey,
   isEmbeddingSupported as checkSupported,
+  resolveAgentProvider,
 } from "@/lib/agent";
 import type { EmbeddingConfig } from '@/types';
 import { configStorage } from '@/lib/storage';
@@ -54,27 +55,36 @@ interface EmbeddingClient {
 }
 
 function createEmbeddingClient(config: EmbeddingClientConfig): EmbeddingClient {
+  const agentProvider = resolveAgentProvider(config.provider);
   const client = createAgentEmbeddingClient({
-    provider: config.provider,
-    apiKey: config.apiKey,
+    provider: agentProvider,
+    apiKey: config.provider === "ollama" ? undefined : config.apiKey,
     baseUrl: config.baseUrl || EMBEDDING_PROVIDER_DEFAULTS[config.provider]?.baseUrl,
     model: config.model || getDefaultEmbeddingModel(config.provider),
-    dimensions: config.dimensions,
+    providerOptions: config.dimensions
+      ? {
+          [agentProvider]: {
+            dimensions: config.dimensions,
+          },
+        }
+      : undefined,
   });
 
   return {
     async embed(text: string) {
-      const result = await client.embed(text);
-      return { embedding: result.embedding };
+      return { embedding: await client.embed(text) };
     },
 
     async embedMany(texts: string[]) {
-      const result = await client.embedMany(texts);
-      return { embeddings: result.embeddings };
+      return { embeddings: await client.embedMany(texts) };
     },
 
     async testConnection() {
-      return client.testConnection();
+      const result = await client.testConnection();
+      return {
+        success: result.success,
+        error: result.error || result.message,
+      };
     },
   };
 }

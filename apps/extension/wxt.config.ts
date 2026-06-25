@@ -49,7 +49,7 @@ export default defineConfig({
     // 设置扩展的默认语言区域为简体中文
     default_locale: "zh_CN",
     // 扩展的版本号
-    version: "1.2.0",
+    version: "1.3.2",
 
     // 声明扩展所需要的浏览器 API 权限
     // 下面的注释同时对应 Chrome Web Store 提交时可填写的权限用途说明
@@ -66,7 +66,6 @@ export default defineConfig({
       "contextMenus", // 在网页右键菜单中提供“收藏到 HamHome”入口，方便用户快速保存当前页面或链接
       "bookmarks", // 读取浏览器原生书签树，用于导入用户已有书签到 HamHome
       "alarms", // 创建后台定时任务，定期执行 WebDAV 同步，并在本地书签变更后延迟触发同步
-      "favicon", // 使用 Chromium 的 _favicon 能力为书签获取站点图标，并在失败时安全回退,
     ],
 
     // 声明需要在页面上下文中可访问的资源

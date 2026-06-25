@@ -5,7 +5,7 @@
 
 // AI 对话式搜索类型
 export * from "./ai-search";
-import type { Suggestion, SuggestionActionType } from "./ai-search";
+import type { ChatMessage, Suggestion, SuggestionActionType } from "./ai-search";
 
 // ============ 书签相关 ============
 
@@ -101,6 +101,7 @@ export interface AIConfig {
   model?: string;
   temperature?: number;
   maxTokens?: number;
+  apiMode?: "chat" | "responses"; // 请求模式，主要用于 OpenAI 兼容的 provider
   enableTranslation: boolean; // 是否启用翻译
   enableSmartCategory: boolean; // 是否启用智能分类
   enableTagSuggestion: boolean; // 是否启用标签推荐
@@ -160,6 +161,7 @@ export interface LocalSettings {
   shortcut: string; // 快捷键配置
   panelPosition: PanelPosition; // 书签面板位置
   panelShortcut: string; // 面板快捷键
+  updatedAt: number; // 配置更新时间，用于 WebDAV 冲突合并
 }
 
 // ============ 快照相关 ============
@@ -443,6 +445,23 @@ export interface TabGroupRuleMatchResult {
 
 export interface TabGroupAutoGroupSettings {
   aiAutoGroupEnabled: boolean;
+  aiAutoGroupInstructions: string;
+  updatedAt: number;
+}
+
+export interface TabGroupPageMetadata {
+  pageTitle?: string;
+  metaDescription?: string;
+  keywords?: string;
+  openGraphTitle?: string;
+  openGraphDescription?: string;
+  openGraphSiteName?: string;
+  openGraphType?: string;
+  twitterTitle?: string;
+  twitterDescription?: string;
+  canonicalUrl?: string;
+  language?: string;
+  headings?: string[];
 }
 
 export interface TabGroupAICacheEntry {
@@ -758,6 +777,24 @@ export interface ConversationalSearchSession {
 }
 
 /**
+ * 对话式搜索 session 摘要，用于 session 列表与切换。
+ */
+export interface ChatSearchSessionSummary {
+  id: string;
+  title: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/**
+ * 对话式搜索 session 快照，包含可展示消息与结构化检索状态。
+ */
+export interface ChatSearchSessionSnapshot extends ChatSearchSessionSummary {
+  state: ConversationalSearchSession;
+  messages: ChatMessage[];
+}
+
+/**
  * 对话状态（结构化检索状态机）
  */
 export interface ConversationState {
@@ -803,7 +840,7 @@ export interface SearchRequest {
 export interface SearchResultItem {
   /** 书签 ID */
   bookmarkId: string;
-  /** 综合评分 */
+  /** 相关性评分 */
   score: number;
   /** 关键词评分 */
   keywordScore?: number;

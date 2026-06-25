@@ -33,8 +33,27 @@ export function getDomain(url: string): string {
  * 获取网站 favicon URL
  */
 export function getFavicon(url: string): string {
-  const domain = getDomain(url);
-  return `https://www.google.com/s2/favicons?domain=${domain}&sz=32`;
+  const domain = getFaviconDomain(url);
+  if (!domain) return '';
+
+  return `https://cn.cravatar.com/favicon/api/index.php?url=${encodeURIComponent(domain)}`;
+}
+
+function getFaviconDomain(url: string): string {
+  const normalizedUrl = url.trim();
+  if (!normalizedUrl) return '';
+
+  try {
+    return new URL(normalizedUrl).hostname;
+  } catch {
+    // 兼容直接传入域名的场景，例如 juejin.cn
+  }
+
+  try {
+    return new URL(`https://${normalizedUrl}`).hostname;
+  } catch {
+    return normalizedUrl;
+  }
 }
 
 /**
@@ -48,4 +67,3 @@ export function isValidUrl(url: string): boolean {
     return false;
   }
 }
-

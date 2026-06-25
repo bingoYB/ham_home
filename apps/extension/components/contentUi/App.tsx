@@ -141,28 +141,30 @@ export function App() {
     return unwatch;
   }, []);
 
-  // 仅在页面可见且处于活跃状态时响应 content UI 交互
-  useEffect(() => {
-    const updatePageInteractiveState = () => {
-      setIsPageInteractive(getIsPageInteractive());
-    };
-
-    document.addEventListener('visibilitychange', updatePageInteractiveState);
-    window.addEventListener('focus', updatePageInteractiveState);
-    window.addEventListener('blur', updatePageInteractiveState);
-
-    return () => {
-      document.removeEventListener('visibilitychange', updatePageInteractiveState);
-      window.removeEventListener('focus', updatePageInteractiveState);
-      window.removeEventListener('blur', updatePageInteractiveState);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!isPageInteractive) {
+  const updatePageInteractiveState = useCallback(() => {
+    const nextIsPageInteractive = getIsPageInteractive();
+    setIsPageInteractive(nextIsPageInteractive);
+    if (!nextIsPageInteractive) {
       closePanel();
     }
-  }, [isPageInteractive, closePanel]);
+  }, [closePanel]);
+
+  // 仅在页面可见且处于活跃状态时响应 content UI 交互
+  useEffect(() => {
+    const handlePageInteractiveChange = () => {
+      updatePageInteractiveState();
+    };
+
+    document.addEventListener('visibilitychange', handlePageInteractiveChange);
+    window.addEventListener('focus', handlePageInteractiveChange);
+    window.addEventListener('blur', handlePageInteractiveChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handlePageInteractiveChange);
+      window.removeEventListener('focus', handlePageInteractiveChange);
+      window.removeEventListener('blur', handlePageInteractiveChange);
+    };
+  }, [updatePageInteractiveState]);
 
   // 监听来自 background 的消息（如快捷键触发）
   useEffect(() => {

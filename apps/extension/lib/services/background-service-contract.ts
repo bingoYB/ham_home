@@ -5,11 +5,12 @@ import type {
   SemanticSearchOptions,
   SemanticSearchResult,
 } from "@/lib/search/semantic-retriever";
-import type { ChatSearchTurnResult } from "@/lib/agent/services/chat-search-service";
+import type { GlobalAgentTurnResult } from "@/lib/agent/services/global-agent-service";
 import type {
   AnalysisResult,
   BookmarkEmbedding,
-  ConversationalSearchSession,
+  ChatSearchSessionSnapshot,
+  ChatSearchSessionSummary,
   ConversationalSearchTurnInput,
   Language,
   LocalBookmark,
@@ -67,10 +68,15 @@ export interface IBackgroundService {
     coverage: number;
   }>;
   getShortcuts(): Promise<ShortcutCommand[]>;
-  chatSearchRunTurn(
+  globalAgentRunTurn(
     input: ConversationalSearchTurnInput,
-    state: ConversationalSearchSession,
-  ): Promise<ChatSearchTurnResult>;
+    sessionId?: string,
+  ): Promise<GlobalAgentTurnResult>;
+  globalAgentListSessions(): Promise<ChatSearchSessionSummary[]>;
+  globalAgentCreateSession(title?: string): Promise<ChatSearchSessionSnapshot>;
+  globalAgentGetSession(sessionId?: string): Promise<ChatSearchSessionSnapshot>;
+  globalAgentClearSession(sessionId: string): Promise<ChatSearchSessionSnapshot>;
+  globalAgentDeleteSession(sessionId: string): Promise<ChatSearchSessionSummary[]>;
   analyzeBookmark(options: {
     pageContent: PageContent;
     userCategories?: LocalCategory[];

@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "@hamhome/ui";
 import { useTranslation } from "react-i18next";
 import type {
   CreateTabGroupRuleInput,
   TabGroupRule,
+  TabGroupAutoGroupSettings,
   TabGroupRuleColor,
   TabGroupRuleMatchCondition,
   TabGroupRuleMatchType,
@@ -115,8 +116,11 @@ export function useTabGroupRules() {
   const [form, setForm] = useState<TabGroupRuleFormState>(() => createDefaultForm());
   const [editingGroupKey, setEditingGroupKey] = useState<string | null>(null);
   const [aiAutoGroupEnabled, setAiAutoGroupEnabled] = useState(false);
+  const [aiAutoGroupInstructions, setAiAutoGroupInstructions] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const autoGroupSettingsLoadedRef = useRef(false);
+  const lastSavedAiAutoGroupInstructionsRef = useRef("");
 
   const supported = useMemo(
     () => tabGroupRuleService.isTabGroupsSupported(),
@@ -124,16 +128,22 @@ export function useTabGroupRules() {
   );
   const groups = useMemo(() => groupTabGroupRules(rules), [rules]);
 
+  const applyAutoGroupSettings = useCallback((settings: TabGroupAutoGroupSettings) => {
+    setAiAutoGroupEnabled(settings.aiAutoGroupEnabled);
+    setAiAutoGroupInstructions(settings.aiAutoGroupInstructions);
+    lastSavedAiAutoGroupInstructionsRef.current = settings.aiAutoGroupInstructions;
+    autoGroupSettingsLoadedRef.current = true;
+  }, []);
+
   const loadRules = useCallback(async () => {
     setLoading(true);
     try {
       setRules(await tabGroupRulesStorage.getRules());
-      const settings = await tabGroupRulesStorage.getAutoGroupSettings();
-      setAiAutoGroupEnabled(settings.aiAutoGroupEnabled);
+      applyAutoGroupSettings(await tabGroupRulesStorage.getAutoGroupSettings());
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [applyAutoGroupSettings]);
 
   useEffect(() => {
     void loadRules();
@@ -143,10 +153,23 @@ export function useTabGroupRules() {
   }, [loadRules]);
 
   useEffect(() => {
-    return tabGroupRulesStorage.watchAutoGroupSettings((settings) => {
-      setAiAutoGroupEnabled(settings.aiAutoGroupEnabled);
-    });
-  }, []);
+    return tabGroupRulesStorage.watchAutoGroupSettings(applyAutoGroupSettings);
+  }, [applyAutoGroupSettings]);
+
+  useEffect(() => {
+    if (!autoGroupSettingsLoadedRef.current) return;
+
+    if (aiAutoGroupInstructions === lastSavedAiAutoGroupInstructionsRef.current) return;
+
+    const timeoutId = window.setTimeout(() => {
+      lastSavedAiAutoGroupInstructionsRef.current = aiAutoGroupInstructions;
+      void tabGroupRulesStorage.setAutoGroupSettings({
+        aiAutoGroupInstructions,
+      });
+    }, 500);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [aiAutoGroupInstructions]);
 
   const resetForm = useCallback(() => {
     setForm(createDefaultForm());
@@ -264,10 +287,25 @@ export function useTabGroupRules() {
 
   const updateAiAutoGroupEnabled = useCallback(async (enabled: boolean) => {
     setAiAutoGroupEnabled(enabled);
+    lastSavedAiAutoGroupInstructionsRef.current = aiAutoGroupInstructions;
     await tabGroupRulesStorage.setAutoGroupSettings({
       aiAutoGroupEnabled: enabled,
+      aiAutoGroupInstructions,
     });
+  }, [aiAutoGroupInstructions]);
+
+  const updateAiAutoGroupInstructions = useCallback((instructions: string) => {
+    setAiAutoGroupInstructions(instructions);
   }, []);
+
+  const saveAiAutoGroupInstructions = useCallback(async () => {
+    const normalized = aiAutoGroupInstructions.trim();
+    setAiAutoGroupInstructions(normalized);
+    lastSavedAiAutoGroupInstructionsRef.current = normalized;
+    await tabGroupRulesStorage.setAutoGroupSettings({
+      aiAutoGroupInstructions: normalized,
+    });
+  }, [aiAutoGroupInstructions]);
 
   return {
     rules,
@@ -279,6 +317,7 @@ export function useTabGroupRules() {
     saving,
     supported,
     aiAutoGroupEnabled,
+    aiAutoGroupInstructions,
     saveRule,
     resetForm,
     startCreateRule,
@@ -288,5 +327,7 @@ export function useTabGroupRules() {
     deleteRuleGroup,
     toggleRuleGroup,
     updateAiAutoGroupEnabled,
+    updateAiAutoGroupInstructions,
+    saveAiAutoGroupInstructions,
   };
 }

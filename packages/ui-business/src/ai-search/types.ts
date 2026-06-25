@@ -41,9 +41,18 @@ export interface ChatMessage {
   sources?: Source[];
 }
 
+export interface AIChatSession {
+  id: string;
+  title: string;
+  updatedAt?: number;
+}
+
 export interface AIChatLabels {
   aiAnswer: string;
   close: string;
+  newSession: string;
+  deleteSession: string;
+  sessionSelect: string;
   aiPlaceholder: string;
   sources: string;
   retry: string;

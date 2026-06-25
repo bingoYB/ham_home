@@ -37,6 +37,7 @@ const DEFAULT_SETTINGS: LocalSettings = {
   shortcut: 'Ctrl+Shift+E',
   panelPosition: 'left',
   panelShortcut: 'Ctrl+Shift+B',
+  updatedAt: 0,
 };
 
 // 定义存储项（使用 sync 实现跨设备同步）
@@ -56,6 +57,10 @@ const customFiltersItem = storage.defineItem<CustomFilter[]>('sync:customFilters
 const embeddingConfigItem = storage.defineItem<EmbeddingConfig>('sync:embeddingConfig', {
   fallback: DEFAULT_EMBEDDING_CONFIG,
 });
+
+function normalizeSettings(settings?: Partial<LocalSettings> | null): LocalSettings {
+  return { ...DEFAULT_SETTINGS, ...(settings ?? {}) };
+}
 
 class ConfigStorage {
   /**
@@ -80,15 +85,21 @@ class ConfigStorage {
    */
   async getSettings(): Promise<LocalSettings> {
     const settings = await settingsItem.getValue();
-    return { ...DEFAULT_SETTINGS, ...settings };
+    return normalizeSettings(settings);
   }
 
   /**
    * 设置用户设置
    */
   async setSettings(settings: Partial<LocalSettings>): Promise<LocalSettings> {
-    const current = await settingsItem.getValue();
-    const updated = { ...current, ...settings };
+    const current = await this.getSettings();
+    const updated = { ...current, ...settings, updatedAt: Date.now() };
+    await settingsItem.setValue(updated);
+    return updated;
+  }
+
+  async importRawSettings(settings: LocalSettings): Promise<LocalSettings> {
+    const updated = normalizeSettings(settings);
     await settingsItem.setValue(updated);
     return updated;
   }
@@ -105,8 +116,9 @@ class ConfigStorage {
    * 重置用户设置为默认值
    */
   async resetSettings(): Promise<LocalSettings> {
-    await settingsItem.setValue(DEFAULT_SETTINGS);
-    return DEFAULT_SETTINGS;
+    const resetSettings = { ...DEFAULT_SETTINGS, updatedAt: Date.now() };
+    await settingsItem.setValue(resetSettings);
+    return resetSettings;
   }
 
   /**
@@ -196,7 +208,7 @@ class ConfigStorage {
    */
   watchSettings(callback: (settings: LocalSettings) => void): () => void {
     return settingsItem.watch((newValue: LocalSettings | null) => {
-      callback({ ...DEFAULT_SETTINGS, ...(newValue ?? {}) });
+      callback(normalizeSettings(newValue));
     });
   }
 

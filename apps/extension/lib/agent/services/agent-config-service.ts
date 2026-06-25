@@ -98,14 +98,15 @@ class AgentConfigService {
           "You are a connection probe. Reply with exactly 'ok' and nothing else.",
       });
 
-      const result = await agent.step("Reply with exactly 'ok'.", {
-        maxTokens: 20,
-        temperature: 0,
-      });
+      const result = await agent.commands.run<{ prompt: string }, { success: boolean; message?: string }>(
+        "testConnection",
+        { prompt: "Reply with exactly 'ok'." },
+        { temperature: 0, maxIterations: 1 },
+      );
 
       return {
-        success: true,
-        message: result.text.trim() || "连接成功",
+        success: Boolean(result.output.success),
+        message: result.output.message?.trim() || "连接成功",
       };
     } catch (error) {
       return {
@@ -122,13 +123,17 @@ class AgentConfigService {
       baseUrl?: string;
     },
   ): Promise<AvailableModelsResult> {
-    const resolved = await resolveAgentConfig({
-      provider: configOverride?.provider as never,
-      apiKey: configOverride?.apiKey,
-      baseUrl:
-        configOverride?.baseUrl ||
-        getDefaultBaseUrl((configOverride?.provider as never) || "openai"),
-    });
+    const resolved = await resolveAgentConfig(
+      Object.fromEntries(
+        Object.entries({
+          provider: configOverride?.provider,
+          apiKey: configOverride?.apiKey,
+          baseUrl:
+            configOverride?.baseUrl ||
+            getDefaultBaseUrl((configOverride?.provider as never) || "openai"),
+        }).filter(([, value]) => value !== undefined),
+      ) as never,
+    );
 
     const provider = resolved.provider;
     const baseUrl =

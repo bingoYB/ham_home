@@ -1,7 +1,7 @@
 /**
  * 批量打标签弹窗组件
  */
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Tag as TagIcon, Loader2 } from 'lucide-react';
 import {
@@ -34,20 +34,17 @@ export function BatchTagDialog({
   const [tags, setTags] = useState<string[]>([]);
   const [saving, setSaving] = useState(false);
 
-  // 弹窗关闭时重置状态
-  useEffect(() => {
-    if (!open) {
-      setTags([]);
-      setSaving(false);
-    }
-  }, [open]);
+  const resetDialogState = () => {
+    setTags([]);
+    setSaving(false);
+  };
 
   const handleConfirm = async () => {
     if (tags.length === 0) return;
     setSaving(true);
     try {
       await onConfirm(tags);
-      setTags([]);
+      resetDialogState();
       onOpenChange(false);
     } catch (error) {
       console.error('[BatchTagDialog] Failed to add tags:', error);
@@ -56,15 +53,16 @@ export function BatchTagDialog({
     }
   };
 
-  const handleClose = () => {
-    if (!saving) {
-      setTags([]);
-      onOpenChange(false);
+  const handleOpenChange = (nextOpen: boolean) => {
+    if (saving && !nextOpen) return;
+    if (!nextOpen) {
+      resetDialogState();
     }
+    onOpenChange(nextOpen);
   };
 
   return (
-    <Dialog open={open} onOpenChange={handleClose}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
           <DialogTitle>{t('bookmark:bookmark.batch.addTags')}</DialogTitle>
@@ -92,7 +90,7 @@ export function BatchTagDialog({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" onClick={handleClose} disabled={saving}>
+          <Button variant="outline" onClick={() => handleOpenChange(false)} disabled={saving}>
             {t('common:common.cancel')}
           </Button>
           <Button onClick={handleConfirm} disabled={saving || tags.length === 0}>

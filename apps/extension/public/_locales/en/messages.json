@@ -1,10 +1,10 @@
 {
   "extName": {
-    "message": "HamHome - Smart Browser Workspace",
+    "message": "HamHome",
     "description": "Extension name"
   },
   "extDescription": {
-    "message": "Save tabs, auto-group sessions, and organize bookmarks and collections with AI",
+    "message": "Smart Browser Workspace -— Save tabs, auto-group sessions, and organize bookmarks and collections with AI",
     "description": "Extension description"
   },
   "commandSaveBookmark": {

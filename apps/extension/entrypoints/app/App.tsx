@@ -3,6 +3,7 @@
  * 使用 SidebarInset 布局结构
  */
 import { useState, useEffect, useMemo } from "react";
+import { browser } from "wxt/browser";
 import { useTranslation } from "react-i18next";
 import {
   Bookmark,
@@ -64,6 +65,7 @@ import { TabGroupsPage } from "@/components/TabGroupsPage";
 import { PrivacyPage } from "@/components/PrivacyPage";
 import { ImportExportPage } from "@/components/ImportExportPage";
 import { AboutPage } from "@/components/AboutPage";
+import { GlobalAgentLauncher } from "@/components/agent/GlobalAgentLauncher";
 import { APP_GITHUB_REPO_URL } from "@/lib/constants/app-info";
 import { safeCreateTab } from "@/utils/browser-api";
 import logoImage from "@/assets/logo.png";
@@ -134,14 +136,26 @@ function AppContent() {
     syncStatus?.lastSyncTime || undefined,
   );
 
-  // 监听 hash 变化
+  // 监听 hash 变化与后台强制跳转消息
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.slice(1);
       setCurrentView(hash || "all");
     };
     window.addEventListener("hashchange", handleHashChange);
-    return () => window.removeEventListener("hashchange", handleHashChange);
+
+    const messageListener = (message: any) => {
+      if (message && message.type === "FORCE_HASH_NAVIGATION" && message.view) {
+        window.location.hash = message.view;
+        window.dispatchEvent(new HashChangeEvent("hashchange"));
+      }
+    };
+    browser.runtime.onMessage.addListener(messageListener);
+
+    return () => {
+      window.removeEventListener("hashchange", handleHashChange);
+      browser.runtime.onMessage.removeListener(messageListener);
+    };
   }, []);
 
   // 主题处理
@@ -604,10 +618,16 @@ function AppContent() {
         </header>
         <main className="flex-1 min-h-0 overflow-hidden">
           <ScrollArea id="main-content" className="h-full">
-            {renderContent()}
+            {/* 增加全局的底部空白间距 (pb-24)，防止右下角的 Agent 入口遮挡页面内容或滚动条 */}
+            <div className="flex flex-col min-h-full pb-24">
+              <div className="flex-1 flex flex-col">
+                {renderContent()}
+              </div>
+            </div>
           </ScrollArea>
         </main>
       </SidebarInset>
+      <GlobalAgentLauncher />
       <Toaster theme={appSettings.theme} />
     </SidebarProvider>
   );
