@@ -323,7 +323,9 @@
         "fetchPageContentDesc": "Access bookmark URLs to get page content for more accurate AI analysis (slower)",
         "fromBrowser": "Import from Browser",
         "fromBrowserDesc": "Directly read bookmarks from current browser",
-        "browserBookmarkCount": "Total {{count}} bookmarks in browser"
+        "browserBookmarkCount": "Total {{count}} bookmarks in browser",
+        "cancelImport": "Stop Import",
+        "importCancelled": "Import stopped"
       },
       "syncBrowser": {
         "title": "Sync to Browser Bookmarks",
