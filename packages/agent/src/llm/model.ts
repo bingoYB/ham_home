@@ -9,6 +9,7 @@ import {
   type ToolSet,
 } from "ai";
 import { resolveLanguageModel } from "./providers";
+import { validateStrictJsonSchema } from "../utils/schema";
 import type {
   AgentMessage,
   AiSdkProviderConfig,
@@ -149,6 +150,8 @@ function toAiSdkOutput(outputSchema: JsonSchema | undefined) {
   if (!outputSchema) {
     return undefined;
   }
+
+  validateStrictJsonSchema(outputSchema);
 
   return Output.object({
     schema: jsonSchema(outputSchema),

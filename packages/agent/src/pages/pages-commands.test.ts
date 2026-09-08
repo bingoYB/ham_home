@@ -128,6 +128,10 @@ describe("PageToolManager and CommandRegistry", () => {
     expect(command).toBeDefined();
     expect(command?.name).toBe("testConnection");
     expect(command?.description).toBe("Test the connectivity of the model");
+    expect(command?.outputSchema).toMatchObject({
+      required: ["success", "message"],
+      additionalProperties: false,
+    });
 
     const result = await agent.commands.run("testConnection", {});
     expect(result.output).toEqual({

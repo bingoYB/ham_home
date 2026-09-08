@@ -29,7 +29,7 @@ const TAB_GROUP_COLORS = [
 const COMMON_SECOND_LEVEL_DOMAIN_LABELS = new Set(["ac", "co", "com", "edu", "gov", "net", "org"]);
 
 const aiTabGroupSuggestionSchema = z.object({
-  groupTitle: z.string().nullable().optional(),
+  groupTitle: z.string(),
 });
 
 type AITabGroupSuggestion = z.infer<typeof aiTabGroupSuggestionSchema>;
@@ -41,8 +41,9 @@ type AITabGroupDecision = {
 const aiTabGroupSuggestionOutputSchema: JsonSchema = {
   type: "object",
   properties: {
-    groupTitle: {},
+    groupTitle: { type: "string" },
   },
+  required: ["groupTitle"],
   additionalProperties: false,
 };
 

@@ -220,7 +220,12 @@ describe("AiSdkModelClient", () => {
 
     const request = createRequest([]);
     request.systemPrompt = "You are a helpful assistant.";
-    request.outputSchema = { type: "object", properties: { success: { type: "boolean" } } };
+    request.outputSchema = {
+      type: "object",
+      properties: { success: { type: "boolean" } },
+      required: ["success"],
+      additionalProperties: false,
+    };
 
     await client.generate(request);
 
@@ -232,6 +237,23 @@ describe("AiSdkModelClient", () => {
       },
     }));
     expect(aiMocks.Output.object).toHaveBeenCalledWith({ schema: request.outputSchema });
+  });
+
+  it("rejects invalid strict output schemas before calling the provider", async () => {
+    const client = new AiSdkModelClient({ model: {} as any });
+    const request = createRequest([]);
+    request.outputSchema = {
+      type: "object",
+      properties: {
+        success: { type: "boolean" },
+        message: { type: "string" },
+      },
+      required: ["success"],
+      additionalProperties: false,
+    };
+
+    await expect(client.generate(request)).rejects.toThrow("Missing: message");
+    expect(aiMocks.generateText).not.toHaveBeenCalled();
   });
 
   it("appends tool instructions without failing if schema generation is empty", async () => {
@@ -275,7 +297,12 @@ describe("AiSdkModelClient", () => {
     const emitFn = vi.fn();
     const request = createRequest([]);
     request.emit = emitFn;
-    request.outputSchema = { type: "object" };
+    request.outputSchema = {
+      type: "object",
+      properties: {},
+      required: [],
+      additionalProperties: false,
+    };
 
     const result = await client.generate(request);
 

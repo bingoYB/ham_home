@@ -35,7 +35,11 @@ export {
   defaultSkillMatcher,
   type AgentSkillRuntimeOptions,
 } from "./skills/skills";
-export { parseStructuredOutput, validateJsonSchema } from "./utils/schema";
+export {
+  parseStructuredOutput,
+  validateJsonSchema,
+  validateStrictJsonSchema,
+} from "./utils/schema";
 export { ToolRegistry, type ToolRegisterOptions } from "./tools/tools";
 export { PlanManager, type TaskItem as PlanItem, type PlanManagerOptions } from "./planning/plan";
 export type {

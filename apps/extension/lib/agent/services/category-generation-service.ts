@@ -7,15 +7,15 @@ import { assertAgentConfigured, resolveAgentConfig } from "../factory";
 
 type GeneratedCategoryOutput = {
   name: string;
-  icon?: string | null;
-  children?: GeneratedCategoryOutput[] | null;
+  icon: string | null;
+  children: GeneratedCategoryOutput[] | null;
 };
 
 const generatedCategorySchema: z.ZodType<GeneratedCategoryOutput> = z.lazy(() =>
   z.object({
     name: z.string(),
-    icon: z.string().nullable().optional(),
-    children: z.array(generatedCategorySchema).nullable().optional(),
+    icon: z.string().nullable(),
+    children: z.array(generatedCategorySchema).nullable(),
   }),
 );
 
@@ -25,29 +25,38 @@ const generatedCategoryListSchema = z.object({
 
 type CategoryGenerationOutput = z.infer<typeof generatedCategoryListSchema>;
 
-function createGeneratedCategoryJsonSchema(): Record<string, unknown> {
-  return {
-    type: "object",
-    properties: {
-      name: { type: "string" },
-      icon: {},
-      children: {},
-    },
-    required: ["name"],
-    additionalProperties: false,
-  };
-}
-
 const generatedCategoryListOutputSchema: JsonSchema = {
   type: "object",
   properties: {
     categories: {
       type: "array",
-      items: createGeneratedCategoryJsonSchema(),
+      items: { $ref: "#/$defs/category" },
     },
   },
   required: ["categories"],
   additionalProperties: false,
+  $defs: {
+    category: {
+      type: "object",
+      properties: {
+        name: { type: "string" },
+        icon: {
+          anyOf: [{ type: "string" }, { type: "null" }],
+        },
+        children: {
+          anyOf: [
+            {
+              type: "array",
+              items: { $ref: "#/$defs/category" },
+            },
+            { type: "null" },
+          ],
+        },
+      },
+      required: ["name", "icon", "children"],
+      additionalProperties: false,
+    },
+  },
 };
 
 function normalizeGeneratedCategory(

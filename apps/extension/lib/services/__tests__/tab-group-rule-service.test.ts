@@ -526,7 +526,11 @@ describe("TabGroupRuleService auto grouping", () => {
     expect(prompt).toContain("现有标签组（含成员摘要）:");
     expect(prompt).toContain("- 工作 —");
     expect(prompt).not.toContain("(blue)");
-    expect(outputSchema.properties).toEqual({ groupTitle: {} });
+    expect(outputSchema).toMatchObject({
+      properties: { groupTitle: { type: "string" } },
+      required: ["groupTitle"],
+      additionalProperties: false,
+    });
     expect(chromeMock.tabs.group).toHaveBeenCalledWith({ tabIds: 12 });
     expect(chromeMock.tabGroups.update).toHaveBeenCalledWith(
       100,

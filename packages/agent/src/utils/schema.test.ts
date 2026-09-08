@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { validateJsonSchema, parseStructuredOutput } from "./schema";
+import {
+  parseStructuredOutput,
+  validateJsonSchema,
+  validateStrictJsonSchema,
+} from "./schema";
 import { SchemaValidationError } from "../core/errors";
 
 describe("Schema Validation", () => {
@@ -69,5 +73,71 @@ describe("parseStructuredOutput", () => {
   it("falls back to trimmed text if no brackets match", () => {
     expect(() => parseStructuredOutput('123'))
       .not.toThrow(); // 123 is valid JSON number, but without schema validation it passes parse
+  });
+});
+
+describe("validateStrictJsonSchema", () => {
+  it("accepts required nullable fields and recursive definitions", () => {
+    expect(() => validateStrictJsonSchema({
+      type: "object",
+      properties: {
+        items: {
+          type: "array",
+          items: { $ref: "#/$defs/item" },
+        },
+      },
+      required: ["items"],
+      additionalProperties: false,
+      $defs: {
+        item: {
+          type: "object",
+          properties: {
+            label: { type: "string" },
+            child: {
+              anyOf: [{ $ref: "#/$defs/item" }, { type: "null" }],
+            },
+          },
+          required: ["label", "child"],
+          additionalProperties: false,
+        },
+      },
+    })).not.toThrow();
+  });
+
+  it("rejects object properties omitted from required", () => {
+    expect(() => validateStrictJsonSchema({
+      type: "object",
+      properties: {
+        success: { type: "boolean" },
+        message: { type: "string" },
+      },
+      required: ["success"],
+      additionalProperties: false,
+    })).toThrow("Missing: message");
+  });
+
+  it("rejects objects that allow additional properties", () => {
+    expect(() => validateStrictJsonSchema({
+      type: "object",
+      properties: {},
+      required: [],
+    })).toThrow("additionalProperties must be false");
+  });
+
+  it("validates object schemas inside definitions", () => {
+    expect(() => validateStrictJsonSchema({
+      type: "object",
+      properties: {},
+      required: [],
+      additionalProperties: false,
+      $defs: {
+        invalid: {
+          type: "object",
+          properties: { value: { type: "string" } },
+          required: [],
+          additionalProperties: false,
+        },
+      },
+    })).toThrow("$.$defs.invalid.required");
   });
 });

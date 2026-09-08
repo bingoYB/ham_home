@@ -39,7 +39,7 @@ export class CommandRegistry {
           success: { type: "boolean" },
           message: { type: "string" },
         },
-        required: ["success"],
+        required: ["success", "message"],
         additionalProperties: false,
       },
     });

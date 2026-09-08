@@ -18,6 +18,18 @@ export function validateJsonSchema(schema: JsonSchema | undefined, value: unknow
 }
 
 /**
+ * Ensures a JSON Schema satisfies the object constraints required by strict
+ * structured-output providers such as OpenAI.
+ *
+ * Every object must reject additional properties and list every declared
+ * property in `required`. Optional values should therefore be represented as
+ * nullable fields instead of omitted fields.
+ */
+export function validateStrictJsonSchema(schema: JsonSchema): void {
+  validateStrictSchemaNode(schema, "$", new Set<JsonSchema>());
+}
+
+/**
  * Parses a JSON object from model text and optionally validates it.
  *
  * Example:
@@ -57,6 +69,88 @@ function validateValue(schema: JsonSchema, value: unknown, path: string): void {
   if (schema.type === "array" || schema.items) {
     validateArray(schema, value, path);
   }
+}
+
+function validateStrictSchemaNode(
+  schema: JsonSchema,
+  path: string,
+  visited: Set<JsonSchema>,
+): void {
+  if (visited.has(schema)) {
+    return;
+  }
+  visited.add(schema);
+
+  const properties = schema.properties;
+  if (schema.type === "object" || properties !== undefined) {
+    if (schema.additionalProperties !== false) {
+      throw new SchemaValidationError(
+        `${path}.additionalProperties must be false for strict structured output.`,
+      );
+    }
+
+    if (!Array.isArray(schema.required)) {
+      throw new SchemaValidationError(
+        `${path}.required must be an array containing every property for strict structured output.`,
+      );
+    }
+
+    const propertyNames = Object.keys(properties ?? {});
+    const required = new Set(schema.required);
+    const missing = propertyNames.filter((property) => !required.has(property));
+    if (missing.length > 0) {
+      throw new SchemaValidationError(
+        `${path}.required must include every property for strict structured output. Missing: ${missing.join(", ")}.`,
+      );
+    }
+  }
+
+  for (const [key, childSchema] of Object.entries(properties ?? {})) {
+    validateStrictSchemaNode(childSchema, `${path}.properties.${key}`, visited);
+  }
+
+  if (schema.items) {
+    validateStrictSchemaNode(schema.items, `${path}.items`, visited);
+  }
+
+  const schemaRecord = schema as Record<string, unknown>;
+  for (const keyword of ["anyOf", "oneOf", "allOf"] as const) {
+    const alternatives = schemaRecord[keyword];
+    if (Array.isArray(alternatives)) {
+      alternatives.forEach((alternative, index) => {
+        if (isJsonSchema(alternative)) {
+          validateStrictSchemaNode(
+            alternative,
+            `${path}.${keyword}[${index}]`,
+            visited,
+          );
+        }
+      });
+    }
+  }
+
+  for (const keyword of ["$defs", "definitions"] as const) {
+    const definitions = schemaRecord[keyword];
+    if (isRecord(definitions)) {
+      for (const [name, definition] of Object.entries(definitions)) {
+        if (isJsonSchema(definition)) {
+          validateStrictSchemaNode(
+            definition,
+            `${path}.${keyword}.${name}`,
+            visited,
+          );
+        }
+      }
+    }
+  }
+}
+
+function isJsonSchema(value: unknown): value is JsonSchema {
+  return isRecord(value);
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
 function validateType(type: JsonSchema["type"], value: unknown, path: string): void {

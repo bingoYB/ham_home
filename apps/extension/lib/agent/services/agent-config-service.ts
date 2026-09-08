@@ -98,7 +98,7 @@ class AgentConfigService {
           "You are a connection probe. Reply with exactly 'ok' and nothing else.",
       });
 
-      const result = await agent.commands.run<{ prompt: string }, { success: boolean; message?: string }>(
+      const result = await agent.commands.run<{ prompt: string }, { success: boolean; message: string }>(
         "testConnection",
         { prompt: "Reply with exactly 'ok'." },
         { temperature: 0, maxIterations: 1 },
