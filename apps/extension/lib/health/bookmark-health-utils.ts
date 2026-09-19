@@ -1,3 +1,7 @@
+import {
+  buildDuplicateGroups,
+  type DuplicateGroup,
+} from "@/lib/bookmarks/bookmark-dedup";
 import type {
   BookmarkHealthRecord,
   BookmarkHealthStatus,
@@ -60,24 +64,25 @@ export function classifyHttpStatus(
   return "unsupported";
 }
 
+/**
+ * 体检中心的重复分组
+ *
+ * 比同步更宽松（忽略 hash、参数顺序），命中后由用户确认再清理，
+ * 所以允许把 #section 这类变体也算作重复。
+ */
+export function buildHealthDuplicateGroups(
+  bookmarks: LocalBookmark[],
+): DuplicateGroup<LocalBookmark>[] {
+  return buildDuplicateGroups(bookmarks, normalizeHealthUrl);
+}
+
 export function buildDuplicateIssueMap(
   bookmarks: LocalBookmark[],
 ): Map<string, string[]> {
-  const groups = new Map<string, LocalBookmark[]>();
-  for (const bookmark of bookmarks) {
-    const normalized = normalizeHealthUrl(bookmark.url);
-    if (!normalized) continue;
-    const group = groups.get(normalized) ?? [];
-    group.push(bookmark);
-    groups.set(normalized, group);
-  }
-
   const result = new Map<string, string[]>();
-  for (const group of groups.values()) {
-    if (group.length < 2) continue;
-    const ordered = [...group].sort((a, b) => a.createdAt - b.createdAt);
-    const canonicalId = ordered[0].id;
-    for (const bookmark of ordered) {
+  for (const group of buildHealthDuplicateGroups(bookmarks)) {
+    const canonicalId = group.canonical.id;
+    for (const bookmark of [group.canonical, ...group.duplicates]) {
       result.set(bookmark.id, [`duplicate_url:${canonicalId}`]);
     }
   }

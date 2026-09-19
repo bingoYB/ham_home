@@ -436,6 +436,18 @@
       "duplicates": "重复书签",
       "unchecked": "未检查"
     },
+    "batch": {
+      "deleteSuccess": "已删除 {{count}} 个书签",
+      "deleteFailed": "批量删除失败",
+      "cleanDuplicates": "清理重复项 ({{count}})",
+      "cleanDuplicatesTitle": "清理重复书签",
+      "cleanDuplicatesConfirm": "每组重复书签保留最早收藏的一条，删除其余 {{count}} 条。此操作无法撤销。",
+      "noDuplicates": "没有发现重复书签"
+    },
+    "duplicateRole": {
+      "canonical": "保留",
+      "duplicate": "重复"
+    },
     "status": {
       "unchecked": "未检查",
       "healthy": "正常",

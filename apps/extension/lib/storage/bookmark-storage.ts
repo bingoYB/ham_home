@@ -9,6 +9,7 @@
  * - 分类 (sync:categories) - 跨设备同步（分类数量较少，不易超限）
  */
 import { nanoid } from 'nanoid';
+import { normalizeBookmarkUrl } from '../bookmarks/bookmark-dedup';
 import { bookmarkClipStorage } from './bookmark-clip-storage';
 import { bookmarkHealthStorage } from './bookmark-health-storage';
 import { bookmarkScreenshotStorage } from './bookmark-screenshot-storage';
@@ -620,6 +621,15 @@ class BookmarkStorage {
   // ============ 同步辅助操作 ============
 
   /**
+   * 获取同步所需的全部书签元数据（含软删除墓碑，不含 content）
+   * getBookmarks() 会过滤掉已删除项，同步必须拿到墓碑才能把删除操作传播到其他设备
+   */
+  async getBookmarksForSync(): Promise<LocalBookmark[]> {
+    const metaList: BookmarkMeta[] = await bookmarkMetaItem.getValue();
+    return metaList.map((meta: BookmarkMeta) => ({ ...meta, content: undefined }));
+  }
+
+  /**
    * 按映射表合并重复分类
    * 删除旧分类并将对应书签全量迁移至新分类
    */
@@ -758,28 +768,10 @@ class BookmarkStorage {
   // ============ 工具方法 ============
 
   /**
-   * 规范化 URL（移除 tracking 参数，统一格式）
+   * 规范化 URL（与同步、体检中心共用同一套去重规则）
    */
   private normalizeUrl(url: string): string {
-    try {
-      const parsed = new URL(url);
-      // 移除 tracking 参数
-      const trackingParams = [
-        'utm_source',
-        'utm_medium',
-        'utm_campaign',
-        'utm_term',
-        'utm_content',
-        'ref',
-        'fbclid',
-        'gclid',
-      ];
-      trackingParams.forEach((param) => parsed.searchParams.delete(param));
-      // 移除末尾斜杠
-      return parsed.toString().replace(/\/$/, '');
-    } catch {
-      return url;
-    }
+    return normalizeBookmarkUrl(url);
   }
 }
 

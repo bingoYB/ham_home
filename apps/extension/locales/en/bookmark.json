@@ -436,6 +436,18 @@
       "duplicates": "Duplicates",
       "unchecked": "Unchecked"
     },
+    "batch": {
+      "deleteSuccess": "Deleted {{count}} bookmarks",
+      "deleteFailed": "Batch delete failed",
+      "cleanDuplicates": "Clean duplicates ({{count}})",
+      "cleanDuplicatesTitle": "Clean duplicate bookmarks",
+      "cleanDuplicatesConfirm": "The earliest bookmark in each group is kept and the other {{count}} are deleted. This action cannot be undone.",
+      "noDuplicates": "No duplicate bookmarks found"
+    },
+    "duplicateRole": {
+      "canonical": "Keep",
+      "duplicate": "Duplicate"
+    },
     "status": {
       "unchecked": "Unchecked",
       "healthy": "Healthy",
