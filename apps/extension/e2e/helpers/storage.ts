@@ -327,25 +327,45 @@ export async function getBookmarks(worker: Worker): Promise<LocalBookmark[]> {
   });
 }
 
+/**
+ * 读取截图资源大小；扩展还没写入时返回 0，便于 expect.poll 继续重试
+ *
+ * 注意不能直接 indexedDB.open("hamhome-assets", 1)：库不存在时那样会建出一个
+ * 没有任何 object store 的空库，而扩展自己用的也是版本 1，onupgradeneeded 从此
+ * 不再触发，截图就再也写不进去了。
+ */
 export async function getScreenshotAssetSizes(
   worker: Worker,
   bookmarkId: string,
 ): Promise<{ image: number; thumbnail: number }> {
   return worker.evaluate(async (id) => {
-    const db = await openAssetDB();
-    const [image, thumbnail] = await Promise.all([
-      getBlob("screenshotImages"),
-      getBlob("screenshotThumbnails"),
-    ]);
-    db.close();
-    return { image: image?.size ?? 0, thumbnail: thumbnail?.size ?? 0 };
+    const empty = { image: 0, thumbnail: 0 };
 
-    function openAssetDB(): Promise<IDBDatabase> {
-      return new Promise((resolve, reject) => {
-        const request = indexedDB.open("hamhome-assets", 1);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-      });
+    const databases = await indexedDB.databases();
+    if (!databases.some((info) => info.name === "hamhome-assets")) return empty;
+
+    // 不带版本号打开，拿到的就是扩展建好的那个版本，不会触发升级
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open("hamhome-assets");
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+
+    try {
+      if (
+        !db.objectStoreNames.contains("screenshotImages") ||
+        !db.objectStoreNames.contains("screenshotThumbnails")
+      ) {
+        return empty;
+      }
+
+      const [image, thumbnail] = await Promise.all([
+        getBlob("screenshotImages"),
+        getBlob("screenshotThumbnails"),
+      ]);
+      return { image: image?.size ?? 0, thumbnail: thumbnail?.size ?? 0 };
+    } finally {
+      db.close();
     }
 
     function getBlob(storeName: string): Promise<Blob | null> {
