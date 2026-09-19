@@ -36,6 +36,7 @@
 | `app-shell.spec.ts` | 扩展加载、主导航、hash 路由、空态入口 |
 | `popup-save.spec.ts` | popup 保存、更新、删除当前页书签 |
 | `bookmark-library.spec.ts` | 书签列表、搜索筛选、编辑、删除、批量操作 |
+| `virtual-list-scroll.spec.ts` | 列表视图虚拟滚动：滚动后继续渲染新行，不空白 |
 | `import-export.spec.ts` | JSON/HTML 导入、导出下载、重复数据处理 |
 | `settings-privacy.spec.ts` | 设置页、主题/语言、隐私域名、快照开关、清理数据 |
 | `workspaces.spec.ts` | 工作区列表、搜索、编辑、页面管理、从工作区保存为书签 |
@@ -218,6 +219,24 @@
   - 选中数量显示正确。
   - 批量标签和分类写入所有选中项。
   - 删除后选择态清空，列表数量更新。
+
+### LIB-008 列表视图虚拟滚动
+
+- 前置：预置 60 条书签，条数远多于一屏。
+- 步骤：
+  - 打开 `app.html#all`，切换到列表视图。
+  - 首屏渲染完成后采集虚拟行状态。
+  - 向下滚动 2000px 后采集。
+  - 继续向下滚到底部后采集。
+  - 再滚回顶部采集。
+- 断言：
+  - 首屏只渲染一个窗口的行（渲染行数远小于 60），且列表容器本身可滚动。
+  - 滚动后虚拟窗口跟着前移（最小 `data-index` > 0），视口内仍然有行，不会整屏空白。
+  - 滚到底部能渲染出最后一条（`data-index` 到 59）并可见。
+  - 滚回顶部后窗口回退到 `data-index` 0。
+- 回归点：`useVirtualBookmarkList` 的 `getScrollElement` 必须返回真正滚动的容器
+  （`parentRef.current`）；返回外层不滚动的包裹元素时 `scrollTop` 恒为 0，
+  滚动过第一屏后就不再渲染新行。
 
 ### IMPORT-001 JSON 导入
 

@@ -1017,6 +1017,7 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
           />
         ) : viewMode === "list" ? (
           <div
+            data-testid="bookmark-virtual-list"
             className="relative w-full"
             style={{ height: `${virtualListTotalSize}px` }}
           >
