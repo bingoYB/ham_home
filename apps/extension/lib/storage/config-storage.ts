@@ -141,9 +141,12 @@ class ConfigStorage {
    * 添加自定义筛选器
    */
   async addCustomFilter(filter: CustomFilter): Promise<void> {
+    // getValue() returns the defineItem fallback array by reference when storage is
+    // empty, so mutating it in place (push/index-assign) corrupts any other holder of
+    // that same reference (e.g. a component's state loaded from the same fallback).
+    // Always build a new array before writing back.
     const filters = await customFiltersItem.getValue();
-    filters.push(filter);
-    await customFiltersItem.setValue(filters);
+    await customFiltersItem.setValue([...filters, filter]);
   }
 
   /**
@@ -153,8 +156,10 @@ class ConfigStorage {
     const filters: CustomFilter[] = await customFiltersItem.getValue();
     const index = filters.findIndex((f: CustomFilter) => f.id === filterId);
     if (index !== -1) {
-      filters[index] = { ...filters[index], ...updates, updatedAt: Date.now() };
-      await customFiltersItem.setValue(filters);
+      const nextFilters = filters.map((f, i) =>
+        i === index ? { ...f, ...updates, updatedAt: Date.now() } : f,
+      );
+      await customFiltersItem.setValue(nextFilters);
     }
   }
 
