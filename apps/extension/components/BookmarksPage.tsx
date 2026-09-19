@@ -59,6 +59,7 @@ import { SearchInputArea } from "@/components/aiSearch";
 import { useSnapshot } from "@/hooks/useSnapshot";
 import { FilterDropdownMenu } from "@/components/bookmarkPanel/FilterPopover";
 import { CustomFilterDialog } from "@/components/bookmarkPanel/CustomFilterDialog";
+import { CustomDateRangeDialog } from "@/components/bookmarkPanel/CustomDateRangeDialog";
 import { useBookmarkSearch } from "@/hooks/useBookmarkSearch";
 import { useBookmarkSelection } from "@/hooks/useBookmarkSelection";
 import { useMasonryLayout } from "@/hooks/useMasonryLayout";
@@ -112,6 +113,8 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
     string | undefined
   >();
   const [customFilterDialogOpen, setCustomFilterDialogOpen] = useState(false);
+  const [customDateRangeDialogOpen, setCustomDateRangeDialogOpen] =
+    useState(false);
   const [pinnedBookmarkIds, setPinnedBookmarkIds] = useState<Set<string>>(
     new Set(),
   );
@@ -637,6 +640,7 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
               selectedCustomFilterId={selectedCustomFilterId}
               onSelectCustomFilter={handleSelectCustomFilter}
               onOpenCustomFilterDialog={() => setCustomFilterDialogOpen(true)}
+              onOpenCustomDateRange={() => setCustomDateRangeDialogOpen(true)}
               onClearFilter={handleClearFilter}
             >
               <Button
@@ -1116,6 +1120,17 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
         open={customFilterDialogOpen}
         onOpenChange={setCustomFilterDialogOpen}
         onSave={handleSaveCustomFilter}
+      />
+
+      {/* Custom date range dialog */}
+      <CustomDateRangeDialog
+        open={customDateRangeDialogOpen}
+        onOpenChange={setCustomDateRangeDialogOpen}
+        timeRange={timeRange}
+        onApply={(range) => {
+          setTimeRange(range);
+          handleSelectCustomFilter(null);
+        }}
       />
 
       {/* 快照查看器 */}
