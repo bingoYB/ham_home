@@ -9,6 +9,7 @@ import { Button, cn } from "@hamhome/ui";
 import { TagFilterDropdown } from "./TagFilterDropdown";
 import { FilterDropdownMenu } from "./FilterPopover";
 import { CustomFilterDialog } from "./CustomFilterDialog";
+import { CustomDateRangeDialog } from "./CustomDateRangeDialog";
 import { QuickActions } from "@/components/common/QuickActions";
 import { SyncStatusWidget } from "@/components/common/SyncStatusWidget";
 import { SearchInputArea } from "@/components/aiSearch";
@@ -58,6 +59,8 @@ export function BookmarkHeader({
 }: BookmarkHeaderProps) {
   const { t } = useTranslation("bookmark");
   const [customFilterDialogOpen, setCustomFilterDialogOpen] = useState(false);
+  const [customDateRangeDialogOpen, setCustomDateRangeDialogOpen] =
+    useState(false);
   const { container: portalContainer } = useContentUI();
 
   const showFilteredCount = filteredCount !== bookmarkCount;
@@ -143,6 +146,7 @@ export function BookmarkHeader({
             selectedCustomFilterId={selectedCustomFilterId}
             onSelectCustomFilter={onSelectCustomFilter}
             onOpenCustomFilterDialog={() => setCustomFilterDialogOpen(true)}
+            onOpenCustomDateRange={() => setCustomDateRangeDialogOpen(true)}
             onClearFilter={handleClearFilter}
           >
             <Button
