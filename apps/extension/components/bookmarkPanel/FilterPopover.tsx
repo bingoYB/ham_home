@@ -2,7 +2,7 @@
  * FilterDropdownMenu - 筛选器下拉菜单组件
  * 提供快捷时间筛选和自定义筛选器选择
  */
-import { Calendar, Plus, Check, X } from 'lucide-react';
+import { Calendar, CalendarRange, Plus, Check, X } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import {
   DropdownMenu,
@@ -25,6 +25,7 @@ export interface FilterDropdownMenuProps {
   selectedCustomFilterId?: string;
   onSelectCustomFilter?: (filterId: string | null) => void;
   onOpenCustomFilterDialog: () => void;
+  onOpenCustomDateRange: () => void;
   onClearFilter?: () => void;
   children: React.ReactNode;
 }
@@ -36,6 +37,7 @@ export function FilterDropdownMenu({
   selectedCustomFilterId,
   onSelectCustomFilter,
   onOpenCustomFilterDialog,
+  onOpenCustomDateRange,
   onClearFilter,
   children,
 }: FilterDropdownMenuProps) {
@@ -94,6 +96,13 @@ export function FilterDropdownMenu({
             </DropdownMenuItem>
           );
         })}
+        <DropdownMenuItem onClick={onOpenCustomDateRange} className="gap-2">
+          <CalendarRange className="h-4 w-4" />
+          <span className="flex-1">{t('bookmark:contentPanel.customDateRange')}</span>
+          {timeRange.type === 'custom' && !selectedCustomFilterId && (
+            <Check className="h-4 w-4" />
+          )}
+        </DropdownMenuItem>
 
         {/* 自定义筛选器 */}
         {customFilters.length > 0 && (

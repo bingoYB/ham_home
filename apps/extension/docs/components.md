@@ -779,6 +779,7 @@ Tab 分组规则列表组件，按规则名称、目标分组、颜色和折叠�
 - 快捷操作区域使用共享的 `QuickActions` 组件
 - 包含主题切换、语言切换和"更多"下拉菜单
 - app 页面全局 AI 入口使用右下角 `GlobalAgentLauncher`
+- 筛选图标下拉（`FilterDropdownMenu`）内置"自定义时间范围"入口，点击后打开内部维护的 `CustomDateRangeDialog` 弹窗
 
 ---
 
@@ -924,25 +925,66 @@ const { container: portalContainer } = useContentUI();
 
 ---
 
-### TimeFilterPopover
+### FilterDropdownMenu
 
-时间范围筛选弹窗组件，支持预设时间范围和自定义范围。
+筛选器下拉菜单组件（`FilterPopover.tsx`），提供快捷时间筛选、自定义时间范围入口和自定义筛选器选择，是 `BookmarksPage` 和 `BookmarkHeader` 筛选图标的共用下拉内容。
 
-| Prop              | Type                         | Required | Default | Description  |
-| ----------------- | ---------------------------- | -------- | ------- | ------------ |
-| open              | `boolean`                    | ✓        | -       | 弹窗是否打开 |
-| onOpenChange      | `(open: boolean) => void`    | ✓        | -       | 打开状态变更 |
-| timeRange         | `TimeRange`                  | ✓        | -       | 当前时间范围 |
-| onTimeRangeChange | `(range: TimeRange) => void` | ✓        | -       | 时间范围变更 |
+| Prop                    | Type                                  | Required | Default | Description                        |
+| ----------------------- | -------------------------------------- | -------- | ------- | ----------------------------------- |
+| timeRange               | `TimeRange`                            | ✓        | -       | 当前时间范围                        |
+| onTimeRangeChange       | `(range: TimeRange) => void`           | ✓        | -       | 时间范围变更回调                    |
+| customFilters           | `CustomFilter[]`                       | -        | `[]`    | 自定义筛选器列表                    |
+| selectedCustomFilterId  | `string`                               | -        | -       | 选中的自定义筛选器 ID               |
+| onSelectCustomFilter    | `(filterId: string \| null) => void`   | -        | -       | 选择/取消选择自定义筛选器           |
+| onOpenCustomFilterDialog| `() => void`                           | ✓        | -       | 打开"添加自定义筛选器"弹窗          |
+| onOpenCustomDateRange   | `() => void`                           | ✓        | -       | 打开"自定义时间范围"弹窗            |
+| onClearFilter           | `() => void`                           | -        | -       | 清除当前时间/自定义筛选器           |
+| children                | `React.ReactNode`                      | ✓        | -       | 下拉触发器（通常是筛选图标按钮）    |
 
-**预设选项：**
+**行为说明：**
 
-- 全部时间
-- 今天
-- 最近一周
-- 最近一月
-- 最近一年
-- 自定义范围
+- 快捷时间筛选提供 今天/最近一周/最近一月/最近一年 四个预设，选中任一预设会清除已选自定义筛选器
+- 预设列表下方是"自定义时间范围"入口，点击后关闭下拉并触发 `onOpenCustomDateRange`（由上层渲染 `CustomDateRangeDialog`），选中时同样清除已选自定义筛选器
+- 自定义筛选器列表仅在 `customFilters` 非空时展示，选中自定义筛选器会将时间范围重置为 `all`
+- 时间筛选（含自定义范围）与自定义筛选器互斥，二者选其一生效
+
+---
+
+### CustomFilterDialog
+
+新建/编辑自定义筛选器弹窗，支持多个条件（AND 关系）。
+
+| Prop           | Type                                                              | Required | Default | Description        |
+| -------------- | ------------------------------------------------------------------ | -------- | ------- | ------------------ |
+| open           | `boolean`                                                         | ✓        | -       | 弹窗是否打开        |
+| onOpenChange   | `(open: boolean) => void`                                         | ✓        | -       | 打开状态变更        |
+| onSave         | `(name: string, conditions: FilterCondition[]) => void`           | ✓        | -       | 保存回调            |
+| editingFilter  | `{ id: string; name: string; conditions: FilterCondition[] } \| null` | -    | `null`  | 编辑中的筛选器      |
+
+**行为说明：**
+
+- 条件字段支持 标题/URL/描述/标签/创建时间，操作符按字段类型动态过滤
+- 名称和全部条件值非空时才允许保存
+- 保存/取消后会重置表单为一条默认条件（标题包含）
+
+---
+
+### CustomDateRangeDialog
+
+自定义时间范围弹窗组件，从 `FilterDropdownMenu` 的"自定义时间范围"入口打开，用于自由选择起止日期（而非固定预设）。
+
+| Prop         | Type                          | Required | Default | Description                         |
+| ------------ | ----------------------------- | -------- | ------- | ------------------------------------ |
+| open         | `boolean`                     | ✓        | -       | 弹窗是否打开                          |
+| onOpenChange | `(open: boolean) => void`     | ✓        | -       | 打开状态变更                          |
+| timeRange    | `TimeRange`                   | ✓        | -       | 当前时间范围，若为 `custom` 用于回填表单 |
+| onApply      | `(range: TimeRange) => void`  | ✓        | -       | 应用自定义范围回调                     |
+
+**行为说明：**
+
+- 起止日期均为必填，且开始日期不得晚于结束日期，否则"应用"按钮禁用
+- 应用时结束日期会被归一化到当天 `23:59:59.999`，确保当天创建的书签也被包含
+- 每次打开弹窗都会以当前生效的时间范围（若类型为 `custom`）回填表单，否则清空
 
 ---
 

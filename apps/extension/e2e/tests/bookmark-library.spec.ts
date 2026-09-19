@@ -194,4 +194,81 @@ test.describe("LIB 书签库核心流程", () => {
     const stored = await getBookmarks(extensionWorker);
     expect(stored).toHaveLength(0);
   });
+
+  test("LIB-006 新建自定义筛选器后列表中不应出现重复项", async ({
+    context,
+    extensionId,
+    extensionWorker,
+    e2eVariant,
+  }, testInfo) => {
+    const t = e2eVariant.text;
+    const { bookmarks, categories } = createLibraryFixtures();
+    await seedCategories(extensionWorker, categories);
+    await seedBookmarks(extensionWorker, bookmarks);
+
+    const page = await openAppPage(context, extensionId, "all");
+
+    await page.getByTitle(t("筛选器", "Filter")).click();
+    await page.getByText(t("添加自定义筛选器", "Add Custom Filter")).click();
+
+    await page
+      .getByPlaceholder(t("给这个筛选器起个名字", "Give this filter a name"))
+      .fill("测试筛选器");
+    await page
+      .getByPlaceholder(t("输入条件值", "Enter condition value"))
+      .fill("test");
+    await page.getByRole("button", { name: t("保存", "Save") }).click();
+
+    await page.getByTitle(t("筛选器", "Filter")).click();
+    await attachStepScreenshot(page, testInfo, "LIB-006-创建后筛选器下拉");
+    await expect(page.getByText("测试筛选器")).toHaveCount(1);
+  });
+
+  test("LIB-007 自定义时间范围筛选", async ({
+    context,
+    extensionId,
+    extensionWorker,
+    e2eVariant,
+  }, testInfo) => {
+    const t = e2eVariant.text;
+    const DAY = 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    const toDateInput = (ts: number) => new Date(ts).toISOString().split("T")[0];
+
+    await seedBookmarks(extensionWorker, [
+      createBookmarkFixture({
+        id: "bm-in-range",
+        title: "范围内书签",
+        createdAt: now - 10 * DAY,
+      }),
+      createBookmarkFixture({
+        id: "bm-out-range",
+        title: "范围外书签",
+        createdAt: now - 100 * DAY,
+      }),
+    ]);
+
+    const page = await openAppPage(context, extensionId, "all");
+
+    await page.getByTitle(t("筛选器", "Filter")).click();
+    await page.getByText(t("自定义时间范围", "Custom Date Range")).click();
+
+    const dialog = page.getByRole("dialog");
+    const dateInputs = dialog.locator('input[type="date"]');
+    await dateInputs.nth(0).fill(toDateInput(now - 20 * DAY));
+    await dateInputs.nth(1).fill(toDateInput(now - 5 * DAY));
+    await attachStepScreenshot(page, testInfo, "LIB-007-自定义时间范围弹窗");
+    await dialog.getByRole("button", { name: t("应用", "Apply") }).click();
+
+    await expect(page.getByText("范围内书签")).toBeVisible();
+    await expect(page.getByText("范围外书签")).toBeHidden();
+    await attachStepScreenshot(page, testInfo, "LIB-007-自定义时间范围筛选结果");
+
+    await page.getByTitle(t("筛选器", "Filter")).click();
+    await expect(
+      page.getByRole("menuitem", {
+        name: t("自定义时间范围", "Custom Date Range"),
+      }),
+    ).toBeVisible();
+  });
 });

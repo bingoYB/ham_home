@@ -1,7 +1,7 @@
 {
   "bookmark": {
     "title": "Bookmarks",
-    "pageTitle": "Bookmark List",
+    "pageTitle": "My Favorites",
     "pageDescription": "Manage and browse all your bookmarks",
     "newBookmark": "New Bookmark",
     "addBookmark": "Add Bookmark",
@@ -457,6 +457,11 @@
     "lastWeek": "Last Week",
     "lastMonth": "Last Month",
     "lastYear": "Last Year",
+    "customDateRange": "Custom Date Range",
+    "customDateRangeTitle": "Custom Date Range",
+    "startDate": "Start Date",
+    "endDate": "End Date",
+    "applyDateRange": "Apply",
     "customFilters": "Custom Filters",
     "clearFilter": "Clear Filter",
     "addCustomFilter": "Add Custom Filter",
