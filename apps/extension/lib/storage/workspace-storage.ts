@@ -109,8 +109,9 @@ class WorkspaceStorage {
       ...data,
       updatedAt: Date.now(),
     };
-    workspaces[index] = updated;
-    await workspacesItem.setValue(workspaces);
+    await workspacesItem.setValue(
+      workspaces.map((w, i) => (i === index ? updated : w)),
+    );
     return updated;
   }
 
@@ -184,8 +185,9 @@ class WorkspaceStorage {
       ...categories[index],
       ...data,
     };
-    categories[index] = updated;
-    await workspaceCategoriesItem.setValue([...categories]);
+    await workspaceCategoriesItem.setValue(
+      categories.map((c, i) => (i === index ? updated : c)),
+    );
     return updated;
   }
 
@@ -242,8 +244,9 @@ class WorkspaceStorage {
       return;
     }
 
-    workspaces[index] = { ...workspaces[index], ...workspace };
-    await workspacesItem.setValue([...workspaces]);
+    await workspacesItem.setValue(
+      workspaces.map((item, i) => (i === index ? { ...item, ...workspace } : item)),
+    );
   }
 
   async importRawCategory(category: WorkspaceCategory): Promise<void> {
@@ -254,8 +257,9 @@ class WorkspaceStorage {
       return;
     }
 
-    categories[index] = { ...categories[index], ...category };
-    await workspaceCategoriesItem.setValue([...categories]);
+    await workspaceCategoriesItem.setValue(
+      categories.map((item, i) => (i === index ? { ...item, ...category } : item)),
+    );
   }
 
   private matchesSearch(workspace: Workspace, search: string): boolean {

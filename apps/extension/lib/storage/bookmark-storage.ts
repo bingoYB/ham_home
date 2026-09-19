@@ -198,8 +198,7 @@ class BookmarkStorage {
     // 保存内容（如果有）
     if (content) {
       const contentsMap = await bookmarkContentsItem.getValue();
-      contentsMap[id] = content;
-      await bookmarkContentsItem.setValue(contentsMap);
+      await bookmarkContentsItem.setValue({ ...contentsMap, [id]: content });
     }
 
     return { ...meta, content };
@@ -229,18 +228,20 @@ class BookmarkStorage {
       updatedAt: Date.now(),
     };
 
-    metaList[index] = updatedMeta;
-    await bookmarkMetaItem.setValue(metaList);
+    await bookmarkMetaItem.setValue(
+      metaList.map((b: BookmarkMeta, i: number) => (i === index ? updatedMeta : b))
+    );
 
     // 更新内容（如果提供了）
     if (content !== undefined) {
       const contentsMap = await bookmarkContentsItem.getValue();
+      const nextContentsMap = { ...contentsMap };
       if (content) {
-        contentsMap[id] = content;
+        nextContentsMap[id] = content;
       } else {
-        delete contentsMap[id];
+        delete nextContentsMap[id];
       }
-      await bookmarkContentsItem.setValue(contentsMap);
+      await bookmarkContentsItem.setValue(nextContentsMap);
     }
 
     // 获取完整书签返回
@@ -257,10 +258,11 @@ class BookmarkStorage {
     if (permanent) {
       // 永久删除：同时删除元数据和内容
       await bookmarkMetaItem.setValue(metaList.filter((b: BookmarkMeta) => b.id !== id));
-      
+
       const contentsMap = await bookmarkContentsItem.getValue();
-      delete contentsMap[id];
-      await bookmarkContentsItem.setValue(contentsMap);
+      const nextContentsMap = { ...contentsMap };
+      delete nextContentsMap[id];
+      await bookmarkContentsItem.setValue(nextContentsMap);
       await Promise.all([
         bookmarkClipStorage.deleteByBookmark(id),
         bookmarkHealthStorage.delete(id),
@@ -271,9 +273,12 @@ class BookmarkStorage {
       // 软删除：只标记元数据
       const index = metaList.findIndex((b: BookmarkMeta) => b.id === id);
       if (index !== -1) {
-        metaList[index].isDeleted = true;
-        metaList[index].updatedAt = Date.now();
-        await bookmarkMetaItem.setValue(metaList);
+        const now = Date.now();
+        await bookmarkMetaItem.setValue(
+          metaList.map((b: BookmarkMeta, i: number) =>
+            i === index ? { ...b, isDeleted: true, updatedAt: now } : b
+          )
+        );
       }
     }
   }
@@ -344,9 +349,9 @@ class BookmarkStorage {
     }
 
     const updated = { ...categories[index], ...data };
-    categories[index] = updated;
-
-    await categoriesItem.setValue(categories);
+    await categoriesItem.setValue(
+      categories.map((c: LocalCategory, i: number) => (i === index ? updated : c))
+    );
     return updated;
   }
 
@@ -445,14 +450,12 @@ class BookmarkStorage {
     if (newMetas.length === 0) return [];
 
     // 一次性追加所有元数据
-    metaList.push(...newMetas);
-    await bookmarkMetaItem.setValue(metaList);
+    await bookmarkMetaItem.setValue([...metaList, ...newMetas]);
 
     // 一次性写入所有内容
     if (Object.keys(newContents).length > 0) {
       const contentsMap = await bookmarkContentsItem.getValue();
-      Object.assign(contentsMap, newContents);
-      await bookmarkContentsItem.setValue(contentsMap);
+      await bookmarkContentsItem.setValue({ ...contentsMap, ...newContents });
     }
 
     return results;
@@ -488,8 +491,9 @@ class BookmarkStorage {
 
       // 同时删除内容
       const contentsMap = await bookmarkContentsItem.getValue();
-      ids.forEach((id) => delete contentsMap[id]);
-      await bookmarkContentsItem.setValue(contentsMap);
+      const nextContentsMap = { ...contentsMap };
+      ids.forEach((id) => delete nextContentsMap[id]);
+      await bookmarkContentsItem.setValue(nextContentsMap);
       await Promise.all([
         bookmarkClipStorage.deleteByBookmarks(ids),
         bookmarkHealthStorage.deleteMany(ids),
@@ -672,11 +676,14 @@ class BookmarkStorage {
     const categories: LocalCategory[] = await categoriesItem.getValue();
     const index = categories.findIndex((c: LocalCategory) => c.id === category.id);
     if (index !== -1) {
-      categories[index] = { ...categories[index], ...category };
+      await categoriesItem.setValue(
+        categories.map((c: LocalCategory, i: number) =>
+          i === index ? { ...c, ...category } : c
+        )
+      );
     } else {
-      categories.push(category);
+      await categoriesItem.setValue([...categories, category]);
     }
-    await categoriesItem.setValue(categories);
   }
 
   /**
@@ -688,16 +695,16 @@ class BookmarkStorage {
 
     const index = metaList.findIndex((b: BookmarkMeta) => b.id === meta.id);
     if (index !== -1) {
-      metaList[index] = { ...metaList[index], ...meta };
+      await bookmarkMetaItem.setValue(
+        metaList.map((b: BookmarkMeta, i: number) => (i === index ? { ...b, ...meta } : b))
+      );
     } else {
-      metaList.push(meta);
+      await bookmarkMetaItem.setValue([...metaList, meta]);
     }
-    await bookmarkMetaItem.setValue(metaList);
 
     if (content !== undefined) {
       const contentsMap = await bookmarkContentsItem.getValue();
-      contentsMap[meta.id] = content;
-      await bookmarkContentsItem.setValue(contentsMap);
+      await bookmarkContentsItem.setValue({ ...contentsMap, [meta.id]: content });
     }
   }
 
@@ -742,8 +749,7 @@ class BookmarkStorage {
    */
   async setBookmarkContent(bookmarkId: string, content: string): Promise<void> {
     const contentsMap = await bookmarkContentsItem.getValue();
-    contentsMap[bookmarkId] = content;
-    await bookmarkContentsItem.setValue(contentsMap);
+    await bookmarkContentsItem.setValue({ ...contentsMap, [bookmarkId]: content });
   }
 
   /**
@@ -751,8 +757,9 @@ class BookmarkStorage {
    */
   async deleteBookmarkContent(bookmarkId: string): Promise<void> {
     const contentsMap = await bookmarkContentsItem.getValue();
-    delete contentsMap[bookmarkId];
-    await bookmarkContentsItem.setValue(contentsMap);
+    const nextContentsMap = { ...contentsMap };
+    delete nextContentsMap[bookmarkId];
+    await bookmarkContentsItem.setValue(nextContentsMap);
   }
 
   // ============ 工具方法 ============

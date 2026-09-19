@@ -264,4 +264,33 @@ test.describe("LIB 书签库核心流程", () => {
     await expect(imageInfo.getByLabel("#D8D0AA")).toBeVisible();
     await attachStepScreenshot(page, testInfo, "LIB-006-图片主色与文件信息");
   });
+
+  test("LIB-007 新建自定义筛选器后列表中不应出现重复项", async ({
+    context,
+    extensionId,
+    extensionWorker,
+    e2eVariant,
+  }, testInfo) => {
+    const t = e2eVariant.text;
+    const { bookmarks, categories } = createLibraryFixtures();
+    await seedCategories(extensionWorker, categories);
+    await seedBookmarks(extensionWorker, bookmarks);
+
+    const page = await openAppPage(context, extensionId, "all");
+
+    await page.getByTitle(t("筛选器", "Filter")).click();
+    await page.getByText(t("添加自定义筛选器", "Add Custom Filter")).click();
+
+    await page
+      .getByPlaceholder(t("给这个筛选器起个名字", "Give this filter a name"))
+      .fill("测试筛选器");
+    await page
+      .getByPlaceholder(t("输入条件值", "Enter condition value"))
+      .fill("test");
+    await page.getByRole("button", { name: t("保存", "Save") }).click();
+
+    await page.getByTitle(t("筛选器", "Filter")).click();
+    await attachStepScreenshot(page, testInfo, "LIB-007-创建后筛选器下拉");
+    await expect(page.getByText("测试筛选器")).toHaveCount(1);
+  });
 });
