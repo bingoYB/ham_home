@@ -901,10 +901,7 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
               ? virtualListParentRef
               : undefined
         }
-        className={cn(
-          "min-h-0 flex-1 overflow-auto [scrollbar-gutter:stable]",
-          viewMode === "grid" ? "p-6" : "p-6",
-        )}
+        className="min-h-0 flex-1 overflow-auto [scrollbar-gutter:stable] p-6 pb-24"
       >
         {filteredBookmarks.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8">
