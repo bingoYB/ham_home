@@ -1,7 +1,7 @@
 {
   "bookmark": {
     "title": "书签",
-    "pageTitle": "书签列表",
+    "pageTitle": "我的收藏",
     "pageDescription": "管理和浏览你的所有书签",
     "newBookmark": "新建书签",
     "addBookmark": "添加书签",
@@ -576,6 +576,11 @@
     "lastWeek": "最近一周",
     "lastMonth": "最近一月",
     "lastYear": "最近一年",
+    "customDateRange": "自定义时间范围",
+    "customDateRangeTitle": "自定义时间范围",
+    "startDate": "开始日期",
+    "endDate": "结束日期",
+    "applyDateRange": "应用",
     "customFilters": "自定义筛选器",
     "clearFilter": "清除筛选器",
     "addCustomFilter": "添加自定义筛选器",
