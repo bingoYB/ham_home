@@ -177,7 +177,10 @@ test.describe("AI 与同步核心流程", () => {
     const reloadedStoragePanel = page.getByRole("tabpanel", { name: /存储管理|Storage/ });
 
     await expect(reloadedStoragePanel.getByPlaceholder("password")).toHaveValue("e2e-password");
-    await expect(reloadedStoragePanel.getByText(/同步失败|Sync Failed/)).toBeVisible();
+    // Match only the status text in the sync status row, not the error hint below it
+    await expect(
+      reloadedStoragePanel.getByText(/^(同步失败|Sync Failed)$/),
+    ).toBeVisible();
     await expect(reloadedStoragePanel.getByText("E2E WebDAV 连接失败")).toBeVisible();
     await attachStepScreenshot(page, testInfo, "SYNC-001-WebDAV失败态");
   });

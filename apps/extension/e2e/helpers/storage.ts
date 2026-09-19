@@ -16,6 +16,9 @@ import { E2E_EXTENSION_CONFIG } from "../e2e.config";
 
 const SNAPSHOT_DB = "hamhome-snapshots";
 const ASSET_DB = "hamhome-assets";
+// Must stay in sync with the store names in lib/storage/bookmark-screenshot-storage.ts
+const ASSET_IMAGE_STORE = "screenshotImages";
+const ASSET_THUMBNAIL_STORE = "screenshotThumbnails";
 const VECTOR_DB = "HamHomeVectors";
 const VECTOR_STORE = "bookmarkEmbeddings";
 
@@ -331,31 +334,64 @@ export async function getScreenshotAssetSizes(
   worker: Worker,
   bookmarkId: string,
 ): Promise<{ image: number; thumbnail: number }> {
-  return worker.evaluate(async (id) => {
-    const db = await openAssetDB();
-    const [image, thumbnail] = await Promise.all([
-      getBlob("screenshotImages"),
-      getBlob("screenshotThumbnails"),
-    ]);
-    db.close();
-    return { image: image?.size ?? 0, thumbnail: thumbnail?.size ?? 0 };
+  return worker.evaluate(
+    async ({ id, dbName, imageStore, thumbnailStore }) => {
+      const db = await openAssetDB();
+      if (!db) return { image: 0, thumbnail: 0 };
 
-    function openAssetDB(): Promise<IDBDatabase> {
-      return new Promise((resolve, reject) => {
-        const request = indexedDB.open("hamhome-assets", 1);
-        request.onsuccess = () => resolve(request.result);
-        request.onerror = () => reject(request.error);
-      });
-    }
+      try {
+        const [image, thumbnail] = await Promise.all([
+          getBlob(db, imageStore),
+          getBlob(db, thumbnailStore),
+        ]);
+        return { image: image?.size ?? 0, thumbnail: thumbnail?.size ?? 0 };
+      } finally {
+        db.close();
+      }
 
-    function getBlob(storeName: string): Promise<Blob | null> {
-      return new Promise((resolve, reject) => {
-        const request = db.transaction(storeName, "readonly").objectStore(storeName).get(id);
-        request.onsuccess = () => resolve(request.result?.blob ?? null);
-        request.onerror = () => reject(request.error);
-      });
-    }
-  }, bookmarkId);
+      // The extension creates the asset DB lazily on the first screenshot
+      // write, so polling can run before it exists. Never open it with an
+      // explicit version: opening a missing DB with version=1 creates an empty
+      // DB with no object stores and pins the version, so the extension's
+      // onupgradeneeded never fires again and screenshots can never be stored.
+      async function openAssetDB(): Promise<IDBDatabase | null> {
+        if (typeof indexedDB.databases === "function") {
+          const databases = await indexedDB.databases();
+          if (!databases.some((entry) => entry.name === dbName)) return null;
+        }
+        return new Promise((resolve, reject) => {
+          const request = indexedDB.open(dbName);
+          request.onsuccess = () => resolve(request.result);
+          request.onerror = () => reject(request.error);
+        });
+      }
+
+      // Treat a not-yet-created store as "no asset yet" and let the caller
+      // keep polling, instead of throwing NotFoundError and failing the test.
+      function getBlob(
+        database: IDBDatabase,
+        storeName: string,
+      ): Promise<Blob | null> {
+        if (!database.objectStoreNames.contains(storeName)) {
+          return Promise.resolve(null);
+        }
+        return new Promise((resolve, reject) => {
+          const request = database
+            .transaction(storeName, "readonly")
+            .objectStore(storeName)
+            .get(id);
+          request.onsuccess = () => resolve(request.result?.blob ?? null);
+          request.onerror = () => reject(request.error);
+        });
+      }
+    },
+    {
+      id: bookmarkId,
+      dbName: ASSET_DB,
+      imageStore: ASSET_IMAGE_STORE,
+      thumbnailStore: ASSET_THUMBNAIL_STORE,
+    },
+  );
 }
 
 export async function clearHtmlImportTask(worker: Worker): Promise<void> {
@@ -370,6 +406,8 @@ export async function clearHtmlImportTask(worker: Worker): Promise<void> {
 export const indexedDbNames = {
   snapshots: SNAPSHOT_DB,
   assets: ASSET_DB,
+  assetImageStore: ASSET_IMAGE_STORE,
+  assetThumbnailStore: ASSET_THUMBNAIL_STORE,
   vectors: VECTOR_DB,
   vectorStore: VECTOR_STORE,
 };

@@ -192,12 +192,20 @@ test.describe("CONTENT 页内保存流程", () => {
       .poll(async () => getBookmarks(extensionWorker))
       .toEqual([expect.objectContaining({ title: "页面截图书签" })])
       .then(async () => getBookmarks(extensionWorker));
+    // The background captures the screenshot asynchronously before storing it,
+    // so poll until it is actually persisted (0 means not written yet)
     await expect
-      .poll(async () => getScreenshotAssetSizes(extensionWorker, saved.id))
-      .toEqual({ image: expect.any(Number), thumbnail: expect.any(Number) });
-    const sizes = await getScreenshotAssetSizes(extensionWorker, saved.id);
-    expect(sizes.image).toBeGreaterThan(1_000);
-    expect(sizes.thumbnail).toBeGreaterThan(100);
+      .poll(
+        async () => {
+          const { image, thumbnail } = await getScreenshotAssetSizes(
+            extensionWorker,
+            saved.id,
+          );
+          return image > 1_000 && thumbnail > 100;
+        },
+        { timeout: 20_000 },
+      )
+      .toBe(true);
 
     const app = await openAppPage(context, extensionId, "all");
     await app.getByTitle(t("视觉画廊", "Visual Gallery")).click();

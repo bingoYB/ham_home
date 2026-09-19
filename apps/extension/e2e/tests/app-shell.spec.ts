@@ -62,7 +62,7 @@ test.describe("APP 核心壳层与导航", () => {
       { text: t("导入/导出", "Import/Export"), hash: "import-export", marker: t("导出数据", "Export Data") },
       { text: t("设置", "Settings"), hash: "settings", marker: t("AI 配置", "AI Config") },
       { text: t("关于", "About"), hash: "about", marker: "HamHome" },
-      { text: t("所有书签", "All Bookmarks"), hash: "all", marker: "React Docs" },
+      { text: t("我的收藏", "My Collection"), hash: "all", marker: "React Docs" },
     ];
 
     for (const route of routes) {
