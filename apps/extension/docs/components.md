@@ -191,7 +191,52 @@ Popup 快捷面板，扩展图标点击后的默认视图。保存书签的 AI �
 - 全量、单条和定期扫描均在 `BookmarkHealthService` 再次执行同一范围过滤，内容收藏不会发起健康检查请求。
 - 普通书签的失效链接、跳转、访问异常与重复 URL 仍按既有规则检查；历史内容收藏健康记录会在扫描时清理。
 - 重复项由 `useDuplicateBookmarks` 从当前书签列表实时计算，未体检也能进入「重复书签」筛选；每组标记最早收藏的一条为「保留」，其余为「重复」。
-- 支持勾选后批量删除，以及「清理重复项」一键删除每组的非保留项；两者都是软删除并刷新 `updatedAt`，删除结果会通过 WebDAV 同步到其他设备。
+- 支持勾选后批量删除，以及「清理重复项」一键删除每组的非保留项；两者都是软删除（进回收站）并刷新 `updatedAt`，删除结果会通过 WebDAV 同步到其他设备。
+
+## TrashPage
+
+书签回收站页面，列出已删除书签、剩余保留天数，支持恢复、彻底删除与清空。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| - | - | - | - | 页面通过 `BookmarkContext` 与 `bookmarkStorage` 自行加载已删除书签 |
+
+**用法示例：**
+
+```tsx
+<TrashPage />
+```
+
+**行为说明：**
+
+- 删除书签是软删除，先进回收站保留 30 天，期间可随时恢复；到期由后台 `bookmarkRetentionService` 自动彻底删除。
+- 彻底删除会清空正文、快照、截图、剪藏、体检记录与向量，只留下 `{ id, deletedAt }` 墓碑，删除结果经 WebDAV 同步到其他设备；墓碑满 90 天后清理。
+- 剩余 3 天内的条目用醒目样式提示，避免用户错过恢复窗口。
+
+## BatchSelectionToolbar
+
+批量选择工具栏，左侧全选与已选数量，右侧由调用方以 children 传入批量操作按钮。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| visibleIds | `string[]` | 是 | - | 当前可见列表的全部 ID，全选只作用于可见项 |
+| selectedCount | `number` | 是 | - | 已选数量 |
+| onToggleSelectAll | `(ids: string[]) => void` | 是 | - | 切换全选 |
+| children | `ReactNode` | 否 | - | 右侧批量操作按钮 |
+
+**用法示例：**
+
+```tsx
+<BatchSelectionToolbar
+  visibleIds={visibleIds}
+  selectedCount={selectedIds.size}
+  onToggleSelectAll={toggleSelectAll}
+>
+  <Button variant="destructive" size="sm" onClick={handleBatchDelete}>
+    批量删除
+  </Button>
+</BatchSelectionToolbar>
+```
 
 ## WorkspacesPage
 

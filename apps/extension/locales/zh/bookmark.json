@@ -8,7 +8,7 @@
     "editBookmark": "编辑书签",
     "deleteBookmark": "删除书签",
     "deleteTitle": "删除确认",
-    "deleteConfirm": "确定删除书签 \"{{title}}\" 吗？此操作无法撤销。",
+    "deleteConfirm": "确定删除书签 \"{{title}}\" 吗？删除后会移入回收站，可随时恢复。",
     "deleteSuccess": "书签已删除",
     "deleteFailed": "删除书签失败",
     "saveSuccess": "书签已保存",
@@ -63,7 +63,7 @@
       "moveCategoryDescription": "将选中的 {{count}} 个书签迁移到分类",
       "delete": "批量删除",
       "deleteTitle": "批量删除确认",
-      "deleteConfirm": "确定删除选中的 {{count}} 个书签吗？此操作无法撤销。"
+      "deleteConfirm": "确定删除选中的 {{count}} 个书签吗？删除后会移入回收站，可随时恢复。"
     },
     "empty": "暂无书签",
     "emptyFilter": "没有符合筛选条件的书签",
@@ -441,7 +441,7 @@
       "deleteFailed": "批量删除失败",
       "cleanDuplicates": "清理重复项 ({{count}})",
       "cleanDuplicatesTitle": "清理重复书签",
-      "cleanDuplicatesConfirm": "每组重复书签保留最早收藏的一条，删除其余 {{count}} 条。此操作无法撤销。",
+      "cleanDuplicatesConfirm": "每组重复书签保留最早收藏的一条，其余 {{count}} 条移入回收站，可随时恢复。",
       "noDuplicates": "没有发现重复书签"
     },
     "duplicateRole": {
@@ -472,6 +472,27 @@
       "missing_description": "缺少摘要",
       "duplicate_url": "高置信度重复网址"
     }
+  },
+  "trash": {
+    "title": "回收站",
+    "navTitle": "回收站",
+    "description": "删除的书签会在这里保留 {{days}} 天，期间可以随时恢复；到期后自动彻底删除并释放占用的空间。",
+    "searchPlaceholder": "搜索标题或网址",
+    "empty_state": "回收站是空的",
+    "restore": "恢复",
+    "restoreSuccess": "已恢复 {{count}} 个书签",
+    "restoreFailed": "恢复失败",
+    "purge": "彻底删除",
+    "purgeTitle": "彻底删除确认",
+    "purgeConfirmText": "彻底删除",
+    "purgeOneConfirm": "确定彻底删除「{{title}}」吗？正文、快照、截图和剪藏会一并清除，且会同步到其他设备，此操作无法撤销。",
+    "purgeSelectedConfirm": "确定彻底删除选中的 {{count}} 个书签吗？正文、快照、截图和剪藏会一并清除，且会同步到其他设备，此操作无法撤销。",
+    "emptyConfirm": "确定清空回收站里全部 {{count}} 个书签吗？正文、快照、截图和剪藏会一并清除，且会同步到其他设备，此操作无法撤销。",
+    "purgeSuccess": "已彻底删除 {{count}} 个书签",
+    "purgeFailed": "彻底删除失败",
+    "empty": "清空回收站",
+    "deletedAt": "删除于 {{time}}",
+    "remainingDays": "{{count}} 天后清除"
   },
   "tabGroups": {
     "title": "浏览器 Tab 分组",

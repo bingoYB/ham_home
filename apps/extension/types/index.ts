@@ -24,7 +24,19 @@ export interface LocalBookmark {
   hasSnapshot: boolean; // 是否有本地快照
   createdAt: number; // 时间戳
   updatedAt: number; // 时间戳
-  isDeleted?: boolean; // 软删除标记
+  isDeleted?: boolean; // 软删除标记（在回收站中）
+  deletedAt?: number; // 进入回收站的时间戳，用于计算保留期
+}
+
+/**
+ * 删除墓碑
+ *
+ * 书签被彻底删除后只保留这条轻量记录，用于把删除结果同步到其他设备；
+ * 超过保留期后墓碑本身也会被清理。
+ */
+export interface BookmarkTombstone {
+  id: string;
+  deletedAt: number;
 }
 
 /**

@@ -25,6 +25,7 @@ import {
   confirm,
   toast,
 } from "@hamhome/ui";
+import { BatchSelectionToolbar } from "@/components/common/BatchSelectionToolbar";
 import { useBookmarks } from "@/contexts/BookmarkContext";
 import { useBookmarkSelection } from "@/hooks/useBookmarkSelection";
 import {
@@ -332,14 +333,29 @@ export function BookmarkHealthPage() {
           </div>
         </div>
 
-        <SelectionToolbar
+        <BatchSelectionToolbar
           visibleIds={filteredBookmarks.map((bookmark) => bookmark.id)}
           selectedCount={selectedIds.size}
-          redundantCount={redundantIds.length}
           onToggleSelectAll={toggleSelectAll}
-          onDeleteSelected={() => void removeSelected()}
-          onCleanDuplicates={() => void cleanDuplicates()}
-        />
+        >
+          {redundantIds.length > 0 && (
+            <Button variant="outline" size="sm" onClick={() => void cleanDuplicates()}>
+              <Copy className="mr-2 h-4 w-4" />
+              {t("bookmark:healthCenter.batch.cleanDuplicates", {
+                count: redundantIds.length,
+              })}
+            </Button>
+          )}
+          <Button
+            variant="destructive"
+            size="sm"
+            disabled={selectedIds.size === 0}
+            onClick={() => void removeSelected()}
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            {t("bookmark:bookmark.batch.delete")}
+          </Button>
+        </BatchSelectionToolbar>
 
         <div className="space-y-2">
           {filteredBookmarks.length === 0 ? (
@@ -366,65 +382,6 @@ export function BookmarkHealthPage() {
             })
           )}
         </div>
-      </div>
-    </div>
-  );
-}
-
-interface SelectionToolbarProps {
-  visibleIds: string[];
-  selectedCount: number;
-  redundantCount: number;
-  onToggleSelectAll: (ids: string[]) => void;
-  onDeleteSelected: () => void;
-  onCleanDuplicates: () => void;
-}
-
-function SelectionToolbar({
-  visibleIds,
-  selectedCount,
-  redundantCount,
-  onToggleSelectAll,
-  onDeleteSelected,
-  onCleanDuplicates,
-}: SelectionToolbarProps) {
-  const { t } = useTranslation(["bookmark", "common"]);
-  const allSelected = visibleIds.length > 0 && selectedCount === visibleIds.length;
-
-  return (
-    <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border bg-card px-4 py-2.5">
-      <div className="flex items-center gap-2.5 text-sm">
-        <Checkbox
-          aria-label={t("bookmark:bookmark.batch.selectAll")}
-          checked={allSelected}
-          disabled={visibleIds.length === 0}
-          onCheckedChange={() => onToggleSelectAll(visibleIds)}
-        />
-        <span className={cn(selectedCount === 0 && "text-muted-foreground")}>
-          {selectedCount > 0
-            ? t("bookmark:bookmark.batch.selected", { count: selectedCount })
-            : t("bookmark:bookmark.batch.selectAll")}
-        </span>
-      </div>
-
-      <div className="flex flex-wrap items-center gap-2">
-        {redundantCount > 0 && (
-          <Button variant="outline" size="sm" onClick={onCleanDuplicates}>
-            <Copy className="mr-2 h-4 w-4" />
-            {t("bookmark:healthCenter.batch.cleanDuplicates", {
-              count: redundantCount,
-            })}
-          </Button>
-        )}
-        <Button
-          variant="destructive"
-          size="sm"
-          disabled={selectedCount === 0}
-          onClick={onDeleteSelected}
-        >
-          <Trash2 className="mr-2 h-4 w-4" />
-          {t("bookmark:bookmark.batch.delete")}
-        </Button>
       </div>
     </div>
   );

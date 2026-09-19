@@ -8,7 +8,7 @@
     "editBookmark": "Edit Bookmark",
     "deleteBookmark": "Delete Bookmark",
     "deleteTitle": "Confirm Delete",
-    "deleteConfirm": "Are you sure you want to delete \"{{title}}\"? This action cannot be undone.",
+    "deleteConfirm": "Delete \"{{title}}\"? It moves to the trash and can be restored at any time.",
     "deleteSuccess": "Bookmark deleted successfully",
     "deleteFailed": "Failed to delete bookmark",
     "saveSuccess": "Bookmark saved successfully",
@@ -63,7 +63,7 @@
       "moveCategoryDescription": "Move {{count}} selected bookmarks to category",
       "delete": "Delete Selected",
       "deleteTitle": "Confirm Batch Delete",
-      "deleteConfirm": "Are you sure you want to delete {{count}} bookmarks? This action cannot be undone."
+      "deleteConfirm": "Delete the {{count}} selected bookmarks? They move to the trash and can be restored at any time."
     },
     "empty": "No bookmarks yet",
     "emptyFilter": "No bookmarks match your filters",
@@ -441,7 +441,7 @@
       "deleteFailed": "Batch delete failed",
       "cleanDuplicates": "Clean duplicates ({{count}})",
       "cleanDuplicatesTitle": "Clean duplicate bookmarks",
-      "cleanDuplicatesConfirm": "The earliest bookmark in each group is kept and the other {{count}} are deleted. This action cannot be undone.",
+      "cleanDuplicatesConfirm": "The earliest bookmark in each group is kept; the other {{count}} move to the trash and can be restored at any time.",
       "noDuplicates": "No duplicate bookmarks found"
     },
     "duplicateRole": {
@@ -472,6 +472,27 @@
       "missing_description": "Missing summary",
       "duplicate_url": "High-confidence duplicate URL"
     }
+  },
+  "trash": {
+    "title": "Trash",
+    "navTitle": "Trash",
+    "description": "Deleted bookmarks stay here for {{days}} days and can be restored at any time. After that they are permanently deleted and the space is freed.",
+    "searchPlaceholder": "Search title or URL",
+    "empty_state": "Trash is empty",
+    "restore": "Restore",
+    "restoreSuccess": "Restored {{count}} bookmarks",
+    "restoreFailed": "Restore failed",
+    "purge": "Delete forever",
+    "purgeTitle": "Confirm permanent delete",
+    "purgeConfirmText": "Delete forever",
+    "purgeOneConfirm": "Permanently delete \"{{title}}\"? Its content, snapshot, screenshot and clips are removed as well, the deletion syncs to your other devices, and this cannot be undone.",
+    "purgeSelectedConfirm": "Permanently delete the {{count}} selected bookmarks? Their content, snapshots, screenshots and clips are removed as well, the deletion syncs to your other devices, and this cannot be undone.",
+    "emptyConfirm": "Empty the trash and permanently delete all {{count}} bookmarks? Their content, snapshots, screenshots and clips are removed as well, the deletion syncs to your other devices, and this cannot be undone.",
+    "purgeSuccess": "Permanently deleted {{count}} bookmarks",
+    "purgeFailed": "Permanent delete failed",
+    "empty": "Empty trash",
+    "deletedAt": "Deleted {{time}}",
+    "remainingDays": "Purged in {{count}} days"
   },
   "tabGroups": {
     "title": "Browser Tab Groups",

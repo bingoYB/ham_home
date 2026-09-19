@@ -5,6 +5,7 @@ import { configStorage } from '../storage/config-storage';
 import { workspaceStorage } from '../storage/workspace-storage';
 import { tabGroupRulesStorage } from '../storage/tab-group-rules-storage';
 import { bookmarkClipStorage } from '../storage/bookmark-clip-storage';
+import { bookmarkTombstoneStorage } from '../storage/bookmark-tombstone-storage';
 import { z } from 'zod';
 import { 
   SyncSysSchema, 
@@ -15,6 +16,7 @@ import {
   RemoteCategorySchema, 
   RemoteCategory, 
   RemoteBookmarksFileSchema,
+  RemoteBookmarkDeletion,
   RemoteBookmarkClipsFileSchema,
   RemoteWorkspacesFileSchema,
   RemoteWorkspace,
@@ -23,6 +25,7 @@ import {
   RemoteTabGroupRule,
 } from './sync-schema';
 import type {
+  BookmarkTombstone,
   LocalBookmark,
   LocalCategory,
   LocalSettings,
@@ -33,6 +36,10 @@ import type {
   BookmarkClip,
 } from '@/types';
 import { buildDuplicateGroups } from '../bookmarks/bookmark-dedup';
+import {
+  mergeTombstones,
+  pruneExpiredTombstones,
+} from '../bookmarks/bookmark-retention';
 import { nanoid } from 'nanoid';
 import pLimit from 'p-limit';
 import { strFromU8, strToU8, gzipSync, unzipSync } from 'fflate';
@@ -582,10 +589,12 @@ export class SyncEngine {
     const remoteMetaFile = await webdavClientAdapter.getJSON<any>(META_JSON);
 
     let remoteMeta: RemoteBookmarkMeta[] = [];
+    let remoteDeletions: RemoteBookmarkDeletion[] = [];
     if (remoteMetaFile) {
       const parsed = RemoteBookmarksFileSchema.safeParse(remoteMetaFile);
       if (parsed.success) {
         remoteMeta = parsed.data.bookmarks;
+        remoteDeletions = parsed.data.deletions;
       } else {
         console.warn('Failed to parse remote meta.json', parsed.error);
         // Disaster threshold protection check might go here
@@ -595,6 +604,10 @@ export class SyncEngine {
     const localMap = new Map(localBookmarks.map(b => [b.id, b]));
     const remoteMap = new Map(remoteMeta.map(b => [b.id, b]));
 
+    // 墓碑先于书签合并：被彻底删除的记录不能再参与后面的 LWW，
+    // 否则本地残留的副本会被当成「远端没有的新书签」重新上传
+    const deletions = await this.reconcileDeletions(localMap, remoteMap, remoteDeletions);
+
     const entries = this.mergeBookmarkEntries(localMap, remoteMap);
     const mergedDuplicates = this.reconcileDuplicateBookmarks(entries);
     if (mergedDuplicates > 0) {
@@ -603,7 +616,10 @@ export class SyncEngine {
 
     const finalMeta: RemoteBookmarkMeta[] = [];
     const chunksToUpload: Array<{ id: string, content: string }> = [];
-    let metaChanged = !remoteMetaFile || entries.size !== remoteMap.size;
+    let metaChanged =
+      !remoteMetaFile ||
+      entries.size !== remoteMap.size ||
+      deletions.length !== remoteDeletions.length;
 
     for (const entry of entries.values()) {
       finalMeta.push(entry.meta);
@@ -642,8 +658,82 @@ export class SyncEngine {
     // Write meta.json last safely
     if (metaChanged || chunksToUpload.length > 0) {
       console.log('Updating remote meta.json...');
-      await webdavClientAdapter.putJSON(META_JSON, { bookmarks: finalMeta });
+      await webdavClientAdapter.putJSON(META_JSON, { bookmarks: finalMeta, deletions });
     }
+  }
+
+  /**
+   * 合并两侧的删除墓碑并落到本地
+   *
+   * 处理完后 localMap / remoteMap 里不会再有被墓碑覆盖的记录。
+   * @returns 合并后应写回远端的墓碑列表
+   */
+  private async reconcileDeletions(
+    localMap: Map<string, LocalBookmark>,
+    remoteMap: Map<string, RemoteBookmarkMeta>,
+    remoteDeletions: RemoteBookmarkDeletion[],
+  ): Promise<BookmarkTombstone[]> {
+    const localTombstones = await bookmarkTombstoneStorage.getAll();
+    // 过期墓碑不再参与同步，否则永远清不掉
+    const merged = pruneExpiredTombstones(
+      mergeTombstones(localTombstones, remoteDeletions),
+    );
+
+    // 删除之后又在别处编辑过的，按 Last-Write-Wins 判定为「复活」，撤销该墓碑
+    const deletions = merged.filter(({ id, deletedAt }) => {
+      const local = localMap.get(id);
+      const remote = remoteMap.get(id);
+      const revivedLocally = !!local && !local.isDeleted && local.updatedAt > deletedAt;
+      const revivedRemotely = !!remote && !remote.isDeleted && remote.updatedAt > deletedAt;
+      return !revivedLocally && !revivedRemotely;
+    });
+
+    const staleLocalIds: string[] = [];
+    for (const { id } of deletions) {
+      if (localMap.has(id)) staleLocalIds.push(id);
+      localMap.delete(id);
+      remoteMap.delete(id);
+    }
+
+    if (staleLocalIds.length > 0) {
+      console.log(`Purging ${staleLocalIds.length} remotely deleted bookmark(s)...`);
+      await bookmarkStorage.purgeBookmarks(staleLocalIds);
+    }
+
+    // purgeBookmarks 会按本地时间补墓碑，这里用合并结果覆盖，保留期以最早的删除时刻为准
+    await bookmarkTombstoneStorage.replaceAll(deletions);
+
+    await this.deleteRemoteChunks(deletions, remoteDeletions);
+
+    return deletions;
+  }
+
+  /**
+   * 清理已彻底删除书签的远端正文分片
+   *
+   * 只处理这次新增的墓碑：已经在远端墓碑表里的，说明别的设备已经删过了。
+   * 删不掉不影响同步结果，只是暂时多占一点空间。
+   */
+  private async deleteRemoteChunks(
+    deletions: BookmarkTombstone[],
+    remoteDeletions: RemoteBookmarkDeletion[],
+  ): Promise<void> {
+    const known = new Set(remoteDeletions.map((deletion) => deletion.id));
+    const newIds = deletions.filter(({ id }) => !known.has(id)).map(({ id }) => id);
+    if (newIds.length === 0) return;
+
+    const limit = pLimit(5);
+    await Promise.all(
+      newIds.map((id) =>
+        limit(async () => {
+          try {
+            await webdavClientAdapter.deleteFile(`${CHUNKS_DIR}/${id}.gz.txt`);
+          } catch (err) {
+            console.warn(`Failed to delete remote chunk for ${id}`, err);
+          }
+        }),
+      ),
+    );
   }
 
   /**

@@ -13,6 +13,7 @@ import { savePopupFallbackStorage } from "@/lib/storage/save-popup-fallback-stor
 import { workspaceService } from "@/lib/services/workspace-service";
 import { tabGroupRuleService } from "@/lib/services/tab-group-rule-service";
 import { bookmarkHealthService } from "@/lib/services/bookmark-health-service";
+import { bookmarkRetentionService } from "@/lib/services/bookmark-retention-service";
 import {
   safeOpenPopup,
   safeSendMessageToActiveTab,
@@ -35,6 +36,7 @@ const IMAGE_CONTEXT_MENU_ID = "save-image-to-hamhome";
 const WORKSPACE_CONTEXT_MENU_ID = "save-window-workspace";
 const MANAGE_HAMHOME_CONTEXT_MENU_ID = "manage-hamhome";
 const BOOKMARK_HEALTH_ALARM_ID = "bookmark-health-periodic-scan";
+const BOOKMARK_RETENTION_ALARM_ID = "bookmark-retention-sweep";
 
 // 防止并发创建菜单
 let isCreatingContextMenu = false;
@@ -246,6 +248,19 @@ async function saveCurrentWindowWorkspaceFromBackground() {
   }
 }
 
+async function runBookmarkRetentionSweep(): Promise<void> {
+  try {
+    const result = await bookmarkRetentionService.sweep();
+    if (result.purged > 0 || result.prunedTombstones > 0) {
+      console.log(
+        `[HamHome Background] 回收站清理：彻底删除 ${result.purged} 条，清理过期墓碑 ${result.prunedTombstones} 条`,
+      );
+    }
+  } catch (error) {
+    console.warn("[HamHome Background] 回收站清理失败:", error);
+  }
+}
+
 async function configureBookmarkHealthAlarm(): Promise<void> {
   const settings = await configStorage.getSettings();
   await browser.alarms.clear(BOOKMARK_HEALTH_ALARM_ID);
@@ -399,11 +414,18 @@ export default defineBackground(() => {
   void applyDevConfigPreset();
   void configureBookmarkHealthAlarm();
 
+  // 回收站保留期清理：每天一次，启动时也补一次（设备长期不开机时 alarm 不会补跑）
+  browser.alarms.create(BOOKMARK_RETENTION_ALARM_ID, { periodInMinutes: 24 * 60 });
+  void runBookmarkRetentionSweep();
+
   browser.alarms.onAlarm.addListener((alarm) => {
     if (alarm.name === BOOKMARK_HEALTH_ALARM_ID) {
       void bookmarkHealthService.scan().catch((error) => {
         console.warn("[HamHome Background] 定期书签体检失败:", error);
       });
+    }
+    if (alarm.name === BOOKMARK_RETENTION_ALARM_ID) {
+      void runBookmarkRetentionSweep();
     }
   });
 
