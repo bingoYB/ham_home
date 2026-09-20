@@ -11,7 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
   Button,
-  Input,
+  DatePicker,
   Label,
 } from '@hamhome/ui';
 import { ContentUIContext } from '@/utils/ContentUIContext';
@@ -24,17 +24,20 @@ export interface CustomDateRangeDialogProps {
   onApply: (range: TimeRange) => void;
 }
 
-function timestampToDateStr(timestamp?: number): string {
-  if (!timestamp) return '';
-  return new Date(timestamp).toISOString().split('T')[0];
+function timestampToDate(timestamp?: number): Date | undefined {
+  return timestamp ? new Date(timestamp) : undefined;
 }
 
-function dateStrToTimestamp(dateStr: string, isEndOfDay = false): number {
-  const date = new Date(dateStr);
-  if (isEndOfDay) {
-    date.setHours(23, 59, 59, 999);
-  }
-  return date.getTime();
+function startOfDay(date: Date): number {
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  return start.getTime();
+}
+
+function endOfDay(date: Date): number {
+  const end = new Date(date);
+  end.setHours(23, 59, 59, 999);
+  return end.getTime();
 }
 
 export function CustomDateRangeDialog({
@@ -43,31 +46,34 @@ export function CustomDateRangeDialog({
   timeRange,
   onApply,
 }: CustomDateRangeDialogProps) {
-  const { t } = useTranslation('bookmark');
+  const { t, i18n } = useTranslation('bookmark');
   // Falls back to undefined (renders into document.body) outside a ContentUIProvider
   const contentUIContext = useContext(ContentUIContext);
   const portalContainer = contentUIContext?.container;
 
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [startDate, setStartDate] = useState<Date | undefined>(undefined);
+  const [endDate, setEndDate] = useState<Date | undefined>(undefined);
 
   // On each open, prefill from the currently active range if it's a custom one
   useEffect(() => {
     if (open) {
       const isCustom = timeRange.type === 'custom';
-      setStartDate(isCustom ? timestampToDateStr(timeRange.startDate) : '');
-      setEndDate(isCustom ? timestampToDateStr(timeRange.endDate) : '');
+      setStartDate(isCustom ? timestampToDate(timeRange.startDate) : undefined);
+      setEndDate(isCustom ? timestampToDate(timeRange.endDate) : undefined);
     }
   }, [open, timeRange]);
 
-  const isValidRange = Boolean(startDate) && Boolean(endDate) && startDate <= endDate;
+  const isValidRange =
+    Boolean(startDate) &&
+    Boolean(endDate) &&
+    startOfDay(startDate!) <= startOfDay(endDate!);
 
   const handleApply = () => {
     if (!isValidRange) return;
     onApply({
       type: 'custom',
-      startDate: dateStrToTimestamp(startDate),
-      endDate: dateStrToTimestamp(endDate, true),
+      startDate: startOfDay(startDate!),
+      endDate: endOfDay(endDate!),
     });
     onOpenChange(false);
   };
@@ -84,26 +90,34 @@ export function CustomDateRangeDialog({
 
         <div className="px-4 pb-4 space-y-3">
           <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">
+            <Label htmlFor="custom-range-start" className="text-xs text-muted-foreground">
               {t('bookmark:contentPanel.startDate')}
             </Label>
-            <Input
-              type="date"
+            <DatePicker
+              id="custom-range-start"
               value={startDate}
-              max={endDate || undefined}
-              onChange={(e) => setStartDate(e.target.value)}
+              onChange={setStartDate}
+              max={endDate}
+              language={i18n.language}
+              container={portalContainer}
+              placeholder={t('bookmark:contentPanel.startDate')}
+              aria-label={t('bookmark:contentPanel.startDate')}
               className="h-9"
             />
           </div>
           <div className="space-y-2">
-            <Label className="text-xs text-muted-foreground">
+            <Label htmlFor="custom-range-end" className="text-xs text-muted-foreground">
               {t('bookmark:contentPanel.endDate')}
             </Label>
-            <Input
-              type="date"
+            <DatePicker
+              id="custom-range-end"
               value={endDate}
-              min={startDate || undefined}
-              onChange={(e) => setEndDate(e.target.value)}
+              onChange={setEndDate}
+              min={startDate}
+              language={i18n.language}
+              container={portalContainer}
+              placeholder={t('bookmark:contentPanel.endDate')}
+              aria-label={t('bookmark:contentPanel.endDate')}
               className="h-9"
             />
           </div>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { LocalBookmark } from "@/types";
+import type { CustomFilter, FilterCondition, LocalBookmark } from "@/types";
 import { mergeBookmarkSearchResults } from "../useBookmarkSearch";
 
 function bookmark(
@@ -165,5 +165,82 @@ describe("mergeBookmarkSearchResults", () => {
     });
 
     expect(results.map((b) => b.id)).toEqual(["img-dev"]);
+  });
+});
+
+describe("自定义筛选器的 createdAt 条件", () => {
+  // 不带时区后缀的日期时间串按本地时间解析，和筛选里的整天换算保持一致
+  const at = (local: string) => new Date(local).getTime();
+
+  const bookmarks = [
+    bookmark("before", { createdAt: at("2026-09-10T12:00:00") }),
+    bookmark("same-day-early", { createdAt: at("2026-09-15T00:00:00") }),
+    bookmark("same-day-late", { createdAt: at("2026-09-15T23:59:00") }),
+    bookmark("after", { createdAt: at("2026-09-20T12:00:00") }),
+  ];
+
+  function run(condition: FilterCondition): string[] {
+    const customFilter: CustomFilter = {
+      id: "cf",
+      name: "cf",
+      conditions: [condition],
+      createdAt: 0,
+      updatedAt: 0,
+    };
+    return mergeBookmarkSearchResults({
+      bookmarks,
+      searchQuery: "",
+      semanticBookmarkIds: [],
+      selectedTags: [],
+      selectedCategory: "all",
+      timeRange: { type: "all" },
+      customFilter,
+    }).map((item) => item.id);
+  }
+
+  it("equals 命中当天任意时刻", () => {
+    expect(
+      run({ field: "createdAt", operator: "equals", value: "2026-09-15" }),
+    ).toEqual(["same-day-late", "same-day-early"]);
+  });
+
+  it("notEquals 排除整天", () => {
+    expect(
+      run({ field: "createdAt", operator: "notEquals", value: "2026-09-15" }),
+    ).toEqual(["after", "before"]);
+  });
+
+  it("greaterThan 从当天结束之后算起", () => {
+    expect(
+      run({ field: "createdAt", operator: "greaterThan", value: "2026-09-15" }),
+    ).toEqual(["after"]);
+  });
+
+  it("lessThan 到当天开始之前为止", () => {
+    expect(
+      run({ field: "createdAt", operator: "lessThan", value: "2026-09-15" }),
+    ).toEqual(["before"]);
+  });
+
+  it("也接受毫秒时间戳字符串", () => {
+    expect(
+      run({
+        field: "createdAt",
+        operator: "equals",
+        value: String(at("2026-09-15T08:30:00")),
+      }),
+    ).toEqual(["same-day-late", "same-day-early"]);
+  });
+
+  it("值不是有效日期时不参与过滤", () => {
+    expect(run({ field: "createdAt", operator: "equals", value: "" })).toEqual([
+      "after",
+      "same-day-late",
+      "same-day-early",
+      "before",
+    ]);
+    expect(
+      run({ field: "createdAt", operator: "equals", value: "2026-02-31" }),
+    ).toEqual(["after", "same-day-late", "same-day-early", "before"]);
   });
 });

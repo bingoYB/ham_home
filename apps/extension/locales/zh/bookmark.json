@@ -624,6 +624,7 @@
     "filterConditions": "筛选条件 (多个条件时需要同时满足)",
     "addCondition": "添加条件",
     "conditionValuePlaceholder": "输入条件值",
+    "selectDate": "选择日期",
     "loadCustomFiltersFailed": "加载自定义筛选器失败",
     "saveCustomFilterFailed": "保存自定义筛选器失败",
     "fields": {

@@ -1,3 +1,4 @@
+import type { Locator, Page } from "@playwright/test";
 import { test, expect } from "../fixtures";
 import {
   createBookmarkFixture,
@@ -12,6 +13,29 @@ import {
   seedCategories,
   seedSnapshot,
 } from "../helpers/storage";
+
+/** 日历格子上的 data-date 是本地时间，用 toISOString 会跨时区差一天 */
+function toLocalISODate(timestamp: number): string {
+  const date = new Date(timestamp);
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+}
+
+/** 打开日期选择器的日历下拉，翻到目标月份后点中那一天 */
+async function pickCalendarDate(page: Page, trigger: Locator, timestamp: number) {
+  await trigger.click();
+  const calendar = page.locator('[data-slot="calendar"]');
+  await expect(calendar).toBeVisible();
+
+  const day = calendar.locator(`[data-date="${toLocalISODate(timestamp)}"]`);
+  // 目标日期可能落在上个月，往回翻到它出现为止
+  for (let i = 0; i < 3 && (await day.count()) === 0; i++) {
+    await calendar.locator(".rdp-button_previous").click();
+  }
+  await day.first().click();
+  await expect(calendar).toBeHidden();
+}
 
 test.describe("LIB 书签库核心流程", () => {
   test.beforeEach(async ({ extensionWorker, e2eVariant }) => {
@@ -233,7 +257,6 @@ test.describe("LIB 书签库核心流程", () => {
     const t = e2eVariant.text;
     const DAY = 24 * 60 * 60 * 1000;
     const now = Date.now();
-    const toDateInput = (ts: number) => new Date(ts).toISOString().split("T")[0];
 
     await seedBookmarks(extensionWorker, [
       createBookmarkFixture({
@@ -254,9 +277,16 @@ test.describe("LIB 书签库核心流程", () => {
     await page.getByText(t("自定义时间范围", "Custom Date Range")).click();
 
     const dialog = page.getByRole("dialog");
-    const dateInputs = dialog.locator('input[type="date"]');
-    await dateInputs.nth(0).fill(toDateInput(now - 20 * DAY));
-    await dateInputs.nth(1).fill(toDateInput(now - 5 * DAY));
+    await pickCalendarDate(
+      page,
+      dialog.getByRole("button", { name: t("开始日期", "Start Date") }),
+      now - 20 * DAY,
+    );
+    await pickCalendarDate(
+      page,
+      dialog.getByRole("button", { name: t("结束日期", "End Date") }),
+      now - 5 * DAY,
+    );
     await attachStepScreenshot(page, testInfo, "LIB-007-自定义时间范围弹窗");
     await dialog.getByRole("button", { name: t("应用", "Apply") }).click();
 
@@ -270,6 +300,61 @@ test.describe("LIB 书签库核心流程", () => {
         name: t("自定义时间范围", "Custom Date Range"),
       }),
     ).toBeVisible();
+  });
+
+  test("LIB-009 自定义筛选器按创建日期筛选", async ({
+    context,
+    extensionId,
+    extensionWorker,
+    e2eVariant,
+  }, testInfo) => {
+    const t = e2eVariant.text;
+    const DAY = 24 * 60 * 60 * 1000;
+    const now = Date.now();
+
+    await seedBookmarks(extensionWorker, [
+      createBookmarkFixture({
+        id: "bm-recent",
+        title: "最近书签",
+        createdAt: now - 10 * DAY,
+      }),
+      createBookmarkFixture({
+        id: "bm-old",
+        title: "很久以前的书签",
+        createdAt: now - 100 * DAY,
+      }),
+    ]);
+
+    const page = await openAppPage(context, extensionId, "all");
+
+    await page.getByTitle(t("筛选器", "Filter")).click();
+    await page.getByText(t("添加自定义筛选器", "Add Custom Filter")).click();
+
+    const dialog = page.getByRole("dialog");
+    await dialog
+      .getByPlaceholder(t("给这个筛选器起个名字", "Give this filter a name"))
+      .fill("按创建日期");
+
+    // 字段切到「创建时间」，值输入随之变成日历下拉
+    await dialog.getByRole("combobox").first().click();
+    await page.getByRole("option", { name: t("创建时间", "Created At") }).click();
+    await dialog.getByRole("combobox").nth(1).click();
+    await page.getByRole("option", { name: t("大于", "Greater Than") }).click();
+
+    await pickCalendarDate(
+      page,
+      dialog.getByRole("button", { name: t("选择日期", "Pick a date") }),
+      now - 20 * DAY,
+    );
+    await attachStepScreenshot(page, testInfo, "LIB-009-自定义筛选器日期条件");
+    await dialog.getByRole("button", { name: t("保存", "Save") }).click();
+
+    await page.getByTitle(t("筛选器", "Filter")).click();
+    await page.getByText("按创建日期").click();
+
+    await expect(page.getByText("最近书签")).toBeVisible();
+    await expect(page.getByText("很久以前的书签")).toBeHidden();
+    await attachStepScreenshot(page, testInfo, "LIB-009-按创建日期筛选结果");
   });
 
   test("LIB-008 图片收藏详情展示主色与文件信息", async ({

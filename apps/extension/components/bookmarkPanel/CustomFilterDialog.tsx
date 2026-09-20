@@ -11,6 +11,7 @@ import {
   DialogHeader,
   DialogTitle,
   Button,
+  DatePicker,
   Input,
   Label,
   Select,
@@ -18,7 +19,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-  cn,
+  parseISODate,
+  toISODate,
 } from '@hamhome/ui';
 import { useContext } from 'react';
 import { ContentUIContext } from '@/utils/ContentUIContext';
@@ -37,7 +39,7 @@ export function CustomFilterDialog({
   onSave,
   editingFilter = null,
 }: CustomFilterDialogProps) {
-  const { t } = useTranslation('bookmark');
+  const { t, i18n } = useTranslation('bookmark');
   // 安全获取 container，如果不在 ContentUIProvider 中则使用 undefined（会回退到 document.body）
   const contentUIContext = useContext(ContentUIContext);
   const portalContainer = contentUIContext?.container;
@@ -235,16 +237,32 @@ export function CustomFilterDialog({
                       </SelectContent>
                     </Select>
 
-                    {/* 值输入 */}
-                    <Input
-                      type={isDateField ? 'date' : 'text'}
-                      placeholder={t('bookmark:contentPanel.conditionValuePlaceholder')}
-                      value={condition.value}
-                      onChange={(e) =>
-                        handleUpdateCondition(index, { value: e.target.value })
-                      }
-                      className="flex-1 h-8 text-xs"
-                    />
+                    {/* 值输入：日期字段用日历下拉，值仍按 `YYYY-MM-DD` 存 */}
+                    {isDateField ? (
+                      <DatePicker
+                        value={parseISODate(condition.value)}
+                        onChange={(date) =>
+                          handleUpdateCondition(index, {
+                            value: date ? toISODate(date) : '',
+                          })
+                        }
+                        language={i18n.language}
+                        container={portalContainer}
+                        placeholder={t('bookmark:contentPanel.selectDate')}
+                        aria-label={t('bookmark:contentPanel.selectDate')}
+                        className="flex-1 h-8 text-xs"
+                      />
+                    ) : (
+                      <Input
+                        type="text"
+                        placeholder={t('bookmark:contentPanel.conditionValuePlaceholder')}
+                        value={condition.value}
+                        onChange={(e) =>
+                          handleUpdateCondition(index, { value: e.target.value })
+                        }
+                        className="flex-1 h-8 text-xs"
+                      />
+                    )}
 
                     {/* 删除按钮 */}
                     {conditions.length > 1 && (

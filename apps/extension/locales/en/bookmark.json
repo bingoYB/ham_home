@@ -624,6 +624,7 @@
     "filterConditions": "Filter Conditions (all conditions must be met)",
     "addCondition": "Add Condition",
     "conditionValuePlaceholder": "Enter condition value",
+    "selectDate": "Pick a date",
     "loadCustomFiltersFailed": "Failed to load custom filters",
     "saveCustomFilterFailed": "Failed to save custom filter",
     "fields": {

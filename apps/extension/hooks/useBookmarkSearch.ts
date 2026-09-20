@@ -3,6 +3,7 @@
  * 从 BookmarksPage.tsx 抽象的公共搜索能力
  */
 import { useState, useMemo, useCallback, useEffect } from 'react';
+import { parseISODate } from '@hamhome/ui';
 import type { LocalBookmark, LocalCategory, CustomFilter, FilterCondition } from '@/types';
 
 const SEMANTIC_SEARCH_MIN_SCORE = 0.3;
@@ -111,13 +112,58 @@ function getTimeRangeBounds(range: TimeRange): { start: number; end: number } | 
 }
 
 /**
+ * 把 createdAt 条件里的值换算成那一天的起止时间戳
+ *
+ * 自定义筛选器弹窗存的是 `YYYY-MM-DD`，Agent 建的规则也可能直接给毫秒时间戳。
+ * 书签的 createdAt 是毫秒时间戳，`Number('2026-09-20')` 得到的是 NaN，
+ * 任何比较都不成立，所以必须先换算再比；按「整天」比较也符合只选到日的交互。
+ */
+function resolveDateBounds(value: string): { start: number; end: number } | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const date = /^\d+$/.test(trimmed)
+    ? new Date(Number(trimmed))
+    : parseISODate(trimmed);
+  if (!date || Number.isNaN(date.getTime())) return null;
+
+  const start = new Date(date);
+  start.setHours(0, 0, 0, 0);
+  const end = new Date(date);
+  end.setHours(23, 59, 59, 999);
+  return { start: start.getTime(), end: end.getTime() };
+}
+
+/**
  * 应用单个筛选条件
  */
 function applyFilterCondition(bookmark: LocalBookmark, condition: FilterCondition): boolean {
   const { field, operator, value } = condition;
 
+  // 日期字段按整天比较，和字符串字段走不同的分支
+  if (field === 'createdAt') {
+    const bounds = resolveDateBounds(value);
+    // 填不出有效日期时不参与过滤，否则筛选器会静默地什么都筛不出来
+    if (!bounds) return true;
+
+    const { createdAt } = bookmark;
+    switch (operator) {
+      case 'equals':
+        return createdAt >= bounds.start && createdAt <= bounds.end;
+      case 'notEquals':
+        return createdAt < bounds.start || createdAt > bounds.end;
+      case 'greaterThan':
+        return createdAt > bounds.end;
+      case 'lessThan':
+        return createdAt < bounds.start;
+      default:
+        // contains / startsWith 之类对日期没有意义
+        return true;
+    }
+  }
+
   // 获取字段值
-  let fieldValue: string | number;
+  let fieldValue: string;
   switch (field) {
     case 'title':
       fieldValue = bookmark.title;
@@ -131,17 +177,13 @@ function applyFilterCondition(bookmark: LocalBookmark, condition: FilterConditio
     case 'tags':
       fieldValue = bookmark.tags.join(' ');
       break;
-    case 'createdAt':
-      fieldValue = bookmark.createdAt;
-      break;
     default:
       return true;
   }
 
-  // 对于字符串字段，转换为小写进行比较
-  const isStringField = field !== 'createdAt';
-  const compareValue = isStringField ? String(fieldValue).toLowerCase() : fieldValue;
-  const compareTarget = isStringField ? value.toLowerCase() : Number(value);
+  // 字符串字段统一转小写比较
+  const compareValue = fieldValue.toLowerCase();
+  const compareTarget = value.toLowerCase();
 
   // 应用操作符
   switch (operator) {
@@ -150,18 +192,15 @@ function applyFilterCondition(bookmark: LocalBookmark, condition: FilterConditio
     case 'notEquals':
       return compareValue !== compareTarget;
     case 'contains':
-      return isStringField && String(compareValue).includes(String(compareTarget));
+      return compareValue.includes(compareTarget);
     case 'notContains':
-      return isStringField && !String(compareValue).includes(String(compareTarget));
+      return !compareValue.includes(compareTarget);
     case 'startsWith':
-      return isStringField && String(compareValue).startsWith(String(compareTarget));
+      return compareValue.startsWith(compareTarget);
     case 'endsWith':
-      return isStringField && String(compareValue).endsWith(String(compareTarget));
-    case 'greaterThan':
-      return !isStringField && Number(compareValue) > Number(compareTarget);
-    case 'lessThan':
-      return !isStringField && Number(compareValue) < Number(compareTarget);
+      return compareValue.endsWith(compareTarget);
     default:
+      // greaterThan / lessThan 只对日期字段开放
       return true;
   }
 }
