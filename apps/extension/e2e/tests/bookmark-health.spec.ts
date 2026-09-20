@@ -60,7 +60,9 @@ test.describe("HEALTH 书签体检中心", () => {
     await expect(page.getByText("Unique Page")).toBeVisible();
 
     // 重复筛选不依赖体检结果
-    await page.getByRole("button", { name: t("重复书签", "Duplicates") }).click();
+    await page
+      .getByRole("button", { name: t("重复书签", "Duplicates"), exact: true })
+      .click();
     await expect(page.getByText("Duplicated Page", { exact: true })).toBeVisible();
     await expect(page.getByText("Duplicated Page Copy 1")).toBeVisible();
     await expect(page.getByText("Unique Page")).toBeHidden();
@@ -118,5 +120,64 @@ test.describe("HEALTH 书签体检中心", () => {
     await expect(page.getByText("Unique Page")).toBeHidden();
     const remaining = await getBookmarks(extensionWorker);
     expect(remaining.filter((item) => !item.isDeleted)).toHaveLength(0);
+  });
+
+  test("HEALTH-003 书签量大时只渲染视口内的行", async ({
+    context,
+    extensionId,
+    extensionWorker,
+  }, testInfo) => {
+    const total = 300;
+    await seedBookmarks(
+      extensionWorker,
+      Array.from({ length: total }, (_, index) =>
+        createBookmarkFixture({
+          id: `bm-health-${index}`,
+          url: `https://example.com/health/${index}`,
+          title: `Health Item ${index}`,
+          createdAt: 1_735_689_600_000 - index * 60_000,
+          updatedAt: 1_735_689_600_000 - index * 60_000,
+        }),
+      ),
+    );
+
+    const page = await openAppPage(context, extensionId, "health");
+    await expect(page.getByText("Health Item 0", { exact: true })).toBeVisible();
+    await attachStepScreenshot(page, testInfo, "HEALTH-003-首屏");
+
+    // 全量渲染上千行正是切换卡顿的原因，这里必须只渲染视口附近的行
+    const renderedOnTop = await page.locator("article").count();
+    expect(renderedOnTop).toBeLessThan(total / 4);
+
+    // 滚到底部：虚拟窗口要跟着走，最后一条可见且不互相压盖
+    const bottom = await page.evaluate(() => {
+      const viewports = Array.from(
+        document.querySelectorAll('[data-slot="scroll-area-viewport"]'),
+      ) as HTMLElement[];
+      // 最后一个是页面自己的滚动容器，第一个是外层主内容区
+      const viewport = viewports[viewports.length - 1];
+      if (!viewport) return null;
+      viewport.scrollTop = viewport.scrollHeight;
+      return true;
+    });
+    expect(bottom).toBe(true);
+
+    await expect(
+      page.getByText(`Health Item ${total - 1}`, { exact: true }),
+    ).toBeVisible();
+    await attachStepScreenshot(page, testInfo, "HEALTH-003-滚到底部");
+
+    const overlaps = await page.evaluate(() => {
+      const rects = Array.from(document.querySelectorAll("article"))
+        .map((el) => el.getBoundingClientRect())
+        .sort((a, b) => a.top - b.top);
+      let count = 0;
+      for (let i = 1; i < rects.length; i++) {
+        if (rects[i].top < rects[i - 1].bottom - 1) count += 1;
+      }
+      return count;
+    });
+    expect(overlaps).toBe(0);
+    expect(await page.locator("article").count()).toBeLessThan(total / 4);
   });
 });

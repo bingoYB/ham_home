@@ -29,6 +29,7 @@ import {
 import { BatchSelectionToolbar } from "@/components/common/BatchSelectionToolbar";
 import { useBookmarks } from "@/contexts/BookmarkContext";
 import { useBookmarkSelection } from "@/hooks/useBookmarkSelection";
+import { useScrollAreaVirtualList } from "@/hooks/useScrollAreaVirtualList";
 import {
   useDuplicateBookmarks,
   type DuplicateRole,
@@ -158,6 +159,27 @@ export function BookmarkHealthPage() {
     deselectAll();
   }, [deselectAll, filter]);
 
+  // 上千条书签全量渲染会把页面切换卡住（每行都有 Checkbox、徽章和按钮），
+  // 这里只渲染视口内的行；整页共用一个滚动容器，所以要带 scrollMargin
+  const getRowKey = useCallback(
+    (index: number) => filteredBookmarks[index]?.id ?? index,
+    [filteredBookmarks],
+  );
+  const {
+    viewportRef,
+    listRef,
+    virtualItems,
+    totalSize,
+    scrollMargin,
+    measureElement,
+  } = useScrollAreaVirtualList({
+    count: filteredBookmarks.length,
+    estimateSize: 92, // 一行标题 + 网址的常见高度
+    gap: 8,
+    overscan: 6,
+    getItemKey: getRowKey,
+  });
+
   const runScan = useCallback(async (bookmarkIds?: string[]) => {
     scanStartedAtRef.current = Date.now();
     setScanning(true);
@@ -258,6 +280,7 @@ export function BookmarkHealthPage() {
       type="auto"
       className="h-full bg-background"
       viewportClassName="[&>div]:block!"
+      viewportRef={viewportRef}
     >
       {/* pb-24：给右下角悬浮的 Agent 入口留末尾空白，留白跟着内容滚动 */}
       <div className="mx-auto max-w-6xl space-y-6 px-6 py-6 pb-24">
@@ -363,31 +386,47 @@ export function BookmarkHealthPage() {
           </Button>
         </BatchSelectionToolbar>
 
-        <div className="space-y-2">
-          {filteredBookmarks.length === 0 ? (
-            <div className="rounded-xl border border-dashed p-12 text-center text-sm text-muted-foreground">
-              {t("bookmark:healthCenter.empty")}
-            </div>
-          ) : (
-            filteredBookmarks.map((bookmark) => {
+        {filteredBookmarks.length === 0 ? (
+          <div className="rounded-xl border border-dashed p-12 text-center text-sm text-muted-foreground">
+            {t("bookmark:healthCenter.empty")}
+          </div>
+        ) : (
+          <div
+            ref={listRef}
+            data-testid="health-virtual-list"
+            className="relative w-full"
+            style={{ height: `${totalSize}px` }}
+          >
+            {virtualItems.map((virtualItem) => {
+              const bookmark = filteredBookmarks[virtualItem.index];
+              if (!bookmark) return null;
               const record = getCurrentRecord(bookmark);
               return (
-                <HealthRow
-                  key={bookmark.id}
-                  bookmark={bookmark}
-                  record={record}
-                  scanning={scanning}
-                  selected={selectedIds.has(bookmark.id)}
-                  duplicateRole={duplicateRoles.get(bookmark.id)}
-                  onToggleSelect={() => toggleSelect(bookmark.id)}
-                  onScan={() => void runScan([bookmark.id])}
-                  onAcceptRedirect={() => record && void acceptRedirect(bookmark, record)}
-                  onDelete={() => void removeBookmark(bookmark)}
-                />
+                <div
+                  key={virtualItem.key}
+                  data-index={virtualItem.index}
+                  ref={measureElement}
+                  className="absolute left-0 right-0 top-0"
+                  style={{
+                    transform: `translateY(${virtualItem.start - scrollMargin}px)`,
+                  }}
+                >
+                  <HealthRow
+                    bookmark={bookmark}
+                    record={record}
+                    scanning={scanning}
+                    selected={selectedIds.has(bookmark.id)}
+                    duplicateRole={duplicateRoles.get(bookmark.id)}
+                    onToggleSelect={() => toggleSelect(bookmark.id)}
+                    onScan={() => void runScan([bookmark.id])}
+                    onAcceptRedirect={() => record && void acceptRedirect(bookmark, record)}
+                    onDelete={() => void removeBookmark(bookmark)}
+                  />
+                </div>
               );
-            })
-          )}
-        </div>
+            })}
+          </div>
+        )}
       </div>
     </ScrollArea>
   );
@@ -451,7 +490,7 @@ function HealthRow({
   return (
     <article
       className={cn(
-        "rounded-xl border bg-card p-4 [content-visibility:auto] [contain-intrinsic-size:88px]",
+        "rounded-xl border bg-card p-4",
         selected && "border-primary/50 bg-primary/5",
       )}
     >

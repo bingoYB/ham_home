@@ -192,6 +192,7 @@ Popup 快捷面板，扩展图标点击后的默认视图。保存书签的 AI �
 - 普通书签的失效链接、跳转、访问异常与重复 URL 仍按既有规则检查；历史内容收藏健康记录会在扫描时清理。
 - 重复项由 `useDuplicateBookmarks` 从当前书签列表实时计算，未体检也能进入「重复书签」筛选；每组标记最早收藏的一条为「保留」，其余为「重复」。
 - 支持勾选后批量删除，以及「清理重复项」一键删除每组的非保留项；两者都是软删除（进回收站）并刷新 `updatedAt`，删除结果会通过 WebDAV 同步到其他设备。
+- 列表用 `useScrollAreaVirtualList` 虚拟化：上千条书签时全量渲染会把页面切换卡住（每行都带 Checkbox、状态徽章和操作按钮），现在只渲染视口附近的行。整页共用一个滚动容器，统计卡片、筛选栏仍跟随列表一起滚动。
 
 ## TrashPage
 
@@ -1907,6 +1908,72 @@ const {
 - `estimateSize` 应设置为 BookmarkListItem 的估计高度（默认 88px）
 - `overscan` 控制预渲染的额外项数，增加可减少滚动时的空白
 - `scrollToBookmark` 支持平滑滚动到指定书签（用于 AI 引用点击定位）
+
+---
+
+### useScrollAreaVirtualList
+
+页面级 `ScrollArea` 内的虚拟列表 Hook。适用于「列表上方还有标题、统计卡片等内容一起滚动」的页面：
+整页只有一个滚动容器，列表只是其中一段，因此虚拟化器必须知道列表在滚动内容里的起始位置。
+
+**参数：**
+
+| Param        | Type                                     | Default | Description                              |
+| ------------ | ---------------------------------------- | ------- | ---------------------------------------- |
+| count        | `number`                                 | -       | 列表项总数                               |
+| estimateSize | `number`                                 | -       | 每项估计高度（像素），实测前用于占位     |
+| gap          | `number`                                 | `0`     | 项与项之间的间距（像素）                 |
+| overscan     | `number`                                 | `6`     | 视口外额外渲染的项数                     |
+| getItemKey   | `(index: number) => string \| number`    | -       | 稳定的列表项 key，避免筛选后串用高度缓存 |
+
+**返回值：**
+
+| Property       | Type                                | Description                                       |
+| -------------- | ----------------------------------- | ------------------------------------------------- |
+| viewportRef    | `RefObject<HTMLDivElement \| null>` | 传给 `ScrollArea` 的 `viewportRef`                 |
+| listRef        | `(node: HTMLDivElement \| null) => void` | 挂在列表容器上，用于测量列表起始位置         |
+| virtualItems   | `VirtualItem[]`                     | 当前需要渲染的虚拟项                              |
+| totalSize      | `number`                            | 列表容器应设置的高度（像素）                      |
+| scrollMargin   | `number`                            | 列表起始位置，渲染时要从 `virtualItem.start` 减掉 |
+| measureElement | `(node: Element \| null) => void`   | 实测行高，挂在每个列表项上（需带 `data-index`）   |
+
+**用法示例：**
+
+```tsx
+const { viewportRef, listRef, virtualItems, totalSize, scrollMargin, measureElement } =
+  useScrollAreaVirtualList({
+    count: rows.length,
+    estimateSize: 92,
+    gap: 8,
+    getItemKey: (index) => rows[index]?.id ?? index,
+  });
+
+<ScrollArea className="h-full" viewportRef={viewportRef}>
+  <div className="space-y-6 p-6">
+    <PageHeader />
+    <div ref={listRef} className="relative w-full" style={{ height: `${totalSize}px` }}>
+      {virtualItems.map((item) => (
+        <div
+          key={item.key}
+          data-index={item.index}
+          ref={measureElement}
+          className="absolute left-0 right-0 top-0"
+          style={{ transform: `translateY(${item.start - scrollMargin}px)` }}
+        >
+          <Row data={rows[item.index]} />
+        </div>
+      ))}
+    </div>
+  </div>
+</ScrollArea>
+```
+
+**行为说明：**
+
+- 不传 `scrollMargin` 会让虚拟窗口整体错位：滚到列表区时渲染出来的是另一批行
+- 列表上方内容的高度会变（扫描进度卡片出现、筛选栏换行），Hook 内部用 ResizeObserver 重新测量起始位置
+- 行高不固定时由 `measureElement` 实测，`estimateSize` 只用于实测前占位；列表项不要写死高度
+- 列表项用 `transform: translateY()` 定位，配合 `measureElement` 才能量到真实高度
 
 ---
 
