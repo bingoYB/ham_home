@@ -130,7 +130,7 @@ export function OptionsPage() {
   } = useOptionsPage();
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-6 space-y-6">
+    <div className="w-full max-w-4xl mx-auto p-6 pb-24 space-y-6">
       <div className="flex items-center gap-3">
         <Globe className="h-6 w-6 text-primary" />
         <h1 className="text-2xl font-bold tracking-tight">

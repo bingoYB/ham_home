@@ -100,3 +100,51 @@ import Masonry from '@hamhome/ui';
 - **`bricks` 必须是稳定引用（memo 化）**：位置缓存按索引存放，`bricks` 引用一变组件就会
   整体重新测量。筛选、排序、增删数据时这正是需要的（同一索引换成了另一条数据，
   沿用旧高度会让卡片互相压盖）；但如果每次渲染都传入新数组字面量，就会反复重测
+
+## ScrollArea
+
+基于 Radix `@radix-ui/react-scroll-area` 的滚动容器，用统一样式的滚动条替代系统原生滚动条
+（原生滚动条在深色主题下会出现浅色滚动槽，且各平台样式不一致）。
+
+### Props
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| type | `"auto" \| "always" \| "scroll" \| "hover"` | No | `"hover"` | 滚动条显示时机，透传给 Radix |
+| viewportRef | `React.Ref<HTMLDivElement>` | No | - | 拿到真正发生滚动的 viewport 节点 |
+| viewportClassName | `string` | No | - | viewport 的类名；内边距等影响滚动内容的样式加在这里 |
+| className | `string` | No | - | 根节点类名，用于约束滚动区域自身的尺寸 |
+| ...props | `ScrollAreaPrimitive.Root` | No | - | 其他 Radix `Root` 属性 |
+
+`ScrollBar` 同时导出，默认已内置在 `ScrollArea` 中，一般不需要单独使用。
+
+### Usage
+
+```tsx
+import { ScrollArea } from "@hamhome/ui";
+
+// 普通滚动区域
+<ScrollArea className="h-80">
+  <div className="p-4">{content}</div>
+</ScrollArea>
+
+// 虚拟列表 / 瀑布流：必须把 viewport 交给它们，否则读到的 scrollTop 恒为 0
+const viewportRef = useRef<HTMLDivElement>(null);
+
+<ScrollArea type="auto" className="min-h-0 flex-1" viewportRef={viewportRef}>
+  <div className="p-6">
+    <Masonry bricks={items} render={renderCard} scrollElement={() => viewportRef.current} />
+  </div>
+</ScrollArea>
+```
+
+### Notes
+
+- **默认的 `type="hover"` 在指针进入之前会把 viewport 设为 `overflow: hidden`**，
+  此时它还不是滚动容器：向上查找可滚动祖先的逻辑（如 `Masonry` 的自动查找）会直接越过它，
+  滚轮也可能滚不动。页面级的主滚动区域用 `type="auto"`，内容溢出即常驻滚动条
+- 滚动条是覆盖层，不占布局宽度，不需要 `scrollbar-gutter: stable`；内容内边距留够
+  （≥ `p-4`）即可避免与滚动条重叠
+- viewport 的内容层默认是 `display: table`，高度不会撑满。内部需要 `h-full` / `min-h-full`
+  时，用 `viewportClassName="[&>div]:block! [&>div]:h-full"`
+- 滑块颜色取自 `foreground` 透明度而不是 `--border`：深色主题下 `--border` 几乎融进背景

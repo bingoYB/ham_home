@@ -21,6 +21,7 @@ import {
   Checkbox,
   Input,
   Progress,
+  ScrollArea,
   cn,
   confirm,
   toast,
@@ -253,8 +254,13 @@ export function BookmarkHealthPage() {
   }, [redundantIds, removeBookmarks, t]);
 
   return (
-    <div className="h-full overflow-auto bg-background px-6 py-6">
-      <div className="mx-auto max-w-6xl space-y-6">
+    <ScrollArea
+      type="auto"
+      className="h-full bg-background"
+      viewportClassName="[&>div]:block!"
+    >
+      {/* pb-24：给右下角悬浮的 Agent 入口留末尾空白，留白跟着内容滚动 */}
+      <div className="mx-auto max-w-6xl space-y-6 px-6 py-6 pb-24">
         <header className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
@@ -383,7 +389,7 @@ export function BookmarkHealthPage() {
           )}
         </div>
       </div>
-    </div>
+    </ScrollArea>
   );
 }
 

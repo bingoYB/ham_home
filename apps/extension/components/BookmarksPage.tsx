@@ -272,6 +272,19 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
     overscan: 5,
   });
 
+  // ScrollArea 的 viewport 才是真正滚动的节点，瀑布流和虚拟列表都要拿到它。
+  // 不能让瀑布流自己向上查找：Radix 在指针进入前把 viewport 的 overflow 设成
+  // hidden，查找会一路越过它，最后退化成监听 window 滚动。
+  const listViewportRef = useRef<HTMLDivElement | null>(null);
+  const setListViewport = useCallback(
+    (node: HTMLDivElement | null) => {
+      listViewportRef.current = node;
+      virtualListParentRef.current = node;
+    },
+    [virtualListParentRef],
+  );
+  const getListViewport = useCallback(() => listViewportRef.current, []);
+
   // 批量打标签弹窗状态
   const [showBatchTagDialog, setShowBatchTagDialog] = useState(false);
 
@@ -896,196 +909,204 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
         )}
       </div>
 
-      {/* 书签列表 */}
-      <div
-        ref={
-          viewMode === "grid"
-            ? masonryContainerRef
-            : viewMode === "list"
-              ? virtualListParentRef
-              : undefined
-        }
-        className="min-h-0 flex-1 overflow-auto [scrollbar-gutter:stable] p-6 pb-24"
+      {/* 书签列表：滚动条统一用组件库的 ScrollArea，不再暴露系统原生滚动条 */}
+      <ScrollArea
+        // type="auto"：内容溢出就常驻滚动条。默认的 hover 模式在指针进入前会把
+        // viewport 的 overflow 设成 hidden，容器此时还不是滚动容器
+        type="auto"
+        className="min-h-0 flex-1"
+        viewportRef={setListViewport}
+        // Radix 的内容层默认 display:table 且高度自适应，这里改成块级并撑满，
+        // 让内部的 min-h-full / flex-1 能正常计算
+        viewportClassName="[&>div]:block! [&>div]:h-full"
       >
-        {filteredBookmarks.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8">
-            <div className="flex flex-col items-center max-w-md text-center space-y-4">
-              <FolderOpen className="h-16 w-16 text-muted-foreground/30 mb-4" />
-              <p className="text-lg font-medium text-foreground">
-                {hasFilters
-                  ? t("bookmark:bookmark.emptyFilter")
-                  : t("bookmark:bookmark.empty")}
-              </p>
+        <div
+          ref={viewMode === "grid" ? masonryContainerRef : undefined}
+          // pb-24 是给右下角悬浮的 Agent 入口留的末尾空白：它跟着内容滚动，
+          // 不会像放在外层布局上那样在视口底部压出一条空带
+          className="flex min-h-full flex-col p-6 pb-24"
+        >
+          {filteredBookmarks.length === 0 ? (
+            <div className="flex flex-1 flex-col items-center justify-center p-8 text-muted-foreground">
+              <div className="flex flex-col items-center max-w-md text-center space-y-4">
+                <FolderOpen className="h-16 w-16 text-muted-foreground/30 mb-4" />
+                <p className="text-lg font-medium text-foreground">
+                  {hasFilters
+                    ? t("bookmark:bookmark.emptyFilter")
+                    : t("bookmark:bookmark.empty")}
+                </p>
 
-              {!hasFilters && bookmarks.length === 0 ? (
-                <>
-                  <p className="text-sm text-muted-foreground mt-2">
-                    {t("bookmark:bookmark.emptyGuide", {
-                      defaultValue:
-                        "您还没有任何数据。您可以从浏览器或其他文件导入数据，或者通过 WebDAV 同步已有的数据。",
-                    })}
-                  </p>
-                  <div className="flex items-center justify-center gap-3 mt-6 pt-4">
-                    <Button
-                      variant="default"
-                      onClick={() => onViewChange?.("import-export")}
-                      className="gap-2"
-                    >
-                      <Download className="h-4 w-4" />
-                      {t("settings:settings.importExport.title", {
-                        defaultValue: "导入数据",
+                {!hasFilters && bookmarks.length === 0 ? (
+                  <>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      {t("bookmark:bookmark.emptyGuide", {
+                        defaultValue:
+                          "您还没有任何数据。您可以从浏览器或其他文件导入数据，或者通过 WebDAV 同步已有的数据。",
                       })}
-                    </Button>
+                    </p>
+                    <div className="flex items-center justify-center gap-3 mt-6 pt-4">
+                      <Button
+                        variant="default"
+                        onClick={() => onViewChange?.("import-export")}
+                        className="gap-2"
+                      >
+                        <Download className="h-4 w-4" />
+                        {t("settings:settings.importExport.title", {
+                          defaultValue: "导入数据",
+                        })}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        onClick={() => onViewChange?.("settings?tab=storage")}
+                        className="gap-2"
+                      >
+                        <Cloud className="h-4 w-4" />
+                        {t("settings:settings.sync.title", {
+                          defaultValue: "WebDAV 同步",
+                        })}
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  hasFilters && (
                     <Button
-                      variant="outline"
-                      onClick={() => onViewChange?.("settings?tab=storage")}
-                      className="gap-2"
+                      variant="link"
+                      onClick={clearFilters}
+                      className="mt-2"
                     >
-                      <Cloud className="h-4 w-4" />
-                      {t("settings:settings.sync.title", {
-                        defaultValue: "WebDAV 同步",
-                      })}
+                      {t("bookmark:bookmark.filter.clearFilter")}
                     </Button>
-                  </div>
-                </>
-              ) : (
-                hasFilters && (
-                  <Button
-                    variant="link"
-                    onClick={clearFilters}
-                    className="mt-2"
-                  >
-                    {t("bookmark:bookmark.filter.clearFilter")}
-                  </Button>
-                )
-              )}
+                  )
+                )}
+              </div>
             </div>
-          </div>
-        ) : viewMode === "grid" ? (
-          <Masonry
-            ref={masonryRef}
-            brickId="id"
-            bricks={filteredBookmarks}
-            gutter={16}
-            columnSize={masonryConfig.columnSize}
-            columnNum={masonryConfig.cols}
-            render={(bookmark, _index, columnWidth) => {
-              const bm = bookmark as LocalBookmark;
-              return (
-                <div
-                  key={bm.id}
-                >
-                  <BookmarkCard
-                    bookmark={bm}
-                    categoryName={getBookmarkCategoryPath(bm.categoryId)}
-                    formattedDate={formatBookmarkDate(bm.createdAt)}
-                    isSelected={selectedIds.has(bm.id)}
-                    isHighlighted={false}
-                    onToggleSelect={() => toggleSelect(bm.id)}
-                    onOpen={() => openBookmark(bm.url)}
-                    onEdit={() => setEditingBookmark(bm)}
-                    onDelete={() => handleDelete(bm)}
-                    onViewScreenshot={
-                      screenshotIndex[bm.id]
-                        ? () => setScreenshotBookmark(bm)
-                        : undefined
-                    }
-                    onViewSnapshot={
-                      bm.hasSnapshot ? () => handleViewSnapshot(bm) : undefined
-                    }
-                    onDeleteSnapshot={
-                      bm.hasSnapshot
-                        ? () => handleDeleteBookmarkSnapshot(bm)
-                        : undefined
-                    }
-                    onSyncToObsidian={() => handleSyncToObsidian(bm)}
-                    onTogglePin={() => handleToggleBookmarkPin(bm)}
-                    isPinned={pinnedBookmarkIds.has(bm.id)}
-                    onReanalyzeAI={() => startBatchAITask([bm.id])}
-                    isProcessingAI={isBatchAIProcessing}
-                    // 用瀑布流实际算出的列宽，避免卡片宽度和单元格宽度两套来源
-                    columnSize={columnWidth}
-                    hasScreenshot={!!screenshotIndex[bm.id]}
-                    subject={toSubjectContent(clipSubjectIndex[bm.id])}
-                    onOpenSubject={() => setSubjectBookmark(bm)}
-                    t={t}
-                  />
-                </div>
-              );
-            }}
-          />
-        ) : viewMode === "list" ? (
-          <div
-            data-testid="bookmark-virtual-list"
-            className="relative w-full"
-            style={{ height: `${virtualListTotalSize}px` }}
-          >
-            {virtualItems.map((virtualItem) => {
-              const bookmark = filteredBookmarks[virtualItem.index];
-              if (!bookmark) return null;
-              return (
-                <div
-                  key={virtualItem.key}
-                  data-index={virtualItem.index}
-                  ref={(el) => {
-                    if (el) virtualBookmarkRefs.current.set(bookmark.id, el);
-                  }}
-                  className="absolute left-0 right-0"
-                  style={{
-                    top: `${virtualItem.start}px`,
-                    height: `${virtualItem.size}px`,
-                  }}
-                >
-                  <BookmarkListItem
-                    bookmark={bookmark}
-                    categoryName={getBookmarkCategoryPath(bookmark.categoryId)}
-                    formattedDate={formatBookmarkDate(bookmark.createdAt)}
-                    isSelected={selectedIds.has(bookmark.id)}
-                    isHighlighted={false}
-                    onToggleSelect={() => toggleSelect(bookmark.id)}
-                    onOpen={() => openBookmark(bookmark.url)}
-                    onEdit={() => setEditingBookmark(bookmark)}
-                    onDelete={() => handleDelete(bookmark)}
-                    onViewScreenshot={
-                      screenshotIndex[bookmark.id]
-                        ? () => setScreenshotBookmark(bookmark)
-                        : undefined
-                    }
-                    onViewSnapshot={
-                      bookmark.hasSnapshot
-                        ? () => handleViewSnapshot(bookmark)
-                        : undefined
-                    }
-                    onDeleteSnapshot={
-                      bookmark.hasSnapshot
-                        ? () => handleDeleteBookmarkSnapshot(bookmark)
-                        : undefined
-                    }
-                    onSyncToObsidian={() => handleSyncToObsidian(bookmark)}
-                    onTogglePin={() => handleToggleBookmarkPin(bookmark)}
-                    isPinned={pinnedBookmarkIds.has(bookmark.id)}
-                    onReanalyzeAI={() => startBatchAITask([bookmark.id])}
-                    isProcessingAI={isBatchAIProcessing}
-                    hasScreenshot={!!screenshotIndex[bookmark.id]}
-                    subject={toSubjectContent(clipSubjectIndex[bookmark.id])}
-                    onOpenSubject={() => setSubjectBookmark(bookmark)}
-                    t={t}
-                  />
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <VisualBookmarkGallery
-            bookmarks={filteredBookmarks}
-            screenshotIds={screenshotIds}
-            selectedIds={selectedIds}
-            onToggleSelect={toggleSelect}
-            onViewScreenshot={setScreenshotBookmark}
-            onOpenBookmark={openBookmark}
-          />
-        )}
-      </div>
+          ) : viewMode === "grid" ? (
+            <Masonry
+              ref={masonryRef}
+              brickId="id"
+              bricks={filteredBookmarks}
+              scrollElement={getListViewport}
+              gutter={16}
+              columnSize={masonryConfig.columnSize}
+              columnNum={masonryConfig.cols}
+              render={(bookmark, _index, columnWidth) => {
+                const bm = bookmark as LocalBookmark;
+                return (
+                  <div
+                    key={bm.id}
+                  >
+                    <BookmarkCard
+                      bookmark={bm}
+                      categoryName={getBookmarkCategoryPath(bm.categoryId)}
+                      formattedDate={formatBookmarkDate(bm.createdAt)}
+                      isSelected={selectedIds.has(bm.id)}
+                      isHighlighted={false}
+                      onToggleSelect={() => toggleSelect(bm.id)}
+                      onOpen={() => openBookmark(bm.url)}
+                      onEdit={() => setEditingBookmark(bm)}
+                      onDelete={() => handleDelete(bm)}
+                      onViewScreenshot={
+                        screenshotIndex[bm.id]
+                          ? () => setScreenshotBookmark(bm)
+                          : undefined
+                      }
+                      onViewSnapshot={
+                        bm.hasSnapshot ? () => handleViewSnapshot(bm) : undefined
+                      }
+                      onDeleteSnapshot={
+                        bm.hasSnapshot
+                          ? () => handleDeleteBookmarkSnapshot(bm)
+                          : undefined
+                      }
+                      onSyncToObsidian={() => handleSyncToObsidian(bm)}
+                      onTogglePin={() => handleToggleBookmarkPin(bm)}
+                      isPinned={pinnedBookmarkIds.has(bm.id)}
+                      onReanalyzeAI={() => startBatchAITask([bm.id])}
+                      isProcessingAI={isBatchAIProcessing}
+                      // 用瀑布流实际算出的列宽，避免卡片宽度和单元格宽度两套来源
+                      columnSize={columnWidth}
+                      hasScreenshot={!!screenshotIndex[bm.id]}
+                      subject={toSubjectContent(clipSubjectIndex[bm.id])}
+                      onOpenSubject={() => setSubjectBookmark(bm)}
+                      t={t}
+                    />
+                  </div>
+                );
+              }}
+            />
+          ) : viewMode === "list" ? (
+            <div
+              data-testid="bookmark-virtual-list"
+              className="relative w-full shrink-0"
+              style={{ height: `${virtualListTotalSize}px` }}
+            >
+              {virtualItems.map((virtualItem) => {
+                const bookmark = filteredBookmarks[virtualItem.index];
+                if (!bookmark) return null;
+                return (
+                  <div
+                    key={virtualItem.key}
+                    data-index={virtualItem.index}
+                    ref={(el) => {
+                      if (el) virtualBookmarkRefs.current.set(bookmark.id, el);
+                    }}
+                    className="absolute left-0 right-0"
+                    style={{
+                      top: `${virtualItem.start}px`,
+                      height: `${virtualItem.size}px`,
+                    }}
+                  >
+                    <BookmarkListItem
+                      bookmark={bookmark}
+                      categoryName={getBookmarkCategoryPath(bookmark.categoryId)}
+                      formattedDate={formatBookmarkDate(bookmark.createdAt)}
+                      isSelected={selectedIds.has(bookmark.id)}
+                      isHighlighted={false}
+                      onToggleSelect={() => toggleSelect(bookmark.id)}
+                      onOpen={() => openBookmark(bookmark.url)}
+                      onEdit={() => setEditingBookmark(bookmark)}
+                      onDelete={() => handleDelete(bookmark)}
+                      onViewScreenshot={
+                        screenshotIndex[bookmark.id]
+                          ? () => setScreenshotBookmark(bookmark)
+                          : undefined
+                      }
+                      onViewSnapshot={
+                        bookmark.hasSnapshot
+                          ? () => handleViewSnapshot(bookmark)
+                          : undefined
+                      }
+                      onDeleteSnapshot={
+                        bookmark.hasSnapshot
+                          ? () => handleDeleteBookmarkSnapshot(bookmark)
+                          : undefined
+                      }
+                      onSyncToObsidian={() => handleSyncToObsidian(bookmark)}
+                      onTogglePin={() => handleToggleBookmarkPin(bookmark)}
+                      isPinned={pinnedBookmarkIds.has(bookmark.id)}
+                      onReanalyzeAI={() => startBatchAITask([bookmark.id])}
+                      isProcessingAI={isBatchAIProcessing}
+                      hasScreenshot={!!screenshotIndex[bookmark.id]}
+                      subject={toSubjectContent(clipSubjectIndex[bookmark.id])}
+                      onOpenSubject={() => setSubjectBookmark(bookmark)}
+                      t={t}
+                    />
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <VisualBookmarkGallery
+              bookmarks={filteredBookmarks}
+              screenshotIds={screenshotIds}
+              selectedIds={selectedIds}
+              onToggleSelect={toggleSelect}
+              onViewScreenshot={setScreenshotBookmark}
+              onOpenBookmark={openBookmark}
+            />
+          )}
+        </div>
+      </ScrollArea>
 
       {/* 编辑弹窗 */}
       {editingBookmark && (

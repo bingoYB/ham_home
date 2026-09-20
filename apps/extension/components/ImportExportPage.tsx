@@ -1216,7 +1216,7 @@ export function ImportExportPage() {
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-6">
+    <div className="w-full max-w-4xl mx-auto p-6 pb-24">
       {/* 导出 */}
       <Card className="mb-6">
         <CardHeader>

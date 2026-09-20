@@ -43,7 +43,9 @@
 }
 
 /* achieve scroll area viewport height 100% */
-#main-content [data-slot="scroll-area-viewport"]>div {
+/* 只作用于直接子级：页面内部嵌套的 ScrollArea 一旦也被强制 height:100%，
+   它自己的滚动内容就会被压成一屏高 */
+#main-content > [data-slot="scroll-area-viewport"] > div {
   height: 100%;
 }
 

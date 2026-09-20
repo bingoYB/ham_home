@@ -625,7 +625,7 @@ export function CategoriesPage() {
         <CardContent className="p-0 h-full">
           <ScrollArea className="w-full h-full">
             {categoryTree.length > 0 ? (
-              <div className="divide-y pr-2">
+              <div className="divide-y pr-2 pb-24">
                 {categoryTree.map((node) => (
                   <CategoryTreeItem
                     key={node.id}

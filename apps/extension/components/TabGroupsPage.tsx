@@ -39,7 +39,7 @@ export function TabGroupsPage() {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-6">
+    <div className="mx-auto flex w-full max-w-6xl flex-col gap-6 p-6 pb-24">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="flex items-start gap-3">
           <div className="rounded-md bg-primary/10 p-2 text-primary">

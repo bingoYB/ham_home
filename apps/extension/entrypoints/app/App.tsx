@@ -666,9 +666,17 @@ function AppContent() {
           </div>
         </header>
         <main className="flex-1 min-h-0 overflow-hidden">
-          <ScrollArea id="main-content" className="h-full scroll-table-fix">
-            {/* 增加全局的底部空白间距 (pb-24)，防止右下角的 Agent 入口遮挡页面内容或滚动条 */}
-            <div className="flex h-full min-h-0 flex-col pb-24">
+          {/* type="auto"：内容溢出就常驻滚动条。默认的 hover 模式在指针进入前
+              viewport 还是 overflow:hidden，此时滚轮根本滚不动 */}
+          <ScrollArea
+            id="main-content"
+            type="auto"
+            className="h-full scroll-table-fix"
+          >
+            {/* 这一层撑满视口，不能加底部 padding：那会把视口下沿 ~96px 变成
+                谁也用不到的空带，内容和滚动条都被截断在空带上沿。
+                Agent 入口是悬浮层，末尾留白由各页面自己的滚动内容负责（pb-24） */}
+            <div className="flex h-full min-h-0 flex-col">
               <div className="flex min-h-0 flex-1 flex-col">
                 {renderContent()}
               </div>

@@ -300,8 +300,7 @@ export function WorkspacesPage() {
       onDragEnd={handleDragEnd}
       onDragCancel={handleDragCancel}
     >
-      {/* -mb-24：这个是抵消全局的agent留白，改成内部元素加pb-24来留白*/}
-      <div className="flex flex-1 h-full min-h-0 flex-col bg-background -mb-24 xl:flex-row">
+      <div className="flex flex-1 h-full min-h-0 flex-col bg-background xl:flex-row">
         <section className="flex min-w-0 flex-1 flex-col">
           <header className="flex min-h-16 flex-wrap gap-3 border-b px-4 py-3">
             <div className="min-w-0 flex-1">
@@ -329,7 +328,8 @@ export function WorkspacesPage() {
               items={sortableIds}
               strategy={verticalListSortingStrategy}
             >
-              <div>
+              {/* pb-24：给右下角悬浮的 Agent 入口留末尾空白 */}
+              <div className="pb-24">
                 {state.filteredWorkspaces.length > 0 ? (
                   state.filteredWorkspaces.map((workspace) => (
                     <WorkspaceSection
