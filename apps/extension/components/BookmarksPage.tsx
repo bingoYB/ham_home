@@ -905,10 +905,7 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
               ? virtualListParentRef
               : undefined
         }
-        className={cn(
-          "min-h-0 flex-1 overflow-auto [scrollbar-gutter:stable]",
-          viewMode === "grid" ? "p-6" : "p-6",
-        )}
+        className="min-h-0 flex-1 overflow-auto [scrollbar-gutter:stable] p-6 pb-24"
       >
         {filteredBookmarks.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-muted-foreground p-8">
@@ -972,10 +969,7 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
             gutter={16}
             columnSize={masonryConfig.columnSize}
             columnNum={masonryConfig.cols}
-            scrollElement={() => {
-              return document.querySelector("#main-content>div");
-            }}
-            render={(bookmark) => {
+            render={(bookmark, _index, columnWidth) => {
               const bm = bookmark as LocalBookmark;
               return (
                 <div
@@ -1009,7 +1003,8 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
                     isPinned={pinnedBookmarkIds.has(bm.id)}
                     onReanalyzeAI={() => startBatchAITask([bm.id])}
                     isProcessingAI={isBatchAIProcessing}
-                    columnSize={masonryConfig.columnSize}
+                    // 用瀑布流实际算出的列宽，避免卡片宽度和单元格宽度两套来源
+                    columnSize={columnWidth}
                     hasScreenshot={!!screenshotIndex[bm.id]}
                     subject={toSubjectContent(clipSubjectIndex[bm.id])}
                     onOpenSubject={() => setSubjectBookmark(bm)}
@@ -1021,6 +1016,7 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
           />
         ) : viewMode === "list" ? (
           <div
+            data-testid="bookmark-virtual-list"
             className="relative w-full"
             style={{ height: `${virtualListTotalSize}px` }}
           >

@@ -48,8 +48,10 @@ export function useVirtualBookmarkList({
 
   const virtualizer = useVirtualizer({
     count: items.length,
-    getScrollElement: () =>
-      document.querySelector("#main-content>div") as HTMLDivElement,
+    // Must be the element that actually scrolls, i.e. the list container the
+    // caller attaches `parentRef` to. Querying an outer wrapper instead reads a
+    // scrollTop that never changes, so the window never advances past row 0.
+    getScrollElement: () => parentRef.current,
     estimateSize: () => estimateSize,
     overscan,
     // 使用书签 ID 作为 key
