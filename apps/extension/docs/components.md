@@ -134,6 +134,8 @@ Popup 快捷面板，扩展图标点击后的默认视图。保存书签的 AI �
 - `settings.usePopupSavePanel` 打开时跳过消息发送，直接切换到 `PopupSaveView`，按钮下方的说明文案同步切换。
 - 提供打开书签面板、保存当前窗口为工作空间、管理书签、设置四个快捷入口，并展示最近保存的 5 条书签。
 - 常用设置区可直接切换「默认保存快照」「地址栏搜索增强」，改动实时写入设置。
+- 面板高度收口在浏览器给 Popup 的上限（600px）：底部状态栏固定，上方内容整体滚动，内容不够高时面板仍按内容收窄。
+- 内容滚动区用原生滚动容器加 `scrollbar-slim`，没有用 `ScrollArea`：`ScrollArea` 的 viewport 靠 `height: 100%` 撑开，在 `max-height` 收口的弹性盒里百分比会按收口前的内容高度计算，viewport 会比容器更高并把底栏顶出可视区。
 
 ## BookmarkSubjectDialog / ImageClipMetadata
 

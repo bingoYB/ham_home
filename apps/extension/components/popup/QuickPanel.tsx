@@ -127,125 +127,133 @@ export function QuickPanel({ onFallbackToSaveView }: QuickPanelProps) {
     .slice(0, RECENT_LIMIT);
 
   return (
-    <div className="flex w-full flex-col bg-background text-foreground">
-      <div className="flex-1 space-y-4 p-4">
-        {/* 快捷操作 */}
-        <section className="space-y-2">
-          <SectionTitle>{t("bookmark:popup.quickActions")}</SectionTitle>
-          <div className="grid grid-cols-2 gap-2">
-            <ActionTile
-              icon={
-                saving ? (
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                ) : (
-                  <Bookmark className="h-3.5 w-3.5" />
-                )
-              }
-              iconClassName="bg-emerald-500/15 text-emerald-500"
-              label={t("bookmark:popup.saveCurrentPage")}
-              hint={formatShortcut("save-bookmark")}
-              disabled={saving || unsupportedPage}
-              onClick={handleSaveCurrentPage}
-            />
-            <ActionTile
-              icon={<AppWindow className="h-3.5 w-3.5" />}
-              iconClassName="bg-amber-500/15 text-amber-500"
-              label={t("bookmark:workspace.saveCurrentWindow")}
-              hint={formatShortcut("save-workspace")}
-              onClick={handleSaveWorkspace}
-            />
-            <ActionTile
-              icon={<List className="h-3.5 w-3.5" />}
-              iconClassName="bg-sky-500/15 text-sky-500"
-              label={t("common:common.manageBookmarks")}
-              onClick={() => openTab(getExtensionURL("app.html"))}
-            />
-            <ActionTile
-              icon={<Settings className="h-3.5 w-3.5" />}
-              iconClassName="bg-muted text-muted-foreground"
-              label={t("common:common.settings")}
-              onClick={() => openTab(getExtensionURL("app.html#settings"))}
-            />
-          </div>
-
-          {/* 保存磁贴被禁用时说明原因，否则用户不知道为何点不动 */}
-          {unsupportedPage && (
-            <p className="text-xs text-muted-foreground">
-              {t("bookmark:popup.cannotSavePage")}
-            </p>
-          )}
-        </section>
-
-        {/* 最近保存 */}
-        <section className="space-y-2">
-          <div className="flex items-center justify-between">
-            <SectionTitle>{t("bookmark:popup.recentSaves")}</SectionTitle>
-            <button
-              type="button"
-              className="flex items-center text-xs text-primary transition-opacity hover:opacity-80"
-              onClick={() => openTab(getExtensionURL("app.html"))}
-            >
-              {t("common:common.viewAll")}
-              <ChevronRight className="h-3 w-3" />
-            </button>
-          </div>
-
-          {recentBookmarks.length > 0 ? (
-            <ul className="space-y-0.5 rounded-xl border bg-card p-1">
-              {recentBookmarks.map((bookmark) => (
-                <RecentBookmarkItem
-                  key={bookmark.id}
-                  bookmark={bookmark}
-                  onOpen={() => openTab(bookmark.url)}
-                />
-              ))}
-            </ul>
-          ) : (
-            <div className="flex flex-col items-center gap-0.5 rounded-xl border border-dashed bg-card px-3 py-4 text-center">
-              <BookmarkX className="mb-1 h-5 w-5 text-muted-foreground/40" />
-              <p className="text-[13px] text-muted-foreground">
-                {t("bookmark:popup.noRecentSaves")}
-              </p>
-              <p className="text-[11px] text-muted-foreground/70">
-                {t("bookmark:popup.noRecentSavesHint")}
-              </p>
+    // max-h-[600px] 是浏览器给 Popup 的高度上限：撑满后由内容区自己滚动，
+    // 否则整个文档滚动，底部状态栏会跟着滚走
+    <div className="flex max-h-[600px] w-full flex-col bg-background text-foreground">
+      {/* 内容滚动区。这里用原生滚动容器而不是 ScrollArea：外层是 max-height
+          收口的弹性盒，ScrollArea 的 viewport 靠 height:100% 撑开，百分比会按
+          收口前的内容高度算，结果 viewport 比容器还高，直接把底栏顶出可视区。
+          scrollbar-slim 保证滚动条是细条而不是系统默认样式 */}
+      <div className="scrollbar-slim min-h-0 flex-1 overflow-y-auto overscroll-contain">
+        <div className="space-y-4 p-4">
+          {/* 快捷操作 */}
+          <section className="space-y-2">
+            <SectionTitle>{t("bookmark:popup.quickActions")}</SectionTitle>
+            <div className="grid grid-cols-2 gap-2">
+              <ActionTile
+                icon={
+                  saving ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <Bookmark className="h-3.5 w-3.5" />
+                  )
+                }
+                iconClassName="bg-emerald-500/15 text-emerald-500"
+                label={t("bookmark:popup.saveCurrentPage")}
+                hint={formatShortcut("save-bookmark")}
+                disabled={saving || unsupportedPage}
+                onClick={handleSaveCurrentPage}
+              />
+              <ActionTile
+                icon={<AppWindow className="h-3.5 w-3.5" />}
+                iconClassName="bg-amber-500/15 text-amber-500"
+                label={t("bookmark:workspace.saveCurrentWindow")}
+                hint={formatShortcut("save-workspace")}
+                onClick={handleSaveWorkspace}
+              />
+              <ActionTile
+                icon={<List className="h-3.5 w-3.5" />}
+                iconClassName="bg-sky-500/15 text-sky-500"
+                label={t("common:common.manageBookmarks")}
+                onClick={() => openTab(getExtensionURL("app.html"))}
+              />
+              <ActionTile
+                icon={<Settings className="h-3.5 w-3.5" />}
+                iconClassName="bg-muted text-muted-foreground"
+                label={t("common:common.settings")}
+                onClick={() => openTab(getExtensionURL("app.html#settings"))}
+              />
             </div>
-          )}
-        </section>
 
-        {/* 常用设置 */}
-        <section className="space-y-2">
-          <SectionTitle>{t("bookmark:popup.quickSettings")}</SectionTitle>
-          <div className="divide-y rounded-xl border bg-card">
-            <SettingRow
-              icon={<Zap className="h-3.5 w-3.5 text-primary" />}
-              label={t("settings:settings.general.autoSaveSnapshot")}
-              description={t("bookmark:popup.autoSaveSnapshotDesc")}
-              checked={appSettings.autoSaveSnapshot}
-              onChange={(checked) =>
-                updateAppSettings({ autoSaveSnapshot: checked })
-              }
-            />
-            <SettingRow
-              icon={<Search className="h-3.5 w-3.5 text-primary" />}
-              label={t("settings:settings.general.enableOmniboxSearch")}
-              description={t("bookmark:popup.omniboxSearchDesc")}
-              checked={appSettings.enableOmniboxSearch}
-              onChange={(checked) =>
-                updateAppSettings({ enableOmniboxSearch: checked })
-              }
-            />
-            <LinkRow
-              icon={<Keyboard className="h-3.5 w-3.5 text-muted-foreground" />}
-              label={t("common:common.viewShortcuts")}
-              description={t("bookmark:popup.viewShortcutsDesc")}
-              onClick={() => openTab(getBrowserSpecificURL("shortcuts"))}
-            />
-          </div>
-        </section>
+            {/* 保存磁贴被禁用时说明原因，否则用户不知道为何点不动 */}
+            {unsupportedPage && (
+              <p className="text-xs text-muted-foreground">
+                {t("bookmark:popup.cannotSavePage")}
+              </p>
+            )}
+          </section>
+
+          {/* 最近保存 */}
+          <section className="space-y-2">
+            <div className="flex items-center justify-between">
+              <SectionTitle>{t("bookmark:popup.recentSaves")}</SectionTitle>
+              <button
+                type="button"
+                className="flex items-center text-xs text-primary transition-opacity hover:opacity-80"
+                onClick={() => openTab(getExtensionURL("app.html"))}
+              >
+                {t("common:common.viewAll")}
+                <ChevronRight className="h-3 w-3" />
+              </button>
+            </div>
+
+            {recentBookmarks.length > 0 ? (
+              <ul className="space-y-0.5 rounded-xl border bg-card p-1">
+                {recentBookmarks.map((bookmark) => (
+                  <RecentBookmarkItem
+                    key={bookmark.id}
+                    bookmark={bookmark}
+                    onOpen={() => openTab(bookmark.url)}
+                  />
+                ))}
+              </ul>
+            ) : (
+              <div className="flex flex-col items-center gap-0.5 rounded-xl border border-dashed bg-card px-3 py-4 text-center">
+                <BookmarkX className="mb-1 h-5 w-5 text-muted-foreground/40" />
+                <p className="text-[13px] text-muted-foreground">
+                  {t("bookmark:popup.noRecentSaves")}
+                </p>
+                <p className="text-[11px] text-muted-foreground/70">
+                  {t("bookmark:popup.noRecentSavesHint")}
+                </p>
+              </div>
+            )}
+          </section>
+
+          {/* 常用设置 */}
+          <section className="space-y-2">
+            <SectionTitle>{t("bookmark:popup.quickSettings")}</SectionTitle>
+            <div className="divide-y rounded-xl border bg-card">
+              <SettingRow
+                icon={<Zap className="h-3.5 w-3.5 text-primary" />}
+                label={t("settings:settings.general.autoSaveSnapshot")}
+                description={t("bookmark:popup.autoSaveSnapshotDesc")}
+                checked={appSettings.autoSaveSnapshot}
+                onChange={(checked) =>
+                  updateAppSettings({ autoSaveSnapshot: checked })
+                }
+              />
+              <SettingRow
+                icon={<Search className="h-3.5 w-3.5 text-primary" />}
+                label={t("settings:settings.general.enableOmniboxSearch")}
+                description={t("bookmark:popup.omniboxSearchDesc")}
+                checked={appSettings.enableOmniboxSearch}
+                onChange={(checked) =>
+                  updateAppSettings({ enableOmniboxSearch: checked })
+                }
+              />
+              <LinkRow
+                icon={<Keyboard className="h-3.5 w-3.5 text-muted-foreground" />}
+                label={t("common:common.viewShortcuts")}
+                description={t("bookmark:popup.viewShortcutsDesc")}
+                onClick={() => openTab(getBrowserSpecificURL("shortcuts"))}
+              />
+            </div>
+          </section>
+        </div>
       </div>
 
-      {/* 底部状态栏 */}
+      {/* 底部固定状态栏 */}
       <footer className="flex shrink-0 items-center justify-between border-t bg-muted/5 px-4 py-2 text-[12px] text-muted-foreground/60">
         <a
           href={APP_WEBSITE_URL}

@@ -265,4 +265,69 @@ test.describe("POPUP 当前页保存流程", () => {
       popup.getByRole("button", { name: /保存当前页面|Save current page/ }),
     ).toBeVisible();
   });
+
+  test("POPUP-006 快捷面板底部固定，内容区滚动", async ({
+    context,
+    extensionId,
+    extensionWorker,
+  }, testInfo) => {
+    // 条数足够撑破 Popup 的高度上限，否则测不到滚动
+    await seedBookmarks(
+      extensionWorker,
+      Array.from({ length: 8 }, (_, index) =>
+        createBookmarkFixture({
+          id: `bm-popup-layout-${index}`,
+          url: `https://example.com/popup-layout/${index}`,
+          title: `Popup Layout Item ${index}`,
+          createdAt: 2_000 - index,
+        }),
+      ),
+    );
+
+    const popup = await openControlledPopupPage(
+      context,
+      extensionId,
+      CURRENT_PAGE,
+      { view: "quick" },
+    );
+    // 模拟浏览器给 Popup 的真实尺寸
+    await popup.setViewportSize({ width: 420, height: 600 });
+    await expect(popup.getByText("Popup Layout Item 0")).toBeVisible();
+
+    const readLayout = () =>
+      popup.evaluate(() => {
+        const footer = document.querySelector("footer");
+        const box = footer?.getBoundingClientRect();
+        // 面板结构：内容滚动区 / footer
+        const content = document.querySelector(
+          "#root > div > div > div",
+        ) as HTMLElement | null;
+        return {
+          footer: box
+            ? { top: Math.round(box.top), bottom: Math.round(box.bottom) }
+            : null,
+          // 整个文档不应该滚动，否则底栏会跟着滚走
+          documentScrollTop: document.scrollingElement?.scrollTop ?? -1,
+          contentScrollTop: content ? Math.round(content.scrollTop) : -1,
+          contentScrollable: content
+            ? content.scrollHeight - content.clientHeight
+            : 0,
+        };
+      });
+
+    const before = await readLayout();
+    expect(before.footer?.bottom).toBe(600);
+    expect(before.contentScrollable).toBeGreaterThan(0);
+    await attachStepScreenshot(popup, testInfo, "POPUP-006-顶部");
+
+    await popup.mouse.move(210, 400);
+    await popup.mouse.wheel(0, 800);
+    await popup.waitForTimeout(400);
+
+    const after = await readLayout();
+    expect(after.contentScrollTop).toBeGreaterThan(0);
+    expect(after.documentScrollTop).toBe(0);
+    expect(after.footer).toEqual(before.footer);
+    await attachStepScreenshot(popup, testInfo, "POPUP-006-滚动后");
+  });
 });
