@@ -9,6 +9,7 @@ import {
 import { DayButton, DayPicker, getDefaultClassNames } from 'react-day-picker'
 
 import { cn } from '@ui/lib/utils'
+import { toISODate } from '@ui/lib/date'
 import { Button, buttonVariants } from '@ui/components/button'
 
 function Calendar({
@@ -191,6 +192,9 @@ function CalendarDayButton({
       variant="ghost"
       size="icon"
       data-day={day.date.toLocaleDateString()}
+      // Locale-independent day key: `data-day` follows the runtime locale, which
+      // makes a cell impossible to address reliably from styling or tests.
+      data-date={toISODate(day.date)}
       data-selected-single={
         modifiers.selected &&
         !modifiers.range_start &&

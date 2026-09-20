@@ -24,6 +24,8 @@ export * from "./components/scroll-area";
 export * from "./components/checkbox";
 export * from "./components/command";
 export * from "./components/popover";
+export * from "./components/calendar";
+export * from "./components/date-picker";
 export * from "./components/hover-card";
 export * from "./components/tooltip";
 export * from "./components/sidebar";
@@ -58,6 +60,7 @@ export {
 
 // 工具函数导出
 export { cn } from "./lib/utils";
+export { toISODate, parseISODate } from "./lib/date";
 export { createDialogOpener, type DialogHandle } from "./lib/dialog-opener";
 export { masonryCompute, MasonryComputeMode } from "./lib/masonryCompute";
 

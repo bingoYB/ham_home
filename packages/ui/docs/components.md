@@ -148,3 +148,103 @@ const viewportRef = useRef<HTMLDivElement>(null);
 - viewport 的内容层默认是 `display: table`，高度不会撑满。内部需要 `h-full` / `min-h-full`
   时，用 `viewportClassName="[&>div]:block! [&>div]:h-full"`
 - 滑块颜色取自 `foreground` 透明度而不是 `--border`：深色主题下 `--border` 几乎融进背景
+
+## Calendar
+
+shadcn/ui 的日历组件，底层是 `react-day-picker` v9。样式全部由 Tailwind class 覆盖，
+不需要额外引入 `react-day-picker` 的 CSS。
+
+### Props
+
+透传 `react-day-picker` 的 `DayPicker` 全部属性，常用的有：
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| mode | `"single" \| "multiple" \| "range"` | No | - | 选择模式 |
+| selected | `Date \| Date[] \| DateRange` | No | - | 当前选中值，类型随 `mode` 变化 |
+| onSelect | `(value) => void` | No | - | 选中回调 |
+| captionLayout | `"label" \| "dropdown" \| "dropdown-months" \| "dropdown-years"` | No | `"label"` | 月份/年份标题样式；`dropdown` 渲染成原生 `select`，可快速跨年份跳转 |
+| locale | `date-fns Locale` | No | `enUS` | 月份、星期名的语言 |
+| startMonth / endMonth | `Date` | No | - | 可导航到的最早/最晚月份；`captionLayout` 含年份下拉时不传默认是「100 年前 ~ 今年年底」 |
+| disabled | `Matcher \| Matcher[]` | No | - | 不可选日期；数组是「或」关系，`{ before, after }` 写在同一个对象里是「且」 |
+| buttonVariant | `ButtonProps["variant"]` | No | `"ghost"` | 上/下月导航按钮的样式 |
+
+### Usage
+
+```tsx
+import { Calendar } from "@hamhome/ui";
+
+const [date, setDate] = useState<Date>();
+
+<Calendar mode="single" selected={date} onSelect={setDate} />;
+```
+
+### Notes
+
+- 日期格子上有两个属性：`data-day` 是 `toLocaleDateString()` 结果（跟随运行时语言），
+  `data-date` 是本地时区的 `YYYY-MM-DD`。要用选择器定位某一天（样式、E2E）只能用 `data-date`
+- 上/下月导航按钮带 `react-day-picker` 的默认类名 `rdp-button_previous` / `rdp-button_next`
+- 要做「输入框 + 日历下拉」用 `DatePicker`，不要自己再拼一遍 Popover
+
+### 配套的日期工具
+
+`data-date` 用的那套 `YYYY-MM-DD` 编解码同样从 `@hamhome/ui` 导出，需要把日历选择结果
+存成字符串时直接用它们，不要自己 `toISOString()` / `new Date('2026-09-20')`——这两个都走 UTC，
+在 UTC 以西的时区会整整差一天。
+
+| Export         | Signature                                | Description                                       |
+| -------------- | ---------------------------------------- | ------------------------------------------------- |
+| `toISODate`    | `(date: Date) => string`                 | 按本地时间格式化成 `YYYY-MM-DD`                    |
+| `parseISODate` | `(value: string) => Date \| undefined`   | 解析 `YYYY-MM-DD` 为当天本地零点；格式非法或日期不存在（如 `2026-02-31`）返回 `undefined` |
+
+---
+
+## DatePicker
+
+触发按钮 + 日历弹层的日期选择器（shadcn/ui date picker 组合），用来替代 `<input type="date">`：
+原生控件的弹层样式跟随浏览器，无法适配主题，各浏览器表现也不一致。
+
+### Props
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| value | `Date` | No | - | 选中日期；不传渲染 `placeholder` |
+| onChange | `(date: Date \| undefined) => void` | No | - | 选中回调 |
+| placeholder | `string` | No | - | 未选中时按钮上的文案 |
+| disabled | `boolean` | No | `false` | 禁用触发按钮 |
+| min / max | `Date` | No | - | 可选日期的上下界（含端点），超出范围的日期不可点击 |
+| startMonth / endMonth | `Date` | No | `min` / `max` | 可导航到的最早/最晚月份 |
+| language | `string` | No | - | BCP-47 语言标签（如 `zh-CN`、`en`），决定星期名、月份下拉和按钮文案的语言 |
+| captionLayout | 同 `Calendar` | No | `"dropdown"` | 月份/年份标题样式 |
+| container | `HTMLElement` | No | - | Portal 容器，渲染在 Shadow DOM 里时必传 |
+| className | `string` | No | - | 触发按钮类名 |
+| id | `string` | No | - | 触发按钮 id，配合 `<Label htmlFor>` 使用 |
+| aria-label | `string` | No | - | 触发按钮的无障碍名称 |
+
+### Usage
+
+```tsx
+import { DatePicker, Label } from "@hamhome/ui";
+
+const [start, setStart] = useState<Date>();
+const [end, setEnd] = useState<Date>();
+
+<Label htmlFor="range-start">开始日期</Label>
+<DatePicker
+  id="range-start"
+  value={start}
+  onChange={setStart}
+  max={end}
+  language={i18n.language}
+  placeholder="开始日期"
+/>;
+```
+
+### Notes
+
+- `language` 只按 `zh` 前缀区分中英文；日历内部用 date-fns locale、触发按钮用 `Intl`，
+  两边由同一处映射得出，不会出现「星期是中文、月份是英文」
+- date-fns locale 按 `date-fns/locale/zh-CN` 这样的子路径引入，避免 `date-fns/locale`
+  桶文件把上百个 locale 打进产物
+- 选中日期后弹层自动关闭；清空选择（`onChange(undefined)`）不关闭
+- 起止日期成对使用时，把对方的值互相传给 `max` / `min`，越界的日期就点不到了
