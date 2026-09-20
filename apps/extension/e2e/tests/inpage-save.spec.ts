@@ -192,13 +192,20 @@ test.describe("CONTENT 页内保存流程", () => {
       .poll(async () => getBookmarks(extensionWorker))
       .toEqual([expect.objectContaining({ title: "页面截图书签" })])
       .then(async () => getBookmarks(extensionWorker));
-    // 截图是书签保存后的异步任务，必须轮询到真正落盘为止：
-    // 断言写成 expect.any(Number) 的话，helper 返回的 0 也会让轮询立刻通过
+    // The background captures the screenshot asynchronously before storing it,
+    // so poll until it is actually persisted (0 means not written yet)
     await expect
-      .poll(async () => (await getScreenshotAssetSizes(extensionWorker, saved.id)).image)
-      .toBeGreaterThan(1_000);
-    const sizes = await getScreenshotAssetSizes(extensionWorker, saved.id);
-    expect(sizes.thumbnail).toBeGreaterThan(100);
+      .poll(
+        async () => {
+          const { image, thumbnail } = await getScreenshotAssetSizes(
+            extensionWorker,
+            saved.id,
+          );
+          return image > 1_000 && thumbnail > 100;
+        },
+        { timeout: 20_000 },
+      )
+      .toBe(true);
 
     const app = await openAppPage(context, extensionId, "all");
     await app.getByTitle(t("视觉画廊", "Visual Gallery")).click();

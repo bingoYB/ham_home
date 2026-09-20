@@ -31,31 +31,35 @@ export * from "./components/sheet";
 export * from "./components/app-sidebar";
 export * from "./components/breadcrumb";
 export { default as Masonry } from "./components/masonry";
-export type { MasonryRef } from "./components/masonry";
+export type { MasonryProps, MasonryRef } from "./components/masonry";
 export { Toaster, toast } from "./components/sonner";
 export * from "./components/carousel";
 
 // Hooks 导出
 export { useDebounce } from "./hooks/useDebounce";
 export {
-  useForceUpdate,
+  useScrollElement,
+  useScrollContainerMetrics,
+  useScrollPosition,
+  type ScrollElementInput,
+  type ScrollContainerMetrics,
+  type ScrollPosition,
+} from "./hooks/useScrollContainer";
+// 瀑布流布局原语直接透出 masonic 的实现
+export {
   usePositioner,
   useResizeObserver,
-  useScroller,
-  useContainerPosition,
+  createPositioner,
   createResizeObserver,
   type UsePositionerOptions,
-  type ResizeObserverInstance,
-  type ScrollerResult,
-  type ContainerPosition,
-} from "./hooks/useMasonry";
+  type Positioner,
+  type PositionerItem,
+} from "masonic";
 
 // 工具函数导出
 export { cn } from "./lib/utils";
 export { createDialogOpener, type DialogHandle } from "./lib/dialog-opener";
 export { masonryCompute, MasonryComputeMode } from "./lib/masonryCompute";
-export { createIntervalTree, type IIntervalTree } from "./lib/interval-tree";
-export { createPositioner, type IPositioner, type PositionerItem } from "./lib/positioner";
 
 // 示例导出
 export * from "./example";

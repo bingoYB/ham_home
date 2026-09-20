@@ -177,7 +177,8 @@ test.describe("AI 与同步核心流程", () => {
     const reloadedStoragePanel = page.getByRole("tabpanel", { name: /存储管理|Storage/ });
 
     await expect(reloadedStoragePanel.getByPlaceholder("password")).toHaveValue("e2e-password");
-    // 锚定整段文本：下方的兜底错误提示同样以「同步失败」开头，不加锚点会命中两个元素
+    // Match only the status text in the sync status row, not the error hint below it
+
     await expect(
       reloadedStoragePanel.getByText(/^(同步失败|Sync Failed)$/),
     ).toBeVisible();
