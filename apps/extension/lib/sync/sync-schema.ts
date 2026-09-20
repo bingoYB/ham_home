@@ -28,8 +28,20 @@ export const RemoteBookmarkMetaSchema = z.object({
 
 export type RemoteBookmarkMeta = z.infer<typeof RemoteBookmarkMetaSchema>;
 
+/**
+ * 删除墓碑：书签彻底删除后只剩这条记录，用于把删除结果同步到其他设备
+ */
+export const RemoteBookmarkDeletionSchema = z.object({
+  id: z.string(),
+  deletedAt: z.number(),
+});
+
+export type RemoteBookmarkDeletion = z.infer<typeof RemoteBookmarkDeletionSchema>;
+
 export const RemoteBookmarksFileSchema = z.object({
   bookmarks: z.array(RemoteBookmarkMetaSchema),
+  // 旧版本写出的 meta.json 没有这个字段
+  deletions: z.array(RemoteBookmarkDeletionSchema).default([]),
 });
 
 export type RemoteBookmarksFile = z.infer<typeof RemoteBookmarksFileSchema>;

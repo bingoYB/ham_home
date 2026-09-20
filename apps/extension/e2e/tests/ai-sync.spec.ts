@@ -178,6 +178,7 @@ test.describe("AI 与同步核心流程", () => {
 
     await expect(reloadedStoragePanel.getByPlaceholder("password")).toHaveValue("e2e-password");
     // Match only the status text in the sync status row, not the error hint below it
+
     await expect(
       reloadedStoragePanel.getByText(/^(同步失败|Sync Failed)$/),
     ).toBeVisible();

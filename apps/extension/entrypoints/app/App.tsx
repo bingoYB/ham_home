@@ -25,6 +25,7 @@ import {
   Briefcase,
   Layers,
   HeartPulse,
+  Trash2,
 } from "lucide-react";
 import {
   Toaster,
@@ -72,6 +73,7 @@ import { safeCreateTab } from "@/utils/browser-api";
 import logoImage from "@/assets/logo.png";
 
 const BookmarkHealthPage = lazy(() => import("@/components/BookmarkHealthPage"));
+const TrashPage = lazy(() => import("@/components/TrashPage"));
 
 // 页面标题映射
 const PAGE_TITLES: Record<string, { title: string; description?: string }> = {
@@ -86,6 +88,10 @@ const PAGE_TITLES: Record<string, { title: string; description?: string }> = {
   health: {
     title: "bookmark:healthCenter.title",
     description: "bookmark:healthCenter.description",
+  },
+  trash: {
+    title: "bookmark:trash.title",
+    description: "bookmark:trash.description",
   },
   privacy: {
     title: "settings:settings.privacy.title",
@@ -331,6 +337,12 @@ function AppContent() {
         isActive: currentViewBase === "import-export",
       },
       {
+        title: t("bookmark:trash.navTitle"),
+        url: "#trash",
+        icon: Trash2,
+        isActive: currentViewBase === "trash",
+      },
+      {
         title: t("settings:settings.title"),
         url: "#settings",
         icon: Settings,
@@ -496,6 +508,18 @@ function AppContent() {
             }
           >
             <BookmarkHealthPage />
+          </Suspense>
+        );
+      case "trash":
+        return (
+          <Suspense
+            fallback={
+              <div className="flex h-full items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            }
+          >
+            <TrashPage />
           </Suspense>
         );
       case "categories":

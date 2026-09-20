@@ -9,10 +9,13 @@
  * - 分类 (sync:categories) - 跨设备同步（分类数量较少，不易超限）
  */
 import { nanoid } from 'nanoid';
+import { normalizeBookmarkUrl } from '../bookmarks/bookmark-dedup';
 import { bookmarkClipStorage } from './bookmark-clip-storage';
 import { bookmarkHealthStorage } from './bookmark-health-storage';
 import { bookmarkScreenshotStorage } from './bookmark-screenshot-storage';
+import { bookmarkTombstoneStorage } from './bookmark-tombstone-storage';
 import { snapshotStorage } from './snapshot-storage';
+import { vectorStore } from './vector-store';
 import type {
   LocalBookmark,
   LocalCategory,
@@ -250,36 +253,25 @@ class BookmarkStorage {
   }
 
   /**
-   * 删除书签（支持软删除和永久删除）
+   * 删除书签
+   * @param permanent true 为彻底删除（清空全部关联数据并留下墓碑），false 为移入回收站
    */
   async deleteBookmark(id: string, permanent = false): Promise<void> {
-    const metaList: BookmarkMeta[] = await bookmarkMetaItem.getValue();
-
     if (permanent) {
-      // 永久删除：同时删除元数据和内容
-      await bookmarkMetaItem.setValue(metaList.filter((b: BookmarkMeta) => b.id !== id));
+      await this.purgeBookmarks([id]);
+      return;
+    }
 
-      const contentsMap = await bookmarkContentsItem.getValue();
-      const nextContentsMap = { ...contentsMap };
-      delete nextContentsMap[id];
-      await bookmarkContentsItem.setValue(nextContentsMap);
-      await Promise.all([
-        bookmarkClipStorage.deleteByBookmark(id),
-        bookmarkHealthStorage.delete(id),
-        bookmarkScreenshotStorage.delete(id),
-        snapshotStorage.deleteSnapshot(id),
-      ]);
-    } else {
-      // 软删除：只标记元数据
-      const index = metaList.findIndex((b: BookmarkMeta) => b.id === id);
-      if (index !== -1) {
-        const now = Date.now();
-        await bookmarkMetaItem.setValue(
-          metaList.map((b: BookmarkMeta, i: number) =>
-            i === index ? { ...b, isDeleted: true, updatedAt: now } : b
-          )
-        );
-      }
+    // 软删除：移入回收站，保留全部数据等待恢复或到期清理
+    const metaList: BookmarkMeta[] = await bookmarkMetaItem.getValue();
+    const index = metaList.findIndex((b: BookmarkMeta) => b.id === id);
+    if (index !== -1) {
+      const now = Date.now();
+      await bookmarkMetaItem.setValue(
+        metaList.map((b: BookmarkMeta, i: number) =>
+          i === index ? { ...b, isDeleted: true, deletedAt: now, updatedAt: now } : b
+        )
+      );
     }
   }
 
@@ -287,7 +279,8 @@ class BookmarkStorage {
    * 恢复已删除的书签
    */
   async restoreBookmark(id: string): Promise<LocalBookmark> {
-    return this.updateBookmark(id, { isDeleted: false });
+    await bookmarkTombstoneStorage.remove([id]);
+    return this.updateBookmark(id, { isDeleted: false, deletedAt: undefined });
   }
 
   /**
@@ -295,6 +288,41 @@ class BookmarkStorage {
    */
   async getDeletedBookmarks(): Promise<LocalBookmark[]> {
     return this.getBookmarks({ isDeleted: true });
+  }
+
+  /**
+   * 彻底删除：清空书签本体与全部关联数据，并留下墓碑
+   *
+   * 墓碑是删除能同步到其他设备的唯一凭据，删数据前先写，
+   * 中途失败也不会出现「本地没了、别的设备又推回来」。
+   * 墓碑的保留期从这一刻起算，而不是从进回收站起算：在此之前，
+   * 软删除记录本身就在传播删除，墓碑接棒后才需要完整的传播窗口。
+   */
+  async purgeBookmarks(ids: string[]): Promise<void> {
+    if (ids.length === 0) return;
+
+    const idSet = new Set(ids);
+    const now = Date.now();
+
+    await bookmarkTombstoneStorage.add(
+      Array.from(idSet, (id) => ({ id, deletedAt: now })),
+    );
+
+    const metaList: BookmarkMeta[] = await bookmarkMetaItem.getValue();
+    await bookmarkMetaItem.setValue(metaList.filter((b: BookmarkMeta) => !idSet.has(b.id)));
+
+    const contentsMap = await bookmarkContentsItem.getValue();
+    const nextContentsMap = { ...contentsMap };
+    for (const id of idSet) delete nextContentsMap[id];
+    await bookmarkContentsItem.setValue(nextContentsMap);
+
+    await Promise.all([
+      bookmarkClipStorage.deleteByBookmarks(ids),
+      bookmarkHealthStorage.deleteMany(ids),
+      bookmarkScreenshotStorage.deleteMany(ids),
+      vectorStore.deleteEmbeddings(ids),
+      ...ids.map((id) => snapshotStorage.deleteSnapshot(id)),
+    ]);
   }
 
   // ============ 分类操作 ============
@@ -483,43 +511,41 @@ class BookmarkStorage {
    * 批量删除书签
    */
   async batchDeleteBookmarks(ids: string[], permanent = false): Promise<void> {
-    let metaList: BookmarkMeta[] = await bookmarkMetaItem.getValue();
+    if (ids.length === 0) return;
 
     if (permanent) {
-      metaList = metaList.filter((b: BookmarkMeta) => !ids.includes(b.id));
-      await bookmarkMetaItem.setValue(metaList);
-
-      // 同时删除内容
-      const contentsMap = await bookmarkContentsItem.getValue();
-      const nextContentsMap = { ...contentsMap };
-      ids.forEach((id) => delete nextContentsMap[id]);
-      await bookmarkContentsItem.setValue(nextContentsMap);
-      await Promise.all([
-        bookmarkClipStorage.deleteByBookmarks(ids),
-        bookmarkHealthStorage.deleteMany(ids),
-        bookmarkScreenshotStorage.deleteMany(ids),
-        Promise.all(ids.map((id) => snapshotStorage.deleteSnapshot(id))),
-      ]);
-    } else {
-      const now = Date.now();
-      metaList = metaList.map((b: BookmarkMeta) =>
-        ids.includes(b.id) ? { ...b, isDeleted: true, updatedAt: now } : b
-      );
-      await bookmarkMetaItem.setValue(metaList);
+      await this.purgeBookmarks(ids);
+      return;
     }
+
+    const metaList: BookmarkMeta[] = await bookmarkMetaItem.getValue();
+    const idSet = new Set(ids);
+    const now = Date.now();
+    await bookmarkMetaItem.setValue(
+      metaList.map((b: BookmarkMeta) =>
+        idSet.has(b.id) ? { ...b, isDeleted: true, deletedAt: now, updatedAt: now } : b
+      )
+    );
   }
 
   /**
    * 批量恢复书签
    */
   async batchRestoreBookmarks(ids: string[]): Promise<void> {
-    const metaList: BookmarkMeta[] = await bookmarkMetaItem.getValue();
-    const now = Date.now();
-    const updated = metaList.map((b: BookmarkMeta) =>
-      ids.includes(b.id) ? { ...b, isDeleted: false, updatedAt: now } : b
-    );
+    if (ids.length === 0) return;
 
-    await bookmarkMetaItem.setValue(updated);
+    await bookmarkTombstoneStorage.remove(ids);
+
+    const metaList: BookmarkMeta[] = await bookmarkMetaItem.getValue();
+    const idSet = new Set(ids);
+    const now = Date.now();
+    await bookmarkMetaItem.setValue(
+      metaList.map((b: BookmarkMeta) =>
+        idSet.has(b.id)
+          ? { ...b, isDeleted: false, deletedAt: undefined, updatedAt: now }
+          : b
+      )
+    );
   }
 
   /**
@@ -622,6 +648,15 @@ class BookmarkStorage {
   }
 
   // ============ 同步辅助操作 ============
+
+  /**
+   * 获取同步所需的全部书签元数据（含软删除墓碑，不含 content）
+   * getBookmarks() 会过滤掉已删除项，同步必须拿到墓碑才能把删除操作传播到其他设备
+   */
+  async getBookmarksForSync(): Promise<LocalBookmark[]> {
+    const metaList: BookmarkMeta[] = await bookmarkMetaItem.getValue();
+    return metaList.map((meta: BookmarkMeta) => ({ ...meta, content: undefined }));
+  }
 
   /**
    * 按映射表合并重复分类
@@ -765,28 +800,10 @@ class BookmarkStorage {
   // ============ 工具方法 ============
 
   /**
-   * 规范化 URL（移除 tracking 参数，统一格式）
+   * 规范化 URL（与同步、体检中心共用同一套去重规则）
    */
   private normalizeUrl(url: string): string {
-    try {
-      const parsed = new URL(url);
-      // 移除 tracking 参数
-      const trackingParams = [
-        'utm_source',
-        'utm_medium',
-        'utm_campaign',
-        'utm_term',
-        'utm_content',
-        'ref',
-        'fbclid',
-        'gclid',
-      ];
-      trackingParams.forEach((param) => parsed.searchParams.delete(param));
-      // 移除末尾斜杠
-      return parsed.toString().replace(/\/$/, '');
-    } catch {
-      return url;
-    }
+    return normalizeBookmarkUrl(url);
   }
 }
 

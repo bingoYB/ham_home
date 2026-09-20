@@ -11,6 +11,14 @@ const mocks = vi.hoisted(() => ({
   importRawAutoGroupSettings: vi.fn(),
   getAllClips: vi.fn(),
   importRawClip: vi.fn(),
+  getBookmarksForSync: vi.fn(),
+  getBookmarkById: vi.fn(),
+  getBookmarkContent: vi.fn(),
+  importRawBookmark: vi.fn(),
+  purgeBookmarks: vi.fn(),
+  getTombstones: vi.fn(),
+  replaceTombstones: vi.fn(),
+  deleteFile: vi.fn(),
 }));
 
 vi.mock("../webdav-client", async () => {
@@ -25,6 +33,7 @@ vi.mock("../webdav-client", async () => {
       reset: vi.fn(),
       checkAuth: vi.fn(),
       ensureDirectory: vi.fn(),
+      deleteFile: mocks.deleteFile,
     },
   };
 });
@@ -40,11 +49,23 @@ vi.mock("../../storage/bookmark-storage", () => ({
   bookmarkStorage: {
     getCategories: vi.fn(),
     getBookmarks: vi.fn(),
-    getBookmarkById: vi.fn(),
-    importRawBookmark: vi.fn(),
+    getBookmarksForSync: mocks.getBookmarksForSync,
+    getBookmarkById: mocks.getBookmarkById,
+    getBookmarkContent: mocks.getBookmarkContent,
+    importRawBookmark: mocks.importRawBookmark,
     importRawCategory: vi.fn(),
     mergeCategories: vi.fn(),
     deleteBookmark: vi.fn(),
+    purgeBookmarks: mocks.purgeBookmarks,
+  },
+}));
+
+vi.mock("../../storage/bookmark-tombstone-storage", () => ({
+  bookmarkTombstoneStorage: {
+    getAll: mocks.getTombstones,
+    replaceAll: mocks.replaceTombstones,
+    add: vi.fn(),
+    remove: vi.fn(),
   },
 }));
 
@@ -101,6 +122,7 @@ describe("SyncEngine settings merge", () => {
     vi.clearAllMocks();
     mocks.getRules.mockResolvedValue([]);
     mocks.getAllClips.mockResolvedValue([]);
+    mocks.getTombstones.mockResolvedValue([]);
   });
 
   it("uploads newer local settings instead of applying stale remote settings", async () => {
@@ -216,5 +238,235 @@ describe("SyncEngine settings merge", () => {
 
     expect(mocks.importRawAutoGroupSettings).toHaveBeenCalledWith(remoteAutoGroupSettings);
     expect(mocks.putJSON).not.toHaveBeenCalled();
+  });
+});
+
+interface TestBookmark {
+  id: string;
+  url: string;
+  title?: string;
+  description?: string;
+  tags?: string[];
+  createdAt?: number;
+  updatedAt?: number;
+  isDeleted?: boolean;
+}
+
+function bookmark(input: TestBookmark) {
+  return {
+    title: `Bookmark ${input.id}`,
+    description: "",
+    categoryId: null,
+    tags: [],
+    hasSnapshot: false,
+    createdAt: 1,
+    updatedAt: 1,
+    ...input,
+  };
+}
+
+interface Tombstone {
+  id: string;
+  deletedAt: number;
+}
+
+/** 跑一次书签同步，返回写入远端 meta.json 的内容 */
+async function runBookmarkSync(options: {
+  local: ReturnType<typeof bookmark>[];
+  remote: ReturnType<typeof bookmark>[] | null;
+  localTombstones?: Tombstone[];
+  remoteDeletions?: Tombstone[];
+}) {
+  mocks.getBookmarksForSync.mockResolvedValue(options.local);
+  mocks.getBookmarkById.mockImplementation(async (id: string) =>
+    options.local.find((item) => item.id === id) ?? null,
+  );
+  mocks.getBookmarkContent.mockResolvedValue(undefined);
+  mocks.getTombstones.mockResolvedValue(options.localTombstones ?? []);
+  mocks.getJSON.mockImplementation(async (filename: string) =>
+    filename.endsWith("/bookmarks/meta.json") && options.remote
+      ? { bookmarks: options.remote, deletions: options.remoteDeletions ?? [] }
+      : null,
+  );
+
+  const { syncEngine } = await import("../sync-engine");
+  await (syncEngine as unknown as { syncBookmarks: () => Promise<void> }).syncBookmarks();
+
+  const metaCall = mocks.putJSON.mock.calls.find(([filename]: [string]) =>
+    filename.endsWith("/bookmarks/meta.json"),
+  );
+  return {
+    bookmarks: metaCall?.[1]?.bookmarks as
+      | Array<ReturnType<typeof bookmark> & { isDeleted: boolean }>
+      | undefined,
+    deletions: metaCall?.[1]?.deletions as Tombstone[] | undefined,
+  };
+}
+
+describe("SyncEngine bookmark merge", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getTombstones.mockResolvedValue([]);
+  });
+
+  it("collapses the same URL saved on two devices into a single bookmark", async () => {
+    const { bookmarks: uploaded } = await runBookmarkSync({
+      local: [
+        bookmark({ id: "local-1", url: "https://example.com/a", createdAt: 200, tags: ["本地"] }),
+      ],
+      remote: [
+        bookmark({ id: "remote-1", url: "https://example.com/a?utm_source=x", createdAt: 100, tags: ["远端"] }),
+      ],
+    });
+
+    const alive = uploaded?.filter((item) => !item.isDeleted) ?? [];
+    expect(alive).toHaveLength(1);
+    // 创建更早的一条胜出，两边的标签都保留下来
+    expect(alive[0].id).toBe("remote-1");
+    expect([...alive[0].tags].sort()).toEqual(["本地", "远端"]);
+    expect(uploaded?.find((item) => item.id === "local-1")?.isDeleted).toBe(true);
+    // 被合并掉的那条要落到本地，用户才看不到重复项
+    expect(mocks.importRawBookmark).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "local-1", isDeleted: true }),
+    );
+  });
+
+  it("merges duplicates that only exist locally", async () => {
+    const { bookmarks: uploaded } = await runBookmarkSync({
+      local: [
+        bookmark({ id: "b1", url: "https://example.com/a", createdAt: 100 }),
+        bookmark({ id: "b2", url: "https://example.com/a", createdAt: 200 }),
+        bookmark({ id: "b3", url: "https://example.com/b", createdAt: 300 }),
+      ],
+      remote: null,
+    });
+
+    expect(uploaded?.filter((item) => !item.isDeleted).map((item) => item.id)).toEqual([
+      "b1",
+      "b3",
+    ]);
+  });
+
+  it("keeps text clips of the same page apart", async () => {
+    const { bookmarks: uploaded } = await runBookmarkSync({
+      local: [
+        bookmark({ id: "c1", url: "https://example.com/p#:~:text=one" }),
+        bookmark({ id: "c2", url: "https://example.com/p#:~:text=two" }),
+      ],
+      remote: null,
+    });
+
+    expect(uploaded?.filter((item) => item.isDeleted)).toHaveLength(0);
+  });
+
+  it("uploads local tombstones so deletions reach other devices", async () => {
+    const { bookmarks: uploaded } = await runBookmarkSync({
+      local: [
+        bookmark({ id: "b1", url: "https://example.com/a", updatedAt: 200, isDeleted: true }),
+      ],
+      remote: [bookmark({ id: "b1", url: "https://example.com/a", updatedAt: 100 })],
+    });
+
+    expect(uploaded?.find((item) => item.id === "b1")?.isDeleted).toBe(true);
+  });
+
+  it("does not resurrect a remote tombstone that never existed locally", async () => {
+    await runBookmarkSync({
+      local: [],
+      remote: [
+        bookmark({ id: "b1", url: "https://example.com/a", updatedAt: 100, isDeleted: true }),
+      ],
+    });
+
+    expect(mocks.importRawBookmark).not.toHaveBeenCalled();
+  });
+
+  it("applies a remote restore back to a locally deleted bookmark", async () => {
+    await runBookmarkSync({
+      local: [
+        bookmark({ id: "b1", url: "https://example.com/a", updatedAt: 100, isDeleted: true }),
+      ],
+      remote: [
+        bookmark({ id: "b1", url: "https://example.com/a", updatedAt: 200, isDeleted: false }),
+      ],
+    });
+
+    expect(mocks.importRawBookmark).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "b1", isDeleted: false }),
+    );
+  });
+});
+
+describe("SyncEngine deletion tombstones", () => {
+  const NOW = Date.now();
+  const DAY = 24 * 60 * 60 * 1000;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getTombstones.mockResolvedValue([]);
+  });
+
+  it("publishes local tombstones and drops the remote copy of the bookmark", async () => {
+    const { bookmarks, deletions } = await runBookmarkSync({
+      local: [],
+      remote: [bookmark({ id: "b1", url: "https://example.com/a", updatedAt: NOW - DAY })],
+      localTombstones: [{ id: "b1", deletedAt: NOW }],
+    });
+
+    expect(deletions).toEqual([{ id: "b1", deletedAt: NOW }]);
+    expect(bookmarks).toEqual([]);
+  });
+
+  it("purges a bookmark another device deleted for good", async () => {
+    await runBookmarkSync({
+      local: [bookmark({ id: "b1", url: "https://example.com/a", updatedAt: NOW - DAY })],
+      remote: [],
+      remoteDeletions: [{ id: "b1", deletedAt: NOW }],
+    });
+
+    expect(mocks.purgeBookmarks).toHaveBeenCalledWith(["b1"]);
+    expect(mocks.replaceTombstones).toHaveBeenCalledWith([{ id: "b1", deletedAt: NOW }]);
+  });
+
+  it("keeps a bookmark that was edited after the delete", async () => {
+    const { bookmarks, deletions } = await runBookmarkSync({
+      local: [bookmark({ id: "b1", url: "https://example.com/a", updatedAt: NOW + DAY })],
+      remote: [],
+      remoteDeletions: [{ id: "b1", deletedAt: NOW }],
+    });
+
+    expect(deletions).toEqual([]);
+    expect(mocks.purgeBookmarks).not.toHaveBeenCalled();
+    expect(bookmarks?.map((item) => item.id)).toEqual(["b1"]);
+  });
+
+  it("stops syncing tombstones past the retention window", async () => {
+    const { deletions } = await runBookmarkSync({
+      local: [],
+      remote: [],
+      remoteDeletions: [
+        { id: "fresh", deletedAt: NOW - DAY },
+        { id: "stale", deletedAt: NOW - 200 * DAY },
+      ],
+    });
+
+    expect(deletions?.map((item) => item.id)).toEqual(["fresh"]);
+  });
+
+  it("removes the remote content chunk only for newly published deletions", async () => {
+    await runBookmarkSync({
+      local: [],
+      remote: [],
+      localTombstones: [
+        { id: "new", deletedAt: NOW },
+        { id: "known", deletedAt: NOW - DAY },
+      ],
+      remoteDeletions: [{ id: "known", deletedAt: NOW - DAY }],
+    });
+
+    expect(mocks.deleteFile).toHaveBeenCalledTimes(1);
+    expect(mocks.deleteFile).toHaveBeenCalledWith(
+      expect.stringContaining("/chunks/new.gz.txt"),
+    );
   });
 });

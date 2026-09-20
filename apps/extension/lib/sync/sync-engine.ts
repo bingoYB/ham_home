@@ -5,6 +5,7 @@ import { configStorage } from '../storage/config-storage';
 import { workspaceStorage } from '../storage/workspace-storage';
 import { tabGroupRulesStorage } from '../storage/tab-group-rules-storage';
 import { bookmarkClipStorage } from '../storage/bookmark-clip-storage';
+import { bookmarkTombstoneStorage } from '../storage/bookmark-tombstone-storage';
 import { z } from 'zod';
 import { 
   SyncSysSchema, 
@@ -15,6 +16,7 @@ import {
   RemoteCategorySchema, 
   RemoteCategory, 
   RemoteBookmarksFileSchema,
+  RemoteBookmarkDeletion,
   RemoteBookmarkClipsFileSchema,
   RemoteWorkspacesFileSchema,
   RemoteWorkspace,
@@ -23,6 +25,7 @@ import {
   RemoteTabGroupRule,
 } from './sync-schema';
 import type {
+  BookmarkTombstone,
   LocalBookmark,
   LocalCategory,
   LocalSettings,
@@ -32,6 +35,11 @@ import type {
   TabGroupAutoGroupSettings,
   BookmarkClip,
 } from '@/types';
+import { buildDuplicateGroups } from '../bookmarks/bookmark-dedup';
+import {
+  mergeTombstones,
+  pruneExpiredTombstones,
+} from '../bookmarks/bookmark-retention';
 import { nanoid } from 'nanoid';
 import pLimit from 'p-limit';
 import { strFromU8, strToU8, gzipSync, unzipSync } from 'fflate';
@@ -47,6 +55,20 @@ const CLIPS_JSON = `${SYNC_ROOT}/bookmarks/clips.json`;
 const CHUNKS_DIR = `${SYNC_ROOT}/bookmarks/chunks`;
 
 const LOCK_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+
+/**
+ * 单条书签在一次同步中的合并结论
+ */
+interface BookmarkSyncEntry {
+  /** 合并后的元数据，最终写入远端 meta.json */
+  meta: RemoteBookmarkMeta;
+  /** 需要把 meta 回写到本地存储 */
+  applyToLocal: boolean;
+  /** meta 相对远端已变化，需要重写 meta.json */
+  uploadMeta: boolean;
+  /** 需要上传本地正文 chunk */
+  uploadContent: boolean;
+}
 
 export class SyncEngine {
   private isSyncing = false;
@@ -552,16 +574,27 @@ export class SyncEngine {
     }
   }
 
+  /**
+   * 书签同步
+   *
+   * 分两步对齐身份，缺一不可：
+   * 1. 按 ID 做 Last-Write-Wins，合并同一条书签在各设备上的不同版本
+   * 2. 按规范化 URL 收敛：各设备独立收藏同一网址时会生成不同的 ID，
+   *    只按 ID 合并会让每台设备的书签数成倍增长（issue #17）
+   */
   private async syncBookmarks() {
     console.log('Syncing bookmarks...');
-    const localBookmarks = await bookmarkStorage.getBookmarks({}, false); // get without content
-    let remoteMetaFile = await webdavClientAdapter.getJSON<any>(META_JSON);
-    
+    // 含软删除墓碑，否则本地删除永远不会传播到其他设备
+    const localBookmarks = await bookmarkStorage.getBookmarksForSync();
+    const remoteMetaFile = await webdavClientAdapter.getJSON<any>(META_JSON);
+
     let remoteMeta: RemoteBookmarkMeta[] = [];
+    let remoteDeletions: RemoteBookmarkDeletion[] = [];
     if (remoteMetaFile) {
       const parsed = RemoteBookmarksFileSchema.safeParse(remoteMetaFile);
       if (parsed.success) {
         remoteMeta = parsed.data.bookmarks;
+        remoteDeletions = parsed.data.deletions;
       } else {
         console.warn('Failed to parse remote meta.json', parsed.error);
         // Disaster threshold protection check might go here
@@ -570,51 +603,40 @@ export class SyncEngine {
 
     const localMap = new Map(localBookmarks.map(b => [b.id, b]));
     const remoteMap = new Map(remoteMeta.map(b => [b.id, b]));
-    
-    const toUploadMeta: RemoteBookmarkMeta[] = [];
-    const chunksToUpload: Array<{ id: string, content: string }> = [];
-    let metaChanged = !remoteMetaFile;
-    
-    const localDeletions: string[] = [];
 
-    // Diff loop
-    for (const [id, local] of localMap) {
-      const remote = remoteMap.get(id);
-      
-      if (!remote) {
-        // Local only -> Upload
-        const { content } = await this.pickLocalBookmarkWithContent(id, local);
-        toUploadMeta.push(this.toRemoteMeta(local));
-        metaChanged = true;
-        if (content) {
-            chunksToUpload.push({ id, content });
-        }
-      } else {
-        // Exists in both, Check timestamps
-        if (local.updatedAt > remote.updatedAt) {
-          // Local newer -> Upload
-          const { content } = await this.pickLocalBookmarkWithContent(id, local);
-          toUploadMeta.push(this.toRemoteMeta(local));
-          metaChanged = true;
-          if (content) {
-            chunksToUpload.push({ id, content });
-          }
-        } else if (local.updatedAt < remote.updatedAt) {
-          // Remote newer -> Apply to Local
-          await this.applyRemoteToLocal(remote);
-          toUploadMeta.push(remote);
-        } else {
-          // Same version
-          toUploadMeta.push(remote);
-        }
-      }
+    // 墓碑先于书签合并：被彻底删除的记录不能再参与后面的 LWW，
+    // 否则本地残留的副本会被当成「远端没有的新书签」重新上传
+    const deletions = await this.reconcileDeletions(localMap, remoteMap, remoteDeletions);
+
+    const entries = this.mergeBookmarkEntries(localMap, remoteMap);
+    const mergedDuplicates = this.reconcileDuplicateBookmarks(entries);
+    if (mergedDuplicates > 0) {
+      console.log(`Merged ${mergedDuplicates} duplicated bookmark(s) by URL`);
     }
 
-    for (const [id, remote] of remoteMap) {
-      if (!localMap.has(id)) {
-        // Remote only -> Download
-        await this.applyRemoteToLocal(remote);
-        toUploadMeta.push(remote);
+    const finalMeta: RemoteBookmarkMeta[] = [];
+    const chunksToUpload: Array<{ id: string, content: string }> = [];
+    let metaChanged =
+      !remoteMetaFile ||
+      entries.size !== remoteMap.size ||
+      deletions.length !== remoteDeletions.length;
+
+    for (const entry of entries.values()) {
+      finalMeta.push(entry.meta);
+
+      if (entry.uploadMeta) {
+        metaChanged = true;
+      }
+
+      if (entry.applyToLocal) {
+        await this.applyRemoteToLocal(entry.meta);
+      }
+
+      if (entry.uploadContent && !entry.meta.isDeleted) {
+        const content = await bookmarkStorage.getBookmarkContent(entry.meta.id);
+        if (content) {
+          chunksToUpload.push({ id: entry.meta.id, content });
+        }
       }
     }
 
@@ -623,7 +645,7 @@ export class SyncEngine {
       console.log(`Uploading ${chunksToUpload.length} chunks...`);
       // Concurrency control using p-limit
       const limit = pLimit(5); // max 5 concurrent uploads
-      
+
       const uploadTasks = chunksToUpload.map(item => limit(async () => {
         const chunkPath = `${CHUNKS_DIR}/${item.id}.gz.txt`; // compressed chunk
         const compressed = this.compressStr(JSON.stringify({ content: item.content }));
@@ -634,10 +656,214 @@ export class SyncEngine {
     }
 
     // Write meta.json last safely
-    if (metaChanged || chunksToUpload.length > 0 || localMap.size !== remoteMap.size || toUploadMeta.length > remoteMeta.length) {
+    if (metaChanged || chunksToUpload.length > 0) {
       console.log('Updating remote meta.json...');
-      await webdavClientAdapter.putJSON(META_JSON, { bookmarks: toUploadMeta });
+      await webdavClientAdapter.putJSON(META_JSON, { bookmarks: finalMeta, deletions });
     }
+  }
+
+  /**
+   * 合并两侧的删除墓碑并落到本地
+   *
+   * 处理完后 localMap / remoteMap 里不会再有被墓碑覆盖的记录。
+   * @returns 合并后应写回远端的墓碑列表
+   */
+  private async reconcileDeletions(
+    localMap: Map<string, LocalBookmark>,
+    remoteMap: Map<string, RemoteBookmarkMeta>,
+    remoteDeletions: RemoteBookmarkDeletion[],
+  ): Promise<BookmarkTombstone[]> {
+    const localTombstones = await bookmarkTombstoneStorage.getAll();
+    // 过期墓碑不再参与同步，否则永远清不掉
+    const merged = pruneExpiredTombstones(
+      mergeTombstones(localTombstones, remoteDeletions),
+    );
+
+    // 删除之后又在别处编辑过的，按 Last-Write-Wins 判定为「复活」，撤销该墓碑
+    const deletions = merged.filter(({ id, deletedAt }) => {
+      const local = localMap.get(id);
+      const remote = remoteMap.get(id);
+      const revivedLocally = !!local && !local.isDeleted && local.updatedAt > deletedAt;
+      const revivedRemotely = !!remote && !remote.isDeleted && remote.updatedAt > deletedAt;
+      return !revivedLocally && !revivedRemotely;
+    });
+
+    const staleLocalIds: string[] = [];
+    for (const { id } of deletions) {
+      if (localMap.has(id)) staleLocalIds.push(id);
+      localMap.delete(id);
+      remoteMap.delete(id);
+    }
+
+    if (staleLocalIds.length > 0) {
+      console.log(`Purging ${staleLocalIds.length} remotely deleted bookmark(s)...`);
+      await bookmarkStorage.purgeBookmarks(staleLocalIds);
+    }
+
+    // purgeBookmarks 会按本地时间补墓碑，这里用合并结果覆盖，保留期以最早的删除时刻为准
+    await bookmarkTombstoneStorage.replaceAll(deletions);
+
+    await this.deleteRemoteChunks(deletions, remoteDeletions);
+
+    return deletions;
+  }
+
+  /**
+   * 清理已彻底删除书签的远端正文分片
+   *
+   * 只处理这次新增的墓碑：已经在远端墓碑表里的，说明别的设备已经删过了。
+   * 删不掉不影响同步结果，只是暂时多占一点空间。
+   */
+  private async deleteRemoteChunks(
+    deletions: BookmarkTombstone[],
+    remoteDeletions: RemoteBookmarkDeletion[],
+  ): Promise<void> {
+    const known = new Set(remoteDeletions.map((deletion) => deletion.id));
+    const newIds = deletions.filter(({ id }) => !known.has(id)).map(({ id }) => id);
+    if (newIds.length === 0) return;
+
+    const limit = pLimit(5);
+    await Promise.all(
+      newIds.map((id) =>
+        limit(async () => {
+          try {
+            await webdavClientAdapter.deleteFile(`${CHUNKS_DIR}/${id}.gz.txt`);
+          } catch (err) {
+            console.warn(`Failed to delete remote chunk for ${id}`, err);
+          }
+        }),
+      ),
+    );
+  }
+
+  /**
+   * 按 ID 合并本地与远端书签元数据（Last-Write-Wins）
+   */
+  private mergeBookmarkEntries(
+    localMap: Map<string, LocalBookmark>,
+    remoteMap: Map<string, RemoteBookmarkMeta>,
+  ): Map<string, BookmarkSyncEntry> {
+    const entries = new Map<string, BookmarkSyncEntry>();
+
+    for (const [id, local] of localMap) {
+      const remote = remoteMap.get(id);
+
+      // 本地独有，或本地版本更新 -> 上传
+      if (!remote || local.updatedAt > remote.updatedAt) {
+        entries.set(id, {
+          meta: this.toRemoteMeta(local),
+          applyToLocal: false,
+          uploadMeta: true,
+          uploadContent: !local.isDeleted,
+        });
+        continue;
+      }
+
+      // 远端版本更新 -> 回写本地
+      if (local.updatedAt < remote.updatedAt) {
+        entries.set(id, {
+          meta: remote,
+          applyToLocal: true,
+          uploadMeta: false,
+          uploadContent: false,
+        });
+        continue;
+      }
+
+      // 同版本，保持不动
+      entries.set(id, {
+        meta: remote,
+        applyToLocal: false,
+        uploadMeta: false,
+        uploadContent: false,
+      });
+    }
+
+    // 远端独有 -> 下载
+    for (const [id, remote] of remoteMap) {
+      if (localMap.has(id)) continue;
+      entries.set(id, {
+        meta: remote,
+        applyToLocal: true,
+        uploadMeta: false,
+        uploadContent: false,
+      });
+    }
+
+    return entries;
+  }
+
+  /**
+   * 把指向同一网址的多条书签收敛成一条
+   *
+   * 保留创建时间最早的一条（ID 字典序兜底，保证每台设备独立算出同样的结果），
+   * 其余记录合并标签等信息后标记为软删除，用户仍可从回收站找回。
+   *
+   * @returns 被合并掉的重复书签数量
+   */
+  private reconcileDuplicateBookmarks(entries: Map<string, BookmarkSyncEntry>): number {
+    const groups = buildDuplicateGroups(
+      Array.from(entries.values(), (entry) => entry.meta),
+    );
+    if (groups.length === 0) return 0;
+
+    const now = Date.now();
+    let mergedCount = 0;
+
+    for (const group of groups) {
+      const canonicalEntry = entries.get(group.canonical.id);
+      if (!canonicalEntry) continue;
+
+      const canonical = canonicalEntry.meta;
+      const tags = new Set(canonical.tags);
+      let title = canonical.title;
+      let description = canonical.description;
+      let favicon = canonical.favicon;
+      let categoryId = canonical.categoryId;
+
+      for (const duplicate of group.duplicates) {
+        const duplicateEntry = entries.get(duplicate.id);
+        if (!duplicateEntry) continue;
+
+        // 只补全保留项缺失的字段，不覆盖用户已填写的内容
+        duplicate.tags.forEach((tag) => tags.add(tag));
+        if (!title.trim()) title = duplicate.title;
+        if (!description.trim()) description = duplicate.description;
+        if (!favicon) favicon = duplicate.favicon;
+        if (!categoryId) categoryId = duplicate.categoryId;
+
+        // 快照 / 正文挂在被删记录自己的 ID 下，不能挪给保留项，只做软删除
+        duplicateEntry.meta = { ...duplicate, isDeleted: true, updatedAt: now };
+        duplicateEntry.applyToLocal = true;
+        duplicateEntry.uploadMeta = true;
+        duplicateEntry.uploadContent = false;
+        mergedCount += 1;
+      }
+
+      const mergedTags = Array.from(tags);
+      const canonicalChanged =
+        title !== canonical.title ||
+        description !== canonical.description ||
+        favicon !== canonical.favicon ||
+        categoryId !== canonical.categoryId ||
+        mergedTags.length !== canonical.tags.length;
+
+      if (canonicalChanged) {
+        canonicalEntry.meta = {
+          ...canonical,
+          title,
+          description,
+          favicon,
+          categoryId,
+          tags: mergedTags,
+          updatedAt: now,
+        };
+        canonicalEntry.applyToLocal = true;
+        canonicalEntry.uploadMeta = true;
+      }
+    }
+
+    return mergedCount;
   }
 
   private async syncBookmarkClips(): Promise<void> {
@@ -694,64 +920,59 @@ export class SyncEngine {
       hasSnapshot: local.hasSnapshot,
       createdAt: local.createdAt,
       updatedAt: local.updatedAt,
-      isDeleted: local.isDeleted
+      // 始终显式写出，否则 isDeleted 无法在 JSON 往返后回到 false（恢复书签不会同步）
+      isDeleted: local.isDeleted ?? false
     };
   }
 
-  private async pickLocalBookmarkWithContent(id: string, cachedLocal?: LocalBookmark): Promise<{ meta: RemoteBookmarkMeta, content?: string }> {
-     const full = await bookmarkStorage.getBookmarkById(id);
-     if (!full) {
-        return { meta: this.toRemoteMeta(cachedLocal!) };
-     }
-     return { meta: this.toRemoteMeta(full), content: full.content };
-  }
-
+  /**
+   * 以远端版本为准回写本地（保留远端时间戳，避免下次同步又被判定为本地更新）
+   */
   private async applyRemoteToLocal(remote: RemoteBookmarkMeta) {
-    if (remote.isDeleted) {
-       // local soft delete
-       await bookmarkStorage.deleteBookmark(remote.id, false);
-       return;
-    }
-
     const exists = await bookmarkStorage.getBookmarkById(remote.id);
-    if (!exists) {
-      // Fetch chunk
-      const chunkPath = `${CHUNKS_DIR}/${remote.id}.gz.txt`;
-      let contentStr = '';
-      try {
-        const chunkRaw = await webdavClientAdapter.getJSON<any>(chunkPath);
-        if (chunkRaw && chunkRaw.data) {
-           const decompressed = this.decompressStr(chunkRaw.data);
-           const chunkJson = JSON.parse(decompressed);
-           contentStr = chunkJson.content || '';
-        }
-      } catch (e) {
-         console.warn(`Failed to fetch chunk for ${remote.id}`, e);
-      }
 
+    if (exists) {
       await bookmarkStorage.importRawBookmark({
-         id: remote.id,
-         url: remote.url,
-         title: remote.title,
-         description: remote.description,
-         categoryId: remote.categoryId,
-         tags: remote.tags,
-         favicon: remote.favicon,
-         hasSnapshot: remote.hasSnapshot,
-         createdAt: remote.createdAt,
-         updatedAt: remote.updatedAt,
-         isDeleted: remote.isDeleted,
-         content: contentStr
+         ...exists, // keeps existing content if any
+         ...remote, // overwrites meta, INCLUDING createdAt, updatedAt, id
+         isDeleted: remote.isDeleted ?? false,
       });
-    } else {
-       // Update metadata exactly mirroring remote timestamps
-       await bookmarkStorage.importRawBookmark({
-          ...exists, // keeps existing content if any
-          ...remote  // overwrites meta, INCLUDING createdAt, updatedAt, id
-       });
-       // If remote has fresh chunks, we might want logic to redownload them if they changed,
-       // but typically updating the meta alone is fine unless the user completely redid content scraping.
+      // If remote has fresh chunks, we might want logic to redownload them if they changed,
+      // but typically updating the meta alone is fine unless the user completely redid content scraping.
+      return;
     }
+
+    // 本地从未存在的墓碑不必落盘，避免回收站里凭空多出别的设备删掉的书签
+    if (remote.isDeleted) return;
+
+    // Fetch chunk
+    const chunkPath = `${CHUNKS_DIR}/${remote.id}.gz.txt`;
+    let contentStr = '';
+    try {
+      const chunkRaw = await webdavClientAdapter.getJSON<any>(chunkPath);
+      if (chunkRaw && chunkRaw.data) {
+         const decompressed = this.decompressStr(chunkRaw.data);
+         const chunkJson = JSON.parse(decompressed);
+         contentStr = chunkJson.content || '';
+      }
+    } catch (e) {
+       console.warn(`Failed to fetch chunk for ${remote.id}`, e);
+    }
+
+    await bookmarkStorage.importRawBookmark({
+       id: remote.id,
+       url: remote.url,
+       title: remote.title,
+       description: remote.description,
+       categoryId: remote.categoryId,
+       tags: remote.tags,
+       favicon: remote.favicon,
+       hasSnapshot: remote.hasSnapshot,
+       createdAt: remote.createdAt,
+       updatedAt: remote.updatedAt,
+       isDeleted: remote.isDeleted ?? false,
+       content: contentStr
+    });
   }
 
   /**

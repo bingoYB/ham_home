@@ -60,6 +60,7 @@ test.describe("APP 核心壳层与导航", () => {
       { text: t("标签", "Tags"), hash: "tags", marker: t("标签统计", "Tag Statistics") },
       { text: t("隐私", "Privacy"), hash: "privacy", marker: t("数据存储", "Data Storage") },
       { text: t("导入/导出", "Import/Export"), hash: "import-export", marker: t("导出数据", "Export Data") },
+      { text: t("回收站", "Trash"), hash: "trash", marker: t("回收站是空的", "Trash is empty") },
       { text: t("设置", "Settings"), hash: "settings", marker: t("AI 配置", "AI Config") },
       { text: t("关于", "About"), hash: "about", marker: "HamHome" },
       { text: t("我的收藏", "My Collection"), hash: "all", marker: "React Docs" },

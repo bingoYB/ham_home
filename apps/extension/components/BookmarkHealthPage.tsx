@@ -4,6 +4,7 @@ import {
   AlertTriangle,
   ArrowRight,
   CheckCircle2,
+  Copy,
   ExternalLink,
   HeartPulse,
   Loader2,
@@ -17,13 +18,20 @@ import {
   Button,
   Card,
   CardContent,
+  Checkbox,
   Input,
   Progress,
   cn,
   confirm,
   toast,
 } from "@hamhome/ui";
+import { BatchSelectionToolbar } from "@/components/common/BatchSelectionToolbar";
 import { useBookmarks } from "@/contexts/BookmarkContext";
+import { useBookmarkSelection } from "@/hooks/useBookmarkSelection";
+import {
+  useDuplicateBookmarks,
+  type DuplicateRole,
+} from "@/hooks/useDuplicateBookmarks";
 import { bookmarkStorage } from "@/lib/storage/bookmark-storage";
 import {
   bookmarkClipStorage,
@@ -49,10 +57,6 @@ const ATTENTION_STATUSES = new Set<BookmarkHealthStatus>([
   "network_error",
   "unsupported",
 ]);
-
-function hasDuplicateIssue(record?: BookmarkHealthRecord): boolean {
-  return record?.issueCodes.some((issue) => issue.startsWith("duplicate_url:")) ?? false;
-}
 
 function getVisibleIssues(record?: BookmarkHealthRecord): string[] {
   if (!record) return [];
@@ -85,6 +89,12 @@ export function BookmarkHealthPage() {
     () => filterBookmarkHealthTargets(bookmarks, subjectIndex),
     [bookmarks, subjectIndex],
   );
+
+  // 重复项实时计算，不依赖体检结果，未体检也能直接清理
+  const { roles: duplicateRoles, redundantIds } =
+    useDuplicateBookmarks(healthBookmarks);
+  const { selectedIds, toggleSelect, deselectAll, toggleSelectAll } =
+    useBookmarkSelection();
 
   const recordMap = useMemo(
     () => new Map(records.map((record) => [record.bookmarkId, record])),
@@ -133,14 +143,19 @@ export function BookmarkHealthPage() {
       const visibleIssues = getVisibleIssues(record);
       if (filter === "unchecked") return !record;
       if (filter === "broken") return record?.status === "broken";
-      if (filter === "duplicates") return hasDuplicateIssue(record);
+      if (filter === "duplicates") return duplicateRoles.has(bookmark.id);
       if (filter === "attention") {
         return !!record &&
           (ATTENTION_STATUSES.has(record.status) || visibleIssues.length > 0);
       }
       return true;
     });
-  }, [filter, getCurrentRecord, healthBookmarks, query]);
+  }, [duplicateRoles, filter, getCurrentRecord, healthBookmarks, query]);
+
+  // 勾选只对当前可见列表有意义，换筛选条件后重新开始
+  useEffect(() => {
+    deselectAll();
+  }, [deselectAll, filter]);
 
   const runScan = useCallback(async (bookmarkIds?: string[]) => {
     scanStartedAtRef.current = Date.now();
@@ -183,6 +198,59 @@ export function BookmarkHealthPage() {
     },
     [deleteBookmark, t],
   );
+
+  /** 批量软删除：标记 isDeleted 并刷新 updatedAt，删除才能同步到其他设备 */
+  const removeBookmarks = useCallback(
+    async (ids: string[]) => {
+      try {
+        await bookmarkStorage.batchDeleteBookmarks(ids);
+        await bookmarkHealthStorage.deleteMany(ids);
+        deselectAll();
+        await refreshBookmarks();
+        toast.success(
+          t("bookmark:healthCenter.batch.deleteSuccess", { count: ids.length }),
+        );
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : t("bookmark:healthCenter.batch.deleteFailed"),
+        );
+      }
+    },
+    [deselectAll, refreshBookmarks, t],
+  );
+
+  const removeSelected = useCallback(async () => {
+    if (selectedIds.size === 0) return;
+    const accepted = await confirm({
+      title: t("bookmark:bookmark.batch.deleteTitle"),
+      description: t("bookmark:bookmark.batch.deleteConfirm", {
+        count: selectedIds.size,
+      }),
+      confirmText: t("common:common.delete"),
+      cancelText: t("common:common.cancel"),
+      variant: "destructive",
+    });
+    if (accepted) await removeBookmarks(Array.from(selectedIds));
+  }, [removeBookmarks, selectedIds, t]);
+
+  const cleanDuplicates = useCallback(async () => {
+    if (redundantIds.length === 0) {
+      toast.info(t("bookmark:healthCenter.batch.noDuplicates"));
+      return;
+    }
+    const accepted = await confirm({
+      title: t("bookmark:healthCenter.batch.cleanDuplicatesTitle"),
+      description: t("bookmark:healthCenter.batch.cleanDuplicatesConfirm", {
+        count: redundantIds.length,
+      }),
+      confirmText: t("common:common.delete"),
+      cancelText: t("common:common.cancel"),
+      variant: "destructive",
+    });
+    if (accepted) await removeBookmarks(redundantIds);
+  }, [redundantIds, removeBookmarks, t]);
 
   return (
     <div className="h-full overflow-auto bg-background px-6 py-6">
@@ -265,6 +333,30 @@ export function BookmarkHealthPage() {
           </div>
         </div>
 
+        <BatchSelectionToolbar
+          visibleIds={filteredBookmarks.map((bookmark) => bookmark.id)}
+          selectedCount={selectedIds.size}
+          onToggleSelectAll={toggleSelectAll}
+        >
+          {redundantIds.length > 0 && (
+            <Button variant="outline" size="sm" onClick={() => void cleanDuplicates()}>
+              <Copy className="mr-2 h-4 w-4" />
+              {t("bookmark:healthCenter.batch.cleanDuplicates", {
+                count: redundantIds.length,
+              })}
+            </Button>
+          )}
+          <Button
+            variant="destructive"
+            size="sm"
+            disabled={selectedIds.size === 0}
+            onClick={() => void removeSelected()}
+          >
+            <Trash2 className="mr-2 h-4 w-4" />
+            {t("bookmark:bookmark.batch.delete")}
+          </Button>
+        </BatchSelectionToolbar>
+
         <div className="space-y-2">
           {filteredBookmarks.length === 0 ? (
             <div className="rounded-xl border border-dashed p-12 text-center text-sm text-muted-foreground">
@@ -279,6 +371,9 @@ export function BookmarkHealthPage() {
                   bookmark={bookmark}
                   record={record}
                   scanning={scanning}
+                  selected={selectedIds.has(bookmark.id)}
+                  duplicateRole={duplicateRoles.get(bookmark.id)}
+                  onToggleSelect={() => toggleSelect(bookmark.id)}
                   onScan={() => void runScan([bookmark.id])}
                   onAcceptRedirect={() => record && void acceptRedirect(bookmark, record)}
                   onDelete={() => void removeBookmark(bookmark)}
@@ -325,6 +420,9 @@ interface HealthRowProps {
   bookmark: LocalBookmark;
   record?: BookmarkHealthRecord;
   scanning: boolean;
+  selected: boolean;
+  duplicateRole?: DuplicateRole;
+  onToggleSelect: () => void;
   onScan: () => void;
   onAcceptRedirect: () => void;
   onDelete: () => void;
@@ -334,6 +432,9 @@ function HealthRow({
   bookmark,
   record,
   scanning,
+  selected,
+  duplicateRole,
+  onToggleSelect,
   onScan,
   onAcceptRedirect,
   onDelete,
@@ -343,13 +444,22 @@ function HealthRow({
   const status = record?.status ?? "unchecked";
   return (
     <article
-      className="rounded-xl border bg-card p-4 [content-visibility:auto] [contain-intrinsic-size:88px]"
+      className={cn(
+        "rounded-xl border bg-card p-4 [content-visibility:auto] [contain-intrinsic-size:88px]",
+        selected && "border-primary/50 bg-primary/5",
+      )}
     >
       <div className="flex flex-wrap items-start gap-3">
+        <Checkbox
+          className="mt-1 shrink-0"
+          checked={selected}
+          onCheckedChange={onToggleSelect}
+        />
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <h2 className="truncate text-sm font-medium">{bookmark.title}</h2>
             <HealthBadge status={status} />
+            {duplicateRole && <DuplicateBadge role={duplicateRole} />}
           </div>
           <p className="mt-1 truncate text-xs text-muted-foreground">{bookmark.url}</p>
           {record?.finalUrl && record.finalUrl !== bookmark.url && (
@@ -398,6 +508,23 @@ function HealthRow({
         </p>
       )}
     </article>
+  );
+}
+
+function DuplicateBadge({ role }: { role: DuplicateRole }) {
+  const { t } = useTranslation("bookmark");
+  return (
+    <Badge
+      variant="outline"
+      className={cn(
+        "shrink-0 text-[11px] font-normal",
+        role === "canonical"
+          ? "border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300"
+          : "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300",
+      )}
+    >
+      {t(`healthCenter.duplicateRole.${role}`)}
+    </Badge>
   );
 }
 

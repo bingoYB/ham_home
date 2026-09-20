@@ -15,5 +15,6 @@ export { aiTaskStorage } from './ai-task-storage';
 export { savePopupFallbackStorage } from './save-popup-fallback-storage';
 export { bookmarkClipStorage } from './bookmark-clip-storage';
 export { bookmarkHealthStorage } from './bookmark-health-storage';
+export { bookmarkTombstoneStorage } from './bookmark-tombstone-storage';
 export { bookmarkScreenshotStorage } from './bookmark-screenshot-storage';
 export type { VectorStoreStats } from './vector-store';

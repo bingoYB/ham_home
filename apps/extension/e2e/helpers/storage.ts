@@ -330,6 +330,13 @@ export async function getBookmarks(worker: Worker): Promise<LocalBookmark[]> {
   });
 }
 
+/**
+ * 读取截图资源大小；扩展还没写入时返回 0，便于 expect.poll 继续重试
+ *
+ * 注意不能直接 indexedDB.open("hamhome-assets", 1)：库不存在时那样会建出一个
+ * 没有任何 object store 的空库，而扩展自己用的也是版本 1，onupgradeneeded 从此
+ * 不再触发，截图就再也写不进去了。
+ */
 export async function getScreenshotAssetSizes(
   worker: Worker,
   bookmarkId: string,
