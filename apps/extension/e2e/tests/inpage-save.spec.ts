@@ -1,6 +1,10 @@
 import { test, expect } from "../fixtures";
-import { attachStepScreenshot } from "../helpers/pages";
-import { getBookmarks, resetExtensionData } from "../helpers/storage";
+import { attachStepScreenshot, openAppPage } from "../helpers/pages";
+import {
+  getBookmarks,
+  getScreenshotAssetSizes,
+  resetExtensionData,
+} from "../helpers/storage";
 
 const PAGE_URL = "https://inpage.e2e.test/article";
 const PAGE_HTML = `<!doctype html>
@@ -144,5 +148,60 @@ test.describe("CONTENT 页内保存流程", () => {
 
     expect(response).toEqual({ ok: false });
     await expect(page.locator("[data-hamhome-save-flow]")).toHaveCount(0);
+  });
+
+  test("CONTENT-004 保存可见区域截图并在视觉画廊展示", async ({
+    context,
+    extensionId,
+    extensionWorker,
+    e2eVariant,
+  }, testInfo) => {
+    const t = e2eVariant.text;
+    await resetExtensionData(extensionWorker, {
+      settings: {
+        ...e2eVariant.settings,
+        autoSaveSnapshot: false,
+        autoSaveScreenshot: true,
+      },
+    });
+
+    const page = await context.newPage();
+    await page.route("**/*", (route) =>
+      route.fulfill({ contentType: "text/html; charset=utf-8", body: PAGE_HTML }),
+    );
+    await page.goto(PAGE_URL);
+
+    await extensionWorker.evaluate(async (url) => {
+      const [tab] = await chrome.tabs.query({ url });
+      if (!tab?.id) throw new Error("测试页面未找到");
+      await chrome.tabs.sendMessage(tab.id, {
+        type: "START_SAVE_FLOW",
+        source: "shortcut",
+      });
+    }, `${PAGE_URL}*`);
+
+    const titleInput = page.getByLabel(t("标题", "Title"));
+    await expect(titleInput).toBeVisible({ timeout: 20_000 });
+    await expect(
+      page.getByRole("switch", { name: /保存页面截图|Save page screenshot/ }),
+    ).toBeChecked();
+    await titleInput.fill("页面截图书签");
+    await page.getByRole("button", { name: /保存书签|Save Bookmark/ }).click();
+
+    const [saved] = await expect
+      .poll(async () => getBookmarks(extensionWorker))
+      .toEqual([expect.objectContaining({ title: "页面截图书签" })])
+      .then(async () => getBookmarks(extensionWorker));
+    await expect
+      .poll(async () => getScreenshotAssetSizes(extensionWorker, saved.id))
+      .toEqual({ image: expect.any(Number), thumbnail: expect.any(Number) });
+    const sizes = await getScreenshotAssetSizes(extensionWorker, saved.id);
+    expect(sizes.image).toBeGreaterThan(1_000);
+    expect(sizes.thumbnail).toBeGreaterThan(100);
+
+    const app = await openAppPage(context, extensionId, "all");
+    await app.getByTitle(t("视觉画廊", "Visual Gallery")).click();
+    await expect(app.getByRole("img", { name: "页面截图书签" })).toBeVisible();
+    await attachStepScreenshot(app, testInfo, "CONTENT-004-视觉画廊截图");
   });
 });

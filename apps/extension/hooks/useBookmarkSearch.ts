@@ -21,11 +21,17 @@ export interface TimeRange {
   endDate?: number;   // 时间戳
 }
 
+/**
+ * 内容类型筛选类型
+ */
+export type BookmarkContentType = 'all' | 'bookmark' | 'image' | 'text';
+
 export interface BookmarkSearchState {
   searchQuery: string;
   selectedTags: string[];
   selectedCategory: string; // 'all' | 'uncategorized' | categoryId
   timeRange: TimeRange;
+  contentType: BookmarkContentType;
 }
 
 export interface BookmarkSearchResult {
@@ -34,6 +40,7 @@ export interface BookmarkSearchResult {
   selectedTags: string[];
   selectedCategory: string;
   timeRange: TimeRange;
+  contentType: BookmarkContentType;
   filteredBookmarks: LocalBookmark[];
   hasFilters: boolean;
 
@@ -42,10 +49,12 @@ export interface BookmarkSearchResult {
   setSelectedTags: (tags: string[]) => void;
   setSelectedCategory: (categoryId: string) => void;
   setTimeRange: (range: TimeRange) => void;
+  setContentType: (type: BookmarkContentType) => void;
   toggleTagSelection: (tag: string) => void;
   clearFilters: () => void;
   clearTagFilters: () => void;
   clearTimeFilter: () => void;
+  clearContentTypeFilter: () => void;
 }
 
 export interface UseBookmarkSearchOptions {
@@ -53,6 +62,7 @@ export interface UseBookmarkSearchOptions {
   categories?: LocalCategory[];
   initialState?: Partial<BookmarkSearchState>;
   customFilter?: CustomFilter | null; // 自定义筛选器
+  subjectIndex?: Readonly<Record<string, { type: 'image' | 'text' }>> | null;
 }
 
 /**
@@ -181,7 +191,22 @@ function matchesBookmarkFilters(
   selectedCategory: string,
   timeBounds: { start: number; end: number } | null,
   customFilter: CustomFilter | null,
+  contentType: BookmarkContentType = 'all',
+  subjectIndex?: Readonly<Record<string, { type: 'image' | 'text' }>> | null,
 ): boolean {
+  if (contentType !== 'all' && subjectIndex) {
+    const subject = subjectIndex[bookmark.id];
+    if (contentType === 'bookmark' && subject) {
+      return false;
+    }
+    if (contentType === 'image' && subject?.type !== 'image') {
+      return false;
+    }
+    if (contentType === 'text' && subject?.type !== 'text') {
+      return false;
+    }
+  }
+
   if (selectedTags.length > 0) {
     const hasAllTags = selectedTags.every((tag) => bookmark.tags.includes(tag));
     if (!hasAllTags) return false;
@@ -216,6 +241,8 @@ interface MergeBookmarkSearchResultsOptions {
   selectedCategory: string;
   timeRange: TimeRange;
   customFilter: CustomFilter | null;
+  contentType?: BookmarkContentType;
+  subjectIndex?: Readonly<Record<string, { type: 'image' | 'text' }>> | null;
 }
 
 export function mergeBookmarkSearchResults({
@@ -226,6 +253,8 @@ export function mergeBookmarkSearchResults({
   selectedCategory,
   timeRange,
   customFilter,
+  contentType = 'all',
+  subjectIndex = null,
 }: MergeBookmarkSearchResultsOptions): LocalBookmark[] {
   const timeBounds = getTimeRangeBounds(timeRange);
   const baseFilteredBookmarks = bookmarks.filter((bookmark) =>
@@ -235,6 +264,8 @@ export function mergeBookmarkSearchResults({
       selectedCategory,
       timeBounds,
       customFilter,
+      contentType,
+      subjectIndex,
     ),
   );
 
@@ -293,6 +324,7 @@ export function useBookmarkSearch({
   bookmarks,
   initialState = {},
   customFilter = null,
+  subjectIndex = null,
 }: UseBookmarkSearchOptions): BookmarkSearchResult {
   // 筛选状态
   const [searchQuery, setSearchQuery] = useState(initialState.searchQuery || '');
@@ -300,6 +332,9 @@ export function useBookmarkSearch({
   const [selectedCategory, setSelectedCategory] = useState(initialState.selectedCategory || 'all');
   const [timeRange, setTimeRange] = useState<TimeRange>(
     initialState.timeRange || { type: 'all' }
+  );
+  const [contentType, setContentType] = useState<BookmarkContentType>(
+    initialState.contentType || 'all'
   );
   const [semanticBookmarkIds, setSemanticBookmarkIds] = useState<string[]>([]);
 
@@ -343,6 +378,8 @@ export function useBookmarkSearch({
       selectedCategory,
       timeRange,
       customFilter,
+      contentType,
+      subjectIndex,
     });
   }, [
     bookmarks,
@@ -352,6 +389,8 @@ export function useBookmarkSearch({
     selectedCategory,
     timeRange,
     customFilter,
+    contentType,
+    subjectIndex,
   ]);
 
   // 切换标签选择
@@ -367,6 +406,7 @@ export function useBookmarkSearch({
     setSelectedTags([]);
     setSelectedCategory('all');
     setTimeRange({ type: 'all' });
+    setContentType('all');
   }, []);
 
   // 清除标签筛选
@@ -379,26 +419,35 @@ export function useBookmarkSearch({
     setTimeRange({ type: 'all' });
   }, []);
 
+  // 清除内容类型筛选
+  const clearContentTypeFilter = useCallback(() => {
+    setContentType('all');
+  }, []);
+
   const hasFilters =
     searchQuery !== '' ||
     selectedTags.length > 0 ||
     selectedCategory !== 'all' ||
-    timeRange.type !== 'all';
+    timeRange.type !== 'all' ||
+    contentType !== 'all';
 
   return {
     searchQuery,
     selectedTags,
     selectedCategory,
     timeRange,
+    contentType,
     filteredBookmarks,
     hasFilters,
     setSearchQuery,
     setSelectedTags,
     setSelectedCategory,
     setTimeRange,
+    setContentType,
     toggleTagSelection,
     clearFilters,
     clearTagFilters,
     clearTimeFilter,
+    clearContentTypeFilter,
   };
 }

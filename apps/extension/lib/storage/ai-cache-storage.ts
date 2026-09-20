@@ -119,6 +119,17 @@ class AICacheStorage {
     pageContent: PageContent,
     analysisResult: AnalysisResult
   ): Promise<void> {
+    return this.cacheAnalysisByUrl(pageContent.url, analysisResult);
+  }
+
+  /**
+   * 按 URL 保存 AI 分析结果
+   * 剪藏分析没有完整的 PageContent，直接以剪藏书签地址作为缓存键
+   */
+  async cacheAnalysisByUrl(
+    url: string,
+    analysisResult: AnalysisResult
+  ): Promise<void> {
     try {
       const db = await this.initDB();
       const store = db
@@ -126,8 +137,8 @@ class AICacheStorage {
         .objectStore(STORE_NAME);
 
       const cachedAnalysis: CachedAnalysis = {
-        id: pageContent.url,
-        url: pageContent.url,
+        id: url,
+        url,
         analysisResult,
         createdAt: Date.now(),
         expiresAt: Date.now() + CACHE_EXPIRY_TIME,

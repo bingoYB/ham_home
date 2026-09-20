@@ -2,7 +2,7 @@
  * App 页面 - 主应用入口
  * 使用 SidebarInset 布局结构
  */
-import { useState, useEffect, useMemo } from "react";
+import { lazy, Suspense, useState, useEffect, useMemo } from "react";
 import { browser } from "wxt/browser";
 import { useTranslation } from "react-i18next";
 import {
@@ -24,6 +24,7 @@ import {
   AlertTriangle,
   Briefcase,
   Layers,
+  HeartPulse,
 } from "lucide-react";
 import {
   Toaster,
@@ -70,6 +71,8 @@ import { APP_GITHUB_REPO_URL } from "@/lib/constants/app-info";
 import { safeCreateTab } from "@/utils/browser-api";
 import logoImage from "@/assets/logo.png";
 
+const BookmarkHealthPage = lazy(() => import("@/components/BookmarkHealthPage"));
+
 // 页面标题映射
 const PAGE_TITLES: Record<string, { title: string; description?: string }> = {
   all: {
@@ -79,6 +82,10 @@ const PAGE_TITLES: Record<string, { title: string; description?: string }> = {
   settings: {
     title: "settings:settings.title",
     description: "settings:settings.description",
+  },
+  health: {
+    title: "bookmark:healthCenter.title",
+    description: "bookmark:healthCenter.description",
   },
   privacy: {
     title: "settings:settings.privacy.title",
@@ -280,6 +287,12 @@ function AppContent() {
         badge: bookmarks.length,
       },
       {
+        title: t("bookmark:healthCenter.navTitle"),
+        url: "#health",
+        icon: HeartPulse,
+        isActive: currentViewBase === "health",
+      },
+      {
         title: t("bookmark:workspace.title"),
         url: "#workspaces",
         icon: Briefcase,
@@ -473,6 +486,18 @@ function AppContent() {
         return <OptionsPage />;
       case "privacy":
         return <PrivacyPage />;
+      case "health":
+        return (
+          <Suspense
+            fallback={
+              <div className="flex h-full items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            }
+          >
+            <BookmarkHealthPage />
+          </Suspense>
+        );
       case "categories":
         return <CategoriesPage />;
       case "tags":
@@ -617,10 +642,10 @@ function AppContent() {
           </div>
         </header>
         <main className="flex-1 min-h-0 overflow-hidden">
-          <ScrollArea id="main-content" className="h-full">
+          <ScrollArea id="main-content" className="h-full scroll-table-fix">
             {/* 增加全局的底部空白间距 (pb-24)，防止右下角的 Agent 入口遮挡页面内容或滚动条 */}
-            <div className="flex flex-col min-h-full pb-24">
-              <div className="flex-1 flex flex-col">
+            <div className="flex h-full min-h-0 flex-col pb-24">
+              <div className="flex min-h-0 flex-1 flex-col">
                 {renderContent()}
               </div>
             </div>

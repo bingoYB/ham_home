@@ -1,4 +1,4 @@
-import { InMemory } from "@browser-agent-sdk/agent";
+import { InMemory } from "@hamhome/agent";
 import { describe, expect, it } from "vitest";
 import {
   ChatSearchSessionStore,

@@ -1,4 +1,4 @@
-import type { AgentTool } from "@browser-agent-sdk/agent";
+import type { AgentTool } from "@hamhome/agent";
 import { bookmarkStorage } from "@/lib/storage";
 import type {
   CreateBookmarkInput,

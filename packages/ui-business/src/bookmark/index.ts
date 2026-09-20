@@ -10,6 +10,11 @@ export {
   type BookmarkListItemProps,
 } from "./BookmarkListItem";
 export {
+  BookmarkSubject,
+  BOOKMARK_SUBJECT_MAX_HEIGHT,
+  BOOKMARK_SUBJECT_MIN_HEIGHT,
+} from "./BookmarkSubject";
+export {
   BOOKMARK_CATEGORY_COLOR,
   getBookmarkHostname,
 } from "./bookmark-utils";
@@ -18,4 +23,5 @@ export type {
   BookmarkDisplayProps,
   BookmarkItemData,
   BookmarkLabelResolver,
+  BookmarkSubjectContent,
 } from "./types";

@@ -6,7 +6,7 @@ import {
   type AgentTool,
   type DynamicCapabilityOptions,
   type Memory,
-} from "@browser-agent-sdk/agent";
+} from "@hamhome/agent";
 import { configStorage } from "@/lib/storage";
 import type { AIConfig, Language } from "@/types";
 import {

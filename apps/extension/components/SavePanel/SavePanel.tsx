@@ -6,7 +6,7 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '@hamhome/ui';
 import { useSavePanel } from './useSavePanel';
-import type { PageContent, LocalBookmark } from '@/types';
+import type { PageContent, LocalBookmark, SaveFlowClipContext } from '@/types';
 import { SavePanelView } from './SavePanelView';
 import { getBackgroundService } from '@/lib/services';
 
@@ -18,6 +18,8 @@ interface SavePanelProps {
   onDelete?: () => void;
   hideSnapshotOptions?: boolean;
   initialSaveSnapshot?: boolean;
+  initialSaveScreenshot?: boolean;
+  initialClip?: SaveFlowClipContext;
   /** 首次加载（含自动 AI 分析）结束回调 */
   onInitialLoadSettled?: () => void;
   /** Popover/下拉的 portal 容器（在 shadow root 中渲染时必须传入） */
@@ -32,6 +34,8 @@ export function SavePanel({
   onDelete,
   hideSnapshotOptions = false,
   initialSaveSnapshot,
+  initialSaveScreenshot,
+  initialClip,
   onInitialLoadSettled,
   portalContainer,
 }: SavePanelProps) {
@@ -51,6 +55,12 @@ export function SavePanel({
     saveSnapshot,
     snapshotStatus,
     snapshotError,
+    saveScreenshot,
+    screenshotStatus,
+    screenshotError,
+    clipNote,
+    clipStatus,
+    clipError,
     syncToObsidian,
     obsidianStatus,
     obsidianError,
@@ -60,6 +70,8 @@ export function SavePanel({
     setCategoryId,
     setTags,
     setSaveSnapshot,
+    setSaveScreenshot,
+    setClipNote,
     setSyncToObsidian,
     runAIAnalysis,
     retryAnalysis,
@@ -71,6 +83,8 @@ export function SavePanel({
     existingBookmark,
     onSaved,
     initialSaveSnapshot,
+    initialSaveScreenshot,
+    initialClip,
     onInitialLoadSettled,
   });
 
@@ -99,6 +113,13 @@ export function SavePanel({
         saveSnapshot={saveSnapshot}
         snapshotStatus={snapshotStatus}
         snapshotError={snapshotError}
+        saveScreenshot={saveScreenshot}
+        screenshotStatus={screenshotStatus}
+        screenshotError={screenshotError}
+        initialClip={initialClip}
+        clipNote={clipNote}
+        clipStatus={clipStatus}
+        clipError={clipError}
         syncToObsidian={syncToObsidian}
         obsidianStatus={obsidianStatus}
         obsidianError={obsidianError}
@@ -108,6 +129,8 @@ export function SavePanel({
         onCategoryChange={setCategoryId}
         onTagsChange={setTags}
         onSaveSnapshotChange={setSaveSnapshot}
+        onSaveScreenshotChange={setSaveScreenshot}
+        onClipNoteChange={setClipNote}
         onSyncToObsidianChange={setSyncToObsidian}
         onLoadSuggestions={runAIAnalysis}
         onApplyAICategory={applyAIRecommendedCategory}

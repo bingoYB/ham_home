@@ -49,6 +49,20 @@ describe("TabGroupRuleService auto grouping", () => {
       tabs: {
         get: vi.fn(async () => ({ groupId: -1 })),
         group: vi.fn(async (options: { groupId?: number }) => options.groupId ?? 100),
+        query: vi.fn(async () => [
+          {
+            id: 90,
+            title: "需求文档",
+            url: "https://docs.example/spec",
+            groupId: 7,
+          },
+          {
+            id: 91,
+            title: "任务看板",
+            url: "https://board.example/sprint",
+            groupId: -1,
+          },
+        ]),
       },
       tabGroups: {
         TAB_GROUP_ID_NONE: -1,
@@ -346,12 +360,14 @@ describe("TabGroupRuleService auto grouping", () => {
     );
   });
 
-  it("reuses a cached AI group for the same domain before asking AI", async () => {
+  it("reuses a confirmed cached AI group for the same domain before asking AI", async () => {
     mocks.getAIGroupCache.mockResolvedValueOnce({
       url: "https://docs.example/project-plan",
       groupTitle: "工作",
       color: "blue",
-      updatedAt: 1,
+      updatedAt: Date.now(),
+      status: "confirmed",
+      agreeCount: 2,
     });
 
     const { tabGroupRuleService } = await import("../tab-group-rule-service");
@@ -507,9 +523,14 @@ describe("TabGroupRuleService auto grouping", () => {
       };
     }).chrome;
 
-    expect(prompt).toContain("现有标签组:\n- 工作");
+    expect(prompt).toContain("现有标签组（含成员摘要）:");
+    expect(prompt).toContain("- 工作 —");
     expect(prompt).not.toContain("(blue)");
-    expect(outputSchema.properties).toEqual({ groupTitle: {} });
+    expect(outputSchema).toMatchObject({
+      properties: { groupTitle: { type: "string" } },
+      required: ["groupTitle"],
+      additionalProperties: false,
+    });
     expect(chromeMock.tabs.group).toHaveBeenCalledWith({ tabIds: 12 });
     expect(chromeMock.tabGroups.update).toHaveBeenCalledWith(
       100,
@@ -626,5 +647,172 @@ describe("TabGroupRuleService auto grouping", () => {
     );
 
     randomSpy.mockRestore();
+  });
+
+  it("includes existing group members and ungrouped tabs in the prompt", async () => {
+    mocks.runExtensionCommand.mockResolvedValue({ output: { groupTitle: "工作" } });
+
+    const { tabGroupRuleService } = await import("../tab-group-rule-service");
+
+    await tabGroupRuleService.autoGroupTab(
+      12,
+      "https://cooking.example/recipes/soup",
+      1,
+      "番茄浓汤食谱",
+      { allowAI: true },
+    );
+
+    const prompt = mocks.runExtensionCommand.mock.calls[0]?.[0]?.command.prompt;
+
+    // 分组成员摘要：让 AI 知道「工作」组里实际装的是什么
+    expect(prompt).toContain("需求文档");
+    expect(prompt).toContain("docs.example");
+    expect(prompt).toContain("1 个标签页");
+    // 未分组标签页：提示 AI 存在潜在同伴 tab
+    expect(prompt).toContain("当前窗口中尚未分组的标签页:");
+    expect(prompt).toContain("任务看板 (board.example)");
+    // 任务指令已恢复
+    expect(prompt).toContain("任务：");
+    expect(prompt).toContain("不要照抄当前页面的具体标题");
+  });
+
+  it("stores a first-time AI suggestion as pending with its path signature", async () => {
+    mocks.runExtensionCommand.mockResolvedValue({ output: { groupTitle: "开发" } });
+
+    const { tabGroupRuleService } = await import("../tab-group-rule-service");
+
+    await tabGroupRuleService.autoGroupTab(
+      12,
+      "https://github.com/acme/repo/issues/1",
+      1,
+      "Fix typo",
+      { allowAI: true },
+    );
+
+    expect(mocks.setAIGroupCache).toHaveBeenCalledWith(
+      "domain:github.com",
+      expect.objectContaining({
+        groupTitle: "开发",
+        status: "pending",
+        samplePath: "acme",
+        agreeCount: 1,
+      }),
+    );
+  });
+
+  it("does not reuse a pending cache entry for a different site section", async () => {
+    mocks.getAIGroupCache.mockResolvedValue({
+      url: "https://github.com/sponsors/acme",
+      groupTitle: "赞助",
+      color: "pink",
+      updatedAt: Date.now(),
+      status: "pending",
+      samplePath: "sponsors",
+      agreeCount: 1,
+    });
+    mocks.runExtensionCommand.mockResolvedValue({ output: { groupTitle: "开发" } });
+
+    const { tabGroupRuleService } = await import("../tab-group-rule-service");
+
+    await tabGroupRuleService.autoGroupTab(
+      12,
+      "https://github.com/acme/repo/issues/1",
+      1,
+      "Fix typo",
+      { allowAI: true },
+    );
+
+    // 跨栏目必须重新询问 AI，而不是沿用单页样本得出的结论
+    expect(mocks.runExtensionCommand).toHaveBeenCalled();
+  });
+
+  it("marks a domain as multiPurpose when a new page contradicts the cached conclusion", async () => {
+    mocks.getAIGroupCache.mockResolvedValue({
+      url: "https://github.com/sponsors/acme",
+      groupTitle: "赞助",
+      color: "pink",
+      updatedAt: Date.now(),
+      status: "pending",
+      samplePath: "sponsors",
+      agreeCount: 1,
+    });
+    mocks.runExtensionCommand.mockResolvedValue({ output: { groupTitle: "开发" } });
+
+    const { tabGroupRuleService } = await import("../tab-group-rule-service");
+
+    await tabGroupRuleService.autoGroupTab(
+      12,
+      "https://github.com/acme/repo/issues/1",
+      1,
+      "Fix typo",
+      { allowAI: true },
+    );
+
+    expect(mocks.setAIGroupCache).toHaveBeenCalledWith(
+      "domain:github.com",
+      expect.objectContaining({ status: "multiPurpose" }),
+    );
+  });
+
+  it("promotes a pending entry to confirmed when another section agrees", async () => {
+    mocks.getAIGroupCache.mockResolvedValue({
+      url: "https://docs.example/guide/intro",
+      groupTitle: "文档",
+      color: "blue",
+      updatedAt: Date.now(),
+      status: "pending",
+      samplePath: "guide",
+      agreeCount: 1,
+    });
+    mocks.runExtensionCommand.mockResolvedValue({ output: { groupTitle: "文档" } });
+
+    const { tabGroupRuleService } = await import("../tab-group-rule-service");
+
+    await tabGroupRuleService.autoGroupTab(
+      12,
+      "https://docs.example/api/reference",
+      1,
+      "API Reference",
+      { allowAI: true },
+    );
+
+    expect(mocks.setAIGroupCache).toHaveBeenCalledWith(
+      "domain:docs.example",
+      expect.objectContaining({
+        groupTitle: "文档",
+        status: "confirmed",
+        agreeCount: 2,
+      }),
+    );
+  });
+
+  it("never reuses a multiPurpose domain cache", async () => {
+    mocks.getAIGroupCache.mockResolvedValue({
+      url: "https://github.com/acme/repo",
+      groupTitle: "开发",
+      color: "blue",
+      updatedAt: Date.now(),
+      status: "multiPurpose",
+      samplePath: "acme",
+      agreeCount: 1,
+    });
+    mocks.runExtensionCommand.mockResolvedValue({ output: { groupTitle: "赞助" } });
+
+    const { tabGroupRuleService } = await import("../tab-group-rule-service");
+
+    await tabGroupRuleService.autoGroupTab(
+      12,
+      "https://github.com/sponsors/acme",
+      1,
+      "Sponsors",
+      { allowAI: true },
+    );
+
+    expect(mocks.runExtensionCommand).toHaveBeenCalled();
+    // multiPurpose 是终态，不应被后续结论覆盖
+    expect(mocks.setAIGroupCache).toHaveBeenCalledWith(
+      "domain:github.com",
+      expect.objectContaining({ status: "multiPurpose", groupTitle: "开发" }),
+    );
   });
 });

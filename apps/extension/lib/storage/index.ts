@@ -13,4 +13,7 @@ export { vectorStore } from './vector-store';
 export { importTaskStorage } from './import-task-storage';
 export { aiTaskStorage } from './ai-task-storage';
 export { savePopupFallbackStorage } from './save-popup-fallback-storage';
+export { bookmarkClipStorage } from './bookmark-clip-storage';
+export { bookmarkHealthStorage } from './bookmark-health-storage';
+export { bookmarkScreenshotStorage } from './bookmark-screenshot-storage';
 export type { VectorStoreStats } from './vector-store';

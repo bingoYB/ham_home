@@ -9,17 +9,25 @@ const mocks = vi.hoisted(() => ({
   getAutoGroupSettings: vi.fn(),
   importRawRule: vi.fn(),
   importRawAutoGroupSettings: vi.fn(),
+  getAllClips: vi.fn(),
+  importRawClip: vi.fn(),
 }));
 
-vi.mock("../webdav-client", () => ({
-  webdavClientAdapter: {
-    getJSON: mocks.getJSON,
-    putJSON: mocks.putJSON,
-    isInitialized: true,
-    init: vi.fn(),
-    ensureDirectory: vi.fn(),
-  },
-}));
+vi.mock("../webdav-client", async () => {
+  const actual = await vi.importActual<typeof import("../webdav-client")>("../webdav-client");
+  return {
+    ...actual,
+    webdavClientAdapter: {
+      getJSON: mocks.getJSON,
+      putJSON: mocks.putJSON,
+      isInitialized: true,
+      init: vi.fn(),
+      reset: vi.fn(),
+      checkAuth: vi.fn(),
+      ensureDirectory: vi.fn(),
+    },
+  };
+});
 
 vi.mock("../sync-config-storage", () => ({
   syncConfigStorage: {
@@ -65,8 +73,18 @@ vi.mock("../../storage/tab-group-rules-storage", () => ({
   },
 }));
 
+vi.mock("../../storage/bookmark-clip-storage", () => ({
+  bookmarkClipStorage: {
+    getAllClips: mocks.getAllClips,
+    importRawClip: mocks.importRawClip,
+  },
+}));
+
 const baseSettings = {
   autoSaveSnapshot: true,
+  autoSaveScreenshot: false,
+  screenshotPrivatePagePolicy: "skip",
+  bookmarkHealthSchedule: "off",
   enableOmniboxSearch: true,
   defaultCategory: null,
   theme: "system" as const,
@@ -82,6 +100,7 @@ describe("SyncEngine settings merge", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.getRules.mockResolvedValue([]);
+    mocks.getAllClips.mockResolvedValue([]);
   });
 
   it("uploads newer local settings instead of applying stale remote settings", async () => {

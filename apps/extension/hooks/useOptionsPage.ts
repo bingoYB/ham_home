@@ -23,7 +23,7 @@ export function useOptionsPage() {
   const syncState = useSyncConfig();
   const filtersState = useCustomFilters();
   const clearDataState = useClearData();
-  const { snapshotStats } = useStorageStats();
+  const { snapshotStats, screenshotStats } = useStorageStats();
 
   const relativeSyncTime = useRelativeTime(
     syncStatus?.lastSyncTime || undefined,
@@ -63,6 +63,7 @@ export function useOptionsPage() {
     syncStatus,
     storageInfo,
     snapshotStats,
+    screenshotStats,
     activeTab,
     handleTabChange,
     relativeSyncTime,

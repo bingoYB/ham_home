@@ -9,6 +9,12 @@ import type {
 
 const MAX_AI_CACHE_ENTRIES = 500;
 
+/**
+ * AI 域名分组缓存的有效期（30 天）。
+ * 网站定位会随时间变化，过期后重新征询 AI，避免旧结论被永久固化。
+ */
+const AI_CACHE_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+
 const DEFAULT_AUTO_GROUP_SETTINGS: TabGroupAutoGroupSettings = {
   aiAutoGroupEnabled: false,
   aiAutoGroupInstructions: "",
@@ -146,7 +152,15 @@ class TabGroupRulesStorage {
 
   async getAIGroupCache(urlKey: string): Promise<TabGroupAICacheEntry | null> {
     const cache = await tabGroupAIGroupCacheItem.getValue();
-    return cache[urlKey] ?? null;
+    const entry = cache[urlKey];
+    if (!entry) return null;
+
+    // multiPurpose 是永久判定，不随 TTL 过期，否则多用途域名会周期性退回错误结论
+    if (entry.status !== "multiPurpose" && Date.now() - entry.updatedAt > AI_CACHE_TTL_MS) {
+      return null;
+    }
+
+    return entry;
   }
 
   async setAIGroupCache(

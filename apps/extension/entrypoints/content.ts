@@ -11,6 +11,9 @@ import { extractPageContent } from "@/utils/page-extract";
 import { saveFlowBus, type SaveFlowTrigger } from "@/utils/save-flow-bus";
 import { registerSingleFileTestHelpers, handleExtractSingleFileHtmlResponse } from "@/utils/single-file-capture";
 import { keepShadowRootDocumentStyles } from "@/utils/shadow-root-style-guard";
+import { enrichClipContext } from "@/utils/clip-context";
+
+let captureUiContainer: HTMLElement | null = null;
 
 // 监听来自 Popup/Background 的消息
 browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
@@ -38,6 +41,7 @@ browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     // 页内保存流程：由快捷键/右键菜单/Popup 触发，在当前页面展示保存浮窗
     const trigger: SaveFlowTrigger = {
       source: message.source ?? "unknown",
+      clip: enrichClipContext(message.clip),
     };
     // 回执让调用方知道页内流程已接管，否则调用方会回退到 Popup；
     // 用户在设置中选择在扩展弹窗中保存时，页面内不接管本次保存
@@ -55,6 +59,20 @@ browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         takeOver();
       })
       .catch(takeOver);
+    return true;
+  }
+
+  if (message.type === "SET_CAPTURE_VISIBILITY") {
+    if (captureUiContainer) {
+      captureUiContainer.style.visibility = message.visible ? "" : "hidden";
+    }
+    if (message.visible) {
+      sendResponse({ ok: true });
+    } else {
+      requestAnimationFrame(() =>
+        requestAnimationFrame(() => sendResponse({ ok: true })),
+      );
+    }
     return true;
   }
 
@@ -78,6 +96,7 @@ export default defineContentScript({
       zIndex: 99999,
       anchor: "body",
       onMount(container) {
+        captureUiContainer = container;
         // 创建 React 挂载点
         const appRoot = document.createElement("div");
         appRoot.id = "hamhome-root";
@@ -89,6 +108,7 @@ export default defineContentScript({
         return { unmount };
       },
       onRemove(mounted) {
+        captureUiContainer = null;
         mounted?.unmount();
       },
     });

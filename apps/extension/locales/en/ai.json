@@ -118,5 +118,13 @@
   "batchOrganize": "Batch AI Organize",
   "batchOrganizeProgress": "AI is organizing bookmarks...",
   "batchOrganizeFailed": "AI organization completed: {{success}} succeeded, {{failed}} failed. Some bookmarks could not be processed. Please check your network and retry.",
-  "reanalyze": "AI Re-analyze"
+  "reanalyze": "AI Re-analyze",
+  "clipAnalysis": {
+    "errors": {
+      "CLIP_IMAGE_VISION_UNSUPPORTED": "The current model does not support image analysis. Switch to a multimodal model in settings.",
+      "CLIP_IMAGE_FETCH_FAILED": "Failed to download the image; the site may block external access.",
+      "CLIP_IMAGE_UNSUPPORTED_TYPE": "Unsupported image format. Only PNG / JPEG / WebP / GIF are supported.",
+      "CLIP_IMAGE_TOO_LARGE": "The image is too large to send for AI analysis."
+    }
+  }
 }

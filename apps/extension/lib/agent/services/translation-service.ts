@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { JsonSchema } from "@browser-agent-sdk/agent";
+import type { JsonSchema } from "@hamhome/agent";
 import { runExtensionCommand } from "../command-runner";
 import { getAgentErrorMessage } from "../errors";
 import { assertAgentConfigured, resolveAgentConfig } from "../factory";

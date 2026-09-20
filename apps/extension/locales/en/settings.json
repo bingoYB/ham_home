@@ -22,7 +22,25 @@
     "maxTokens": "Max Tokens",
     "importBookmarks": "Import Data",
     "exportBookmarks": "Export Data",
-    "about": "About",
+    "about": {
+      "title": "About",
+      "description": "About HamHome",
+      "subtitle": "AI-Powered Browser Workspace",
+      "intro": "HamHome is a local-first browser workspace for saving and restoring open tabs, automatically grouping active sessions, and organizing bookmarks and collections with AI so both in-progress browsing and long-term saves stay easier to manage.",
+      "versionLabel": "Version",
+      "versionValue": "HamHome v{{version}}",
+      "versionHint": "Shows the version of the extension currently installed",
+      "websiteLabel": "Official Website",
+      "websiteHint": "Visit the website for product updates, downloads, and privacy details",
+      "websiteButton": "Open Website",
+      "githubLabel": "GitHub Repository",
+      "githubHint": "Browse the source code, releases, issues, and contribution workflow",
+      "githubButton": "View Repository",
+      "starTitle": "Enjoying HamHome? Please give it a Star",
+      "starHint": "If HamHome is helpful to you, a GitHub Star would mean a lot. Your support helps the project keep improving and reach more users.",
+      "starButton": "Star on GitHub",
+      "copyright": "© 2024-2026 HamHome. All rights reserved."
+    },
     "sections": {
       "general": "General",
       "ai": "AI",
@@ -45,6 +63,21 @@
       "description": "Customize your experience",
       "autoSaveSnapshot": "Auto Save Snapshots",
       "autoSaveSnapshotDesc": "Automatically save page snapshots when saving bookmarks",
+      "autoSaveScreenshot": "Save Page Screenshots by Default",
+      "autoSaveScreenshotDesc": "Capture the visible area by default; each save can still opt out",
+      "screenshotPrivatePagePolicy": "Private Page Screenshots",
+      "screenshotPrivatePagePolicyDesc": "Choose whether screenshots can be selected on signed-in or private pages",
+      "screenshotPrivatePagePolicyOptions": {
+        "skip": "Always skip",
+        "ask": "Allow choice"
+      },
+      "bookmarkHealthSchedule": "Automatic Bookmark Check",
+      "bookmarkHealthScheduleDesc": "Periodically check link status in the background; off by default with manual scans always available",
+      "bookmarkHealthScheduleOptions": {
+        "off": "Off",
+        "weekly": "Weekly",
+        "monthly": "Monthly"
+      },
       "usePopupSavePanel": "Save in Extension Popup",
       "usePopupSavePanelDesc": "When on, the bookmark form opens inside the extension popup; when off, a save panel appears right on the page so AI analysis never interrupts your browsing",
       "enableOmniboxSearch": "Omnibox Search Enhancement",
@@ -105,7 +138,6 @@
       "maxTokens": "Max Tokens",
       "temperature": "Temperature",
       "apiKey": "API Key",
-      "baseUrl": "Base URL",
       "noApiKeyNeeded": "No API Key Needed",
       "searchModel": "Search model name",
       "noModelFound": "No matching models found",
@@ -191,7 +223,9 @@
           "clearTitle": "Confirm Clear Vector Data",
           "clearWarning": "This will delete all bookmark vectors, semantic search will be temporarily unavailable. Confirm clear?"
         }
-      }
+      },
+      "enableImageAnalysis": "AI analysis for image clips",
+      "enableImageAnalysisHint": "When enabled, saving an image sends it to the AI to generate a description, category and tags. Private pages are never sent."
     },
     "storage": {
       "title": "Storage Management",
@@ -221,6 +255,12 @@
         "confirmTitle": "Confirm Clear Snapshots",
         "confirmWarning": "This will delete all locally saved web snapshots. Your bookmarks will not be affected. This action cannot be undone!"
       },
+      "screenshotData": {
+        "title": "Page Screenshots",
+        "count": "{{count}} screenshots",
+        "size": "{{size}}",
+        "localOnly": "Stored on this device only; delete individual images from bookmark details"
+      },
       "vectorData": {
         "title": "Semantic Vector Index",
         "count": "{{count}} vectors",
@@ -235,29 +275,10 @@
       "exportHTML": "Export as HTML",
       "dangerZone": "Danger Zone",
       "clearAllData": "Clear All Business Data",
-      "clearAllDesc": "Clear bookmarks, categories, workspaces, snapshots, and vectors (AI config and settings will be kept)",
+      "clearAllDesc": "Clear bookmarks, categories, workspaces, snapshots, page screenshots, and vectors (AI config and settings will be kept)",
       "confirmClearAll": "Confirm Clear All Data",
-      "clearAllWarning": "This will delete all bookmarks, categories, workspaces, snapshots, and vector indexes. AI config, tag settings, and WebDAV config will be kept. This action cannot be undone!",
+      "clearAllWarning": "This will delete all bookmarks, categories, workspaces, snapshots, page screenshots, and vector indexes. AI config, tag settings, and WebDAV config will be kept. This action cannot be undone!",
       "notEnabled": "Not enabled"
-    },
-    "about": {
-      "title": "About",
-      "description": "About HamHome",
-      "subtitle": "AI-Powered Browser Workspace",
-      "intro": "HamHome is a local-first browser workspace for saving and restoring open tabs, automatically grouping active sessions, and organizing bookmarks and collections with AI so both in-progress browsing and long-term saves stay easier to manage.",
-      "versionLabel": "Version",
-      "versionValue": "HamHome v{{version}}",
-      "versionHint": "Shows the version of the extension currently installed",
-      "websiteLabel": "Official Website",
-      "websiteHint": "Visit the website for product updates, downloads, and privacy details",
-      "websiteButton": "Open Website",
-      "githubLabel": "GitHub Repository",
-      "githubHint": "Browse the source code, releases, issues, and contribution workflow",
-      "githubButton": "View Repository",
-      "starTitle": "Enjoying HamHome? Please give it a Star",
-      "starHint": "If HamHome is helpful to you, a GitHub Star would mean a lot. Your support helps the project keep improving and reach more users.",
-      "starButton": "Star on GitHub",
-      "copyright": "© 2024-2026 HamHome. All rights reserved."
     },
     "dialogs": {
       "confirmClear": "Confirm Clear All Data",
@@ -551,7 +572,17 @@
         "neverSynced": "Never Synced",
         "statusError": "Sync Failed",
         "statusSyncing": "Syncing...",
-        "statusIdle": "Idle / Synced"
+        "statusIdle": "Idle / Synced",
+        "errors": {
+          "auth": "Authentication failed (401): double-check the username and password. If two-factor authentication is enabled on the server, use an app password / access token instead; on a NAS (e.g. Synology) also make sure the account may access that WebDAV shared folder.",
+          "forbidden": "Access denied (403): the account cannot read or write this directory. Check the shared folder permissions or use another WebDAV path.",
+          "notFound": "Path not found (404): make sure the server URL contains the correct WebDAV sub path (e.g. /dav or /webdav).",
+          "network": "Cannot reach the server: check that the host and port are reachable, that the HTTPS certificate is valid, and your network / firewall settings.",
+          "server": "The server returned an error (5xx): try again later or check the server logs.",
+          "invalidUrl": "Invalid server URL: the address must start with http:// or https://.",
+          "notInitialized": "Sync is not initialized: please re-enter the server URL and credentials.",
+          "unknown": "Sync failed: see the error details below."
+        }
       }
     }
   }

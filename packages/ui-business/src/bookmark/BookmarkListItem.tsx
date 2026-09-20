@@ -13,11 +13,17 @@ export function BookmarkListItem({
   isSelected,
   isHighlighted = false,
   faviconSrc,
+  subject,
+  onOpenSubject,
   onToggleSelect,
   ...actionProps
 }: BookmarkListItemProps) {
   const hostname = getBookmarkHostname(bookmark.url);
   const resolvedFavicon = faviconSrc ?? bookmark.favicon;
+  // 文字剪藏没有可展示的缩略图，左侧不占位
+  const showThumbnail = subject?.type !== "text";
+  const description =
+    subject?.type === "text" ? subject.text : bookmark.description;
 
   return (
     <div
@@ -33,38 +39,52 @@ export function BookmarkListItem({
         <Checkbox checked={isSelected} onCheckedChange={onToggleSelect} />
       </div>
 
-      <BookmarkFavicon src={resolvedFavicon} size="sm" />
+      {showThumbnail && (
+        <BookmarkFavicon
+          src={resolvedFavicon}
+          imageSrc={subject?.type === "image" ? subject.imageSrc : null}
+          size="sm"
+        />
+      )}
 
-      <a
-        href={bookmark.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="w-0 grow min-w-0"
-      >
-        <h3
-          className="font-medium text-foreground truncate"
-          title={bookmark.title}
+      {/* 剪藏主体的完整内容在弹窗里看，普通书签直接打开原链接 */}
+      {subject && onOpenSubject ? (
+        // 标题是标题元素，不能放进 button，用可聚焦容器承载点击
+        <div
+          role="button"
+          tabIndex={0}
+          onClick={onOpenSubject}
+          onKeyDown={(event) => {
+            if (event.key !== "Enter" && event.key !== " ") return;
+            event.preventDefault();
+            onOpenSubject();
+          }}
+          className="w-0 grow min-w-0 cursor-pointer text-left"
         >
-          {bookmark.title}
-        </h3>
-        {bookmark.description && (
-          <p
-            className="text-xs text-muted-foreground truncate mt-1"
-            title={bookmark.description}
-          >
-            {bookmark.description}
-          </p>
-        )}
-        <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-          <span className="truncate max-w-[200px]">{hostname}</span>
-          <span className="shrink-0">•</span>
-          <span className="shrink-0 truncate max-w-[100px]">
-            {categoryName}
-          </span>
-          <span className="shrink-0">•</span>
-          <span className="shrink-0 whitespace-nowrap">{formattedDate}</span>
+          <BookmarkListItemMeta
+            bookmark={bookmark}
+            description={description}
+            hostname={hostname}
+            categoryName={categoryName}
+            formattedDate={formattedDate}
+          />
         </div>
-      </a>
+      ) : (
+        <a
+          href={bookmark.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="w-0 grow min-w-0"
+        >
+          <BookmarkListItemMeta
+            bookmark={bookmark}
+            description={description}
+            hostname={hostname}
+            categoryName={categoryName}
+            formattedDate={formattedDate}
+          />
+        </a>
+      )}
 
       {bookmark.tags.length > 0 && (
         <div className="hidden lg:flex flex-wrap items-center gap-1.5 max-w-[240px] max-h-[52px] overflow-hidden">
@@ -80,5 +100,48 @@ export function BookmarkListItem({
         <BookmarkActionsMenu bookmark={bookmark} {...actionProps} />
       </div>
     </div>
+  );
+}
+
+interface BookmarkListItemMetaProps
+  extends Pick<
+    BookmarkListItemProps,
+    "bookmark" | "categoryName" | "formattedDate"
+  > {
+  description?: string | null;
+  hostname: string;
+}
+
+function BookmarkListItemMeta({
+  bookmark,
+  description,
+  hostname,
+  categoryName,
+  formattedDate,
+}: BookmarkListItemMetaProps) {
+  return (
+    <>
+      <h3
+        className="font-medium text-foreground truncate"
+        title={bookmark.title}
+      >
+        {bookmark.title}
+      </h3>
+      {description && (
+        <p
+          className="text-xs text-muted-foreground truncate mt-1"
+          title={description}
+        >
+          {description}
+        </p>
+      )}
+      <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
+        <span className="truncate max-w-[200px]">{hostname}</span>
+        <span className="shrink-0">•</span>
+        <span className="shrink-0 truncate max-w-[100px]">{categoryName}</span>
+        <span className="shrink-0">•</span>
+        <span className="shrink-0 whitespace-nowrap">{formattedDate}</span>
+      </div>
+    </>
   );
 }

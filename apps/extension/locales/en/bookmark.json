@@ -23,7 +23,7 @@
     "tags": "Tags",
     "createdAt": "Created",
     "recent": "Recent Bookmarks",
-    "all": "All Bookmarks",
+    "all": "My Collection",
     "privacy": "Privacy",
     "search": "Search bookmarks, tags, or URLs...",
     "count": "You have {{count}} bookmark",
@@ -39,11 +39,17 @@
       "allCategories": "All Categories",
       "allTags": "All Tags",
       "selectedTags": "{{count}} tags selected",
-      "clearFilter": "Clear Filters"
+      "clearFilter": "Clear Filters",
+      "contentType": "Content Type",
+      "typeAll": "All",
+      "typeBookmark": "Bookmarks",
+      "typeImage": "Images",
+      "typeText": "Text"
     },
     "view": {
       "grid": "Grid View",
-      "list": "List View"
+      "list": "List View",
+      "visual": "Visual Gallery"
     },
     "batch": {
       "selected": "{{count}} selected",
@@ -73,6 +79,16 @@
     "share": "Share",
     "aiTag": "AI",
     "viewSnapshot": "View Snapshot",
+    "screenshot": {
+      "view": "Page screenshot",
+      "notFound": "This bookmark has no page screenshot",
+      "openInNewTab": "Open in new tab",
+      "download": "Download screenshot",
+      "delete": "Delete screenshot",
+      "deleteTitle": "Delete page screenshot",
+      "deleteDesc": "Only the local image is removed; the bookmark and its web snapshot stay.",
+      "deleted": "Page screenshot deleted"
+    },
     "snapshot": {
       "title": "Web Snapshot",
       "loading": "Loading snapshot...",
@@ -95,6 +111,28 @@
       "obsidianBatchResult": "Obsidian sync completed: {{success}} succeeded, {{failed}} failed, {{skipped}} skipped",
       "noSnapshot": "No snapshot available"
     }
+  },
+  "screenshotPreview": {
+    "capturedPage": "Page preview captured when saved"
+  },
+  "visualGallery": {
+    "empty": "No page screenshots yet",
+    "emptyDesc": "Enable “Save page screenshot” when bookmarking and this view will grow into your product UI and visual inspiration library."
+  },
+  "subject": {
+    "imageTitle": "Image clip",
+    "textTitle": "Saved selection",
+    "source": "Source",
+    "note": "Note",
+    "imageInfo": "Image information",
+    "dimensions": "Dimensions",
+    "fileSize": "File size",
+    "format": "Format",
+    "unknown": "Unknown",
+    "copyText": "Copy text",
+    "copied": "Copied to clipboard",
+    "openImage": "Open image",
+    "openSource": "Open source page"
   },
   "modal": {
     "title": "Add New Bookmark",
@@ -321,6 +359,35 @@
     "updateBookmark": "Update Bookmark",
     "saveBookmark": "Save Bookmark",
     "saving": "Saving...",
+    "screenshot": {
+      "title": "Save page screenshot",
+      "enabledDesc": "Capture the visible page for previews and visual references",
+      "disabledDesc": "Skip the image now; you can capture it later from bookmark details",
+      "status": {
+        "saving": "Capturing the current page",
+        "skipped": "Page screenshot skipped",
+        "saved": "Page screenshot saved",
+        "failed": "Screenshot failed; you can retry later"
+      }
+    },
+    "clip": {
+      "willSave": "Saved with bookmark",
+      "imageUrlLabel": "Image URL",
+      "sourceLabel": "Source",
+      "notePlaceholder": "Add a note to this clip (optional)",
+      "types": {
+        "highlight": "Text highlight",
+        "note": "Page note",
+        "link": "Link clip",
+        "image": "Image clip"
+      },
+      "status": {
+        "saving": "Saving clip",
+        "skipped": "Clip skipped",
+        "saved": "Clip saved",
+        "failed": "Clip failed; you can retry later"
+      }
+    },
     "snapshot": {
       "title": "Save Snapshot",
       "enabledDesc": "Save offline content for later review",
@@ -340,6 +407,58 @@
         "skipped": "Obsidian sync skipped",
         "failed": "Failed to sync to Obsidian"
       }
+    }
+  },
+  "healthCenter": {
+    "title": "Bookmark Health Center",
+    "navTitle": "Bookmark Health",
+    "description": "Check dead links, redirects, access errors, and duplicates for bookmark collections only. Image and text clips are excluded. Authentication, rate limits, and network failures are kept distinct from broken links.",
+    "scanAll": "Run Full Check",
+    "scanning": "Checking",
+    "scanComplete": "Bookmark check complete",
+    "scanFailed": "Bookmark check failed",
+    "progress": "Checking link status",
+    "searchPlaceholder": "Search title or URL",
+    "empty": "No bookmarks match this filter",
+    "useRedirect": "Use New URL",
+    "redirectApplied": "Updated to the redirected URL",
+    "checkedAt": "Checked {{date}}",
+    "stats": {
+      "total": "Bookmark Collection",
+      "healthy": "Healthy",
+      "attention": "Needs Attention",
+      "unchecked": "Unchecked"
+    },
+    "filters": {
+      "all": "All",
+      "attention": "Needs Attention",
+      "broken": "Broken",
+      "duplicates": "Duplicates",
+      "unchecked": "Unchecked"
+    },
+    "status": {
+      "unchecked": "Unchecked",
+      "healthy": "Healthy",
+      "redirected": "Redirected",
+      "broken": "Broken",
+      "auth_required": "Sign-in Required",
+      "rate_limited": "Rate Limited",
+      "server_error": "Server Error",
+      "network_error": "Network Error",
+      "unsupported": "Unsupported"
+    },
+    "issues": {
+      "redirected": "URL redirects elsewhere",
+      "broken": "Page not found",
+      "auth_required": "Page requires sign-in or authorization",
+      "rate_limited": "The site limited the check request",
+      "server_error": "The site is temporarily unavailable",
+      "network_error": "The current network cannot reach this page",
+      "timeout": "Request timed out",
+      "unsupported_protocol": "This URL type cannot be checked",
+      "missing_title": "Missing title",
+      "missing_description": "Missing summary",
+      "duplicate_url": "High-confidence duplicate URL"
     }
   },
   "tabGroups": {

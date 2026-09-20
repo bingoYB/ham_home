@@ -1,10 +1,13 @@
 import {
   BookmarkCard as SharedBookmarkCard,
-  type BookmarkCardProps,
+  type BookmarkCardProps as SharedBookmarkCardProps,
 } from "@hamhome/ui-business/bookmark";
 import { useSafeFavicon } from "@/hooks/useSafeFavicon";
+import { BookmarkScreenshotHover } from "./BookmarkScreenshotHover";
 
-export type { BookmarkCardProps };
+export interface BookmarkCardProps extends SharedBookmarkCardProps {
+  hasScreenshot?: boolean;
+}
 
 export function BookmarkCard(props: BookmarkCardProps) {
   const safeFavicon = useSafeFavicon(
@@ -12,10 +15,17 @@ export function BookmarkCard(props: BookmarkCardProps) {
     props.bookmark.favicon,
   );
 
+  const { hasScreenshot, ...sharedProps } = props;
   return (
-    <SharedBookmarkCard
-      {...props}
-      faviconSrc={props.faviconSrc ?? safeFavicon}
-    />
+    <BookmarkScreenshotHover
+      bookmarkId={props.bookmark.id}
+      title={props.bookmark.title}
+      enabled={hasScreenshot}
+    >
+      <SharedBookmarkCard
+        {...sharedProps}
+        faviconSrc={props.faviconSrc ?? safeFavicon}
+      />
+    </BookmarkScreenshotHover>
   );
 }

@@ -11,6 +11,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  Switch,
 } from "@hamhome/ui";
 import type { AIConfig } from "@/types";
 
@@ -80,6 +81,21 @@ export function AdvancedSettings({
               </Select>
             </div>
           )}
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <div className="space-y-1">
+            <Label htmlFor="enableImageAnalysis">
+              {t("settings:settings.ai.enableImageAnalysis")}
+            </Label>
+            <p className="text-xs text-muted-foreground">
+              {t("settings:settings.ai.enableImageAnalysisHint")}
+            </p>
+          </div>
+          <Switch
+            id="enableImageAnalysis"
+            checked={aiConfig.enableImageAnalysis !== false}
+            onCheckedChange={(checked) => onUpdate({ enableImageAnalysis: checked })}
+          />
         </div>
       </CollapsibleContent>
     </Collapsible>

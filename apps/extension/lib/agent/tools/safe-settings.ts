@@ -48,6 +48,8 @@ const AI_PROVIDERS = new Set<AIProvider>([
 const THEMES = new Set<ThemeMode>(["light", "dark", "system"]);
 const LANGUAGES = new Set(["zh", "en"]);
 const PANEL_POSITIONS = new Set<PanelPosition>(["left", "right"]);
+const SCREENSHOT_PRIVATE_POLICIES = new Set(["skip", "ask"]);
+const BOOKMARK_HEALTH_SCHEDULES = new Set(["off", "weekly", "monthly"]);
 const SENSITIVE_KEYS = new Set([
   "apiKey",
   "baseUrl",
@@ -138,6 +140,9 @@ export function sanitizeSafeSettingsUpdate(
       "theme",
       "language",
       "autoSaveSnapshot",
+      "autoSaveScreenshot",
+      "screenshotPrivatePagePolicy",
+      "bookmarkHealthSchedule",
       "enableOmniboxSearch",
       "defaultCategory",
       "enableSidePanel",
@@ -162,6 +167,36 @@ export function sanitizeSafeSettingsUpdate(
     settings.autoSaveSnapshot = rawSettings.autoSaveSnapshot;
   } else if ("autoSaveSnapshot" in rawSettings) {
     reject(rejected, "settings", "autoSaveSnapshot", "value must be boolean");
+  }
+
+  if (isBoolean(rawSettings.autoSaveScreenshot)) {
+    settings.autoSaveScreenshot = rawSettings.autoSaveScreenshot;
+  } else if ("autoSaveScreenshot" in rawSettings) {
+    reject(rejected, "settings", "autoSaveScreenshot", "value must be boolean");
+  }
+
+  if (SCREENSHOT_PRIVATE_POLICIES.has(rawSettings.screenshotPrivatePagePolicy as string)) {
+    settings.screenshotPrivatePagePolicy =
+      rawSettings.screenshotPrivatePagePolicy as LocalSettings["screenshotPrivatePagePolicy"];
+  } else if ("screenshotPrivatePagePolicy" in rawSettings) {
+    reject(
+      rejected,
+      "settings",
+      "screenshotPrivatePagePolicy",
+      "value must be skip or ask",
+    );
+  }
+
+  if (BOOKMARK_HEALTH_SCHEDULES.has(rawSettings.bookmarkHealthSchedule as string)) {
+    settings.bookmarkHealthSchedule =
+      rawSettings.bookmarkHealthSchedule as LocalSettings["bookmarkHealthSchedule"];
+  } else if ("bookmarkHealthSchedule" in rawSettings) {
+    reject(
+      rejected,
+      "settings",
+      "bookmarkHealthSchedule",
+      "value must be off, weekly, or monthly",
+    );
   }
 
   if (isBoolean(rawSettings.enableOmniboxSearch)) {
@@ -209,6 +244,7 @@ export function sanitizeSafeSettingsUpdate(
       "enableTagSuggestion",
       "presetTags",
       "autoDetectPrivacy",
+      "enableImageAnalysis",
       "apiMode",
       "language",
     ]),
@@ -263,6 +299,7 @@ export function sanitizeSafeSettingsUpdate(
     "enableSmartCategory",
     "enableTagSuggestion",
     "autoDetectPrivacy",
+    "enableImageAnalysis",
   ] as const) {
     if (isBoolean(rawAIConfig[key])) {
       aiConfig[key] = rawAIConfig[key];

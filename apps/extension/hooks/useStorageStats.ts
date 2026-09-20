@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { snapshotStorage } from "@/lib/storage/snapshot-storage";
+import { bookmarkScreenshotStorage } from "@/lib/storage/bookmark-screenshot-storage";
 import { getBackgroundService } from "@/lib/services";
 import type { VectorStoreStats } from "@/lib/storage/vector-store";
 
@@ -10,6 +11,7 @@ export interface SnapshotStats {
 
 export interface UseStorageStatsReturn {
   snapshotStats: SnapshotStats | null;
+  screenshotStats: SnapshotStats | null;
   vectorStats: VectorStoreStats | null;
   isLoadingSnapshotStats: boolean;
   isLoadingVectorStats: boolean;
@@ -19,6 +21,7 @@ export interface UseStorageStatsReturn {
 
 export function useStorageStats(): UseStorageStatsReturn {
   const [snapshotStats, setSnapshotStats] = useState<SnapshotStats | null>(null);
+  const [screenshotStats, setScreenshotStats] = useState<SnapshotStats | null>(null);
   const [vectorStats, setVectorStats] = useState<VectorStoreStats | null>(null);
   const [isLoadingSnapshotStats, setIsLoadingSnapshotStats] = useState(false);
   const [isLoadingVectorStats, setIsLoadingVectorStats] = useState(false);
@@ -26,11 +29,16 @@ export function useStorageStats(): UseStorageStatsReturn {
   const loadSnapshotStats = useCallback(async () => {
     setIsLoadingSnapshotStats(true);
     try {
-      const stats = await snapshotStorage.getStorageUsage();
-      setSnapshotStats(stats);
+      const [snapshots, screenshots] = await Promise.all([
+        snapshotStorage.getStorageUsage(),
+        bookmarkScreenshotStorage.getStorageUsage(),
+      ]);
+      setSnapshotStats(snapshots);
+      setScreenshotStats(screenshots);
     } catch (error) {
       console.error("[useStorageStats] Failed to load snapshot stats:", error);
       setSnapshotStats(null);
+      setScreenshotStats(null);
     } finally {
       setIsLoadingSnapshotStats(false);
     }
@@ -60,6 +68,7 @@ export function useStorageStats(): UseStorageStatsReturn {
 
   return {
     snapshotStats,
+    screenshotStats,
     vectorStats,
     isLoadingSnapshotStats,
     isLoadingVectorStats,

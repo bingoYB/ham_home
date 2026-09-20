@@ -94,6 +94,83 @@ export function GeneralTab({
           />
         </div>
 
+        {/* 自动保存页面截图 */}
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label>{t("settings:settings.general.autoSaveScreenshot")}</Label>
+            <p className="text-sm text-muted-foreground">
+              {t("settings:settings.general.autoSaveScreenshotDesc")}
+            </p>
+          </div>
+          <Switch
+            checked={appSettings.autoSaveScreenshot}
+            onCheckedChange={(checked) =>
+              updateAppSettings({ autoSaveScreenshot: checked })
+            }
+          />
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label htmlFor="screenshot-private-policy">
+              {t("settings:settings.general.screenshotPrivatePagePolicy")}
+            </Label>
+            <p className="text-sm text-muted-foreground">
+              {t("settings:settings.general.screenshotPrivatePagePolicyDesc")}
+            </p>
+          </div>
+          <Select
+            value={appSettings.screenshotPrivatePagePolicy}
+            onValueChange={(value: "skip" | "ask") =>
+              updateAppSettings({ screenshotPrivatePagePolicy: value })
+            }
+          >
+            <SelectTrigger id="screenshot-private-policy" className="w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="skip">
+                {t("settings:settings.general.screenshotPrivatePagePolicyOptions.skip")}
+              </SelectItem>
+              <SelectItem value="ask">
+                {t("settings:settings.general.screenshotPrivatePagePolicyOptions.ask")}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label htmlFor="bookmark-health-schedule">
+              {t("settings:settings.general.bookmarkHealthSchedule")}
+            </Label>
+            <p className="text-sm text-muted-foreground">
+              {t("settings:settings.general.bookmarkHealthScheduleDesc")}
+            </p>
+          </div>
+          <Select
+            value={appSettings.bookmarkHealthSchedule}
+            onValueChange={(value: "off" | "weekly" | "monthly") =>
+              updateAppSettings({ bookmarkHealthSchedule: value })
+            }
+          >
+            <SelectTrigger id="bookmark-health-schedule" className="w-32">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="off">
+                {t("settings:settings.general.bookmarkHealthScheduleOptions.off")}
+              </SelectItem>
+              <SelectItem value="weekly">
+                {t("settings:settings.general.bookmarkHealthScheduleOptions.weekly")}
+              </SelectItem>
+              <SelectItem value="monthly">
+                {t("settings:settings.general.bookmarkHealthScheduleOptions.monthly")}
+              </SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
         {/* 保存方式：页内浮窗 / 扩展弹窗 */}
         <div className="flex items-center justify-between">
           <div className="space-y-0.5">

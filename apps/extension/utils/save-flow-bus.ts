@@ -6,10 +6,8 @@
  * 避免用户点击后因为 UI 尚未挂载而丢失触发。
  */
 
-export interface SaveFlowTrigger {
-  /** 触发来源，便于后续埋点或差异化行为 */
-  source: "shortcut" | "contextMenu" | "popup" | "unknown";
-}
+import type { SaveFlowTrigger } from "@/types";
+export type { SaveFlowTrigger } from "@/types";
 
 type SaveFlowListener = (trigger: SaveFlowTrigger) => void;
 

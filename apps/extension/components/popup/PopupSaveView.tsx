@@ -11,23 +11,33 @@ import { Button } from "@hamhome/ui";
 import { SavePanel } from "@/components/SavePanel";
 import { useCurrentPage } from "@/hooks/useCurrentPage";
 import { bookmarkStorage } from "@/lib/storage/bookmark-storage";
-import type { LocalBookmark } from "@/types";
+import type { LocalBookmark, SaveFlowClipContext } from "@/types";
+import {
+  applyClipTargetToPageContent,
+  isSubjectClip,
+} from "@/utils/clip-context";
 
 interface PopupSaveViewProps {
   /** 返回快捷面板 */
   onBack: () => void;
+  initialClip?: SaveFlowClipContext;
 }
 
-export function PopupSaveView({ onBack }: PopupSaveViewProps) {
+export function PopupSaveView({ onBack, initialClip }: PopupSaveViewProps) {
   const { t } = useTranslation(["bookmark", "common"]);
   const { pageContent, loading, error } = useCurrentPage();
   const [existingBookmark, setExistingBookmark] =
     useState<LocalBookmark | null>(null);
+  const effectivePageContent = pageContent
+    ? applyClipTargetToPageContent(pageContent, initialClip)
+    : null;
 
   useEffect(() => {
-    if (!pageContent?.url) return;
-    bookmarkStorage.getBookmarkByUrl(pageContent.url).then(setExistingBookmark);
-  }, [pageContent?.url]);
+    if (!effectivePageContent?.url) return;
+    bookmarkStorage
+      .getBookmarkByUrl(effectivePageContent.url)
+      .then(setExistingBookmark);
+  }, [effectivePageContent?.url]);
 
   return (
     <div className="flex w-full min-h-[400px] max-h-[600px] flex-col bg-background text-foreground">
@@ -51,11 +61,13 @@ export function PopupSaveView({ onBack }: PopupSaveViewProps) {
           <LoadingState />
         ) : error ? (
           <ErrorState error={error} />
-        ) : pageContent ? (
+        ) : effectivePageContent ? (
           <SavePanel
-            key={`${pageContent.url}:${existingBookmark?.id ?? "new"}`}
-            pageContent={pageContent}
+            key={`${effectivePageContent.url}:${existingBookmark?.id ?? "new"}`}
+            pageContent={effectivePageContent}
             existingBookmark={existingBookmark}
+            initialClip={initialClip}
+            hideSnapshotOptions={isSubjectClip(initialClip)}
             onSaved={() => window.close()}
             onClose={() => window.close()}
             onDelete={() => window.close()}

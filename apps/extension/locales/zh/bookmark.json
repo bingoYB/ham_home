@@ -23,7 +23,7 @@
     "tags": "标签",
     "createdAt": "创建时间",
     "recent": "最近的书签",
-    "all": "所有书签",
+    "all": "我的收藏",
     "privacy": "隐私",
     "search": "搜索书签、标签、网址...",
     "count": "你有 {{count}} 个书签",
@@ -39,11 +39,17 @@
       "allCategories": "全部分类",
       "allTags": "全部标签",
       "selectedTags": "已选 {{count}} 个标签",
-      "clearFilter": "清除筛选"
+      "clearFilter": "清除筛选",
+      "contentType": "内容类型",
+      "typeAll": "所有",
+      "typeBookmark": "书签",
+      "typeImage": "图片",
+      "typeText": "文本"
     },
     "view": {
       "grid": "卡片视图",
-      "list": "列表视图"
+      "list": "列表视图",
+      "visual": "视觉画廊"
     },
     "batch": {
       "selected": "已选择 {{count}} 项",
@@ -73,6 +79,16 @@
     "share": "分享",
     "aiTag": "AI",
     "viewSnapshot": "查看快照",
+    "screenshot": {
+      "view": "界面截图",
+      "notFound": "这条书签没有界面截图",
+      "openInNewTab": "在新标签页中打开",
+      "download": "下载截图",
+      "delete": "删除截图",
+      "deleteTitle": "删除界面截图",
+      "deleteDesc": "仅删除本地图片，不会删除书签或网页快照。",
+      "deleted": "界面截图已删除"
+    },
     "snapshot": {
       "title": "网页快照",
       "loading": "正在加载快照...",
@@ -96,6 +112,28 @@
       "noSnapshot": "暂无快照",
       "noSnapshotToSync": "选中的书签均无快照，无法同步到 Obsidian"
     }
+  },
+  "screenshotPreview": {
+    "capturedPage": "保存时截取的页面预览"
+  },
+  "visualGallery": {
+    "empty": "还没有可展示的页面截图",
+    "emptyDesc": "保存书签时勾选“保存页面截图”，这里会逐渐成为你的产品界面与视觉灵感库。"
+  },
+  "subject": {
+    "imageTitle": "图片剪藏",
+    "textTitle": "选中内容",
+    "source": "来源",
+    "note": "备注",
+    "imageInfo": "图片信息",
+    "dimensions": "尺寸",
+    "fileSize": "文件大小",
+    "format": "格式",
+    "unknown": "未知",
+    "copyText": "复制文字",
+    "copied": "已复制到剪贴板",
+    "openImage": "打开原图",
+    "openSource": "打开来源页"
   },
   "modal": {
     "title": "添加新书签",
@@ -321,6 +359,35 @@
     "updateBookmark": "更新书签",
     "saveBookmark": "保存书签",
     "saving": "保存中...",
+    "screenshot": {
+      "title": "保存页面截图",
+      "enabledDesc": "保存当前可见区域，用于视觉预览与设计参考",
+      "disabledDesc": "不保存页面图片，可在书签详情中稍后补充",
+      "status": {
+        "saving": "正在截取当前页面",
+        "skipped": "已跳过页面截图",
+        "saved": "页面截图已保存",
+        "failed": "页面截图保存失败，可稍后重试"
+      }
+    },
+    "clip": {
+      "willSave": "随书签保存",
+      "imageUrlLabel": "图片链接",
+      "sourceLabel": "来源",
+      "notePlaceholder": "为这条剪藏补充备注（可选）",
+      "types": {
+        "highlight": "文本高亮",
+        "note": "页面备注",
+        "link": "链接剪藏",
+        "image": "图片剪藏"
+      },
+      "status": {
+        "saving": "正在保存剪藏",
+        "skipped": "已跳过剪藏",
+        "saved": "剪藏已保存",
+        "failed": "剪藏保存失败，可稍后重试"
+      }
+    },
     "snapshot": {
       "title": "保存快照",
       "enabledDesc": "保存离线内容，便于后续回看",
@@ -340,6 +407,58 @@
         "skipped": "已跳过 Obsidian 同步",
         "failed": "同步到 Obsidian 失败"
       }
+    }
+  },
+  "healthCenter": {
+    "title": "书签健康中心",
+    "navTitle": "书签体检",
+    "description": "仅检查书签收藏的失效链接、跳转、访问异常与重复项，不检查图片或文字剪藏。登录限制、限流和网络故障会单独标记，不会误判为失效。",
+    "scanAll": "开始全面体检",
+    "scanning": "正在体检",
+    "scanComplete": "书签体检完成",
+    "scanFailed": "书签体检失败",
+    "progress": "正在检查链接状态",
+    "searchPlaceholder": "搜索标题或网址",
+    "empty": "当前筛选下没有书签",
+    "useRedirect": "采用新地址",
+    "redirectApplied": "已更新为跳转后的地址",
+    "checkedAt": "检查于 {{date}}",
+    "stats": {
+      "total": "书签收藏",
+      "healthy": "状态健康",
+      "attention": "需要关注",
+      "unchecked": "尚未检查"
+    },
+    "filters": {
+      "all": "全部",
+      "attention": "需要关注",
+      "broken": "已失效",
+      "duplicates": "重复书签",
+      "unchecked": "未检查"
+    },
+    "status": {
+      "unchecked": "未检查",
+      "healthy": "正常",
+      "redirected": "已跳转",
+      "broken": "已失效",
+      "auth_required": "需要登录",
+      "rate_limited": "访问受限",
+      "server_error": "服务异常",
+      "network_error": "网络异常",
+      "unsupported": "无法检测"
+    },
+    "issues": {
+      "redirected": "网址发生跳转",
+      "broken": "页面不存在",
+      "auth_required": "页面需要登录或授权",
+      "rate_limited": "站点限制了检查请求",
+      "server_error": "站点服务器暂时异常",
+      "network_error": "当前网络无法访问",
+      "timeout": "请求超时",
+      "unsupported_protocol": "不支持检测此类网址",
+      "missing_title": "缺少标题",
+      "missing_description": "缺少摘要",
+      "duplicate_url": "高置信度重复网址"
     }
   },
   "tabGroups": {

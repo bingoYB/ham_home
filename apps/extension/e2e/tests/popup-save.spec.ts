@@ -213,6 +213,14 @@ test.describe("POPUP 当前页保存流程", () => {
       { view: "quick" },
     );
     await expect(popup.getByText("最近保存的书签")).toBeVisible();
+    await expect(popup.locator("#root")).toHaveCSS("width", "420px");
+    await expect
+      .poll(() =>
+        popup.locator("body").evaluate((element) =>
+          Math.round(element.getBoundingClientRect().width),
+        ),
+      )
+      .toBe(420);
     await expect(
       popup.getByRole("button", { name: /保存当前页面|Save current page/ }),
     ).toBeEnabled();

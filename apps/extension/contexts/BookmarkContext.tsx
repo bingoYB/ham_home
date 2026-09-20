@@ -14,6 +14,9 @@ import React, {
 import { bookmarkStorage } from "@/lib/storage/bookmark-storage";
 import { workspaceStorage } from "@/lib/storage/workspace-storage";
 import { tabGroupRulesStorage } from "@/lib/storage/tab-group-rules-storage";
+import { bookmarkClipStorage } from "@/lib/storage/bookmark-clip-storage";
+import { bookmarkHealthStorage } from "@/lib/storage/bookmark-health-storage";
+import { bookmarkScreenshotStorage } from "@/lib/storage/bookmark-screenshot-storage";
 import {
   configStorage,
   DEFAULT_AI_CONFIG,
@@ -386,6 +389,9 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
       storage.removeItem("local:bookmarks"),
       storage.removeItem("local:bookmarkContents"),
       storage.removeItem("sync:categories"),
+      bookmarkClipStorage.importRawClips([]),
+      bookmarkHealthStorage.clear(),
+      bookmarkScreenshotStorage.clear(),
     ]);
     setBookmarks([]);
     setCategories([]);
@@ -411,11 +417,13 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
       workspaceCategories,
       tabGroupRules,
       tabGroupAutoGroupSettings,
+      clips,
     ] = await Promise.all([
       workspaceStorage.getWorkspaces(),
       workspaceStorage.getCategories(),
       tabGroupRulesStorage.getRules(),
       tabGroupRulesStorage.getAutoGroupSettings(),
+      bookmarkClipStorage.getAllClips(),
     ]);
 
     const data = {
@@ -427,6 +435,7 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
       workspaceCategories,
       tabGroupRules,
       tabGroupAutoGroupSettings,
+      clips,
     };
 
     if (format === "json") {

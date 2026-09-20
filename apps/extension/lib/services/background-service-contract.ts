@@ -8,6 +8,7 @@ import type {
 import type { GlobalAgentTurnResult } from "@/lib/agent/services/global-agent-service";
 import type {
   AnalysisResult,
+  ImageClipMetadata,
   BookmarkEmbedding,
   ChatSearchSessionSnapshot,
   ChatSearchSessionSummary,
@@ -17,6 +18,10 @@ import type {
   LocalCategory,
   LocalSettings,
   PageContent,
+  BookmarkHealthRecord,
+  SaveFlowClipContext,
+  SaveScreenshotBackgroundOptions,
+  ScreenshotCaptureResult,
   SaveSnapshotBackgroundOptions,
   SnapshotSaveResult,
 } from "@/types";
@@ -36,6 +41,11 @@ export interface IBackgroundService {
     bookmarkId: string,
     options?: SaveSnapshotBackgroundOptions,
   ): Promise<SnapshotSaveResult>;
+  saveScreenshotBackground(
+    bookmarkId: string,
+    options?: SaveScreenshotBackgroundOptions,
+  ): Promise<ScreenshotCaptureResult>;
+  scanBookmarkHealth(bookmarkIds?: string[]): Promise<BookmarkHealthRecord[]>;
   getVectorStats(): Promise<VectorStoreStats>;
   clearVectorStore(): Promise<void>;
   getEmbeddingQueueStatus(): Promise<QueueStatus>;
@@ -84,6 +94,23 @@ export interface IBackgroundService {
     /** 跳过缓存强制重新分析（重试场景） */
     skipCache?: boolean;
   }): Promise<AnalysisResult>;
+  /**
+   * AI 分析剪藏（图片 / 选中文字）。
+   * 与整页书签分析分开：图片走多模态，文字以选中片段为主体，
+   * 图片抓取需要 background 的跨域权限，因此必须在此执行。
+   */
+  analyzeClip(options: {
+    clip: SaveFlowClipContext;
+    /** 剪藏书签的地址，用作分析缓存的键 */
+    cacheKey: string;
+    source?: { url?: string; title?: string; excerpt?: string };
+    userCategories?: LocalCategory[];
+    existingTags?: string[];
+    /** 跳过缓存强制重新分析（重试场景） */
+    skipCache?: boolean;
+  }): Promise<AnalysisResult>;
+  /** 读取图片剪藏原图的尺寸、大小和格式，不触发 AI。 */
+  inspectClipImage(url: string): Promise<ImageClipMetadata>;
   translate(text: string, targetLang: Language): Promise<string>;
   /**
    * 在浏览器中打开外部协议链接（如 obsidian://）

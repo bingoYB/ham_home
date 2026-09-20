@@ -1,9 +1,10 @@
-import { webdavClientAdapter } from './webdav-client';
+import { webdavClientAdapter, toSyncError } from './webdav-client';
 import { syncConfigStorage } from './sync-config-storage';
 import { bookmarkStorage } from '../storage/bookmark-storage';
 import { configStorage } from '../storage/config-storage';
 import { workspaceStorage } from '../storage/workspace-storage';
 import { tabGroupRulesStorage } from '../storage/tab-group-rules-storage';
+import { bookmarkClipStorage } from '../storage/bookmark-clip-storage';
 import { z } from 'zod';
 import { 
   SyncSysSchema, 
@@ -14,6 +15,7 @@ import {
   RemoteCategorySchema, 
   RemoteCategory, 
   RemoteBookmarksFileSchema,
+  RemoteBookmarkClipsFileSchema,
   RemoteWorkspacesFileSchema,
   RemoteWorkspace,
   RemoteWorkspaceCategory,
@@ -28,6 +30,7 @@ import type {
   WorkspaceCategory,
   TabGroupRule,
   TabGroupAutoGroupSettings,
+  BookmarkClip,
 } from '@/types';
 import { nanoid } from 'nanoid';
 import pLimit from 'p-limit';
@@ -40,6 +43,7 @@ const CATEGORIES_JSON = `${SYNC_ROOT}/categories.json`;
 const WORKSPACES_JSON = `${SYNC_ROOT}/workspaces.json`;
 const TAB_GROUP_CONFIG_JSON = `${SYNC_ROOT}/tab-group-config.json`;
 const META_JSON = `${SYNC_ROOT}/bookmarks/meta.json`;
+const CLIPS_JSON = `${SYNC_ROOT}/bookmarks/clips.json`;
 const CHUNKS_DIR = `${SYNC_ROOT}/bookmarks/chunks`;
 
 const LOCK_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
@@ -133,10 +137,12 @@ export class SyncEngine {
         sys.last_sync_time = Date.now();
         await webdavClientAdapter.putJSON(SYS_JSON, sys);
         
-        await syncConfigStorage.setStatus({ 
-          status: 'idle', 
-          lastSyncTime: sys.last_sync_time, 
-          syncVersion: sys.sync_version 
+        await syncConfigStorage.setStatus({
+          status: 'idle',
+          lastSyncTime: sys.last_sync_time,
+          syncVersion: sys.sync_version,
+          errorCode: undefined,
+          errorMessage: ''
         });
       }
     } catch (err) {
@@ -160,15 +166,17 @@ export class SyncEngine {
     }
 
     this.isSyncing = true;
-    await syncConfigStorage.setStatus({ status: 'syncing' });
+    await syncConfigStorage.setStatus({ status: 'syncing', errorCode: undefined, errorMessage: '' });
 
     try {
-      if (!webdavClientAdapter.isInitialized) {
-        webdavClientAdapter.init(config);
-      }
+      // Always re-init: the adapter reuses the client unless the credentials changed,
+      // otherwise an updated password would never reach the server.
+      webdavClientAdapter.init(config);
 
-      await webdavClientAdapter.ensureDirectory(SYNC_ROOT);
-      await webdavClientAdapter.ensureDirectory(`${SYNC_ROOT}/bookmarks`);
+      // Verify credentials before writing anything remote
+      await webdavClientAdapter.checkAuth(SYS_JSON);
+
+      // Recursive, so it also creates SYNC_ROOT and SYNC_ROOT/bookmarks
       await webdavClientAdapter.ensureDirectory(CHUNKS_DIR);
 
       const locked = await this.acquireLock();
@@ -184,14 +192,24 @@ export class SyncEngine {
         await this.syncWorkspaces();
         await this.syncTabGroupConfig();
         await this.syncBookmarks();
+        await this.syncBookmarkClips();
         console.log('WebDAV Sync complete.');
       } finally {
         await this.releaseLock();
       }
 
     } catch (err: any) {
-      console.error('WebDAV Sync failed:', err);
-      await syncConfigStorage.setStatus({ status: 'error', errorMessage: err.message || String(err) });
+      const error = toSyncError(err);
+      console.error('WebDAV Sync failed:', error);
+      // A failed auth handshake may have been negotiated against stale state, start clean next time
+      if (error.code === 'auth') {
+        webdavClientAdapter.reset();
+      }
+      await syncConfigStorage.setStatus({
+        status: 'error',
+        errorCode: error.code,
+        errorMessage: error.message,
+      });
     } finally {
       this.isSyncing = false;
     }
@@ -200,6 +218,9 @@ export class SyncEngine {
   private areSettingsEqual(local: LocalSettings, remote: RemoteSettings): boolean {
     return (
       local.autoSaveSnapshot === remote.autoSaveSnapshot &&
+      local.autoSaveScreenshot === remote.autoSaveScreenshot &&
+      local.screenshotPrivatePagePolicy === remote.screenshotPrivatePagePolicy &&
+      local.bookmarkHealthSchedule === remote.bookmarkHealthSchedule &&
       local.enableOmniboxSearch === remote.enableOmniboxSearch &&
       local.defaultCategory === remote.defaultCategory &&
       local.theme === remote.theme &&
@@ -619,6 +640,48 @@ export class SyncEngine {
     }
   }
 
+  private async syncBookmarkClips(): Promise<void> {
+    const localClips = await bookmarkClipStorage.getAllClips();
+    const remoteRaw = await webdavClientAdapter.getJSON<any>(CLIPS_JSON);
+    const parsed = remoteRaw
+      ? RemoteBookmarkClipsFileSchema.safeParse(remoteRaw)
+      : null;
+    const remoteClips = parsed?.success ? parsed.data.clips : [];
+    const localMap = new Map(localClips.map((clip) => [clip.id, clip]));
+    const remoteMap = new Map(remoteClips.map((clip) => [clip.id, clip]));
+    const merged: BookmarkClip[] = [];
+    let changed = !remoteRaw || (parsed !== null && !parsed.success);
+
+    for (const [id, local] of localMap) {
+      const remote = remoteMap.get(id);
+      if (!remote || local.updatedAt >= remote.updatedAt) {
+        merged.push(local);
+        if (
+          !remote ||
+          local.updatedAt > remote.updatedAt ||
+          JSON.stringify(local) !== JSON.stringify(remote)
+        ) {
+          changed = true;
+        }
+      } else {
+        const normalized = remote as BookmarkClip;
+        merged.push(normalized);
+        await bookmarkClipStorage.importRawClip(normalized);
+      }
+    }
+
+    for (const [id, remote] of remoteMap) {
+      if (localMap.has(id)) continue;
+      const normalized = remote as BookmarkClip;
+      merged.push(normalized);
+      await bookmarkClipStorage.importRawClip(normalized);
+    }
+
+    if (changed || localMap.size !== remoteMap.size) {
+      await webdavClientAdapter.putJSON(CLIPS_JSON, { clips: merged });
+    }
+  }
+
   private toRemoteMeta(local: LocalBookmark): RemoteBookmarkMeta {
     return {
       id: local.id,
@@ -704,27 +767,29 @@ export class SyncEngine {
       throw new Error('WebDAV is not configured');
     }
     
-    if (!webdavClientAdapter.isInitialized) {
-      webdavClientAdapter.init(config);
-    }
-    
     try {
       this.isSyncing = true;
-      const success = await webdavClientAdapter.deleteFile(SYNC_ROOT);
-      if (!success) {
-        throw new Error('Failed to delete remote directory');
-      }
-      
+      webdavClientAdapter.init(config);
+      await webdavClientAdapter.checkAuth(SYS_JSON);
+      await webdavClientAdapter.deleteFile(SYNC_ROOT);
+
       // Reset local sync status
-      await syncConfigStorage.setStatus({ 
-        status: 'idle', 
-        lastSyncTime: 0, 
+      await syncConfigStorage.setStatus({
+        status: 'idle',
+        lastSyncTime: 0,
         syncVersion: '',
+        errorCode: undefined,
         errorMessage: ''
       });
     } catch (err: any) {
-      console.error('Failed to clear remote WebDAV data:', err);
-      throw new Error(`Failed to clear remote data: ${err.message || String(err)}`);
+      const error = toSyncError(err);
+      console.error('Failed to clear remote WebDAV data:', error);
+      await syncConfigStorage.setStatus({
+        status: 'error',
+        errorCode: error.code,
+        errorMessage: error.message,
+      });
+      throw error;
     } finally {
       this.isSyncing = false;
     }

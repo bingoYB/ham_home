@@ -11,6 +11,7 @@ import { QuickPanel } from "@/components/popup/QuickPanel";
 import { PopupSaveView } from "@/components/popup/PopupSaveView";
 import { configStorage, savePopupFallbackStorage } from "@/lib/storage";
 import { useBookmarks } from "@/contexts";
+import type { SaveFlowTrigger } from "@/types";
 import "../../style.css";
 
 type PopupMode = "quick" | "save";
@@ -18,6 +19,7 @@ type PopupMode = "quick" | "save";
 export function App() {
   const { appSettings } = useBookmarks();
   const [mode, setMode] = useState<PopupMode>("quick");
+  const [pendingTrigger, setPendingTrigger] = useState<SaveFlowTrigger | null>(null);
 
   // 两种情况直接进入保存模式：background 在页内保存不可用时打开 Popup 并留下标记；
   // 用户在设置中选择在扩展弹窗中保存，此时点击扩展图标也应直接打开保存表单
@@ -26,8 +28,9 @@ export function App() {
       savePopupFallbackStorage.consumePending(),
       configStorage.getSettings(),
     ])
-      .then(([hasPendingSave, settings]) => {
-        if (hasPendingSave || settings.usePopupSavePanel) setMode("save");
+      .then(([trigger, settings]) => {
+        setPendingTrigger(trigger);
+        if (trigger || settings.usePopupSavePanel) setMode("save");
       })
       .catch((error: unknown) => {
         console.warn("[Popup] Failed to read save mode:", error);
@@ -39,7 +42,10 @@ export function App() {
   return (
     <div className="w-[420px]">
       {mode === "save" ? (
-        <PopupSaveView onBack={() => setMode("quick")} />
+        <PopupSaveView
+          onBack={() => setMode("quick")}
+          initialClip={pendingTrigger?.clip}
+        />
       ) : (
         <QuickPanel onFallbackToSaveView={() => setMode("save")} />
       )}

@@ -4,6 +4,7 @@ import {
   Download,
   Edit,
   ExternalLink,
+  Image as ImageIcon,
   MoreHorizontal,
   Pin,
   Share2,
@@ -31,6 +32,7 @@ export function BookmarkActionsMenu({
   onOpen,
   onEdit,
   onDelete,
+  onViewScreenshot,
   onViewSnapshot,
   onSaveSnapshot,
   onDeleteSnapshot,
@@ -41,8 +43,12 @@ export function BookmarkActionsMenu({
   isProcessingAI,
   t,
 }: BookmarkActionsMenuProps) {
-  const hasSnapshotActions =
-    onViewSnapshot || onSaveSnapshot || onDeleteSnapshot || onSyncToObsidian;
+  const hasAssetActions =
+    onViewScreenshot ||
+    onViewSnapshot ||
+    onSaveSnapshot ||
+    onDeleteSnapshot ||
+    onSyncToObsidian;
 
   const handleCopyLink = () => {
     navigator.clipboard.writeText(bookmark.url);
@@ -91,9 +97,15 @@ export function BookmarkActionsMenu({
             {isPinned ? t("bookmark:bookmark.unpin") : t("bookmark:bookmark.pin")}
           </DropdownMenuItem>
         )}
-        {hasSnapshotActions && (
+        {hasAssetActions && (
           <>
             <DropdownMenuSeparator />
+            {onViewScreenshot && (
+              <DropdownMenuItem onClick={onViewScreenshot}>
+                <ImageIcon className="h-4 w-4 mr-2" />
+                {t("bookmark:bookmark.screenshot.view")}
+              </DropdownMenuItem>
+            )}
             {bookmark.hasSnapshot && onViewSnapshot && (
               <DropdownMenuItem onClick={onViewSnapshot}>
                 <Camera className="h-4 w-4 mr-2" />

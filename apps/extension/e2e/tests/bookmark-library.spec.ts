@@ -271,4 +271,74 @@ test.describe("LIB 书签库核心流程", () => {
       }),
     ).toBeVisible();
   });
+
+  test("LIB-008 图片收藏详情展示主色与文件信息", async ({
+    context,
+    extensionId,
+    extensionWorker,
+    e2eVariant,
+  }, testInfo) => {
+    const t = e2eVariant.text;
+    const imageUrl = "https://assets.hamhome.test/samurai.png";
+    const bookmark = createBookmarkFixture({
+      id: "bm-image-metadata",
+      url: imageUrl,
+      title: "竹林武士角色设定",
+      description: "深绿色竹林中的武士角色。",
+      tags: ["角色设计", "绿色"],
+    });
+    await seedBookmarks(extensionWorker, [bookmark]);
+    await extensionWorker.evaluate(
+      async ({ bookmarkId, sourceUrl, now }) => {
+        await chrome.storage.local.set({
+          bookmarkClips: [
+            {
+              id: "clip-image-metadata",
+              bookmarkId,
+              type: "image",
+              imageSourceUrl: sourceUrl,
+              sourceUrl: "https://example.com/concept-art",
+              sourceTitle: "Concept Art",
+              imageMetadata: {
+                colors: ["#102A18", "#1E5930", "#C7AA5B", "#D8D0AA"],
+                width: 1280,
+                height: 1280,
+                size: 247_070,
+                format: "PNG",
+                mimeType: "image/png",
+              },
+              createdAt: now,
+              updatedAt: now,
+            },
+          ],
+        });
+      },
+      { bookmarkId: bookmark.id, sourceUrl: imageUrl, now: Date.now() },
+    );
+
+    await context.route(imageUrl, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: "image/png",
+        body: Buffer.from(
+          "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+          "base64",
+        ),
+      });
+    });
+
+    const page = await openAppPage(context, extensionId, "all");
+    await page.getByRole("img", { name: "竹林武士角色设定" }).click();
+
+    const imageInfo = page.getByLabel(
+      t("图片信息", "Image information"),
+    );
+    await expect(imageInfo).toBeVisible();
+    await expect(imageInfo.getByText("1280 × 1280")).toBeVisible();
+    await expect(imageInfo.getByText("241 KB")).toBeVisible();
+    await expect(imageInfo.getByText("PNG", { exact: true })).toBeVisible();
+    await expect(imageInfo.getByLabel("#102A18")).toBeVisible();
+    await expect(imageInfo.getByLabel("#D8D0AA")).toBeVisible();
+    await attachStepScreenshot(page, testInfo, "LIB-008-图片主色与文件信息");
+  });
 });

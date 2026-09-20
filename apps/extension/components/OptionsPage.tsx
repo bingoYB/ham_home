@@ -91,6 +91,7 @@ export function OptionsPage() {
     setShowClearVectorsDialog,
     isClearing,
     snapshotStats,
+    screenshotStats,
     handleAutoSaveSnapshotChange,
     formatBytes,
     localWebdavUrl,
@@ -232,6 +233,7 @@ export function OptionsPage() {
           <StorageTab
             storageInfo={storageInfo}
             snapshotStats={snapshotStats}
+            screenshotStats={screenshotStats}
             vectorStats={vectorStats}
             embeddingConfig={embeddingConfig}
             syncConfig={syncConfig ?? { enabled: false, url: '', username: '' }}

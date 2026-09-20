@@ -2,7 +2,7 @@
  * Embedding 客户端封装
  * 基于 OpenAI-compatible Embedding 能力
  */
-import { createEmbeddingClient as createAgentEmbeddingClient } from "@browser-agent-sdk/agent";
+import { createEmbeddingClient as createAgentEmbeddingClient } from "@hamhome/agent";
 import {
   EMBEDDING_PROVIDER_DEFAULTS,
   getDefaultEmbeddingModel,

@@ -6,25 +6,35 @@ import { browser } from "wxt/browser";
 import { registerBackgroundService } from "@/lib/services/background-service-server";
 import { configStorage } from "@/lib/storage";
 import { bookmarkStorage } from "@/lib/storage/bookmark-storage";
+import { bookmarkClipStorage } from "@/lib/storage/bookmark-clip-storage";
 import { workspaceStorage } from "@/lib/storage/workspace-storage";
 import { workspaceRestoreSuppressionStorage } from "@/lib/storage/workspace-restore-suppression-storage";
 import { savePopupFallbackStorage } from "@/lib/storage/save-popup-fallback-storage";
 import { workspaceService } from "@/lib/services/workspace-service";
 import { tabGroupRuleService } from "@/lib/services/tab-group-rule-service";
+import { bookmarkHealthService } from "@/lib/services/bookmark-health-service";
 import {
   safeOpenPopup,
   safeSendMessageToActiveTab,
   safeCreateTab,
   getExtensionURL,
 } from "@/utils/browser-api";
-import type { Language, SaveFlowSource, TabGroupPageMetadata } from "@/types";
+import type {
+  Language,
+  SaveFlowClipContext,
+  SaveFlowSource,
+  TabGroupPageMetadata,
+} from "@/types";
 import { initApiModePersistence } from "@/lib/agent/api-mode-persistence";
 import { applyDevConfigPreset } from "@/lib/dev/dev-config-preset";
 
 // 右键菜单 ID
-const CONTEXT_MENU_ID = "save-to-hamhome";
+const PAGE_CONTEXT_MENU_ID = "save-page-to-hamhome";
+const HIGHLIGHT_CONTEXT_MENU_ID = "save-highlight-to-hamhome";
+const IMAGE_CONTEXT_MENU_ID = "save-image-to-hamhome";
 const WORKSPACE_CONTEXT_MENU_ID = "save-window-workspace";
 const MANAGE_HAMHOME_CONTEXT_MENU_ID = "manage-hamhome";
+const BOOKMARK_HEALTH_ALARM_ID = "bookmark-health-periodic-scan";
 
 // 防止并发创建菜单
 let isCreatingContextMenu = false;
@@ -83,9 +93,20 @@ async function fetchResourceForSingleFile(
 }
 
 // 菜单标题映射
-const MENU_TITLES: Record<Language, string> = {
-  en: "Save to HamHome",
-  zh: "收藏到 HamHome",
+const MENU_TITLES: Record<
+  Language,
+  { page: string; highlight: string; image: string }
+> = {
+  en: {
+    page: "Save current page",
+    highlight: "Save selection",
+    image: "Save image",
+  },
+  zh: {
+    page: "保存当前页面",
+    highlight: "保存选中内容",
+    image: "保存图片",
+  },
 };
 
 const WORKSPACE_MENU_TITLES: Record<Language, string> = {
@@ -102,7 +123,7 @@ const MANAGE_MENU_TITLES: Record<Language, string> = {
  * 获取右键菜单标题（根据用户语言设置）
  */
 async function getContextMenuTitles(): Promise<{
-  bookmark: string;
+  bookmark: (typeof MENU_TITLES)[Language];
   workspace: string;
   manage: string;
 }> {
@@ -159,11 +180,9 @@ async function createContextMenu() {
     // 创建新的右键菜单
     // 使用 Promise.allSettled 或逐个创建并捕获错误
     const menuConfigs = [
-      {
-        id: CONTEXT_MENU_ID,
-        title: titles.bookmark,
-        contexts: ["page", "selection", "link", "image"] as const,
-      },
+      { id: PAGE_CONTEXT_MENU_ID, title: titles.bookmark.page, contexts: ["page"] as const },
+      { id: HIGHLIGHT_CONTEXT_MENU_ID, title: titles.bookmark.highlight, contexts: ["selection"] as const },
+      { id: IMAGE_CONTEXT_MENU_ID, title: titles.bookmark.image, contexts: ["image"] as const },
       {
         id: WORKSPACE_CONTEXT_MENU_ID,
         title: titles.workspace,
@@ -201,9 +220,11 @@ async function createContextMenu() {
 async function updateContextMenuTitle() {
   try {
     const titles = await getContextMenuTitles();
-    await browser.contextMenus.update(CONTEXT_MENU_ID, {
-      title: titles.bookmark,
-    });
+    await Promise.all([
+      browser.contextMenus.update(PAGE_CONTEXT_MENU_ID, { title: titles.bookmark.page }),
+      browser.contextMenus.update(HIGHLIGHT_CONTEXT_MENU_ID, { title: titles.bookmark.highlight }),
+      browser.contextMenus.update(IMAGE_CONTEXT_MENU_ID, { title: titles.bookmark.image }),
+    ]);
     await browser.contextMenus.update(WORKSPACE_CONTEXT_MENU_ID, {
       title: titles.workspace,
     });
@@ -223,6 +244,18 @@ async function saveCurrentWindowWorkspaceFromBackground() {
   } catch (error) {
     console.error("[HamHome Background] 保存工作空间失败:", error);
   }
+}
+
+async function configureBookmarkHealthAlarm(): Promise<void> {
+  const settings = await configStorage.getSettings();
+  await browser.alarms.clear(BOOKMARK_HEALTH_ALARM_ID);
+  if (settings.bookmarkHealthSchedule === "off") return;
+  browser.alarms.create(BOOKMARK_HEALTH_ALARM_ID, {
+    periodInMinutes:
+      settings.bookmarkHealthSchedule === "weekly"
+        ? 7 * 24 * 60
+        : 30 * 24 * 60,
+  });
 }
 
 async function autoGroupTabFromRules(
@@ -326,6 +359,7 @@ const newlyCreatedTabs = new Set<number>();
  */
 async function triggerSaveBookmarkFlow(
   source: SaveFlowSource,
+  clip?: SaveFlowClipContext,
 ): Promise<void> {
   let usePopupSavePanel = false;
   try {
@@ -338,13 +372,14 @@ async function triggerSaveBookmarkFlow(
     const response = await safeSendMessageToActiveTab<{ ok?: boolean }>({
       type: "START_SAVE_FLOW",
       source,
+      clip,
     });
 
     if (response?.ok) return;
     console.log("[HamHome Background] 页内保存不可用，回退到 Popup");
   }
 
-  await savePopupFallbackStorage.markPending(source);
+  await savePopupFallbackStorage.markPending({ source, clip });
   const opened = await safeOpenPopup();
   if (!opened) {
     await savePopupFallbackStorage.clear();
@@ -362,6 +397,15 @@ export default defineBackground(() => {
 
   // 开发态：把 .env.local 里的 AI / Embedding / 同步配置写入存储（生产构建会被移除）
   void applyDevConfigPreset();
+  void configureBookmarkHealthAlarm();
+
+  browser.alarms.onAlarm.addListener((alarm) => {
+    if (alarm.name === BOOKMARK_HEALTH_ALARM_ID) {
+      void bookmarkHealthService.scan().catch((error) => {
+        console.warn("[HamHome Background] 定期书签体检失败:", error);
+      });
+    }
+  });
 
   // 1. 初始化并订阅 WebDAV 存储变更自动同步
   Promise.all([
@@ -399,6 +443,9 @@ export default defineBackground(() => {
     bookmarkStorage.watchBookmarks(() => {
       // 在 Manifest V3 中，长时间的 setTimeout 会在其休眠时被取消，
       // 所以对于 5 分钟的延迟，必须使用 browser.alarms 来实现可靠的防抖
+      browser.alarms.create("webdav-local-change-sync", { delayInMinutes: 5 });
+    });
+    bookmarkClipStorage.watch(() => {
       browser.alarms.create("webdav-local-change-sync", { delayInMinutes: 5 });
     });
   });
@@ -472,8 +519,28 @@ export default defineBackground(() => {
   // 监听右键菜单点击
   browser.contextMenus.onClicked.addListener(async (info, tab) => {
     console.log("[HamHome Background] 右键菜单点击:", info.menuItemId);
-    if (info.menuItemId === CONTEXT_MENU_ID) {
-      await triggerSaveBookmarkFlow("contextMenu");
+    if (
+      info.menuItemId === PAGE_CONTEXT_MENU_ID ||
+      info.menuItemId === HIGHLIGHT_CONTEXT_MENU_ID ||
+      info.menuItemId === IMAGE_CONTEXT_MENU_ID
+    ) {
+      const clip: SaveFlowClipContext | undefined =
+        info.menuItemId === IMAGE_CONTEXT_MENU_ID && info.srcUrl
+          ? {
+              type: "image",
+              imageSourceUrl: info.srcUrl,
+              sourceUrl: tab?.url,
+              sourceTitle: tab?.title,
+            }
+          : info.menuItemId === HIGHLIGHT_CONTEXT_MENU_ID && info.selectionText
+            ? {
+                type: "highlight",
+                text: info.selectionText,
+                sourceUrl: tab?.url,
+                sourceTitle: tab?.title,
+              }
+            : undefined;
+      await triggerSaveBookmarkFlow("contextMenu", clip);
     } else if (info.menuItemId === WORKSPACE_CONTEXT_MENU_ID) {
       await saveCurrentWindowWorkspaceFromBackground();
     } else if (info.menuItemId === MANAGE_HAMHOME_CONTEXT_MENU_ID) {
@@ -570,6 +637,7 @@ export default defineBackground(() => {
     if (settings?.language) {
       updateContextMenuTitle();
     }
+    void configureBookmarkHealthAlarm();
   });
 
   // ========== 地址栏搜索 (Omnibox) ==========

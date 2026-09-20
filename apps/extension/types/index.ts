@@ -108,6 +108,7 @@ export interface AIConfig {
   presetTags?: string[]; // 预设标签列表（用于自动匹配书签）
   privacyDomains?: string[]; // 隐私域名列表（不分析这些域名的页面内容）
   autoDetectPrivacy?: boolean; // 是否自动检测隐私页面（默认开启）
+  enableImageAnalysis?: boolean; // 是否允许将图片剪藏发送给 AI 分析（默认开启）
   language?: Language; // AI 提示词语言
 }
 
@@ -154,6 +155,9 @@ export type PanelPosition = "left" | "right";
  */
 export interface LocalSettings {
   autoSaveSnapshot: boolean; // 自动保存快照
+  autoSaveScreenshot: boolean; // 保存书签时自动截取当前可见页面
+  screenshotPrivatePagePolicy: "skip" | "ask"; // 隐私页面截图策略
+  bookmarkHealthSchedule: "off" | "weekly" | "monthly"; // 自动书签体检周期
   enableOmniboxSearch: boolean; // 是否启用地址栏搜索支持
   defaultCategory: string | null;
   theme: ThemeMode;
@@ -467,11 +471,25 @@ export interface TabGroupPageMetadata {
   headings?: string[];
 }
 
+/**
+ * AI 域名分组结论的置信状态。
+ * - pending: 仅有单个页面样本支撑，证据较弱
+ * - confirmed: 至少两个不同栏目的页面样本得出一致结论
+ * - multiPurpose: 同域名不同页面得出互相矛盾的结论，域名缓存已停用
+ */
+export type TabGroupAICacheStatus = "pending" | "confirmed" | "multiPurpose";
+
 export interface TabGroupAICacheEntry {
   url: string;
   groupTitle: string;
   color: TabGroupRuleColor;
   updatedAt: number;
+  /** 缺省视为 confirmed，用于兼容旧版本写入的缓存 */
+  status?: TabGroupAICacheStatus;
+  /** 产生该结论的页面路径特征，用于判断新页面是否属于同一栏目 */
+  samplePath?: string;
+  /** 已达成一致的独立样本数 */
+  agreeCount?: number;
 }
 
 /**
@@ -484,6 +502,131 @@ export interface Snapshot {
   type: SnapshotContentType;
   size: number;
   createdAt: number; // 时间戳
+}
+
+// ============ 富剪藏与页面截图 ============
+
+export type BookmarkClipType = "highlight" | "note" | "link" | "image";
+
+/** 文本定位采用 quote selector，DOM 变化后仍可通过上下文回退匹配。 */
+export interface TextQuoteSelector {
+  exact: string;
+  prefix?: string;
+  suffix?: string;
+  domPath?: string;
+}
+
+/** 图片剪藏的可持久化视觉与文件信息。旧数据可能只包含其中一部分。 */
+export interface ImageClipMetadata {
+  /** 按画面占比从高到低排列的主色，使用 #RRGGBB。 */
+  colors?: string[];
+  width?: number;
+  height?: number;
+  /** 原图字节数。 */
+  size?: number;
+  /** 面向用户展示的格式，如 JPG / PNG / WEBP。 */
+  format?: string;
+  mimeType?: string;
+}
+
+export interface BookmarkClip {
+  id: string;
+  bookmarkId: string;
+  type: BookmarkClipType;
+  text?: string;
+  note?: string;
+  targetUrl?: string;
+  imageSourceUrl?: string;
+  sourceUrl: string;
+  sourceTitle?: string;
+  selector?: TextQuoteSelector;
+  imageMetadata?: ImageClipMetadata;
+  createdAt: number;
+  updatedAt: number;
+  isDeleted?: boolean;
+}
+
+export type CreateBookmarkClipInput = Omit<
+  BookmarkClip,
+  "id" | "bookmarkId" | "createdAt" | "updatedAt"
+>;
+
+/** 右键菜单传给保存流程的待保存剪藏上下文。 */
+export interface SaveFlowClipContext {
+  type: BookmarkClipType;
+  text?: string;
+  targetUrl?: string;
+  imageSourceUrl?: string;
+  sourceUrl?: string;
+  sourceTitle?: string;
+  selector?: TextQuoteSelector;
+  /** 图片的 alt 文本，随图片一并提供给 AI 作为辅助描述 */
+  imageAlt?: string;
+  /** 图片的 title 属性 */
+  imageTitle?: string;
+  /** 图片的 figcaption / 相邻说明文字 */
+  caption?: string;
+  /** 图片的渲染尺寸，用于识别装饰性小图 */
+  imageWidth?: number;
+  imageHeight?: number;
+}
+
+export interface BookmarkScreenshotAsset {
+  id: string;
+  bookmarkId: string;
+  sourceUrl: string;
+  image: Blob;
+  thumbnail: Blob;
+  mimeType: string;
+  width: number;
+  height: number;
+  size: number;
+  capturedAt: number;
+  updatedAt: number;
+}
+
+export type BookmarkScreenshotMetadata = Omit<
+  BookmarkScreenshotAsset,
+  "image" | "thumbnail"
+> & {
+  thumbnailSize: number;
+};
+
+export interface SaveScreenshotBackgroundOptions {
+  expectedUrl?: string;
+}
+
+export interface ScreenshotCaptureResult {
+  ok: boolean;
+  skipped?: boolean;
+  metadata?: BookmarkScreenshotMetadata;
+  error?: string;
+}
+
+// ============ 书签健康中心 ============
+
+export type BookmarkHealthStatus =
+  | "unchecked"
+  | "healthy"
+  | "redirected"
+  | "broken"
+  | "auth_required"
+  | "rate_limited"
+  | "server_error"
+  | "network_error"
+  | "unsupported";
+
+export interface BookmarkHealthRecord {
+  bookmarkId: string;
+  sourceUrl: string;
+  checkedAt: number;
+  status: BookmarkHealthStatus;
+  httpStatus?: number;
+  finalUrl?: string;
+  issueCodes: string[];
+  ignoredIssueCodes?: string[];
+  responseTimeMs?: number;
+  error?: string;
 }
 
 // ============ 页面内容提取 ============
@@ -545,6 +688,8 @@ export interface AnalysisResult {
   summary: string;
   category: string;
   tags: string[];
+  /** 仅图片剪藏分析返回，用于随剪藏一并保存。 */
+  imageMetadata?: ImageClipMetadata;
 }
 
 /**
@@ -913,6 +1058,11 @@ export interface EmbeddingJob {
  * 保存书签流程的触发来源
  */
 export type SaveFlowSource = "shortcut" | "contextMenu" | "popup" | "unknown";
+
+export interface SaveFlowTrigger {
+  source: SaveFlowSource;
+  clip?: SaveFlowClipContext;
+}
 
 // ============ WebDAV 同步相关 ============
 export * from "./sync";

@@ -1,4 +1,4 @@
-import type { AiSdkProviderName } from "@browser-agent-sdk/agent";
+import type { AiSdkProviderName } from "@hamhome/agent";
 import type { AIProvider } from "@/types";
 
 export interface ProviderConfig {

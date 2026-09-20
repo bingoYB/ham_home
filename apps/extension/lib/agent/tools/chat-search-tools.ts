@@ -1,4 +1,4 @@
-import type { AgentTool, JsonSchema } from "@browser-agent-sdk/agent";
+import type { AgentTool, JsonSchema } from "@hamhome/agent";
 import { createLogger } from "@hamhome/utils";
 import { bookmarkStorage, configStorage } from "@/lib/storage";
 import { hybridRetriever } from "@/lib/search/hybrid-retriever";

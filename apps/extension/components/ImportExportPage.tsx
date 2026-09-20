@@ -36,6 +36,7 @@ import {
 import { getFavicon } from "@hamhome/utils";
 import { useBookmarks } from "@/contexts/BookmarkContext";
 import { bookmarkStorage } from "@/lib/storage/bookmark-storage";
+import { bookmarkClipStorage } from "@/lib/storage/bookmark-clip-storage";
 import { workspaceStorage } from "@/lib/storage/workspace-storage";
 import { tabGroupRulesStorage } from "@/lib/storage/tab-group-rules-storage";
 import { importTaskStorage } from "@/lib/storage/import-task-storage";
@@ -458,6 +459,66 @@ export function ImportExportPage() {
       imported = created.length;
       skipped = data.bookmarks.length - created.length;
       importedBookmarkIds.push(...created.map((b) => b.id));
+    }
+
+    // 剪藏是结构化文本，可随 JSON 迁移；页面截图二进制不进入 JSON 导出。
+    if (Array.isArray(data.clips) && Array.isArray(data.bookmarks)) {
+      const sourceBookmarkUrls = new Map<string, string>(
+        data.bookmarks.map((bookmark: { id: string; url: string }) => [
+          bookmark.id,
+          bookmark.url,
+        ]),
+      );
+      const localBookmarks = await bookmarkStorage.getBookmarks();
+      const localByUrl = new Map(
+        localBookmarks.map((bookmark) => [
+          bookmarkStorage.normalizeUrlPublic(bookmark.url),
+          bookmark,
+        ]),
+      );
+      const existingClips = await bookmarkClipStorage.getAllClips();
+      const signatures = new Set(
+        existingClips.map((clip) =>
+          [
+            clip.bookmarkId,
+            clip.type,
+            clip.text ?? "",
+            clip.note ?? "",
+            clip.targetUrl ?? "",
+            clip.imageSourceUrl ?? "",
+          ].join("\u0000"),
+        ),
+      );
+
+      for (const clip of data.clips) {
+        if (clip.isDeleted) continue;
+        const sourceBookmarkUrl = sourceBookmarkUrls.get(clip.bookmarkId);
+        if (!sourceBookmarkUrl) continue;
+        const localBookmark = localByUrl.get(
+          bookmarkStorage.normalizeUrlPublic(sourceBookmarkUrl),
+        );
+        if (!localBookmark) continue;
+        const signature = [
+          localBookmark.id,
+          clip.type,
+          clip.text ?? "",
+          clip.note ?? "",
+          clip.targetUrl ?? "",
+          clip.imageSourceUrl ?? "",
+        ].join("\u0000");
+        if (signatures.has(signature)) continue;
+        await bookmarkClipStorage.addClip(localBookmark.id, {
+          type: clip.type,
+          text: clip.text,
+          note: clip.note,
+          targetUrl: clip.targetUrl,
+          imageSourceUrl: clip.imageSourceUrl,
+          sourceUrl: clip.sourceUrl || sourceBookmarkUrl,
+          sourceTitle: clip.sourceTitle,
+          selector: clip.selector,
+        });
+        signatures.add(signature);
+      }
     }
 
     let workspaceCategoriesCreated = 0;

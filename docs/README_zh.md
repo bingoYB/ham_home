@@ -181,7 +181,7 @@ pnpm --filter hamhome screenshots
 - **浏览器扩展**：WXT + React 19 + TypeScript + Tailwind CSS 4
 - **产品介绍站**：Next.js 16 + React 19
 - **UI**：shadcn/ui 风格组件、Radix UI、lucide-react、共享 `@hamhome/ui` 与 `@hamhome/ui-business`
-- **AI**：`@browser-agent-sdk/agent`、Provider 适配、Embedding 队列、混合检索
+- **AI**：`@hamhome/agent`、Provider 适配、Embedding 队列、混合检索
 - **内容提取**：Defuddle、Mozilla Readability、SingleFile 风格捕获、Turndown/Markdown 工作流
 - **存储**：WXT Storage、浏览器存储 API、IndexedDB 快照/AI 缓存/向量数据
 - **同步**：WebDAV、gzip 压缩书签正文分片、同步锁、本地凭据混淆
@@ -202,6 +202,7 @@ ham_home/
 │   │   └── e2e/            # Playwright 扩展测试与截图生成
 │   └── web/                # Next.js 产品介绍站
 ├── packages/
+│   ├── agent/              # 浏览器端 Agent 运行时（内置自 browser-agent-sdk）
 │   ├── ui/                 # 共享 UI 基础组件
 │   ├── ui-business/        # HamHome 业务 UI 组件
 │   ├── types/              # 共享 TypeScript 类型

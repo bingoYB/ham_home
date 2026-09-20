@@ -15,6 +15,7 @@ import type {
 import { E2E_EXTENSION_CONFIG } from "../e2e.config";
 
 const SNAPSHOT_DB = "hamhome-snapshots";
+const ASSET_DB = "hamhome-assets";
 const VECTOR_DB = "HamHomeVectors";
 const VECTOR_STORE = "bookmarkEmbeddings";
 
@@ -29,6 +30,9 @@ interface ResetExtensionDataOptions {
 
 const DEFAULT_SETTINGS: LocalSettings = {
   autoSaveSnapshot: true,
+  autoSaveScreenshot: false,
+  screenshotPrivatePagePolicy: "skip",
+  bookmarkHealthSchedule: "off",
   enableOmniboxSearch: true,
   defaultCategory: null,
   theme: "system",
@@ -59,6 +63,7 @@ export async function resetExtensionData(
 
     await Promise.all([
       deleteDatabase("hamhome-snapshots"),
+      deleteDatabase("hamhome-assets"),
       deleteDatabase("HamHomeVectors"),
     ]);
 
@@ -322,6 +327,37 @@ export async function getBookmarks(worker: Worker): Promise<LocalBookmark[]> {
   });
 }
 
+export async function getScreenshotAssetSizes(
+  worker: Worker,
+  bookmarkId: string,
+): Promise<{ image: number; thumbnail: number }> {
+  return worker.evaluate(async (id) => {
+    const db = await openAssetDB();
+    const [image, thumbnail] = await Promise.all([
+      getBlob("screenshotImages"),
+      getBlob("screenshotThumbnails"),
+    ]);
+    db.close();
+    return { image: image?.size ?? 0, thumbnail: thumbnail?.size ?? 0 };
+
+    function openAssetDB(): Promise<IDBDatabase> {
+      return new Promise((resolve, reject) => {
+        const request = indexedDB.open("hamhome-assets", 1);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    }
+
+    function getBlob(storeName: string): Promise<Blob | null> {
+      return new Promise((resolve, reject) => {
+        const request = db.transaction(storeName, "readonly").objectStore(storeName).get(id);
+        request.onsuccess = () => resolve(request.result?.blob ?? null);
+        request.onerror = () => reject(request.error);
+      });
+    }
+  }, bookmarkId);
+}
+
 export async function clearHtmlImportTask(worker: Worker): Promise<void> {
   await worker.evaluate(async () => {
     await chrome.storage.local.set({
@@ -333,6 +369,7 @@ export async function clearHtmlImportTask(worker: Worker): Promise<void> {
 
 export const indexedDbNames = {
   snapshots: SNAPSHOT_DB,
+  assets: ASSET_DB,
   vectors: VECTOR_DB,
   vectorStore: VECTOR_STORE,
 };

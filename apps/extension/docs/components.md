@@ -79,6 +79,10 @@
 
 **行为说明：**
 
+- 剪藏（图片 / 选中文字）的 AI 分析主体是剪藏内容本身，不是来源页：图片以多模态附件形式发送给模型，由模型描述画面并给出分类与标签；选中文字以选段为主体，只产出分类与标签。整页书签仍走原有的页面分析提示词，三者的提示词相互独立。
+- 图片剪藏不做文本降级：模型不支持图片输入、图片下载失败或体积超限时，面板直接在 `AIStatus` 上展示可操作的错误提示，并提供重试入口。
+- 图片剪藏的标题由模型对图片的描述填充，可在保存前手动修改。
+- 隐私页面（命中隐私域名或自动检测为隐私）不会触发任何剪藏 AI 分析；图片剪藏另受设置页「图片剪藏 AI 分析」开关控制。
 - `saveSnapshot` 初始值跟随设置页的默认保存快照策略。
 - 保存面板内调整快照开关只影响本次保存，不反写设置页默认值。
 - 快照类型由系统自动决定：可阅读页面优先保存 Markdown，其他页面保存完整 HTML。
@@ -130,6 +134,62 @@ Popup 快捷面板，扩展图标点击后的默认视图。保存书签的 AI �
 - `settings.usePopupSavePanel` 打开时跳过消息发送，直接切换到 `PopupSaveView`，按钮下方的说明文案同步切换。
 - 提供打开书签面板、保存当前窗口为工作空间、管理书签、设置四个快捷入口，并展示最近保存的 5 条书签。
 - 常用设置区可直接切换「默认保存快照」「地址栏搜索增强」，改动实时写入设置。
+
+## BookmarkSubjectDialog / ImageClipMetadata
+
+“我的收藏”中图片剪藏和选中文字剪藏的主体详情弹窗。图片详情通过 `ImageClipMetadata` 在原图下方展示 AI 提取的主色板，以及原图尺寸、文件大小和格式。
+
+### BookmarkSubjectDialog Props
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| bookmark | `LocalBookmark \| null` | ✓ | - | 当前收藏对应的书签信息 |
+| subject | `BookmarkClipSubject \| null` | ✓ | - | 图片或文字剪藏主体，图片主体可包含 `imageMetadata` |
+| open | `boolean` | ✓ | - | 是否打开弹窗 |
+| onOpenChange | `(open: boolean) => void` | ✓ | - | 弹窗开关回调 |
+
+### ImageClipMetadata Props
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| metadata | `ImageClipMetadata` | - | `undefined` | 主色、宽高、原图字节数、格式和 MIME；没有可展示字段时不渲染 |
+
+**用法示例：**
+
+```tsx
+<BookmarkSubjectDialog
+  bookmark={bookmark}
+  subject={clipSubject}
+  open={open}
+  onOpenChange={setOpen}
+/>
+```
+
+**行为说明：**
+
+- 图片主色限制为 1–8 个 `#RRGGBB` 值，并按视觉占比从高到低显示在原图正下方。
+- 技术信息读取原始图片的尺寸、字节大小与格式，不使用发送给 AI 的压缩副本。
+- 历史剪藏没有新增字段时保持兼容，只隐藏缺失的信息项。
+
+## BookmarkHealthPage
+
+普通书签收藏的健康检查页面，展示链接状态、重复项、统计和修复入口。图片剪藏与选中文字剪藏属于内容收藏，不进入健康中心。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| - | - | - | - | 页面通过 `BookmarkContext`、`bookmarkClipStorage` 和后台服务自行加载数据 |
+
+**用法示例：**
+
+```tsx
+<BookmarkHealthPage />
+```
+
+**行为说明：**
+
+- 页面根据 `BookmarkClipSubjectIndex` 排除图片剪藏和选中文字剪藏，统计、筛选、搜索与进度只计算普通书签收藏。
+- 全量、单条和定期扫描均在 `BookmarkHealthService` 再次执行同一范围过滤，内容收藏不会发起健康检查请求。
+- 普通书签的失效链接、跳转、访问异常与重复 URL 仍按既有规则检查；历史内容收藏健康记录会在扫描时清理。
 
 ## WorkspacesPage
 
@@ -1342,6 +1402,8 @@ interface Source {
 
 书签列表管理相关组件，用于 `BookmarksPage` 主内容区的书签展示和编辑。
 
+应用内容壳以视口高度作为固定的 flex 布局基准，长页面仍由外层 `ScrollArea` 滚动。`BookmarksPage` 会填满其中的可用区域，筛选栏保持在顶部，网格、列表和视觉画廊共用剩余高度并在内部滚动；滚动条空间会稳定预留，避免动态高度卡片出现后改变列宽。
+
 ### BookmarkCard
 
 网格视图下的书签卡片组件。
@@ -1494,7 +1556,7 @@ const { snapshotUrl, loading, error, openSnapshot, closeSnapshot } =
 
 ### useGlobalAgent
 
-全局插件 Agent Hook，封装右下角浮窗所需的多轮会话、session 切换、执行状态、过程步骤、书签来源和 background service 调用。内部通过 `globalAgentService` 使用 `@browser-agent-sdk/agent` 的 skill/tool loop，实现插件功能问答、功能详情读取、安全配置修改、页面打开、书签搜索和数据查询。
+全局插件 Agent Hook，封装右下角浮窗所需的多轮会话、session 切换、执行状态、过程步骤、书签来源和 background service 调用。内部通过 `globalAgentService` 使用 `@hamhome/agent` 的 skill/tool loop，实现插件功能问答、功能详情读取、安全配置修改、页面打开、书签搜索和数据查询。
 
 **返回值：**
 
@@ -2222,6 +2284,14 @@ keepShadowRootDocumentStyles(ctx);
 - 通过 MutationObserver 监听 `document.head`（以及 `documentElement`，应对整个 `<head>` 被替换的情况），
   发现样式被移除后立即重新挂回；`ctx.onInvalidated` 时停止监听
 
+### content-ui-keyboard-guard
+
+隔离 content UI Shadow DOM 内的键盘事件，避免宿主页面（例如 GitHub）把输入框中的字符识别为页面快捷键。
+
+- `ContentUIProvider` 在 content UI 根节点安装 `keydown`、`keypress` 和 `keyup` 的冒泡拦截器
+- 只停止事件继续冒泡到宿主页面，不调用 `preventDefault`，因此 content UI 自身的输入、Enter、方向键等行为仍由组件处理
+- 组件卸载时移除监听器，避免重复挂载造成监听器累积
+
 ---
 
 ## Storage 存储模块
@@ -2756,6 +2826,7 @@ AI 配置标签页，负责大模型服务商配置、模型选择、高级参�
 - 提供模型拉取（Fetch Models）功能，自动发现可用模型。
 - 包含语义搜索开关及向量索引统计信息展示。
 - 支持增量/全量索引重建及向量数据清理。
+- 高级设置中提供「图片剪藏 AI 分析」开关（默认开启）：关闭后保存图片剪藏不会把图片发送给模型；隐私页面无论开关状态都不会发送。
 
 ---
 
@@ -2810,3 +2881,31 @@ AI 配置标签页，负责大模型服务商配置、模型选择、高级参�
 
 - 包含数据清理、索引重建、远端数据清除、自定义筛选器编辑/删除等所有二次确认弹窗。
 - 统一处理 loading 状态展示。
+
+---
+
+## ContentTypeFilterDropdown
+
+内容类型下拉筛选组件，用于在「我的收藏」列表顶部工具栏筛选不同内容形式的收藏（所有、书签、图片、文本）。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| value | `BookmarkContentType` | ✓ | - | 当前选中的内容类型（`"all"` \| `"bookmark"` \| `"image"` \| `"text"`） |
+| onChange | `(value: BookmarkContentType) => void` | ✓ | - | 内容类型切换回调 |
+| className | `string` | - | - | 外层容器样式类名 |
+| triggerClassName | `string` | - | - | 下拉触发按钮样式类名 |
+
+**用法示例：**
+
+```tsx
+<ContentTypeFilterDropdown
+  value={contentType}
+  onChange={setContentType}
+/>
+```
+
+**行为说明：**
+
+- 提供四种类型选项：所有（`"all"`，默认）、书签（`"bookmark"`）、图片（`"image"`）、文本（`"text"`）。
+- 每个选项配有对应图标，选中后直接在触发器中展示图标与文字。
+- 与 `useBookmarkSearch` 协同工作，选择后实时过滤书签列表并在下方显示活动筛选徽章。

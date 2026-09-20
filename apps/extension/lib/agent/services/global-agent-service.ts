@@ -1,4 +1,4 @@
-import { InMemory, type AgentEvent } from "@browser-agent-sdk/agent";
+import { InMemory, type AgentEvent } from "@hamhome/agent";
 import { createLogger } from "@hamhome/utils";
 import type {
   AgentProcessStep,

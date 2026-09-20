@@ -13,14 +13,18 @@ import { aiCacheStorage } from "@/lib/storage/ai-cache-storage";
 import { bookmarkStorage } from "@/lib/storage/bookmark-storage";
 import { configStorage } from "@/lib/storage/config-storage";
 import { snapshotStorage } from "@/lib/storage/snapshot-storage";
+import { bookmarkHealthService } from "@/lib/services/bookmark-health-service";
+import { bookmarkScreenshotService } from "@/lib/services/bookmark-screenshot-service";
 import { vectorStore } from "@/lib/storage/vector-store";
 import { workspaceService } from "@/lib/services/workspace-service";
 import { embeddingClient, embeddingQueue } from "@/lib/embedding";
 import { semanticRetriever } from "@/lib/search/semantic-retriever";
 import {
   bookmarkAnalysisService,
+  clipAnalysisService,
   translationService,
 } from "@/lib/agent";
+import { inspectClipImageMetadata } from "@/lib/agent/fetch-clip-image";
 import { getExtensionURL, type ShortcutCommand } from "@/utils/browser-api";
 import {
   globalAgentService,
@@ -32,6 +36,11 @@ import type {
   ConversationalSearchTurnInput,
   LocalCategory,
   PageContent,
+  BookmarkHealthRecord,
+  SaveFlowClipContext,
+  ImageClipMetadata,
+  SaveScreenshotBackgroundOptions,
+  ScreenshotCaptureResult,
   SaveSnapshotBackgroundOptions,
   SnapshotSaveResult,
 } from "@/types";
@@ -218,6 +227,19 @@ class BackgroundServiceImpl implements IBackgroundService {
         error: error instanceof Error ? error.message : "快照保存失败",
       };
     }
+  }
+
+  async saveScreenshotBackground(
+    bookmarkId: string,
+    options?: SaveScreenshotBackgroundOptions,
+  ): Promise<ScreenshotCaptureResult> {
+    return bookmarkScreenshotService.captureVisibleTab(bookmarkId, options);
+  }
+
+  async scanBookmarkHealth(
+    bookmarkIds?: string[],
+  ): Promise<BookmarkHealthRecord[]> {
+    return bookmarkHealthService.scan(bookmarkIds);
   }
 
   async openOptionsPage(view: string = "settings"): Promise<void> {
@@ -479,6 +501,44 @@ class BackgroundServiceImpl implements IBackgroundService {
     const result = await bookmarkAnalysisService.analyzeBookmark(analysisOptions);
     await aiCacheStorage.cacheAnalysis(analysisOptions.pageContent, result);
     return result;
+  }
+
+  /**
+   * AI 分析剪藏。
+   * 图片剪藏需要抓取跨域原图并转成多模态附件，只有 background 有这个权限，
+   * 因此不论调用方是 popup 还是 content script，都在此统一执行。
+   */
+  async analyzeClip(options: {
+    clip: SaveFlowClipContext;
+    cacheKey: string;
+    source?: { url?: string; title?: string; excerpt?: string };
+    userCategories?: LocalCategory[];
+    existingTags?: string[];
+    skipCache?: boolean;
+  }): Promise<AnalysisResult> {
+    const { skipCache = false, cacheKey, ...analysisOptions } = options;
+    // 图片提示词和输出结构会独立演进，版本化缓存键避免复用缺少主色的旧结果。
+    const resolvedCacheKey =
+      options.clip.type === "image" ? `clip-image-v2:${cacheKey}` : cacheKey;
+
+    if (!skipCache) {
+      const cached = await aiCacheStorage.getCachedAnalysis(resolvedCacheKey);
+      if (cached) {
+        return cached;
+      }
+    }
+
+    const result =
+      options.clip.type === "image"
+        ? await clipAnalysisService.analyzeImageClip(analysisOptions)
+        : await clipAnalysisService.analyzeHighlightClip(analysisOptions);
+
+    await aiCacheStorage.cacheAnalysisByUrl(resolvedCacheKey, result);
+    return result;
+  }
+
+  async inspectClipImage(url: string): Promise<ImageClipMetadata> {
+    return inspectClipImageMetadata(url);
   }
 
   async openProtocolUrl(url: string): Promise<void> {

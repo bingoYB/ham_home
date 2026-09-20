@@ -181,7 +181,7 @@ pnpm --filter hamhome screenshots
 - **Extension**: WXT + React 19 + TypeScript + Tailwind CSS 4
 - **Product site**: Next.js 16 + React 19
 - **UI**: shadcn/ui-style primitives, Radix UI, lucide-react, shared `@hamhome/ui` and `@hamhome/ui-business`
-- **AI**: `@browser-agent-sdk/agent`, provider adapters, embedding queue, hybrid retriever
+- **AI**: `@hamhome/agent`, provider adapters, embedding queue, hybrid retriever
 - **Extraction**: Defuddle, Mozilla Readability, SingleFile-style capture, Turndown/Markdown workflows
 - **Storage**: WXT Storage, browser storage APIs, IndexedDB for snapshots, AI cache, and vector data
 - **Sync**: WebDAV, gzip-compressed bookmark content chunks, sync locks, local credential obfuscation
@@ -202,6 +202,7 @@ ham_home/
 │   │   └── e2e/            # Playwright extension tests and screenshot generation
 │   └── web/                # Next.js product / marketing site
 ├── packages/
+│   ├── agent/              # Browser agent runtime (vendored from browser-agent-sdk)
 │   ├── ui/                 # Shared UI primitives
 │   ├── ui-business/        # Shared HamHome business UI
 │   ├── types/              # Shared TypeScript types

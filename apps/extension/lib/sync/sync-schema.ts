@@ -34,9 +34,47 @@ export const RemoteBookmarksFileSchema = z.object({
 
 export type RemoteBookmarksFile = z.infer<typeof RemoteBookmarksFileSchema>;
 
+export const RemoteBookmarkClipSchema = z.object({
+  id: z.string(),
+  bookmarkId: z.string(),
+  type: z.enum(['highlight', 'note', 'link', 'image']),
+  text: z.string().optional(),
+  note: z.string().optional(),
+  targetUrl: z.string().optional(),
+  imageSourceUrl: z.string().optional(),
+  sourceUrl: z.string(),
+  sourceTitle: z.string().optional(),
+  selector: z.object({
+    exact: z.string(),
+    prefix: z.string().optional(),
+    suffix: z.string().optional(),
+    domPath: z.string().optional(),
+  }).optional(),
+  imageMetadata: z.object({
+    colors: z.array(z.string().regex(/^#[0-9A-Fa-f]{6}$/)).max(8).optional(),
+    width: z.number().positive().optional(),
+    height: z.number().positive().optional(),
+    size: z.number().nonnegative().optional(),
+    format: z.string().optional(),
+    mimeType: z.string().optional(),
+  }).optional(),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+  isDeleted: z.boolean().optional(),
+});
+
+export const RemoteBookmarkClipsFileSchema = z.object({
+  clips: z.array(RemoteBookmarkClipSchema),
+});
+
+export type RemoteBookmarkClip = z.infer<typeof RemoteBookmarkClipSchema>;
+
 // Settings schema corresponds to LocalSettings from @/types
 export const RemoteSettingsSchema = z.object({
   autoSaveSnapshot: z.boolean(),
+  autoSaveScreenshot: z.boolean().default(false),
+  screenshotPrivatePagePolicy: z.enum(['skip', 'ask']).default('skip'),
+  bookmarkHealthSchedule: z.enum(['off', 'weekly', 'monthly']).default('off'),
   enableOmniboxSearch: z.boolean().default(true),
   defaultCategory: z.string().nullable(),
   theme: z.enum(['light', 'dark', 'system']),

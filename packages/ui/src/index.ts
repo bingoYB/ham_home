@@ -27,6 +27,7 @@ export * from "./components/popover";
 export * from "./components/hover-card";
 export * from "./components/tooltip";
 export * from "./components/sidebar";
+export * from "./components/sheet";
 export * from "./components/app-sidebar";
 export * from "./components/breadcrumb";
 export { default as Masonry } from "./components/masonry";

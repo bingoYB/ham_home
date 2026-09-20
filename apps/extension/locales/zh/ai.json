@@ -118,5 +118,13 @@
   "batchOrganize": "批量 AI 整理",
   "batchOrganizeProgress": "AI 正在重新整理书签...",
   "batchOrganizeFailed": "AI 整理完成：成功 {{success}} 个，失败 {{failed}} 个。部分书签未能成功处理，请检查网络后重试。",
-  "reanalyze": "AI 重新分析"
+  "reanalyze": "AI 重新分析",
+  "clipAnalysis": {
+    "errors": {
+      "CLIP_IMAGE_VISION_UNSUPPORTED": "当前模型不支持图片分析，请在设置中更换支持多模态的模型",
+      "CLIP_IMAGE_FETCH_FAILED": "图片下载失败，可能是站点限制了外部访问",
+      "CLIP_IMAGE_UNSUPPORTED_TYPE": "不支持该图片格式，仅支持 PNG / JPEG / WebP / GIF",
+      "CLIP_IMAGE_TOO_LARGE": "图片体积过大，无法发送给 AI 分析"
+    }
+  }
 }

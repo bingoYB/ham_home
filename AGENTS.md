@@ -8,7 +8,7 @@ This is a pnpm + Turborepo monorepo for HamHome - 智能书签管理工具.
 apps/
   extension/   # WXT-based browser extension (main product)
   web/         # Next.js product/marketing site
-packages/*    # Shared libraries (ui, types, utils, ai, db, storage, parser, i18n, api)
+packages/*    # Shared libraries (agent, ui, ui-business, types, utils, db, storage, parser, i18n, api)
 docs/         # Product docs, design notes
 ```
 

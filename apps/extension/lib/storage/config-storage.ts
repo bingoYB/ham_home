@@ -17,6 +17,7 @@ const DEFAULT_AI_CONFIG: AIConfig = {
   enableTagSuggestion: true, // 默认开启标签推荐
   privacyDomains: [], // 隐私域名列表
   autoDetectPrivacy: true, // 默认开启自动隐私检测
+  enableImageAnalysis: true, // 默认允许将图片剪藏发送给 AI 分析
 };
 
 // 默认 Embedding 配置
@@ -30,6 +31,9 @@ const DEFAULT_EMBEDDING_CONFIG: EmbeddingConfig = {
 // 默认设置
 const DEFAULT_SETTINGS: LocalSettings = {
   autoSaveSnapshot: true,
+  autoSaveScreenshot: false,
+  screenshotPrivatePagePolicy: 'skip',
+  bookmarkHealthSchedule: 'off',
   enableOmniboxSearch: true,
   defaultCategory: null,
   theme: 'system',

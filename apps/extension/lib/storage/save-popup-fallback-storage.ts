@@ -4,10 +4,9 @@
  * 保存书签默认走页内浮窗；当页面无法注入 content script 时，background 会打开 Popup，
  * 并写入该标记，Popup 读到新鲜标记后直接进入保存表单而不是快捷操作面板。
  */
-import type { SaveFlowSource } from "@/types";
+import type { SaveFlowTrigger } from "@/types";
 
-interface SavePopupFallbackState {
-  source: SaveFlowSource;
+interface SavePopupFallbackState extends SaveFlowTrigger {
   createdAt: number;
 }
 
@@ -20,17 +19,18 @@ const savePopupFallbackItem = storage.defineItem<SavePopupFallbackState | null>(
 );
 
 class SavePopupFallbackStorage {
-  async markPending(source: SaveFlowSource): Promise<void> {
-    await savePopupFallbackItem.setValue({ source, createdAt: Date.now() });
+  async markPending(trigger: SaveFlowTrigger): Promise<void> {
+    await savePopupFallbackItem.setValue({ ...trigger, createdAt: Date.now() });
   }
 
   /** 读取并清除标记，返回是否应直接进入保存模式 */
-  async consumePending(): Promise<boolean> {
+  async consumePending(): Promise<SaveFlowTrigger | null> {
     const state = await savePopupFallbackItem.getValue();
-    if (!state) return false;
+    if (!state) return null;
 
     await this.clear();
-    return Date.now() - state.createdAt <= FALLBACK_TTL;
+    if (Date.now() - state.createdAt > FALLBACK_TTL) return null;
+    return { source: state.source, clip: state.clip };
   }
 
   async clear(): Promise<void> {

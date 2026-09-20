@@ -22,7 +22,25 @@
     "maxTokens": "最大 Token 数",
     "importBookmarks": "导入数据",
     "exportBookmarks": "导出数据",
-    "about": "关于",
+    "about": {
+      "title": "关于",
+      "description": "关于 HamHome",
+      "subtitle": "AI 驱动的浏览器工作空间",
+      "intro": "HamHome 是一款AI驱动的浏览器工作空间管理器，支持保存和恢复已打开的 Tab、自动分组，并通过 AI 管理书签与收藏内容，让进行中的浏览和长期沉淀都更容易整理。",
+      "versionLabel": "当前版本",
+      "versionValue": "HamHome v{{version}}",
+      "versionHint": "显示当前已安装的扩展版本号",
+      "websiteLabel": "官网",
+      "websiteHint": "访问官网查看产品介绍、下载方式与隐私说明",
+      "websiteButton": "访问官网",
+      "githubLabel": "GitHub 仓库",
+      "githubHint": "查看源码、发布版本、提交 Issue 或参与贡献",
+      "githubButton": "查看仓库",
+      "starTitle": "喜欢 HamHome？欢迎点个 Star",
+      "starHint": "如果 HamHome 对你有帮助，欢迎到 GitHub 点个 Star。你的支持会帮助项目持续迭代，也让更多用户发现它。",
+      "starButton": "前往 GitHub 点 Star",
+      "copyright": "© 2024-2026 HamHome. 保留所有权利。"
+    },
     "sections": {
       "general": "通用",
       "ai": "AI",
@@ -45,6 +63,21 @@
       "description": "自定义你的使用体验",
       "autoSaveSnapshot": "默认保存快照",
       "autoSaveSnapshotDesc": "保存书签时自动保存页面快照",
+      "autoSaveScreenshot": "默认保存页面截图",
+      "autoSaveScreenshotDesc": "保存书签时默认截取当前可见区域；每次保存仍可单独关闭",
+      "screenshotPrivatePagePolicy": "隐私页面截图",
+      "screenshotPrivatePagePolicyDesc": "控制检测到登录态或隐私内容时是否允许手动截图",
+      "screenshotPrivatePagePolicyOptions": {
+        "skip": "自动跳过",
+        "ask": "允许选择"
+      },
+      "bookmarkHealthSchedule": "自动书签体检",
+      "bookmarkHealthScheduleDesc": "后台定期检查链接状态；默认关闭，也可随时手动扫描",
+      "bookmarkHealthScheduleOptions": {
+        "off": "关闭",
+        "weekly": "每周",
+        "monthly": "每月"
+      },
       "usePopupSavePanel": "在扩展弹窗中保存",
       "usePopupSavePanelDesc": "开启后触发保存时在扩展弹窗内填写书签表单；关闭则在当前网页内展示保存浮窗，AI 分析期间不打断浏览",
       "enableOmniboxSearch": "地址栏搜索增强",
@@ -105,7 +138,6 @@
       "maxTokens": "最大 Token 数",
       "temperature": "Temperature (随机性)",
       "apiKey": "API 密钥",
-      "baseUrl": "Base URL",
       "noApiKeyNeeded": "不需要 API Key",
       "searchModel": "搜索模型名称",
       "noModelFound": "没有找到匹配的模型",
@@ -191,7 +223,9 @@
           "clearTitle": "确认清除向量数据",
           "clearWarning": "这将删除所有书签的向量索引，语义搜索功能将暂时不可用。确认清除？"
         }
-      }
+      },
+      "enableImageAnalysis": "图片剪藏 AI 分析",
+      "enableImageAnalysisHint": "开启后，保存图片时会将图片发送给 AI 以生成描述、分类和标签。隐私页面始终不会发送。"
     },
     "storage": {
       "title": "存储管理",
@@ -221,6 +255,12 @@
         "confirmTitle": "确认清除快照",
         "confirmWarning": "此操作将删除所有本地保存的网页快照，书签本身不受影响。此操作无法撤销！"
       },
+      "screenshotData": {
+        "title": "页面截图",
+        "count": "{{count}} 张截图",
+        "size": "{{size}}",
+        "localOnly": "仅存储在本机；可在书签详情中逐张删除"
+      },
       "vectorData": {
         "title": "语义向量索引",
         "count": "{{count}} 个向量",
@@ -235,29 +275,10 @@
       "exportHTML": "导出为 HTML",
       "dangerZone": "危险操作",
       "clearAllData": "清除所有业务数据",
-      "clearAllDesc": "清除书签、分类、工作空间、快照及向量数据（AI 配置和应用设置将被保留）",
+      "clearAllDesc": "清除书签、分类、工作空间、快照、页面截图及向量数据（AI 配置和应用设置将被保留）",
       "confirmClearAll": "确认清除所有数据",
-      "clearAllWarning": "此操作将删除所有书签、分类、工作空间、网页快照和向量索引。AI 配置、标签设置、WebDAV 配置等个人设置将被保留。此操作无法撤销！",
+      "clearAllWarning": "此操作将删除所有书签、分类、工作空间、网页快照、页面截图和向量索引。AI 配置、标签设置、WebDAV 配置等个人设置将被保留。此操作无法撤销！",
       "notEnabled": "未启用"
-    },
-    "about": {
-      "title": "关于",
-      "description": "关于 HamHome",
-      "subtitle": "AI 驱动的浏览器工作空间",
-      "intro": "HamHome 是一款AI驱动的浏览器工作空间管理器，支持保存和恢复已打开的 Tab、自动分组，并通过 AI 管理书签与收藏内容，让进行中的浏览和长期沉淀都更容易整理。",
-      "versionLabel": "当前版本",
-      "versionValue": "HamHome v{{version}}",
-      "versionHint": "显示当前已安装的扩展版本号",
-      "websiteLabel": "官网",
-      "websiteHint": "访问官网查看产品介绍、下载方式与隐私说明",
-      "websiteButton": "访问官网",
-      "githubLabel": "GitHub 仓库",
-      "githubHint": "查看源码、发布版本、提交 Issue 或参与贡献",
-      "githubButton": "查看仓库",
-      "starTitle": "喜欢 HamHome？欢迎点个 Star",
-      "starHint": "如果 HamHome 对你有帮助，欢迎到 GitHub 点个 Star。你的支持会帮助项目持续迭代，也让更多用户发现它。",
-      "starButton": "前往 GitHub 点 Star",
-      "copyright": "© 2024-2026 HamHome. 保留所有权利。"
     },
     "dialogs": {
       "confirmClear": "确认清除所有数据",
@@ -551,7 +572,17 @@
         "neverSynced": "从未同步",
         "statusError": "同步失败",
         "statusSyncing": "正在同步",
-        "statusIdle": "空闲 / 已同步"
+        "statusIdle": "空闲 / 已同步",
+        "errors": {
+          "auth": "认证失败 (401)：请确认用户名与密码是否正确。若服务端开启了两步验证，需要改用「应用专用密码 / 授权码」；群晖等 NAS 还需确认该账号有权访问对应的 WebDAV 共享文件夹。",
+          "forbidden": "没有访问权限 (403)：账号无权读写该目录，请检查共享文件夹权限或更换 WebDAV 路径。",
+          "notFound": "路径不存在 (404)：请检查服务器地址是否包含正确的 WebDAV 子路径（例如 /dav 或 /webdav）。",
+          "network": "无法连接服务器：请检查地址与端口是否可达、HTTPS 证书是否有效，以及本机网络或防火墙设置。",
+          "server": "服务器返回错误 (5xx)：请稍后重试，或查看服务端日志。",
+          "invalidUrl": "服务器地址无效：地址需要以 http:// 或 https:// 开头。",
+          "notInitialized": "同步未初始化：请重新填写服务器地址与账号信息。",
+          "unknown": "同步失败：请查看下方的错误详情。"
+        }
       }
     }
   }

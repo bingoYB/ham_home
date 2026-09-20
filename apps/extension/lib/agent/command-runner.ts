@@ -2,7 +2,7 @@ import type {
   AgentCommand,
   AgentRunOptions,
   CommandRunResult,
-} from "@browser-agent-sdk/agent";
+} from "@hamhome/agent";
 import type { ResolvedAgentConfig } from "./factory";
 import {
   assertAgentConfigured,

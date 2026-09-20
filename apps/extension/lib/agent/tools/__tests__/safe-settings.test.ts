@@ -8,6 +8,9 @@ describe("sanitizeSafeSettingsUpdate", () => {
         theme: "dark",
         language: "zh",
         autoSaveSnapshot: false,
+        autoSaveScreenshot: true,
+        screenshotPrivatePagePolicy: "ask",
+        bookmarkHealthSchedule: "weekly",
         panelPosition: "right",
         shortcut: "Ctrl+X",
       },
@@ -30,6 +33,9 @@ describe("sanitizeSafeSettingsUpdate", () => {
       theme: "dark",
       language: "zh",
       autoSaveSnapshot: false,
+      autoSaveScreenshot: true,
+      screenshotPrivatePagePolicy: "ask",
+      bookmarkHealthSchedule: "weekly",
       panelPosition: "right",
     });
     expect(sanitized.aiConfig).toMatchObject({

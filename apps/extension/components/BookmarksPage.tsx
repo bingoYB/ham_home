@@ -19,6 +19,10 @@ import {
   Loader2,
   Download,
   Cloud,
+  Images,
+  Bookmark as BookmarkIcon,
+  Highlighter,
+  Image as ImageIcon,
 } from "lucide-react";
 import {
   Button,
@@ -38,6 +42,7 @@ import {
 import { useBookmarks } from "@/contexts/BookmarkContext";
 import { bookmarkStorage } from "@/lib/storage/bookmark-storage";
 import { CategoryFilterDropdown } from "@/components/common/CategoryTree";
+import { ContentTypeFilterDropdown } from "@/components/common/ContentTypeFilterDropdown";
 import {
   BookmarkCard,
   BookmarkListItem,
@@ -45,7 +50,11 @@ import {
   SnapshotViewer,
   BatchTagDialog,
   BatchMoveCategoryDialog,
+  VisualBookmarkGallery,
+  BookmarkSubjectDialog,
+  BookmarkScreenshotViewer,
 } from "@/components/bookmarkListMng";
+import type { BookmarkSubjectContent } from "@hamhome/ui-business/bookmark";
 import { SearchInputArea } from "@/components/aiSearch";
 import { useSnapshot } from "@/hooks/useSnapshot";
 import { FilterDropdownMenu } from "@/components/bookmarkPanel/FilterPopover";
@@ -59,18 +68,38 @@ import { useBatchAITask } from "@/hooks/useBatchAITask";
 import { getCategoryPath, formatDate } from "@/utils/bookmark-utils";
 import { configStorage } from "@/lib/storage/config-storage";
 import { pinStorage } from "@/lib/storage";
+import { bookmarkScreenshotStorage } from "@/lib/storage/bookmark-screenshot-storage";
+import {
+  bookmarkClipStorage,
+  type BookmarkClipSubject,
+  type BookmarkClipSubjectIndex,
+} from "@/lib/storage/bookmark-clip-storage";
 import { obsidianSyncService } from "@/lib/services/obsidian-sync-service";
 import type {
   LocalBookmark,
   CustomFilter,
   FilterCondition,
+  BookmarkScreenshotMetadata,
 } from "@/types";
 
-type ViewMode = "grid" | "list";
+type ViewMode = "grid" | "list" | "visual";
 
 interface BookmarksPageProps {
   currentView: string;
   onViewChange?: (view: string) => void;
+}
+
+/** 剪藏主体转成展示层结构；缺内容的剪藏退回普通书签展示 */
+function toSubjectContent(
+  subject?: BookmarkClipSubject,
+): BookmarkSubjectContent | undefined {
+  if (subject?.type === "image" && subject.imageSrc) {
+    return { type: "image", imageSrc: subject.imageSrc };
+  }
+  if (subject?.type === "text" && subject.text) {
+    return { type: "text", text: subject.text };
+  }
+  return undefined;
 }
 
 export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
@@ -89,6 +118,12 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
   const [pinnedBookmarkIds, setPinnedBookmarkIds] = useState<Set<string>>(
     new Set(),
   );
+  const [screenshotIndex, setScreenshotIndex] = useState<
+    Record<string, BookmarkScreenshotMetadata>
+  >({});
+  // 图片 / 选中文字剪藏以剪藏内容本身作为列表展示主体
+  const [clipSubjectIndex, setClipSubjectIndex] =
+    useState<BookmarkClipSubjectIndex>({});
 
   // 瀑布流组件引用（用于触发重排）
   const masonryRef = useRef<MasonryRef | null>(null);
@@ -104,6 +139,16 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
       }
     };
     loadCustomFilters();
+  }, []);
+
+  useEffect(() => {
+    void bookmarkScreenshotStorage.getIndex().then(setScreenshotIndex);
+    return bookmarkScreenshotStorage.watchIndex(setScreenshotIndex);
+  }, []);
+
+  useEffect(() => {
+    void bookmarkClipStorage.getSubjectIndex().then(setClipSubjectIndex);
+    return bookmarkClipStorage.watchSubjectIndex(setClipSubjectIndex);
   }, []);
 
   useEffect(() => {
@@ -135,25 +180,29 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
     return customFilters.find((f) => f.id === selectedCustomFilterId) || null;
   }, [selectedCustomFilterId, customFilters]);
 
-  // 筛选逻辑（使用 useBookmarkSearch 支持时间范围和自定义筛选器）
+  // 筛选逻辑（使用 useBookmarkSearch 支持时间范围、内容类型和自定义筛选器）
   const {
     searchQuery,
     selectedTags,
     selectedCategory,
     timeRange,
+    contentType,
     hasFilters,
     filteredBookmarks: keywordFilteredBookmarks,
     setSearchQuery,
     setSelectedCategory,
     setTimeRange,
+    setContentType,
     toggleTagSelection,
     clearFilters,
     clearTagFilters,
     clearTimeFilter,
+    clearContentTypeFilter,
   } = useBookmarkSearch({
     bookmarks,
     categories,
     customFilter: selectedCustomFilter,
+    subjectIndex: clipSubjectIndex,
   });
 
   // 视图模式
@@ -161,6 +210,10 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
 
   // 当前书签列表由关键词、分类、标签、时间和自定义筛选器共同决定。
   const filteredBookmarks = keywordFilteredBookmarks;
+  const screenshotIds = useMemo(
+    () => new Set(Object.keys(screenshotIndex)),
+    [screenshotIndex],
+  );
 
   // 处理关键词搜索查询变化
   const handleKeywordQueryChange = useCallback(
@@ -230,6 +283,13 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
   const [editingBookmark, setEditingBookmark] = useState<LocalBookmark | null>(
     null,
   );
+  // 剪藏主体弹窗：展示图片 / 选中文字的完整内容
+  const [subjectBookmark, setSubjectBookmark] = useState<LocalBookmark | null>(
+    null,
+  );
+  // 界面截图查看器
+  const [screenshotBookmark, setScreenshotBookmark] =
+    useState<LocalBookmark | null>(null);
 
   // 快照查看状态
   const [snapshotBookmark, setSnapshotBookmark] =
@@ -492,7 +552,7 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
   };
 
   return (
-    <div className="flex flex-col bg-background h-full">
+    <div className="flex min-h-0 flex-1 flex-col bg-background">
       {/* 筛选栏 */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border px-6 py-4 pt-6">
         <div className="flex items-start justify-between gap-4">
@@ -506,6 +566,12 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
 
           {/* 右侧：筛选和视图切换 */}
           <div className="flex items-center gap-2">
+            {/* 内容类型筛选 */}
+            <ContentTypeFilterDropdown
+              value={contentType}
+              onChange={setContentType}
+            />
+
             {/* 标签筛选 */}
             <Popover>
               <PopoverTrigger asChild>
@@ -610,6 +676,15 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
               >
                 <List className="h-4 w-4" />
               </Button>
+              <Button
+                variant={viewMode === "visual" ? "secondary" : "ghost"}
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setViewMode("visual")}
+                title={t("bookmark:bookmark.view.visual")}
+              >
+                <Images className="h-4 w-4" />
+              </Button>
             </div>
           </div>
         </div>
@@ -617,8 +692,38 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
         {/* 筛选状态和批量操作 */}
         {(hasFilters || selectedIds.size > 0) && (
           <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/50">
-            {/* 左侧：当前分类和筛选标签 */}
+            {/* 左侧：当前分类、内容类型和筛选标签 */}
             <div className="flex items-center gap-2 flex-wrap">
+              {contentType !== "all" && (
+                <Badge
+                  variant="secondary"
+                  className="text-xs px-2 py-1 gap-1.5 cursor-pointer group/type border"
+                >
+                  {contentType === "bookmark" && (
+                    <BookmarkIcon className="h-3 w-3 text-blue-500" />
+                  )}
+                  {contentType === "image" && (
+                    <ImageIcon className="h-3 w-3 text-amber-500" />
+                  )}
+                  {contentType === "text" && (
+                    <Highlighter className="h-3 w-3 text-emerald-500" />
+                  )}
+                  {contentType === "bookmark" &&
+                    t("bookmark:bookmark.filter.typeBookmark")}
+                  {contentType === "image" &&
+                    t("bookmark:bookmark.filter.typeImage")}
+                  {contentType === "text" &&
+                    t("bookmark:bookmark.filter.typeText")}
+                  <X
+                    className="h-3 w-3 opacity-0 group-hover/type:opacity-100 transition-opacity hover:text-foreground cursor-pointer"
+                    style={{ pointerEvents: "auto" }}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      clearContentTypeFilter();
+                    }}
+                  />
+                </Badge>
+              )}
               {selectedCategory !== "all" && (
                 <Badge
                   variant="secondary"
@@ -793,9 +898,15 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
 
       {/* 书签列表 */}
       <div
-        ref={viewMode === "grid" ? masonryContainerRef : virtualListParentRef}
+        ref={
+          viewMode === "grid"
+            ? masonryContainerRef
+            : viewMode === "list"
+              ? virtualListParentRef
+              : undefined
+        }
         className={cn(
-          "flex-1 overflow-auto",
+          "min-h-0 flex-1 overflow-auto [scrollbar-gutter:stable]",
           viewMode === "grid" ? "p-6" : "p-6",
         )}
       >
@@ -880,6 +991,11 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
                     onOpen={() => openBookmark(bm.url)}
                     onEdit={() => setEditingBookmark(bm)}
                     onDelete={() => handleDelete(bm)}
+                    onViewScreenshot={
+                      screenshotIndex[bm.id]
+                        ? () => setScreenshotBookmark(bm)
+                        : undefined
+                    }
                     onViewSnapshot={
                       bm.hasSnapshot ? () => handleViewSnapshot(bm) : undefined
                     }
@@ -894,13 +1010,16 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
                     onReanalyzeAI={() => startBatchAITask([bm.id])}
                     isProcessingAI={isBatchAIProcessing}
                     columnSize={masonryConfig.columnSize}
+                    hasScreenshot={!!screenshotIndex[bm.id]}
+                    subject={toSubjectContent(clipSubjectIndex[bm.id])}
+                    onOpenSubject={() => setSubjectBookmark(bm)}
                     t={t}
                   />
                 </div>
               );
             }}
           />
-        ) : (
+        ) : viewMode === "list" ? (
           <div
             className="relative w-full"
             style={{ height: `${virtualListTotalSize}px` }}
@@ -931,6 +1050,11 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
                     onOpen={() => openBookmark(bookmark.url)}
                     onEdit={() => setEditingBookmark(bookmark)}
                     onDelete={() => handleDelete(bookmark)}
+                    onViewScreenshot={
+                      screenshotIndex[bookmark.id]
+                        ? () => setScreenshotBookmark(bookmark)
+                        : undefined
+                    }
                     onViewSnapshot={
                       bookmark.hasSnapshot
                         ? () => handleViewSnapshot(bookmark)
@@ -946,12 +1070,24 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
                     isPinned={pinnedBookmarkIds.has(bookmark.id)}
                     onReanalyzeAI={() => startBatchAITask([bookmark.id])}
                     isProcessingAI={isBatchAIProcessing}
+                    hasScreenshot={!!screenshotIndex[bookmark.id]}
+                    subject={toSubjectContent(clipSubjectIndex[bookmark.id])}
+                    onOpenSubject={() => setSubjectBookmark(bookmark)}
                     t={t}
                   />
                 </div>
               );
             })}
           </div>
+        ) : (
+          <VisualBookmarkGallery
+            bookmarks={filteredBookmarks}
+            screenshotIds={screenshotIds}
+            selectedIds={selectedIds}
+            onToggleSelect={toggleSelect}
+            onViewScreenshot={setScreenshotBookmark}
+            onOpenBookmark={openBookmark}
+          />
         )}
       </div>
 
@@ -963,6 +1099,25 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
           onClose={() => setEditingBookmark(null)}
         />
       )}
+
+      <BookmarkSubjectDialog
+        bookmark={subjectBookmark}
+        subject={
+          subjectBookmark ? (clipSubjectIndex[subjectBookmark.id] ?? null) : null
+        }
+        open={!!subjectBookmark}
+        onOpenChange={(open) => {
+          if (!open) setSubjectBookmark(null);
+        }}
+      />
+
+      <BookmarkScreenshotViewer
+        bookmark={screenshotBookmark}
+        open={!!screenshotBookmark}
+        onOpenChange={(open) => {
+          if (!open) setScreenshotBookmark(null);
+        }}
+      />
 
       {/* 自定义筛选器弹窗 */}
       <CustomFilterDialog

@@ -3,7 +3,7 @@ import {
   type Memory,
   type MemoryEntry,
   type MemorySession,
-} from "@browser-agent-sdk/agent";
+} from "@hamhome/agent";
 import type {
   AgentProcessStep,
   ChatMessage,

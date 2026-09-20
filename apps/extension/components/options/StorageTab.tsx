@@ -31,6 +31,7 @@ interface SnapshotStats {
 interface StorageTabProps {
   storageInfo: StorageInfo;
   snapshotStats: SnapshotStats | null;
+  screenshotStats: SnapshotStats | null;
   vectorStats: VectorStoreStats | null;
   embeddingConfig: EmbeddingConfig;
   syncConfig: WebDAVConfig;
@@ -66,6 +67,7 @@ interface StorageTabProps {
 export function StorageTab({
   storageInfo,
   snapshotStats,
+  screenshotStats,
   vectorStats,
   embeddingConfig,
   syncConfig,
@@ -113,7 +115,7 @@ export function StorageTab({
             <h4 className="text-sm font-medium text-muted-foreground">
               {t("settings:settings.storage.dataOverview")}
             </h4>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
               {/* 书签 & 分类 */}
               <div className="flex flex-col p-4 rounded-lg border bg-muted/30 gap-3">
                 <div className="flex-1">
@@ -214,6 +216,28 @@ export function StorageTab({
                   )}
                   {t("settings:settings.storage.snapshotData.clear")}
                 </Button>
+              </div>
+
+              {/* 页面截图 */}
+              <div className="flex flex-col p-4 rounded-lg border bg-muted/30 gap-3">
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-foreground">
+                    {t("settings:settings.storage.screenshotData.title")}
+                  </p>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {t("settings:settings.storage.screenshotData.count", {
+                      count: screenshotStats?.count || 0,
+                    })}
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    {t("settings:settings.storage.screenshotData.size", {
+                      size: formatBytes(screenshotStats?.totalSize || 0),
+                    })}
+                  </p>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {t("settings:settings.storage.screenshotData.localOnly")}
+                </p>
               </div>
 
               {/* 语义向量索引 */}
@@ -468,10 +492,20 @@ export function StorageTab({
                     {syncStatus.syncVersion || "-"}
                   </span>
                 </div>
-                {syncStatus.errorMessage && (
-                  <div className="mt-2 text-destructive p-2 bg-red-50 dark:bg-red-900/10 rounded-md border border-red-100 dark:border-red-900/30">
-                    <AlertTriangle className="inline-block mr-1 h-3 w-3" />
-                    {syncStatus.errorMessage}
+                {(syncStatus.errorCode || syncStatus.errorMessage) && (
+                  <div className="mt-2 text-destructive p-2 bg-red-50 dark:bg-red-900/10 rounded-md border border-red-100 dark:border-red-900/30 space-y-1">
+                    <div>
+                      <AlertTriangle className="inline-block mr-1 h-3 w-3" />
+                      {t(
+                        `settings:settings.sync.config.errors.${syncStatus.errorCode || "unknown"}`,
+                        syncStatus.errorMessage || "",
+                      )}
+                    </div>
+                    {syncStatus.errorMessage && (
+                      <div className="text-xs font-mono opacity-70 break-all">
+                        {syncStatus.errorMessage}
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

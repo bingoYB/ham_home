@@ -414,17 +414,21 @@ export default forwardRef<MasonryRef, MasonryProps>(
       },
     }));
 
-    const containerStyle: React.CSSProperties = useMemo(
-      () => ({
-        position: "relative",
-        width: "100%",
-        height: positioner.estimateHeight(allItems.length, itemHeightEstimate),
-        maxHeight: positioner.estimateHeight(allItems.length, itemHeightEstimate),
-        willChange: isScrolling ? "contents" : undefined,
-        pointerEvents: isScrolling ? "none" : undefined,
-      }),
-      [positioner, allItems.length, itemHeightEstimate, isScrolling]
+    // ResizeObserver 会原地更新 positioner 并触发重渲染。这里必须在每次渲染时
+    // 重新读取高度，不能只依赖 positioner 引用做 memo，否则动态变高的卡片会让
+    // 容器一直停留在初始估算高度，后续内容在滚动区域中被裁切。
+    const containerHeight = positioner.estimateHeight(
+      allItems.length,
+      itemHeightEstimate
     );
+    const containerStyle: React.CSSProperties = {
+      position: "relative",
+      width: "100%",
+      height: containerHeight,
+      maxHeight: containerHeight,
+      willChange: isScrolling ? "contents" : undefined,
+      pointerEvents: isScrolling ? "none" : undefined,
+    };
 
     return (
       <div className={className} style={containerStyle} ref={containerRef}>

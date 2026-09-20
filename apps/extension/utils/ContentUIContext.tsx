@@ -2,7 +2,8 @@
  * ContentUI Context
  * 提供 React Root 实例和容器元素给子组件使用
  */
-import React, { createContext, useContext } from "react";
+import React, { createContext, useContext, useEffect } from "react";
+import { installContentUIKeyboardEventGuard } from "@/utils/content-ui-keyboard-guard";
 import type { Root } from "react-dom/client";
 
 interface ContentUIContextValue {
@@ -25,6 +26,11 @@ export function ContentUIProvider({
   container,
   children,
 }: ContentUIProviderProps) {
+  useEffect(
+    () => installContentUIKeyboardEventGuard(container),
+    [container],
+  );
+
   return (
     <ContentUIContext.Provider value={{ root, container }}>
       {children}

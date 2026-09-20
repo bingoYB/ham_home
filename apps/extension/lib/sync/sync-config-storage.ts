@@ -97,7 +97,13 @@ class SyncConfigStorage {
   async setConfig(config: Partial<WebDAVConfig>): Promise<WebDAVConfig> {
     const current = await this.getConfig();
     const updated = { ...current, ...config };
-    
+
+    // Values pasted from a password manager often carry stray whitespace/newlines,
+    // which servers reject with a 401 that is indistinguishable from a wrong password.
+    if (typeof updated.url === 'string') updated.url = updated.url.trim();
+    if (typeof updated.username === 'string') updated.username = updated.username.trim();
+    if (typeof updated.password === 'string') updated.password = updated.password.trim();
+
     const toSave = { ...updated };
     if (toSave.password) {
       toSave.password = await encrypt(toSave.password);
