@@ -27,10 +27,6 @@ import {
 import {
   Button,
   Badge,
-  Checkbox,
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
   ScrollArea,
   confirm,
   Masonry,
@@ -57,6 +53,7 @@ import {
 import type { BookmarkSubjectContent } from "@hamhome/ui-business/bookmark";
 import { SearchInputArea } from "@/components/aiSearch";
 import { useSnapshot } from "@/hooks/useSnapshot";
+import { TagFilterDropdown } from "@/components/bookmarkPanel/TagFilterDropdown";
 import { FilterDropdownMenu } from "@/components/bookmarkPanel/FilterPopover";
 import { CustomFilterDialog } from "@/components/bookmarkPanel/CustomFilterDialog";
 import { CustomDateRangeDialog } from "@/components/bookmarkPanel/CustomDateRangeDialog";
@@ -586,57 +583,28 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
             />
 
             {/* 标签筛选 */}
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant={selectedTags.length > 0 ? "secondary" : "outline"}
-                  size="sm"
-                  className={cn("gap-2")}
-                >
-                  <Tag className="h-4 w-4" />
-                  {selectedTags.length > 0
-                    ? t("bookmark:bookmark.filter.selectedTags", {
-                        count: selectedTags.length,
-                      })
-                    : t("bookmark:bookmark.filter.tags")}
-                  <ChevronDown className="h-3 w-3" />
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-64 p-2" align="end">
-                <ScrollArea className="h-64">
-                  <div className="space-y-1">
-                    {allTags.length === 0 ? (
-                      <p className="text-sm text-muted-foreground p-2">
-                        {t("bookmark:tags.empty")}
-                      </p>
-                    ) : (
-                      allTags.map((tag) => (
-                        <div
-                          key={tag}
-                          onClick={() => toggleTagSelection(tag)}
-                          className="flex items-center gap-2 w-full px-2 py-1.5 rounded-md hover:bg-muted text-sm text-left cursor-pointer"
-                        >
-                          <Checkbox checked={selectedTags.includes(tag)} />
-                          <span className="truncate">{tag}</span>
-                        </div>
-                      ))
-                    )}
-                  </div>
-                </ScrollArea>
-                {selectedTags.length > 0 && (
-                  <div className="border-t border-border mt-2 pt-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="w-full"
-                      onClick={clearTagFilters}
-                    >
-                      {t("bookmark:bookmark.filter.clearFilter")}
-                    </Button>
-                  </div>
-                )}
-              </PopoverContent>
-            </Popover>
+            <TagFilterDropdown
+              allTags={allTags}
+              selectedTags={selectedTags}
+              onToggleTag={toggleTagSelection}
+              onClearTags={clearTagFilters}
+              // 已选标签在筛选栏下方单独展示，弹层里不必再回显一遍
+              showSelectedTags={false}
+            >
+              <Button
+                variant={selectedTags.length > 0 ? "secondary" : "outline"}
+                size="sm"
+                className={cn("gap-2")}
+              >
+                <Tag className="h-4 w-4" />
+                {selectedTags.length > 0
+                  ? t("bookmark:bookmark.filter.selectedTags", {
+                      count: selectedTags.length,
+                    })
+                  : t("bookmark:bookmark.filter.tags")}
+                <ChevronDown className="h-3 w-3" />
+              </Button>
+            </TagFilterDropdown>
 
             {/* 分类筛选 */}
             <CategoryFilterDropdown

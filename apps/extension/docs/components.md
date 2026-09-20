@@ -1003,6 +1003,57 @@ const { container: portalContainer } = useContentUI();
 
 ---
 
+### TagFilterList
+
+可搜索的标签多选列表。标签筛选的三个入口——「我的收藏」筛选栏、侧边栏 `BookmarkHeader`、
+弹窗形态的 `TagFilterPopover`——都复用它，各自只负责外壳（触发器、已选回显、清除入口）。
+
+| Prop         | Type                      | Required | Default | Description            |
+| ------------ | ------------------------- | -------- | ------- | ---------------------- |
+| allTags      | `string[]`                | ✓        | -       | 全部可选标签           |
+| selectedTags | `string[]`                | ✓        | -       | 已选标签               |
+| onToggleTag  | `(tag: string) => void`   | ✓        | -       | 切换某个标签的选中态   |
+| height       | `number`                  | -        | `256`   | 列表可视区高度（像素） |
+| className    | `string`                  | -        | -       | 自定义容器样式类       |
+
+**行为说明：**
+
+- 列表用 TanStack Virtual 虚拟化，只渲染可视区内的行。标签上千时下拉打开一次只产生十几个节点，
+  不会因为一次性铺开全部标签而卡住
+- 顶部搜索框按子串（忽略大小写）过滤，右侧 `×` 清空关键词
+- 选中判断走 `Set`，避免逐行 `Array.includes` 让渲染退化成 O(n²)
+- 行高固定 32px，虚拟化不需要实测；改行内边距时要同步改 `ROW_HEIGHT`
+- 滚动容器用 `ScrollArea type="auto"`：默认的 hover 模式在指针进入前 viewport 是 `overflow: hidden`，
+  虚拟化会拿不到真正的滚动容器
+- 无匹配时按「一个标签都没有」和「搜不到」显示不同文案
+
+---
+
+### TagFilterDropdown
+
+标签筛选下拉外壳，`BookmarksPage` 筛选栏和侧边栏 `BookmarkHeader` 共用。
+搜索框和标签列表来自 `TagFilterList`。
+
+| Prop             | Type                                | Required | Default   | Description                        |
+| ---------------- | ----------------------------------- | -------- | --------- | ---------------------------------- |
+| allTags          | `string[]`                          | ✓        | -         | 全部可选标签                       |
+| selectedTags     | `string[]`                          | ✓        | -         | 已选标签                           |
+| onToggleTag      | `(tag: string) => void`             | ✓        | -         | 切换某个标签的选中态               |
+| onClearTags      | `() => void`                        | -        | -         | 清除全部标签；不传则不显示清除入口 |
+| showSelectedTags | `boolean`                           | -        | `true`    | 在列表上方回显已选标签             |
+| align            | `"start" \| "center" \| "end"`      | -        | `"end"`   | 弹层相对触发器的对齐方式           |
+| children         | `React.ReactNode`                   | ✓        | -         | 触发器                             |
+
+**行为说明：**
+
+- 用 `Popover` 而不是 `DropdownMenu`：`DropdownMenu` 会在列表项之间做 roving focus 和首字母跳转，
+  和内嵌的搜索框、虚拟列表互相打架（打开时焦点会被列表项抢走）
+- Portal 容器从 `ContentUIContext` 直接取，取不到时回退 `document.body`——
+  这个组件在内容脚本（Shadow DOM）和扩展应用页都会用，用 `useContentUI()` 会在应用页每次渲染都告警
+- 上层已经单独展示已选标签时（如 `BookmarksPage` 的筛选栏），传 `showSelectedTags={false}` 避免重复
+
+---
+
 ### FilterDropdown
 
 筛选类型选择下拉组件，提供标签筛选和时间筛选入口。
@@ -1029,6 +1080,11 @@ const { container: portalContainer } = useContentUI();
 | selectedTags | `string[]`                | ✓        | -       | 已选标签     |
 | onToggleTag  | `(tag: string) => void`   | ✓        | -       | 切换标签选择 |
 | onConfirm    | `() => void`              | -        | -       | 确认回调     |
+
+**行为说明：**
+
+- 搜索框和标签列表来自 `TagFilterList`（虚拟滚动），弹窗本身只负责标题、已选回显和确认/取消
+- 目前没有页面引用它，保留为弹窗形态的备选外壳
 
 ---
 
