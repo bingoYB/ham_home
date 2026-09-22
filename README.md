@@ -1,35 +1,37 @@
-<p>
-  <img src="logo.png" alt="HamHome" width="280" />
+<p align="center">
+  <a href="./docs/README_zh.md">简体中文</a> · <a href="./README.md">English</a>
 </p>
+
+<div align="center">
+
+<img src="logo.png" alt="HamHome" width="200" />
 
 # HamHome
 
-**AI browser workspace for bookmarks, tabs, sessions, and Agent-assisted extension control**
+### Organize bookmarks with AI, rediscover saved content, and pick up where you left off
+
+[![Release](https://img.shields.io/github/v/release/bingoYB/ham_home?style=flat-square)](https://github.com/bingoYB/ham_home/releases)
+[![Stars](https://img.shields.io/github/stars/bingoYB/ham_home?style=flat-square)](https://github.com/bingoYB/ham_home/stargazers)
+[![Issues](https://img.shields.io/github/issues/bingoYB/ham_home?style=flat-square)](https://github.com/bingoYB/ham_home/issues)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](./LICENSE)
+
+**Find what you saved. Resume what you started.**
 
 <p>
-  <img src="https://img.shields.io/github/v/release/bingoYB/ham_home?style=flat-square" alt="Release" />
-  <img src="https://img.shields.io/github/stars/bingoYB/ham_home?style=flat-square" alt="Stars" />
-  <img src="https://img.shields.io/github/forks/bingoYB/ham_home?style=flat-square" alt="Forks" />
-  <img src="https://img.shields.io/github/issues/bingoYB/ham_home?style=flat-square" alt="Issues" />
-  <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License" />
+  <a href="https://bingoyb.github.io/ham_home/">Website</a> · <a href="#downloads">Install</a> · <a href="./docs/USAGE_en.md">Usage Guide</a> · <a href="#features">Features</a> · <a href="#development">Development</a>
 </p>
 
-<p>
-  <a href="https://bingoyb.github.io/ham_home/">Product Introduction</a> •
-  <a href="./docs/README_zh.md">中文文档</a> •
-  <a href="./docs/USAGE_en.md">Usage</a> •
-  <a href="./docs/USAGE_zh.md">中文使用文档</a> •
-  <a href="#features">Features</a> •
-  <a href="#development">Development</a>
-</p>
+</div>
 
 ## What is HamHome?
 
-HamHome is a browser extension for turning everyday browsing into an organized, searchable workspace. It combines AI-assisted bookmark saving, a full bookmark library, page snapshots, an Agent that understands and operates HamHome, restorable tab workspaces, and native browser Tab Group automation.
+HamHome is an AI browser workspace that brings bookmarks, page snapshots, and tab sessions together. Save content worth keeping, along with the browsing context you want to return to.
 
-By default, bookmarks, categories, settings, snapshots, vectors, workspaces, and rules live in your browser storage. You can connect your own AI provider for analysis and semantic search, and optionally use WebDAV or export/import files to move structured data across devices.
+- **Save with less sorting.** Let AI generate summaries, categories, and tags, and keep page snapshots for offline reading.
+- **Find it when you need it.** Search saved content with keywords or semantic search, or ask the built-in Agent to find and summarize it.
+- **Pick up where you left off.** Save a set of tabs as a workspace, restore it when needed, and organize active tabs with grouping rules.
 
-👉 **[View Product Introduction](https://bingoyb.github.io/ham_home/)** - Learn more about the product and download options.
+**Local first. Your choice of AI.** Data stays in your browser by default, with no HamHome account required. AI features send relevant content to the provider you connect. WebDAV sync and file import/export are optional.
 
 ## Screenshots
 

@@ -1,35 +1,37 @@
-<p>
-  <img src="../logo.png" alt="HamHome" width="280" />
+<p align="center">
+  <a href="./README_zh.md">简体中文</a> · <a href="../README.md">English</a>
 </p>
+
+<div align="center">
+
+<img src="../logo.png" alt="HamHome" width="200" />
 
 # HamHome（仓鼠家）
 
-**AI 浏览器工作台：统一管理书签、标签页、工作空间，并内置 Agent 让你更容易的操作插件**
+### 用 AI 整理收藏、找回内容，随时接着上次的浏览继续工作
+
+[![Release](https://img.shields.io/github/v/release/bingoYB/ham_home?style=flat-square)](https://github.com/bingoYB/ham_home/releases)
+[![Stars](https://img.shields.io/github/stars/bingoYB/ham_home?style=flat-square)](https://github.com/bingoYB/ham_home/stargazers)
+[![Issues](https://img.shields.io/github/issues/bingoYB/ham_home?style=flat-square)](https://github.com/bingoYB/ham_home/issues)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](../LICENSE)
+
+**让收藏找得到，让工作接得上。**
 
 <p>
-  <img src="https://img.shields.io/github/v/release/bingoYB/ham_home?style=flat-square" alt="Release" />
-  <img src="https://img.shields.io/github/stars/bingoYB/ham_home?style=flat-square" alt="Stars" />
-  <img src="https://img.shields.io/github/forks/bingoYB/ham_home?style=flat-square" alt="Forks" />
-  <img src="https://img.shields.io/github/issues/bingoYB/ham_home?style=flat-square" alt="Issues" />
-  <img src="https://img.shields.io/badge/license-MIT-blue?style=flat-square" alt="License" />
+  <a href="https://bingoyb.github.io/ham_home/">产品介绍</a> · <a href="#下载">安装扩展</a> · <a href="./USAGE_zh.md">使用指南</a> · <a href="#功能特性">功能特性</a> · <a href="#开发">开发文档</a>
 </p>
 
-<p>
-  <a href="https://bingoyb.github.io/ham_home/">产品介绍</a> •
-  <a href="../README.md">English</a> •
-  <a href="./USAGE_zh.md">使用文档</a> •
-  <a href="./USAGE_en.md">Usage</a> •
-  <a href="#功能特性">功能特性</a> •
-  <a href="#开发">开发</a>
-</p>
+</div>
 
 ## 什么是 HamHome？
 
-HamHome（仓鼠家）是一款浏览器扩展，用来把日常浏览转成可整理、可搜索、可恢复的个人工作台。它把 AI 辅助收藏、书签管理、网页快照、能理解并操作插件的 Agent、可恢复的标签页工作空间，以及浏览器原生 Tab Group 自动分组整合在一起。
+HamHome 是一款 AI 浏览器工作台，将书签、网页快照和标签页工作空间放在一起，帮助你保存值得留住的内容，也保存下次继续工作的现场。
 
-默认情况下，书签、分类、设置、快照、向量索引、工作空间和规则保存在浏览器本地。你可以接入自己的 AI Provider 做分析和语义搜索，也可以通过 WebDAV、JSON/HTML 导入导出在设备之间迁移结构化数据。
+- **收藏时，少做整理**：保存网页后，用 AI 生成摘要、分类和标签，并保留快照供离线阅读。
+- **需要时，更容易找回**：用关键词或语义搜索查找收藏，也可以让内置 Agent 帮你搜索、总结已保存的内容。
+- **回来时，接着上次继续**：把一组标签页保存为工作空间，按需恢复；用分组规则整理正在浏览的页面。
 
-👉 **[查看产品介绍](https://bingoyb.github.io/ham_home/)** - 了解产品能力与下载方式。
+**本地优先，AI 自选。** 数据默认保存在浏览器本地，无需注册 HamHome 账号。AI 功能需连接你选择的服务，相关内容会发送给该服务处理；你也可以按需启用 WebDAV 同步或文件导入导出。
 
 ## 产品截图
 
