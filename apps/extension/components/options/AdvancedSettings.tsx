@@ -43,15 +43,6 @@ export function AdvancedSettings({
       <CollapsibleContent className="space-y-4">
         <div className="grid grid-cols-2 gap-4">
           <div className="space-y-2">
-            <Label htmlFor="maxTokens">{t("settings:settings.ai.maxTokens")}</Label>
-            <Input
-              id="maxTokens"
-              type="number"
-              value={aiConfig.maxTokens}
-              onChange={(e) => onUpdate({ maxTokens: parseInt(e.target.value) })}
-            />
-          </div>
-          <div className="space-y-2">
             <Label htmlFor="temperature">{t("settings:settings.ai.temperature")}</Label>
             <Input
               id="temperature"

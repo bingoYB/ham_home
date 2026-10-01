@@ -11,7 +11,6 @@ const DEFAULT_AI_CONFIG: AIConfig = {
   baseUrl: '',
   model: 'gpt-3.5-turbo',
   temperature: 0.3,
-  maxTokens: 1000,
   enableTranslation: false, // 默认关闭翻译
   enableSmartCategory: true, // 默认开启智能分类
   enableTagSuggestion: true, // 默认开启标签推荐

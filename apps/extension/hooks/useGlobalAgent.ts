@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   AgentProcessStep,
+  AgentToolApprovalRequest,
   AISearchStatus,
   ChatMessage,
   ChatSearchSessionSummary,
@@ -9,12 +10,15 @@ import type {
   Suggestion,
 } from "@/types";
 import { getBackgroundService } from "@/lib/services";
+import { useAgentTurnProgress } from "./useAgentTurnProgress";
 
 export interface UseGlobalAgentReturn {
   query: string;
   setQuery: (query: string) => void;
   messages: ChatMessage[];
+  /** Answer of the turn in progress; streams live while the turn runs */
   currentAnswer: string;
+  /** Process steps of the turn in progress; update live while the turn runs */
   currentSteps: AgentProcessStep[];
   status: AISearchStatus;
   error: string | null;
@@ -23,6 +27,12 @@ export interface UseGlobalAgentReturn {
   sessions: ChatSearchSessionSummary[];
   currentSessionId: string | null;
   isOpen: boolean;
+  /** High-risk tool call of the running turn waiting for the user's decision */
+  pendingApproval: AgentToolApprovalRequest | null;
+  isRespondingToApproval: boolean;
+  respondToApproval: (approved: boolean) => Promise<void>;
+  /** Stop the running turn; its message goes back into the input */
+  cancel: () => Promise<void>;
   open: () => void;
   close: () => void;
   submit: (textOverride?: string, sessionIdOverride?: string) => Promise<void>;
@@ -80,6 +90,10 @@ export function useGlobalAgent(): UseGlobalAgentReturn {
   const [sessions, setSessions] = useState<ChatSearchSessionSummary[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
+  const turnProgress = useAgentTurnProgress();
+  const { watchTurn, stopWatching, hasStreamedAnswer, cancelTurn } = turnProgress;
+  const cancelledRef = useRef(false);
+  const isTurnRunning = status === "thinking" || status === "searching";
 
   const loadSession = useCallback(async (sessionId?: string) => {
     const backgroundService = getBackgroundService();
@@ -129,6 +143,7 @@ export function useGlobalAgent(): UseGlobalAgentReturn {
       };
 
       setMessages((prev) => [...prev, userMessage]);
+      cancelledRef.current = false;
       setIsOpen(true);
       setStatus("thinking");
       setError(null);
@@ -140,10 +155,10 @@ export function useGlobalAgent(): UseGlobalAgentReturn {
         setStatus("searching");
         const backgroundService = getBackgroundService();
         const targetSessionId = overrideSessionId !== undefined ? overrideSessionId : currentSessionId;
-        const result = await backgroundService.globalAgentRunTurn(
-          input,
-          targetSessionId || undefined,
-        );
+        const turnId = watchTurn();
+        const result = await backgroundService
+          .globalAgentRunTurn(input, targetSessionId || undefined, turnId)
+          .finally(stopWatching);
 
         setCurrentSessionId(result.session.id);
         setSessions((prev) => {
@@ -158,7 +173,13 @@ export function useGlobalAgent(): UseGlobalAgentReturn {
         setCurrentSteps(result.steps);
 
         setStatus("writing");
-        await simulateStreamingOutput(result.response.answer, setCurrentAnswer);
+        // The streamed draft already showed the text; only animate answers
+        // that arrived without streaming.
+        if (hasStreamedAnswer()) {
+          setCurrentAnswer(result.response.answer);
+        } else {
+          await simulateStreamingOutput(result.response.answer, setCurrentAnswer);
+        }
 
         const assistantMessage: ChatMessage = {
           role: "assistant",
@@ -173,13 +194,26 @@ export function useGlobalAgent(): UseGlobalAgentReturn {
         setQuery("");
         setStatus("done");
       } catch (err) {
+        if (cancelledRef.current) {
+          // Nothing of a stopped turn is saved, so drop its message and let
+          // the user edit and resend it.
+          setMessages((prev) => prev.filter((message) => message !== userMessage));
+          setQuery(displayText);
+          setStatus("idle");
+          return;
+        }
         console.error("[useGlobalAgent] Turn failed:", err);
         setError(err instanceof Error ? err.message : "Agent failed");
         setStatus("error");
       }
     },
-    [currentSessionId],
+    [currentSessionId, watchTurn, stopWatching, hasStreamedAnswer],
   );
+
+  const cancel = useCallback(async () => {
+    cancelledRef.current = true;
+    await cancelTurn();
+  }, [cancelTurn]);
 
   const submit = useCallback(async (textOverride?: string, sessionIdOverride?: string) => {
     const textToSubmit = textOverride ?? query;
@@ -271,8 +305,8 @@ export function useGlobalAgent(): UseGlobalAgentReturn {
     query,
     setQuery,
     messages,
-    currentAnswer,
-    currentSteps,
+    currentAnswer: isTurnRunning ? turnProgress.draftAnswer : currentAnswer,
+    currentSteps: isTurnRunning ? turnProgress.steps : currentSteps,
     status,
     error,
     sources,
@@ -280,6 +314,10 @@ export function useGlobalAgent(): UseGlobalAgentReturn {
     sessions,
     currentSessionId,
     isOpen,
+    pendingApproval: turnProgress.pendingApproval,
+    isRespondingToApproval: turnProgress.isResponding,
+    respondToApproval: turnProgress.respond,
+    cancel,
     open: () => setIsOpen(true),
     close: () => setIsOpen(false),
     submit,

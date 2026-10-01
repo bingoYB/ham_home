@@ -5,7 +5,7 @@ import { syncConfigStorage } from "@/lib/sync/sync-config-storage";
 import { getExtensionURL } from "@/utils/browser-api";
 import type { ChatSearchSession } from "./chat-search-tools";
 import { createChatSearchTools } from "./chat-search-tools";
-import { sanitizeSafeSettingsUpdate } from "./safe-settings";
+import { constrainEmbeddingDimensions, sanitizeSafeSettingsUpdate } from "./safe-settings";
 import { createListHamHomeFeaturesTool } from "../skills/hamhome-feature-skill";
 import { createRuleManagementTools } from "./rule-management-tools";
 import { createBookmarkManagementTools } from "./bookmark-management-tools";
@@ -49,7 +49,6 @@ async function getSafeSettingsSnapshot() {
       provider: aiConfig.provider,
       model: aiConfig.model,
       temperature: aiConfig.temperature,
-      maxTokens: aiConfig.maxTokens,
       apiMode: aiConfig.apiMode,
       language: aiConfig.language,
       enableTranslation: aiConfig.enableTranslation,
@@ -169,7 +168,6 @@ export async function createGlobalAgentTools(
               provider: { type: "string" },
               model: { type: "string" },
               temperature: { type: "number", minimum: 0, maximum: 2 },
-              maxTokens: { type: "integer", minimum: 1, maximum: 8000 },
               apiMode: { type: "string", enum: ["chat", "responses"] },
               language: { type: "string", enum: ["zh", "en"] },
               enableTranslation: { type: "boolean" },
@@ -205,7 +203,10 @@ export async function createGlobalAgentTools(
       },
       metadata: { readOnly: false, riskLevel: "medium" },
       async execute(input) {
-        const sanitized = sanitizeSafeSettingsUpdate(input);
+        const sanitized = constrainEmbeddingDimensions(
+          sanitizeSafeSettingsUpdate(input),
+          await configStorage.getEmbeddingConfig(),
+        );
 
         const [settings, aiConfig, embeddingConfig, webdavConfig] = await Promise.all([
           hasPatch(sanitized.settings as Record<string, unknown>)
@@ -240,7 +241,6 @@ export async function createGlobalAgentTools(
               provider: aiConfig.provider,
               model: aiConfig.model,
               temperature: aiConfig.temperature,
-              maxTokens: aiConfig.maxTokens,
               apiMode: aiConfig.apiMode,
               language: aiConfig.language,
               enableTranslation: aiConfig.enableTranslation,

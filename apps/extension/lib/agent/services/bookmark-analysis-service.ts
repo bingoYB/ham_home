@@ -1,3 +1,4 @@
+import type { AgentCommand } from "@hamhome/agent";
 import { getFavicon } from "@hamhome/utils";
 import type {
   AnalysisResult,
@@ -10,6 +11,7 @@ import {
   buildBookmarkAnalysisPrompt,
   buildBookmarkAnalysisSystemPrompt,
   type BookmarkAnalysisOutput,
+  type BookmarkAnalysisPromptInput,
 } from "../prompts";
 import {
   createAIRecommendedCategory,
@@ -17,8 +19,18 @@ import {
 } from "../category-utils";
 import { getAgentErrorMessage } from "../errors";
 import { fetchPageContentForAI } from "../fetch-page-content";
-import { assertAgentConfigured, resolveAgentConfig } from "../factory";
-import { runExtensionCommand } from "../command-runner";
+import { createExtensionAgent } from "../factory";
+
+const analyzeBookmarkCommand: AgentCommand<
+  BookmarkAnalysisPromptInput,
+  BookmarkAnalysisOutput
+> = {
+  name: "analyzeBookmark",
+  description: "Analyze a web page and return bookmark metadata.",
+  outputSchema: bookmarkAnalysisOutputSchema,
+  maxIterations: 1,
+  prompt: buildBookmarkAnalysisPrompt,
+};
 
 export interface EnhancedAnalyzeInput {
   pageContent: PageContent;
@@ -35,29 +47,23 @@ export interface BookmarkAnalysisApplyResult {
 
 class BookmarkAnalysisService {
   async analyzeBookmark(input: EnhancedAnalyzeInput): Promise<AnalysisResult> {
-    const config = await resolveAgentConfig();
-    assertAgentConfigured(config.rawConfig);
+    const { agent, config } = await createExtensionAgent();
 
     try {
-      const result = await runExtensionCommand<Record<string, never>, BookmarkAnalysisOutput>({
-        config,
-        temperature: config.temperature ?? 0.2,
-        maxIterations: 1,
-        systemPrompt: buildBookmarkAnalysisSystemPrompt(config.language),
-        command: {
-          name: "analyzeBookmark",
-          description: "Analyze a web page and return bookmark metadata.",
-          outputSchema: bookmarkAnalysisOutputSchema,
-          prompt: buildBookmarkAnalysisPrompt({
-            language: config.language,
-            pageContent: input.pageContent,
-            userCategories: input.userCategories,
-            existingTags: input.existingTags,
-            presetTags: config.rawConfig.presetTags,
-          }),
+      const result = await agent.commands.run(
+        analyzeBookmarkCommand,
+        {
+          language: config.language,
+          pageContent: input.pageContent,
+          userCategories: input.userCategories,
+          existingTags: input.existingTags,
+          presetTags: config.rawConfig.presetTags,
         },
-        input: {},
-      });
+        {
+          systemPrompt: buildBookmarkAnalysisSystemPrompt(config.language),
+          temperature: config.temperature ?? 0.2,
+        },
+      );
 
       const output = bookmarkAnalysisResultSchema.parse(result.output);
 

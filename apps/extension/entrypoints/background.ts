@@ -26,7 +26,6 @@ import type {
   SaveFlowSource,
   TabGroupPageMetadata,
 } from "@/types";
-import { initApiModePersistence } from "@/lib/agent/api-mode-persistence";
 import { applyDevConfigPreset } from "@/lib/dev/dev-config-preset";
 
 // 右键菜单 ID
@@ -406,9 +405,6 @@ export default defineBackground(() => {
 
   // 注册 proxy service（必须在最顶部同步执行）
   registerBackgroundService();
-
-  // 初始化 OpenAI API 模式缓存持久化
-  initApiModePersistence();
 
   // 开发态：把 .env.local 里的 AI / Embedding / 同步配置写入存储（生产构建会被移除）
   void applyDevConfigPreset();

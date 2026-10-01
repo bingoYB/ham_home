@@ -1,5 +1,5 @@
-import type { AiSdkProviderName } from "@hamhome/agent";
-import type { AIProvider } from "@/types";
+import { supportsEmbeddingDimensions, type AiSdkProviderName } from "@hamhome/agent";
+import type { AIProvider, EmbeddingConfig } from "@/types";
 
 export interface ProviderConfig {
   baseUrl: string;
@@ -13,6 +13,35 @@ export interface EmbeddingProviderConfig {
   supportsEmbedding: boolean;
 }
 
+export interface EmbeddingDimensionSpec {
+  /** Native output size, used when `dimensions` is unset */
+  defaultDimensions: number;
+  /** Other output sizes the model accepts, largest first */
+  options: number[];
+}
+
+/**
+ * Embedding models known to accept a custom output size. Matching by model id
+ * also covers gateways that proxy them through custom/OpenAI-compatible endpoints.
+ */
+const EMBEDDING_DIMENSION_RULES: Array<EmbeddingDimensionSpec & { pattern: RegExp }> = [
+  // OpenAI (also Azure deployments named after the model)
+  { pattern: /text-embedding-3-large/i, defaultDimensions: 3072, options: [2048, 1536, 1024, 768, 512, 256] },
+  { pattern: /text-embedding-3-small/i, defaultDimensions: 1536, options: [1024, 768, 512, 256] },
+  // Google
+  { pattern: /gemini-embedding-001/i, defaultDimensions: 3072, options: [1536, 768] },
+  { pattern: /text-embedding-004/i, defaultDimensions: 768, options: [512, 256, 128] },
+  // Zhipu
+  { pattern: /(^|\/)embedding-3$/i, defaultDimensions: 2048, options: [1024, 512, 256] },
+  // Qwen3 embedding (e.g. SiliconFlow)
+  { pattern: /qwen3-embedding-8b/i, defaultDimensions: 4096, options: [2048, 1024, 768, 512, 256, 128, 64] },
+  { pattern: /qwen3-embedding-4b/i, defaultDimensions: 2560, options: [2048, 1024, 768, 512, 256, 128, 64] },
+  { pattern: /qwen3-embedding-0\.6b/i, defaultDimensions: 1024, options: [768, 512, 256, 128, 64] },
+  // Alibaba DashScope (OpenAI-compatible mode)
+  { pattern: /(^|\/)text-embedding-v4$/i, defaultDimensions: 1024, options: [2048, 1536, 768, 512, 256, 128, 64] },
+  { pattern: /(^|\/)text-embedding-v3$/i, defaultDimensions: 1024, options: [768, 512, 256, 128, 64] },
+];
+
 export const PROVIDER_DEFAULTS: Record<AIProvider, ProviderConfig> = {
   openai: {
     baseUrl: "https://api.openai.com/v1",
@@ -20,7 +49,7 @@ export const PROVIDER_DEFAULTS: Record<AIProvider, ProviderConfig> = {
     requiresApiKey: true,
   },
   anthropic: {
-    baseUrl: "https://api.anthropic.com",
+    baseUrl: "https://api.anthropic.com/v1",
     models: [
       "claude-3-5-haiku-latest",
       "claude-3-5-sonnet-latest",
@@ -124,7 +153,7 @@ export const EMBEDDING_PROVIDER_DEFAULTS: Record<
     supportsEmbedding: true,
   },
   anthropic: {
-    baseUrl: "https://api.anthropic.com",
+    baseUrl: "https://api.anthropic.com/v1",
     defaultModel: "",
     supportsEmbedding: false,
   },
@@ -235,6 +264,27 @@ export function getDefaultBaseUrl(provider: AIProvider): string {
 }
 
 /**
+ * Normalize a configured base URL into the form the AI SDK provider expects.
+ * The Anthropic provider appends `/messages` directly, so its base URL must end
+ * with `/v1`; older configs stored the bare host `https://api.anthropic.com`.
+ */
+export function normalizeProviderBaseUrl(
+  provider: AIProvider,
+  baseUrl?: string,
+): string | undefined {
+  const trimmed = baseUrl?.trim().replace(/\/+$/, "");
+  if (!trimmed) {
+    return undefined;
+  }
+
+  if (provider === "anthropic" && !trimmed.endsWith("/v1")) {
+    return `${trimmed}/v1`;
+  }
+
+  return trimmed;
+}
+
+/**
  * 判断 provider 是否需要 API Key。
  */
 export function requiresApiKey(provider: AIProvider): boolean {
@@ -256,7 +306,59 @@ export function getDefaultEmbeddingModel(provider: AIProvider): string {
 }
 
 /**
- * 生成向量索引使用的模型标识。
+ * Output sizes the embedding model accepts, or null when its size is fixed or
+ * the provider cannot forward `dimensions`.
+ *
+ * Example:
+ * ```ts
+ * getEmbeddingDimensionSpec("openai", "text-embedding-3-small"); // { defaultDimensions: 1536, ... }
+ * getEmbeddingDimensionSpec("siliconflow", "BAAI/bge-m3"); // null
+ * ```
+ */
+export function getEmbeddingDimensionSpec(
+  provider: AIProvider,
+  model?: string,
+): EmbeddingDimensionSpec | null {
+  if (!isEmbeddingSupported(provider) || !supportsEmbeddingDimensions(resolveAgentProvider(provider))) {
+    return null;
+  }
+
+  const modelId = model?.trim() || getDefaultEmbeddingModel(provider);
+  const rule = EMBEDDING_DIMENSION_RULES.find((item) => item.pattern.test(modelId));
+  return rule ? { defaultDimensions: rule.defaultDimensions, options: rule.options } : null;
+}
+
+/**
+ * The configured output size when the model accepts it. Undefined means the
+ * model's native size; unsupported or native values resolve to undefined.
+ */
+export function resolveEmbeddingDimensions(config: {
+  provider: AIProvider;
+  model?: string;
+  dimensions?: number;
+}): number | undefined {
+  const spec = getEmbeddingDimensionSpec(config.provider, config.model);
+  return spec && config.dimensions && spec.options.includes(config.dimensions)
+    ? config.dimensions
+    : undefined;
+}
+
+/**
+ * Drop `dimensions` from an update when the resulting model cannot use it,
+ * e.g. after switching to a fixed-size model.
+ */
+export function withValidEmbeddingDimensions(
+  current: EmbeddingConfig,
+  updates: Partial<EmbeddingConfig>,
+): Partial<EmbeddingConfig> {
+  const next = { ...current, ...updates };
+  return resolveEmbeddingDimensions(next) === next.dimensions
+    ? updates
+    : { ...updates, dimensions: undefined };
+}
+
+/**
+ * 生成向量索引使用的模型标识（只包含实际生效的维度）。
  */
 export function getEmbeddingModelKey(config: {
   provider: AIProvider;
@@ -264,11 +366,8 @@ export function getEmbeddingModelKey(config: {
   dimensions?: number;
 }): string {
   const model = config.model || getDefaultEmbeddingModel(config.provider);
-  return [
-    config.provider,
-    model,
-    config.dimensions ? `dim${config.dimensions}` : null,
-  ]
+  const dimensions = resolveEmbeddingDimensions(config);
+  return [config.provider, model, dimensions ? `dim${dimensions}` : null]
     .filter(Boolean)
     .join(":");
 }

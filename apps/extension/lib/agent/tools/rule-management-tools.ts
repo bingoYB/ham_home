@@ -146,7 +146,7 @@ export function createRuleManagementTools(): AgentTool[] {
         required: ["id"],
         additionalProperties: false,
       },
-      metadata: { readOnly: false, riskLevel: "medium" },
+      metadata: { readOnly: false, riskLevel: "high" },
       async execute(input: { id: string }) {
         await configStorage.deleteCustomFilter(input.id);
         return { success: true, deletedId: input.id };
@@ -280,7 +280,7 @@ export function createRuleManagementTools(): AgentTool[] {
         required: ["id"],
         additionalProperties: false,
       },
-      metadata: { readOnly: false, riskLevel: "medium" },
+      metadata: { readOnly: false, riskLevel: "high" },
       async execute(input: { id: string }) {
         await tabGroupRulesStorage.deleteRule(input.id);
         return { success: true, deletedId: input.id };

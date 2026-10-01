@@ -5,7 +5,7 @@ const mocks = vi.hoisted(() => ({
   getAutoGroupSettings: vi.fn(),
   getAIGroupCache: vi.fn(),
   setAIGroupCache: vi.fn(),
-  runExtensionCommand: vi.fn(),
+  runCommand: vi.fn(),
 }));
 
 vi.mock("@/lib/storage/tab-group-rules-storage", () => ({
@@ -22,16 +22,20 @@ vi.mock("@/lib/privacy/privacy-detector", () => ({
 }));
 
 vi.mock("@/lib/agent/factory", () => ({
-  resolveAgentConfig: vi.fn(async () => ({
-    language: "zh",
-    rawConfig: { enabled: true, apiKey: "test-key", model: "test-model" },
+  createExtensionAgent: vi.fn(async () => ({
+    agent: { commands: { run: mocks.runCommand } },
+    config: {
+      language: "zh",
+      rawConfig: { enabled: true, apiKey: "test-key", model: "test-model" },
+    },
   })),
-  assertAgentConfigured: vi.fn(),
 }));
 
-vi.mock("@/lib/agent/command-runner", () => ({
-  runExtensionCommand: mocks.runExtensionCommand,
-}));
+/** Render the prompt of the first AI command run, as the SDK would. */
+function getFirstCommandPrompt(): string {
+  const [command, input] = mocks.runCommand.mock.calls[0] ?? [];
+  return command.prompt(input, {});
+}
 
 describe("TabGroupRuleService auto grouping", () => {
   beforeEach(() => {
@@ -115,7 +119,7 @@ describe("TabGroupRuleService auto grouping", () => {
     }).chrome;
 
     expect(grouped).toBe(true);
-    expect(mocks.runExtensionCommand).not.toHaveBeenCalled();
+    expect(mocks.runCommand).not.toHaveBeenCalled();
     expect(chromeMock.tabs.group).toHaveBeenCalledWith({ tabIds: 12 });
     expect(chromeMock.tabGroups.update).toHaveBeenCalledWith(
       100,
@@ -153,7 +157,7 @@ describe("TabGroupRuleService auto grouping", () => {
     }).chrome;
 
     expect(grouped).toBe(true);
-    expect(mocks.runExtensionCommand).not.toHaveBeenCalled();
+    expect(mocks.runCommand).not.toHaveBeenCalled();
     expect(chromeMock.tabs.group).toHaveBeenCalledWith({ tabIds: 12 });
     expect(chromeMock.tabGroups.update).toHaveBeenCalledWith(
       100,
@@ -251,7 +255,7 @@ describe("TabGroupRuleService auto grouping", () => {
       aiAutoGroupInstructions: "",
       domainAutoGroupEnabled: true,
     });
-    mocks.runExtensionCommand.mockResolvedValue({
+    mocks.runCommand.mockResolvedValue({
       output: {
         groupTitle: "AI 分组",
       },
@@ -273,7 +277,7 @@ describe("TabGroupRuleService auto grouping", () => {
       };
     }).chrome;
 
-    expect(mocks.runExtensionCommand).toHaveBeenCalled();
+    expect(mocks.runCommand).toHaveBeenCalled();
     expect(chromeMock.tabGroups.update).toHaveBeenCalledWith(
       100,
       expect.objectContaining({
@@ -283,7 +287,7 @@ describe("TabGroupRuleService auto grouping", () => {
   });
 
   it("reuses an existing group when AI returns an existing group title", async () => {
-    mocks.runExtensionCommand.mockResolvedValue({
+    mocks.runCommand.mockResolvedValue({
       output: {
         groupTitle: "工作",
       },
@@ -322,7 +326,7 @@ describe("TabGroupRuleService auto grouping", () => {
   });
 
   it("reuses an existing group when AI explicitly chooses a matching group", async () => {
-    mocks.runExtensionCommand.mockResolvedValue({
+    mocks.runCommand.mockResolvedValue({
       output: {
         groupTitle: "工作",
       },
@@ -392,7 +396,7 @@ describe("TabGroupRuleService auto grouping", () => {
 
     expect(grouped).toBe(true);
     expect(mocks.getAIGroupCache).toHaveBeenCalledWith("domain:docs.example");
-    expect(mocks.runExtensionCommand).not.toHaveBeenCalled();
+    expect(mocks.runCommand).not.toHaveBeenCalled();
     expect(mocks.setAIGroupCache).not.toHaveBeenCalled();
     expect(chromeMock.tabs.group).toHaveBeenCalledWith({ tabIds: 12, groupId: 7 });
     expect(chromeMock.tabGroups.update).toHaveBeenCalledWith(
@@ -406,7 +410,7 @@ describe("TabGroupRuleService auto grouping", () => {
   });
 
   it("includes page metadata in the AI grouping prompt", async () => {
-    mocks.runExtensionCommand.mockResolvedValue({
+    mocks.runCommand.mockResolvedValue({
       output: {
         groupTitle: "烹饪",
       },
@@ -439,8 +443,8 @@ describe("TabGroupRuleService auto grouping", () => {
       },
     );
 
-    const prompt = mocks.runExtensionCommand.mock.calls[0]?.[0]?.command.prompt;
-    const outputSchema = mocks.runExtensionCommand.mock.calls[0]?.[0]?.command.outputSchema;
+    const prompt = getFirstCommandPrompt();
+    const outputSchema = mocks.runCommand.mock.calls[0]?.[0]?.outputSchema;
 
     expect(prompt).toContain("页面元数据:");
     expect(prompt).toContain("页面标题: 番茄浓汤食谱 - 家常菜谱");
@@ -459,7 +463,7 @@ describe("TabGroupRuleService auto grouping", () => {
       aiAutoGroupInstructions: customInstructions,
       domainAutoGroupEnabled: false,
     });
-    mocks.runExtensionCommand.mockResolvedValue({
+    mocks.runCommand.mockResolvedValue({
       output: {
         groupTitle: "项目",
       },
@@ -478,7 +482,7 @@ describe("TabGroupRuleService auto grouping", () => {
       },
     );
 
-    const prompt = mocks.runExtensionCommand.mock.calls[0]?.[0]?.command.prompt;
+    const prompt = getFirstCommandPrompt();
     const cacheKey =
       `domain:docs.example::instructions=${encodeURIComponent(customInstructions)}`;
 
@@ -495,7 +499,7 @@ describe("TabGroupRuleService auto grouping", () => {
 
   it("only asks AI for a group title and chooses new group color locally", async () => {
     const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0.42);
-    mocks.runExtensionCommand.mockResolvedValue({
+    mocks.runCommand.mockResolvedValue({
       output: {
         groupTitle: "烹饪",
       },
@@ -514,8 +518,8 @@ describe("TabGroupRuleService auto grouping", () => {
       },
     );
 
-    const prompt = mocks.runExtensionCommand.mock.calls[0]?.[0]?.command.prompt;
-    const outputSchema = mocks.runExtensionCommand.mock.calls[0]?.[0]?.command.outputSchema;
+    const prompt = getFirstCommandPrompt();
+    const outputSchema = mocks.runCommand.mock.calls[0]?.[0]?.outputSchema;
     const chromeMock = (globalThis as typeof globalThis & {
       chrome: {
         tabs: { group: ReturnType<typeof vi.fn> };
@@ -552,7 +556,7 @@ describe("TabGroupRuleService auto grouping", () => {
   });
 
   it("instructs AI to keep group titles short", async () => {
-    mocks.runExtensionCommand.mockResolvedValue({
+    mocks.runCommand.mockResolvedValue({
       output: {
         groupTitle: "烹饪",
       },
@@ -571,7 +575,7 @@ describe("TabGroupRuleService auto grouping", () => {
       },
     );
 
-    const systemPrompt = mocks.runExtensionCommand.mock.calls[0]?.[0]?.systemPrompt;
+    const systemPrompt = mocks.runCommand.mock.calls[0]?.[2]?.systemPrompt;
 
     expect(systemPrompt).toContain("中文不超过 5 个字");
     expect(systemPrompt).toContain("英文不超过 2 个单词");
@@ -579,7 +583,7 @@ describe("TabGroupRuleService auto grouping", () => {
 
   it("trims overlong AI group titles before grouping and caching", async () => {
     const randomSpy = vi.spyOn(Math, "random").mockReturnValue(0.42);
-    mocks.runExtensionCommand.mockResolvedValueOnce({
+    mocks.runCommand.mockResolvedValueOnce({
       output: {
         groupTitle: "番茄浓汤菜谱",
       },
@@ -597,7 +601,7 @@ describe("TabGroupRuleService auto grouping", () => {
       },
     );
 
-    mocks.runExtensionCommand.mockResolvedValueOnce({
+    mocks.runCommand.mockResolvedValueOnce({
       output: {
         groupTitle: "Machine Learning Research",
       },
@@ -650,7 +654,7 @@ describe("TabGroupRuleService auto grouping", () => {
   });
 
   it("includes existing group members and ungrouped tabs in the prompt", async () => {
-    mocks.runExtensionCommand.mockResolvedValue({ output: { groupTitle: "工作" } });
+    mocks.runCommand.mockResolvedValue({ output: { groupTitle: "工作" } });
 
     const { tabGroupRuleService } = await import("../tab-group-rule-service");
 
@@ -662,7 +666,7 @@ describe("TabGroupRuleService auto grouping", () => {
       { allowAI: true },
     );
 
-    const prompt = mocks.runExtensionCommand.mock.calls[0]?.[0]?.command.prompt;
+    const prompt = getFirstCommandPrompt();
 
     // 分组成员摘要：让 AI 知道「工作」组里实际装的是什么
     expect(prompt).toContain("需求文档");
@@ -677,7 +681,7 @@ describe("TabGroupRuleService auto grouping", () => {
   });
 
   it("stores a first-time AI suggestion as pending with its path signature", async () => {
-    mocks.runExtensionCommand.mockResolvedValue({ output: { groupTitle: "开发" } });
+    mocks.runCommand.mockResolvedValue({ output: { groupTitle: "开发" } });
 
     const { tabGroupRuleService } = await import("../tab-group-rule-service");
 
@@ -710,7 +714,7 @@ describe("TabGroupRuleService auto grouping", () => {
       samplePath: "sponsors",
       agreeCount: 1,
     });
-    mocks.runExtensionCommand.mockResolvedValue({ output: { groupTitle: "开发" } });
+    mocks.runCommand.mockResolvedValue({ output: { groupTitle: "开发" } });
 
     const { tabGroupRuleService } = await import("../tab-group-rule-service");
 
@@ -723,7 +727,7 @@ describe("TabGroupRuleService auto grouping", () => {
     );
 
     // 跨栏目必须重新询问 AI，而不是沿用单页样本得出的结论
-    expect(mocks.runExtensionCommand).toHaveBeenCalled();
+    expect(mocks.runCommand).toHaveBeenCalled();
   });
 
   it("marks a domain as multiPurpose when a new page contradicts the cached conclusion", async () => {
@@ -736,7 +740,7 @@ describe("TabGroupRuleService auto grouping", () => {
       samplePath: "sponsors",
       agreeCount: 1,
     });
-    mocks.runExtensionCommand.mockResolvedValue({ output: { groupTitle: "开发" } });
+    mocks.runCommand.mockResolvedValue({ output: { groupTitle: "开发" } });
 
     const { tabGroupRuleService } = await import("../tab-group-rule-service");
 
@@ -764,7 +768,7 @@ describe("TabGroupRuleService auto grouping", () => {
       samplePath: "guide",
       agreeCount: 1,
     });
-    mocks.runExtensionCommand.mockResolvedValue({ output: { groupTitle: "文档" } });
+    mocks.runCommand.mockResolvedValue({ output: { groupTitle: "文档" } });
 
     const { tabGroupRuleService } = await import("../tab-group-rule-service");
 
@@ -796,7 +800,7 @@ describe("TabGroupRuleService auto grouping", () => {
       samplePath: "acme",
       agreeCount: 1,
     });
-    mocks.runExtensionCommand.mockResolvedValue({ output: { groupTitle: "赞助" } });
+    mocks.runCommand.mockResolvedValue({ output: { groupTitle: "赞助" } });
 
     const { tabGroupRuleService } = await import("../tab-group-rule-service");
 
@@ -808,7 +812,7 @@ describe("TabGroupRuleService auto grouping", () => {
       { allowAI: true },
     );
 
-    expect(mocks.runExtensionCommand).toHaveBeenCalled();
+    expect(mocks.runCommand).toHaveBeenCalled();
     // multiPurpose 是终态，不应被后续结论覆盖
     expect(mocks.setAIGroupCache).toHaveBeenCalledWith(
       "domain:github.com",

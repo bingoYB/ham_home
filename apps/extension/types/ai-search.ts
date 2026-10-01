@@ -84,6 +84,47 @@ export interface AgentProcessStep {
 }
 
 /**
+ * A high-risk agent tool call waiting for the user's approval.
+ *
+ * Example:
+ * ```ts
+ * const request: AgentToolApprovalRequest = {
+ *   id: 'approval_1',
+ *   toolName: 'delete_bookmark',
+ *   title: '删除书签',
+ *   target: 'React 性能优化',
+ *   expiresAt: Date.now() + 120_000,
+ * };
+ * ```
+ */
+export interface AgentToolApprovalRequest {
+  /** Approval id, sent back with the user's decision */
+  id: string;
+  /** Tool waiting for approval */
+  toolName: string;
+  /** Localized action, e.g. "删除书签" */
+  title: string;
+  /** Readable target of the action, e.g. the bookmark title */
+  target?: string;
+  /** Consequences worth knowing before approving */
+  detail?: string;
+  /** Epoch ms after which the call is rejected automatically */
+  expiresAt: number;
+}
+
+/**
+ * Live state of a running agent turn, polled by the UI.
+ */
+export interface AgentTurnProgress {
+  /** Process steps so far; tool steps still running have status "running" */
+  steps: AgentProcessStep[];
+  /** Answer text streamed by the current model step; restarts with each step */
+  draftAnswer: string;
+  /** High-risk tool call waiting for the user's decision */
+  pendingApproval: AgentToolApprovalRequest | null;
+}
+
+/**
  * 引用源（关联的书签）
  */
 export interface Source {

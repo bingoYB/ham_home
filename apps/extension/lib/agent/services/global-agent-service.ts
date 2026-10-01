@@ -1,7 +1,13 @@
-import { InMemory, type AgentEvent } from "@hamhome/agent";
-import { createLogger } from "@hamhome/utils";
+import {
+  InMemory,
+  TokenBudgetContextBuilder,
+  type AgentMessage,
+  type AgentRunResult,
+} from "@hamhome/agent";
+import { createLogger, generateId } from "@hamhome/utils";
 import type {
   AgentProcessStep,
+  AgentTurnProgress,
   ChatSearchResponse,
   ChatSearchSessionSnapshot,
   ChatSearchSessionSummary,
@@ -26,8 +32,28 @@ import {
   AgentSessionStore,
   createInitialChatSearchState,
 } from "./chat-search-session-store";
+import { createTurnProgressTracker } from "./turn-progress";
+import {
+  ToolApprovalBroker,
+  createToolApprovalPolicy,
+} from "./tool-approval-service";
 
 const logger = createLogger({ namespace: "GlobalAgentService" });
+
+/**
+ * History budget per model call. Earlier turns beyond it are summarized; it
+ * leaves room for the system prompt and tool definitions in a 32k context.
+ */
+const GLOBAL_AGENT_CONTEXT_WINDOW = {
+  maxTokens: 16_000,
+  maxToolResultTokens: 4_000,
+  summarize: true,
+};
+
+interface ActiveTurn {
+  progress: ReturnType<typeof createTurnProgressTracker>;
+  controller: AbortController;
+}
 
 export interface GlobalAgentTurnResult {
   session: ChatSearchSessionSnapshot;
@@ -111,156 +137,6 @@ function buildSourceList(
   });
 }
 
-function safeJsonSummary(value: unknown, maxLength = 600): string {
-  const seen = new WeakSet<object>();
-  try {
-    const redacted = JSON.stringify(
-      value,
-      (key, rawValue) => {
-        if (
-          ["apiKey", "baseUrl", "password", "username", "privacyDomains"].includes(
-            key,
-          )
-        ) {
-          return "[redacted]";
-        }
-        if (typeof rawValue === "object" && rawValue !== null) {
-          if (seen.has(rawValue)) {
-            return "[circular]";
-          }
-          seen.add(rawValue);
-        }
-        return rawValue;
-      },
-      2,
-    );
-
-    return (redacted || String(value)).slice(0, maxLength);
-  } catch {
-    return String(value).slice(0, maxLength);
-  }
-}
-
-function getFriendlyIterationName(iteration: number, language: "zh" | "en") {
-  return language === "zh" ? `思考与分析 (第 ${iteration} 轮)` : `Thinking & Planning (Round ${iteration})`;
-}
-
-function getFriendlyToolName(toolName: string, language: "zh" | "en") {
-  const map: Record<string, Record<"zh" | "en", string>> = {
-    "update_safe_plugin_settings": { zh: "更新插件配置", en: "Update plugin settings" },
-    "get_safe_plugin_settings": { zh: "读取插件配置", en: "Read plugin settings" },
-    "search_bookmarks": { zh: "检索书签数据", en: "Search bookmarks" },
-    "get_hamhome_feature_detail": { zh: "查阅功能文档", en: "Read feature docs" },
-    "skill_view": { zh: "调用功能助手", en: "Call feature assistant" },
-    "open_extension_view": { zh: "打开功能页面", en: "Open extension page" },
-    "get_system_stats": { zh: "读取系统状态", en: "Read system stats" },
-  };
-  return map[toolName]?.[language] || toolName;
-}
-
-function createProcessStepRecorder(language: "zh" | "en") {
-  const steps: AgentProcessStep[] = [];
-  const runningToolIds = new Map<string, string[]>();
-
-  const addStep = (
-    step: Omit<AgentProcessStep, "id" | "timestamp">,
-  ): AgentProcessStep => {
-    const nextStep: AgentProcessStep = {
-      ...step,
-      id: `step_${steps.length + 1}`,
-      timestamp: Date.now(),
-    };
-    steps.push(nextStep);
-    return nextStep;
-  };
-
-  const completeToolStep = (
-    toolName: string,
-    update: Partial<AgentProcessStep>,
-  ) => {
-    const ids = runningToolIds.get(toolName) || [];
-    const stepId = ids.shift();
-    if (!stepId) {
-      addStep({
-        type: "tool",
-        title: getFriendlyToolName(toolName, language),
-        toolName,
-        status: update.status || "completed",
-        ...update,
-      });
-      return;
-    }
-
-    const step = steps.find((item) => item.id === stepId);
-    if (step) {
-      Object.assign(step, update);
-    }
-    runningToolIds.set(toolName, ids);
-  };
-
-  const record = (event: AgentEvent) => {
-    if (event.type === "agent.iteration.started") {
-      addStep({
-        type: "iteration",
-        title: getFriendlyIterationName(event.iteration, language),
-        status: "completed",
-      });
-      return;
-    }
-
-    if (event.type === "skill.mounted") {
-      addStep({
-        type: "skill",
-        title: event.skillId,
-        content: event.reason,
-        status: "completed",
-      });
-      return;
-    }
-
-    if (event.type === "tool.call.started") {
-      const step = addStep({
-        type: "tool",
-        title: getFriendlyToolName(event.toolName, language),
-        toolName: event.toolName,
-        input: safeJsonSummary(event.input, 280),
-        status: "running",
-      });
-      runningToolIds.set(event.toolName, [
-        ...(runningToolIds.get(event.toolName) || []),
-        step.id,
-      ]);
-      return;
-    }
-
-    if (event.type === "tool.call.completed") {
-      completeToolStep(event.toolName, {
-        status: "completed",
-        output: safeJsonSummary(event.output),
-      });
-      return;
-    }
-
-    if (event.type === "tool.call.failed") {
-      completeToolStep(event.toolName, {
-        status: "failed",
-        error: event.error.message,
-      });
-    }
-  };
-
-  const finish = () => {
-    for (const step of steps) {
-      if (step.status === "running") {
-        step.status = "completed";
-      }
-    }
-    return steps;
-  };
-
-  return { record, finish };
-}
-
 function buildDefaultSuggestions(language: "zh" | "en"): Suggestion[] {
   return language === "zh"
     ? [
@@ -275,14 +151,25 @@ function buildDefaultSuggestions(language: "zh" | "en"): Suggestion[] {
       ];
 }
 
+/**
+ * Tool-call steps and tool results of a turn: everything between its user
+ * message and its final answer.
+ */
+function getTurnTranscript(turnMessages: AgentMessage[]): AgentMessage[] {
+  const steps = turnMessages.slice(1);
+  return steps.at(-1)?.role === "assistant" ? steps.slice(0, -1) : steps;
+}
+
 function buildNextState(
   state: ConversationalSearchSession,
   session: ChatSearchSession,
   displayText: string,
   answer: string,
   sourceIds: string[],
+  pinnedSkillIds: string[],
 ): ConversationalSearchSession {
   return {
+    pinnedSkillIds,
     filters: session.workingFilters,
     seenBookmarkIds: [...new Set([...state.seenBookmarkIds, ...sourceIds])],
     lastSelectedBookmarkIds: sourceIds,
@@ -303,6 +190,7 @@ function buildSystemPrompt(language: "zh" | "en"): string {
       "职责：回答插件功能问题、按需读取功能详情、搜索和总结书签、查询本地数据、打开插件页面，并在安全白名单内修改配置。",
       "工作方式：先判断用户目标，必要时调用工具收集事实；涉及插件功能时优先使用 skill_view 或 get_hamhome_feature_detail；涉及书签问题时调用搜索/统计工具；涉及配置时先读取当前安全配置，再调用 update_safe_plugin_settings。",
       "安全规则：绝不代填或输出 API Key、同步凭据等敏感信息；遇到这些请求时解释原因，并可调用 open_extension_view 打开设置页引导用户手动处理。",
+      "确认规则：删除书签、分类、自定义筛选器或分组规则时，界面会请求用户确认；如果被拒绝或超时，不要重试，直接告诉用户操作已取消。",
       "回答要求：简洁、直接、基于工具结果；已经执行的配置或打开页面要明确告知；如果信息不足，说明下一步。",
     ].join("\n");
   }
@@ -312,6 +200,7 @@ function buildSystemPrompt(language: "zh" | "en"): string {
     "Responsibilities: explain extension features, read feature details when needed, search and summarize bookmarks, inspect local data, open extension pages, and update allowlisted safe settings.",
     "Workflow: identify the user's goal, call tools for grounded facts, use skill_view or get_hamhome_feature_detail for feature questions, use search/stat tools for bookmark questions, and read safe settings before using update_safe_plugin_settings for configuration requests.",
     "Safety: never fill, reveal, or update API keys, base URLs, privacy domains, sync credentials, or browser shortcuts. When encountering requests for these sensitive settings, explain why you cannot change them and use open_extension_view to open the settings page so the user can configure them manually.",
+    "Confirmation: deleting bookmarks, categories, custom filters, or tab group rules asks the user to confirm in the UI. If it is rejected or times out, do not retry; tell the user the action was cancelled.",
     "Answer concisely from tool results. State what was changed or opened. Ask for the next step only when required.",
   ].join("\n");
 }
@@ -320,8 +209,14 @@ function buildSystemPrompt(language: "zh" | "en"): string {
  * 全局插件 Agent 服务，负责多轮会话、skill/tool 编排和过程步骤记录。
  */
 export class GlobalAgentService {
+  private readonly activeTurns = new Map<string, ActiveTurn>();
+
   constructor(
     private readonly sessionStore = new AgentSessionStore(),
+    private readonly approvals = new ToolApprovalBroker(),
+    // Shared by every turn, so summaries of earlier history are reused while
+    // the service worker is alive instead of being recomputed each turn.
+    private readonly contextBuilder = new TokenBudgetContextBuilder(GLOBAL_AGENT_CONTEXT_WINDOW),
   ) {}
 
   async listSessions(): Promise<ChatSearchSessionSummary[]> {
@@ -344,9 +239,46 @@ export class GlobalAgentService {
     return this.sessionStore.deleteSession(sessionId);
   }
 
+  /**
+   * Live steps, streamed answer text and pending approval of a running turn;
+   * the UI polls this. Null once the turn has finished.
+   */
+  getTurnProgress(turnId: string): AgentTurnProgress | null {
+    const turn = this.activeTurns.get(turnId);
+    if (!turn) {
+      return null;
+    }
+    return { ...turn.progress.snapshot(), pendingApproval: this.approvals.getPending(turnId) };
+  }
+
+  /**
+   * Stops a running turn: the model call and remaining tool calls are aborted
+   * and nothing is saved. Returns false when the turn is not running.
+   */
+  cancelTurn(turnId: string): boolean {
+    const turn = this.activeTurns.get(turnId);
+    if (!turn) {
+      return false;
+    }
+    const pending = this.approvals.getPending(turnId);
+    if (pending) {
+      this.approvals.resolve(pending.id, false);
+    }
+    turn.controller.abort();
+    return true;
+  }
+
+  /**
+   * Approve or reject a pending tool call; returns false if it already expired.
+   */
+  resolveApproval(approvalId: string, approved: boolean): boolean {
+    return this.approvals.resolve(approvalId, approved);
+  }
+
   async runTurn(
     input: ConversationalSearchTurnInput,
     sessionId?: string,
+    turnId?: string,
   ): Promise<GlobalAgentTurnResult> {
     const language = await getChatSearchLanguage();
     const displayText = resolveDisplayText(input);
@@ -376,13 +308,25 @@ export class GlobalAgentService {
       observations: [],
     };
 
+    const turnKey = turnId ?? generateId();
+    const progress = createTurnProgressTracker(language);
+    const controller = new AbortController();
+    this.activeTurns.set(turnKey, { progress, controller });
+
     try {
-      const runtimeMemory = new InMemory({ maxMessages: 100 });
-      await this.sessionStore.seedRuntimeMemory(persistedSession.id, runtimeMemory);
+      // No message cap: the context window decides what the model receives.
+      const runtimeMemory = new InMemory();
+      const seededCount = await this.sessionStore.seedRuntimeMemory(persistedSession.id, runtimeMemory);
       const tools = await createGlobalAgentTools(orchestrationSession);
-      const recorder = createProcessStepRecorder(language);
-      const { agent, config } = await createExtensionAgent({
-        name: "hamhome-global-agent",
+      const securityPolicy = createToolApprovalPolicy({
+        tools,
+        language,
+        // Without a turn id the UI cannot show the request, so the call is rejected.
+        requestApproval: (request) =>
+          turnId ? this.approvals.waitForDecision(turnId, request) : Promise.resolve(false),
+      });
+      const { agent } = await createExtensionAgent({
+        agentId: "hamhome-global-agent",
         sessionId: persistedSession.id,
         memory: runtimeMemory,
         systemPrompt: buildSystemPrompt(language),
@@ -390,23 +334,34 @@ export class GlobalAgentService {
         skills: [createHamHomeFeatureSkill()],
         dynamicCapabilities: { enabled: true },
         maxIterations: 10,
+        securityPolicy,
+        contextBuilder: this.contextBuilder,
       });
-      const off = agent.on(recorder.record);
-      const result = await agent
-        .run(agentInput, {
-          maxIterations: 10,
-          temperature: 0.2,
-          invocationMode: config.invocationMode,
-          skillContext: {
-            pageId: "extension-app",
-            moduleId: "global-assistant",
-            userInput: agentInput,
-            tags: ["hamhome", "extension", "assistant"],
-          },
-        })
-        .finally(off);
 
-      const steps = recorder.finish();
+      // Streaming lets getTurnProgress() show steps and answer text live.
+      let result: AgentRunResult | undefined;
+      for await (const event of agent.runStream(agentInput, {
+        runId: turnKey,
+        signal: controller.signal,
+        temperature: 0.2,
+        skillContext: {
+          pinnedSkillIds: state.pinnedSkillIds ?? [],
+          pageId: "extension-app",
+          moduleId: "global-assistant",
+          userInput: agentInput,
+          tags: ["hamhome", "extension", "assistant"],
+        },
+      })) {
+        progress.record(event);
+        if (event.type === "agent.completed") {
+          result = event.result;
+        }
+      }
+      if (!result) {
+        throw new Error("The agent stream ended without a result.");
+      }
+
+      const steps = progress.finish();
       const sourceIds =
         orchestrationSession.lastSearch?.bookmarkIds ||
         orchestrationSession.lastStatistics?.bookmarkIds ||
@@ -433,7 +388,11 @@ export class GlobalAgentService {
         displayText,
         response.answer,
         sourceIds,
+        result.pinnedSkillIds,
       );
+      // Store the turn's tool calls and results too, so the next turn's model
+      // sees what was looked up, not only the final answer text.
+      const turnMessages = (await runtimeMemory.get({ sessionId: persistedSession.id })).slice(seededCount);
 
       await this.sessionStore.appendTurn(
         persistedSession.id,
@@ -443,6 +402,7 @@ export class GlobalAgentService {
           sources,
           steps,
         },
+        getTurnTranscript(turnMessages),
       );
       const savedSession = await this.sessionStore.saveState(
         persistedSession.id,
@@ -469,7 +429,12 @@ export class GlobalAgentService {
         newState,
       };
     } catch (error) {
+      if (controller.signal.aborted) {
+        throw new Error(language === "zh" ? "已停止生成" : "Stopped");
+      }
       throw new Error(getAgentErrorMessage(error, "AI 助手执行失败"));
+    } finally {
+      this.activeTurns.delete(turnKey);
     }
   }
 }

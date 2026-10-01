@@ -2,20 +2,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { validateStrictJsonSchema, type JsonSchema } from "@hamhome/agent";
 
 const mocks = vi.hoisted(() => ({
-  runExtensionCommand: vi.fn(),
-}));
-
-vi.mock("../../command-runner", () => ({
-  runExtensionCommand: mocks.runExtensionCommand,
+  runCommand: vi.fn(),
 }));
 
 vi.mock("../../factory", () => ({
-  resolveAgentConfig: vi.fn(async () => ({
-    language: "zh",
-    temperature: 0.4,
-    rawConfig: { enabled: true, apiKey: "test-key", model: "test-model" },
+  createExtensionAgent: vi.fn(async () => ({
+    agent: { commands: { run: mocks.runCommand } },
+    config: {
+      language: "zh",
+      temperature: 0.4,
+      rawConfig: { enabled: true, apiKey: "test-key", model: "test-model" },
+    },
   })),
-  assertAgentConfigured: vi.fn(),
 }));
 
 describe("CategoryGenerationService", () => {
@@ -24,7 +22,7 @@ describe("CategoryGenerationService", () => {
   });
 
   it("uses an OpenAI-compatible strict recursive output schema", async () => {
-    mocks.runExtensionCommand.mockResolvedValue({
+    mocks.runCommand.mockResolvedValue({
       output: {
         categories: [
           {
@@ -40,8 +38,8 @@ describe("CategoryGenerationService", () => {
 
     const { categoryGenerationService } = await import("../category-generation-service");
     const result = await categoryGenerationService.generateCategories("开发分类");
-    const outputSchema = mocks.runExtensionCommand.mock.calls[0][0].command
-      .outputSchema as JsonSchema;
+    const [command, input, options] = mocks.runCommand.mock.calls[0];
+    const outputSchema = command.outputSchema as JsonSchema;
 
     expect(() => validateStrictJsonSchema(outputSchema)).not.toThrow();
     expect(outputSchema).toMatchObject({
@@ -54,6 +52,9 @@ describe("CategoryGenerationService", () => {
         },
       },
     });
+    expect(command.prompt(input, {})).toBe("language: zh\n\ndescription:\n开发分类");
+    expect(options).toMatchObject({ temperature: 0.4 });
+    expect(options.systemPrompt).toContain("分类体系设计助手");
     expect(result).toEqual([
       {
         name: "开发",

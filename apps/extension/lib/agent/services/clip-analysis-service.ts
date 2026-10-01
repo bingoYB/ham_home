@@ -5,7 +5,7 @@
  * - 图片剪藏：图片本体作为多模态附件发给模型，模型不支持视觉时直接报错，不做文本降级
  * - 文字剪藏：以选中片段为分析主体，只产出分类与标签
  */
-import type { AgentContentPart } from "@hamhome/agent";
+import type { AgentCommand } from "@hamhome/agent";
 import type { AnalysisResult, LocalCategory, SaveFlowClipContext } from "@/types";
 import {
   buildClipHighlightPrompt,
@@ -17,7 +17,9 @@ import {
   clipImageOutputSchema,
   clipImageResultSchema,
   type ClipHighlightOutput,
+  type ClipHighlightPromptInput,
   type ClipImageOutput,
+  type ClipImagePromptInput,
 } from "../prompts";
 import {
   ClipAnalysisError,
@@ -25,8 +27,7 @@ import {
 } from "../clip-analysis-errors";
 import { getAgentErrorMessage } from "../errors";
 import { fetchClipImageForAI } from "../fetch-clip-image";
-import { assertAgentConfigured, resolveAgentConfig } from "../factory";
-import { runExtensionCommand } from "../command-runner";
+import { createExtensionAgent } from "../factory";
 
 /** 来源页信息只作为背景上下文提供给模型 */
 export interface ClipSourceContext {
@@ -50,6 +51,25 @@ function normalizeColors(colors: string[]): string[] {
   return [...new Set(colors.map((color) => color.toUpperCase()))].slice(0, 8);
 }
 
+const analyzeImageClipCommand: AgentCommand<ClipImagePromptInput, ClipImageOutput> = {
+  name: "analyzeImageClip",
+  description: "Analyze a clipped image and return bookmark metadata.",
+  outputSchema: clipImageOutputSchema,
+  maxIterations: 1,
+  prompt: buildClipImagePrompt,
+};
+
+const analyzeHighlightClipCommand: AgentCommand<
+  ClipHighlightPromptInput,
+  ClipHighlightOutput
+> = {
+  name: "analyzeHighlightClip",
+  description: "Analyze a highlighted passage and return its category and tags.",
+  outputSchema: clipHighlightOutputSchema,
+  maxIterations: 1,
+  prompt: buildClipHighlightPrompt,
+};
+
 class ClipAnalysisService {
   /**
    * 图片剪藏分析：标题与摘要都来自模型对图片本身的描述。
@@ -60,41 +80,33 @@ class ClipAnalysisService {
       throw new ClipAnalysisError("CLIP_IMAGE_FETCH_FAILED");
     }
 
-    const config = await resolveAgentConfig();
-    assertAgentConfigured(config.rawConfig);
-
+    const { agent, config } = await createExtensionAgent();
     const attachment = await fetchClipImageForAI(imageUrl);
-    const attachments: AgentContentPart[] = [
-      { type: "image", image: attachment.image, mediaType: attachment.mediaType },
-    ];
 
     try {
-      const result = await runExtensionCommand<Record<string, never>, ClipImageOutput>({
-        config,
-        temperature: config.temperature ?? 0.2,
-        maxIterations: 1,
-        systemPrompt: buildClipImageSystemPrompt(config.language),
-        command: {
-          name: "analyzeImageClip",
-          description: "Analyze a clipped image and return bookmark metadata.",
-          outputSchema: clipImageOutputSchema,
-          attachments,
-          prompt: buildClipImagePrompt({
-            language: config.language,
-            imageUrl,
-            imageAlt: input.clip.imageAlt,
-            imageTitle: input.clip.imageTitle,
-            caption: input.clip.caption,
-            sourceUrl: input.clip.sourceUrl ?? input.source?.url,
-            sourceTitle: input.clip.sourceTitle ?? input.source?.title,
-            sourceExcerpt: input.source?.excerpt,
-            userCategories: input.userCategories,
-            existingTags: input.existingTags,
-            presetTags: config.rawConfig.presetTags,
-          }),
+      const result = await agent.commands.run(
+        analyzeImageClipCommand,
+        {
+          language: config.language,
+          imageUrl,
+          imageAlt: input.clip.imageAlt,
+          imageTitle: input.clip.imageTitle,
+          caption: input.clip.caption,
+          sourceUrl: input.clip.sourceUrl ?? input.source?.url,
+          sourceTitle: input.clip.sourceTitle ?? input.source?.title,
+          sourceExcerpt: input.source?.excerpt,
+          userCategories: input.userCategories,
+          existingTags: input.existingTags,
+          presetTags: config.rawConfig.presetTags,
         },
-        input: {},
-      });
+        {
+          systemPrompt: buildClipImageSystemPrompt(config.language),
+          temperature: config.temperature ?? 0.2,
+          attachments: [
+            { type: "image", image: attachment.image, mediaType: attachment.mediaType },
+          ],
+        },
+      );
 
       const output = clipImageResultSchema.parse(result.output);
 
@@ -128,34 +140,28 @@ class ClipAnalysisService {
       throw new Error("选中内容为空，无法分析");
     }
 
-    const config = await resolveAgentConfig();
-    assertAgentConfigured(config.rawConfig);
+    const { agent, config } = await createExtensionAgent();
 
     try {
-      const result = await runExtensionCommand<Record<string, never>, ClipHighlightOutput>({
-        config,
-        temperature: config.temperature ?? 0.2,
-        maxIterations: 1,
-        systemPrompt: buildClipHighlightSystemPrompt(config.language),
-        command: {
-          name: "analyzeHighlightClip",
-          description: "Analyze a highlighted passage and return its category and tags.",
-          outputSchema: clipHighlightOutputSchema,
-          prompt: buildClipHighlightPrompt({
-            language: config.language,
-            selectedText,
-            contextBefore: input.clip.selector?.prefix,
-            contextAfter: input.clip.selector?.suffix,
-            sourceUrl: input.clip.sourceUrl ?? input.source?.url,
-            sourceTitle: input.clip.sourceTitle ?? input.source?.title,
-            sourceExcerpt: input.source?.excerpt,
-            userCategories: input.userCategories,
-            existingTags: input.existingTags,
-            presetTags: config.rawConfig.presetTags,
-          }),
+      const result = await agent.commands.run(
+        analyzeHighlightClipCommand,
+        {
+          language: config.language,
+          selectedText,
+          contextBefore: input.clip.selector?.prefix,
+          contextAfter: input.clip.selector?.suffix,
+          sourceUrl: input.clip.sourceUrl ?? input.source?.url,
+          sourceTitle: input.clip.sourceTitle ?? input.source?.title,
+          sourceExcerpt: input.source?.excerpt,
+          userCategories: input.userCategories,
+          existingTags: input.existingTags,
+          presetTags: config.rawConfig.presetTags,
         },
-        input: {},
-      });
+        {
+          systemPrompt: buildClipHighlightSystemPrompt(config.language),
+          temperature: config.temperature ?? 0.2,
+        },
+      );
 
       const output = clipHighlightResultSchema.parse(result.output);
 

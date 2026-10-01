@@ -32,7 +32,6 @@ export const E2E_EXTENSION_CONFIG: E2EExtensionConfig = {
     baseUrl: process.env.E2E_AI_BASE_URL ?? DEFAULT_AI_BASE_URL,
     model: process.env.E2E_AI_MODEL ?? "e2e-chat-model",
     temperature: readNumberEnv("E2E_AI_TEMPERATURE", 0.1),
-    maxTokens: readNumberEnv("E2E_AI_MAX_TOKENS", 1000),
     apiMode: readApiModeEnv("E2E_AI_API_MODE", "chat"),
     enableTranslation: readBooleanEnv("E2E_AI_ENABLE_TRANSLATION", false),
     enableSmartCategory: readBooleanEnv("E2E_AI_ENABLE_SMART_CATEGORY", true),

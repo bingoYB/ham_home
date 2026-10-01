@@ -112,7 +112,6 @@ export interface AIConfig {
   baseUrl?: string; // 自定义端点
   model?: string;
   temperature?: number;
-  maxTokens?: number;
   apiMode?: "chat" | "responses"; // 请求模式，主要用于 OpenAI 兼容的 provider
   enableTranslation: boolean; // 是否启用翻译
   enableSmartCategory: boolean; // 是否启用智能分类
@@ -934,6 +933,8 @@ export interface ConversationalSearchSession {
   lastQuery?: string;
   /** 最近多轮对话历史 */
   history: Array<{ role: "user" | "assistant"; text: string }>;
+  /** Skills the agent activated in earlier turns, kept active in the next turn */
+  pinnedSkillIds?: string[];
 }
 
 /**
