@@ -18,11 +18,17 @@ import {
 } from "@hamhome/ui";
 import { Loader2, Check, AlertTriangle, CheckCircle2 } from "lucide-react";
 import { Sparkles } from "lucide-react";
+import { EmbeddingDimensionsField } from "./EmbeddingDimensionsField";
 import { EmbeddingSection } from "./EmbeddingSection";
 import type { EmbeddingConfig, AIProvider } from "@/types";
 import type { VectorStoreStats } from "@/lib/storage/vector-store";
 import type { QueueProgress } from "@/lib/embedding/embedding-queue";
-import { getDefaultBaseUrl, getDefaultEmbeddingModel } from "@/lib/agent/provider-config";
+import {
+  getDefaultBaseUrl,
+  getDefaultEmbeddingModel,
+  getEmbeddingDimensionSpec,
+  resolveEmbeddingDimensions,
+} from "@/lib/agent/provider-config";
 
 interface EmbeddingConfigProps {
   embeddingConfig: EmbeddingConfig;
@@ -165,6 +171,12 @@ export function EmbeddingConfigCard({
               placeholder={getDefaultEmbeddingModel(embeddingConfig.provider) || "text-embedding-3-small"}
             />
           </div>
+
+          <EmbeddingDimensionsField
+            spec={getEmbeddingDimensionSpec(embeddingConfig.provider, embeddingConfig.model)}
+            value={resolveEmbeddingDimensions(embeddingConfig)}
+            onChange={(dimensions) => updateEmbeddingConfig({ dimensions })}
+          />
 
           <div className="flex gap-2">
             <Button

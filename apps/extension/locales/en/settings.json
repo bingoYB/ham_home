@@ -19,7 +19,6 @@
     "apiKey": "API Key",
     "modelName": "Model Name",
     "temperature": "Temperature (Creativity)",
-    "maxTokens": "Max Tokens",
     "importBookmarks": "Import Data",
     "exportBookmarks": "Export Data",
     "about": {
@@ -135,7 +134,6 @@
       "apiModeDefault": "Auto-detect (Recommended)",
       "apiModeChat": "Chat API (Legacy)",
       "apiModeResponses": "Responses API (New)",
-      "maxTokens": "Max Tokens",
       "temperature": "Temperature",
       "apiKey": "API Key",
       "noApiKeyNeeded": "No API Key Needed",
@@ -172,11 +170,17 @@
         "baseUrlPlaceholder": "https://api.example.com/v1",
         "model": "Embedding Model",
         "modelPlaceholder": "text-embedding-3-small",
+        "dimensions": {
+          "label": "Vector Dimensions",
+          "native": "Default ({{dimensions}})",
+          "option": "{{dimensions}}",
+          "hint": "Smaller vectors use less storage and search faster, with slightly lower accuracy. Run \"Incremental Rebuild\" after changing it."
+        },
         "batchSize": "Batch Size",
         "batchSizeDesc": "Number of bookmarks per batch (recommended 8-32)",
         "testConnection": "Test Connection",
         "testing": "Testing...",
-        "testSuccess": "Connection successful",
+        "testSuccess": "Connection successful ({{dimensions}} dimensions)",
         "testFailed": "Connection failed: {{error}}",
         "status": {
           "title": "Vector Index Status",
@@ -304,7 +308,6 @@
     },
     "messages": {
       "temperatureDesc": "Control the randomness of generated content (0-2, recommended 0.3)",
-      "maxTokensDesc": "Maximum length of generated content (recommended 1000)",
       "apiKeySecure": "Your API Key will be securely stored locally and never uploaded to the server"
     },
     "importExport": {

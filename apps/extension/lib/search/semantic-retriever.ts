@@ -301,7 +301,12 @@ class SemanticRetriever {
 
     const bookmarkIds = bookmarks.map((b) => b.id);
     const embeddings = await vectorStore.getEmbeddings(bookmarkIds);
-    const withEmbedding = embeddings.size;
+    await embeddingClient.loadConfig();
+    // Vectors from another model/dimensions are not searchable, so they do not count.
+    const modelKey = embeddingClient.getModelKey();
+    const withEmbedding = [...embeddings.values()].filter(
+      (embedding) => embedding.modelKey === modelKey,
+    ).length;
 
     return {
       total,

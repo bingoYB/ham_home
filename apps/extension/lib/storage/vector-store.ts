@@ -236,12 +236,17 @@ class VectorStore {
   }
 
   /**
-   * 检查书签是否需要重新生成向量（checksum 不匹配）
+   * Whether the bookmark needs a new vector: its embedding text changed, or the
+   * stored vector came from another model or dimensions (`modelKey`).
    */
-  async needsUpdate(bookmarkId: string, newChecksum: string): Promise<boolean> {
+  async needsUpdate(
+    bookmarkId: string,
+    newChecksum: string,
+    modelKey: string,
+  ): Promise<boolean> {
     const existing = await this.getEmbedding(bookmarkId);
     if (!existing) return true;
-    return existing.checksum !== newChecksum;
+    return existing.checksum !== newChecksum || existing.modelKey !== modelKey;
   }
 
   /**
