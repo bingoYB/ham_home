@@ -19,9 +19,15 @@ const faqs: Record<FAQCategory, { qEn: string; aEn: string; qZh: string; aZh: st
   general: [
     {
       qEn: 'What is HamHome?',
-      aEn: 'HamHome is an AI browser workspace. It combines bookmark capture, page snapshots, semantic search, an Agent that understands and operates HamHome, saved tab workspaces, native Tab Group automation, import/export, and WebDAV migration.',
+      aEn: 'HamHome is an AI browser workspace. It combines bookmark capture, text and image clips, page snapshots and screenshots, semantic search, a bookmark Health Center, an Agent that understands and operates HamHome, saved tab workspaces, native Tab Group automation, import/export, and WebDAV sync.',
       qZh: '什么是 HamHome？',
-      aZh: 'HamHome 是一个 AI 浏览器工作台，整合了书签收藏、网页快照、语义搜索、能理解并操作插件的 Agent、标签页工作空间、原生 Tab Group 自动化、导入导出和 WebDAV 迁移。'
+      aZh: 'HamHome 是一个 AI 浏览器工作台，整合了书签收藏、文字与图片剪藏、网页快照与页面截图、语义搜索、书签健康中心、能理解并操作插件的 Agent、标签页工作空间、原生 Tab Group 自动化、导入导出和 WebDAV 同步。'
+    },
+    {
+      qEn: 'Can I save part of a page instead of the whole page?',
+      aEn: 'Yes. Select text or right-click an image and choose to save it. Text clips keep the exact quote and reopen the source page at that passage; image clips keep the image URL, source page, size, format, and dominant colors. Both appear in the library as cards and can be filtered by content type.',
+      qZh: '可以只保存页面中的一段文字或一张图片吗？',
+      aZh: '可以。选中文字或右键图片即可单独保存。文字剪藏保留原文，打开时会定位到来源页中的那一段；图片剪藏记录图片地址、来源页、尺寸、格式和主色。两者都会以卡片形式出现在收藏库中，并可按内容类型筛选。'
     },
     {
       qEn: 'Which browsers are supported?',
@@ -39,15 +45,21 @@ const faqs: Record<FAQCategory, { qEn: string; aEn: string; qZh: string; aZh: st
   privacy: [
     {
       qEn: 'Where is my data stored?',
-      aEn: 'Primary data is stored locally in browser storage and IndexedDB. That includes bookmarks, categories, settings, snapshots, AI cache, vector data, workspaces, and rules.',
+      aEn: 'Primary data is stored locally in browser storage and IndexedDB. That includes bookmarks, clips, categories, settings, snapshots, page screenshots, AI cache, vector data, workspaces, and rules.',
       qZh: '我的数据存储在哪里？',
-      aZh: '主要数据保存在浏览器存储和 IndexedDB 中，包括书签、分类、设置、快照、AI 缓存、向量数据、工作空间和规则。'
+      aZh: '主要数据保存在浏览器存储和 IndexedDB 中，包括书签、剪藏、分类、设置、快照、页面截图、AI 缓存、向量数据、工作空间和规则。'
     },
     {
       qEn: 'Are my private sites sent to AI?',
-      aEn: 'You can configure privacy domains and use automatic privacy detection so sensitive sites skip AI analysis. AI keys, Base URLs, privacy domains, WebDAV credentials, and browser shortcuts are manually configured by the user.',
+      aEn: 'You can configure privacy domains and use automatic privacy detection so sensitive sites skip AI analysis and page screenshots. AI keys, Base URLs, privacy domains, WebDAV credentials, and browser shortcuts are manually configured by the user.',
       qZh: '我的私人网站内容会发送给 AI 吗？',
-      aZh: '你可以配置隐私域名并启用自动隐私检测，让敏感站点跳过 AI 分析。API Key、Base URL、隐私域名、WebDAV 凭据和浏览器快捷键都由用户手动配置。'
+      aZh: '你可以配置隐私域名并启用自动隐私检测，让敏感站点跳过 AI 分析和页面截图。API Key、Base URL、隐私域名、WebDAV 凭据和浏览器快捷键都由用户手动配置。'
+    },
+    {
+      qEn: 'Where are page screenshots stored?',
+      aEn: 'Page screenshots capture only the visible area of the page, without HamHome UI, and are stored in IndexedDB on the current device. They are not included in WebDAV sync or JSON backups, and private pages skip screenshots by default. Settings shows how many screenshots you have and how much space they use; each one can be downloaded or deleted from the screenshot viewer.',
+      qZh: '页面截图保存在哪里？',
+      aZh: '页面截图只截取网页当前可见区域，不包含 HamHome 自身界面，保存在当前设备的 IndexedDB 中，不进入 WebDAV 同步或 JSON 备份，隐私页面默认跳过截图。设置中可以查看截图数量与占用空间，单张截图可在截图查看器中下载或删除。'
     },
     {
       qEn: 'Can the Agent change sensitive settings?',
@@ -70,6 +82,12 @@ const faqs: Record<FAQCategory, { qEn: string; aEn: string; qZh: string; aZh: st
       aZh: '聊天模型支持 OpenAI、Anthropic、Google Gemini、Azure OpenAI、DeepSeek、Groq、Mistral、Moonshot/Kimi、智谱/GLM、腾讯混元、NVIDIA NIM、SiliconFlow、Ollama 和自定义 OpenAI 兼容 API。语义搜索的 Embedding 会单独配置。'
     },
     {
+      qEn: 'Does AI analyze image clips?',
+      aEn: 'Yes, with a vision-capable model. When you save an image clip, HamHome can send the image to your AI provider to suggest a title, summary, category, and tags. You can turn off "AI analysis for image clips" in AI settings, and images from private pages are never sent.',
+      qZh: 'AI 会分析图片剪藏吗？',
+      aZh: '会，需要使用支持图像输入的模型。保存图片剪藏时，HamHome 可以把图片发送给你配置的 AI 服务，生成标题、摘要、分类和标签。你可以在 AI 设置中关闭「图片剪藏 AI 分析」，隐私页面上的图片始终不会发送。'
+    },
+    {
       qEn: 'What is new about the Agent UI?',
       aEn: 'The current Agent UI has a floating launcher, session switching, visible process steps, context cards, suggestion chips, extension navigation, and safe action execution. The landing page now reflects that global Agent surface.',
       qZh: '新版 Agent UI 有什么变化？',
@@ -79,15 +97,21 @@ const faqs: Record<FAQCategory, { qEn: string; aEn: string; qZh: string; aZh: st
   sync: [
     {
       qEn: 'Can I sync my data across multiple devices?',
-      aEn: 'Yes. WebDAV sync writes structured HamHome data under /HamHomeSync, including settings, bookmarks and bookmark text content, categories, workspaces, workspace categories, Tab Group rules, and auto-group settings.',
+      aEn: 'Yes. WebDAV sync writes structured HamHome data under /HamHomeSync, including settings, bookmarks and bookmark text content, clips, categories, workspaces, workspace categories, Tab Group rules, and auto-group settings. Bookmarks are matched by URL, so syncing from several devices does not create duplicates.',
       qZh: '我可以在多个设备之间同步我的数据吗？',
-      aZh: '可以。WebDAV 会在 /HamHomeSync 下同步结构化数据，包括设置、书签与书签正文、分类、工作空间、工作空间分类、Tab 分组规则和自动分组设置。'
+      aZh: '可以。WebDAV 会在 /HamHomeSync 下同步结构化数据，包括设置、书签与书签正文、剪藏、分类、工作空间、工作空间分类、Tab 分组规则和自动分组设置。书签按网址对齐身份，多台设备同步也不会产生重复书签。'
     },
     {
-      qEn: 'Are local snapshots synced through WebDAV?',
-      aEn: 'The current WebDAV sync focuses on structured data and bookmark text content. Local HTML/Markdown snapshot blobs remain local unless you export them or send Markdown-style notes through the Obsidian workflow.',
-      qZh: '本地快照会通过 WebDAV 同步吗？',
-      aZh: '当前 WebDAV 同步重点是结构化数据和书签正文。本地 HTML/Markdown 快照 Blob 默认仍在本机，除非你导出它们，或通过 Obsidian 工作流发送 Markdown 风格笔记。'
+      qEn: 'What happens when I delete a bookmark?',
+      aEn: 'It moves to Trash and stays restorable for 30 days, together with its content, snapshot, screenshot, and clips. After that, or when you delete it forever, HamHome removes the data and keeps only a lightweight tombstone so the deletion also syncs to your other devices.',
+      qZh: '删除书签后会发生什么？',
+      aZh: '书签会先进入回收站，连同正文、快照、截图和剪藏一起保留 30 天，期间可随时恢复。到期或你手动彻底删除后，HamHome 会清除这些数据，只保留一条轻量墓碑，让删除结果同步到其他设备。'
+    },
+    {
+      qEn: 'Are local snapshots and page screenshots synced through WebDAV?',
+      aEn: 'No. WebDAV sync focuses on structured data and bookmark text content. Local HTML/Markdown snapshot files and page screenshots remain on the device unless you download them or send Markdown-style notes through the Obsidian workflow.',
+      qZh: '本地快照和页面截图会通过 WebDAV 同步吗？',
+      aZh: '不会。WebDAV 同步重点是结构化数据和书签正文。本地 HTML/Markdown 快照文件和页面截图默认只在本机，除非你手动下载，或通过 Obsidian 工作流发送 Markdown 风格笔记。'
     },
     {
       qEn: 'Can I move data back to the browser bookmark bar?',

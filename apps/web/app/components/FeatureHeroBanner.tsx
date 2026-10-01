@@ -9,7 +9,15 @@ import {
   CarouselItem,
   type CarouselApi,
 } from "@hamhome/ui";
-import { Bot, Download, Github, Layers3, ShieldCheck, Sparkles } from "lucide-react";
+import {
+  Bot,
+  Download,
+  Github,
+  Highlighter,
+  Layers3,
+  ShieldCheck,
+  Sparkles,
+} from "lucide-react";
 import { GITHUB_RELEASE_URL, openRecommendedDownload } from "@/app/lib/download";
 import { ExtensionScreenshotFrame } from "./ExtensionScreenshotFrame";
 import type { ExtensionScreenshotId } from "./extensionScreenshots";
@@ -23,7 +31,9 @@ const GITHUB_REPO_URL = "https://github.com/bingoYB/ham_home";
 
 const HERO_SCREENSHOTS: ExtensionScreenshotId[] = [
   "bookmarkLibrary",
+  "visualGallery",
   "aiAgent",
+  "healthCenter",
   "workspaces",
   "tabGroups",
   "importExportSync",
@@ -62,13 +72,17 @@ export function FeatureHeroBanner({ isEn, isDark }: FeatureHeroBannerProps) {
       ? "Save pages. Restore sessions. Agent handles the rest."
       : "网页收藏、会话恢复，Agent 帮你打理。",
     desc: isEn
-      ? "HamHome turns bookmarks, page snapshots, Agent-assisted controls, restorable workspaces, native Tab Group rules, and WebDAV migration into one extension."
-      : "HamHome 将书签、网页快照、Agent 代办插件操作、可恢复工作空间、原生 Tab 分组规则和 WebDAV 迁移整合进一个扩展。",
+      ? "HamHome brings bookmarks, text and image clips, page snapshots and screenshots, restorable workspaces, and Tab Group rules into one extension, with an Agent that operates it for you."
+      : "HamHome 将书签、文字与图片剪藏、网页快照与截图、可恢复工作空间和原生 Tab 分组规则整合进一个扩展，并由 Agent 替你代办插件操作。",
     downloadButton: isEn ? "Install Extension" : "安装扩展",
     githubButton: "GitHub",
   };
 
   const highlights = [
+    {
+      label: isEn ? "Text and image clips" : "文字与图片剪藏",
+      icon: <Highlighter className="h-4 w-4" />,
+    },
     {
       label: isEn ? "Agent-guided controls" : "Agent 帮你用插件",
       icon: <Bot className="h-4 w-4" />,
@@ -137,7 +151,7 @@ export function FeatureHeroBanner({ isEn, isDark }: FeatureHeroBannerProps) {
               </Button>
             </div>
 
-            <div className="mt-8 grid gap-3 sm:grid-cols-3">
+            <div className="mt-8 grid gap-3 sm:grid-cols-2">
               {highlights.map((item) => (
                 <div
                   key={item.label}

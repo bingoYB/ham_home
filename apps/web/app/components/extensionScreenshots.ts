@@ -7,7 +7,11 @@ export type ExtensionScreenshotId =
   | "aiAgent"
   | "workspaces"
   | "tabGroups"
-  | "importExportSync";
+  | "importExportSync"
+  | "visualGallery"
+  | "imageClipSave"
+  | "healthCenter"
+  | "trash";
 
 export interface ExtensionScreenshotCopy {
   title: string;
@@ -27,11 +31,11 @@ export const EXTENSION_SCREENSHOTS: Record<ExtensionScreenshotId, ExtensionScree
     aspect: "popup",
     zh: {
       title: "页内快速保存",
-      alt: "HamHome 页内快速保存浮窗截图",
+      alt: "HamHome 页内快速保存浮窗截图，含页面截图与快照选项",
     },
     en: {
       title: "In-page Quick Save",
-      alt: "HamHome in-page quick save panel screenshot",
+      alt: "HamHome in-page quick save panel with page screenshot and snapshot options",
     },
   },
   popupQuickPanel: {
@@ -128,6 +132,54 @@ export const EXTENSION_SCREENSHOTS: Record<ExtensionScreenshotId, ExtensionScree
     en: {
       title: "Import, Export, and Sync",
       alt: "HamHome import, export, and sync screenshot",
+    },
+  },
+  visualGallery: {
+    file: "10-visual-gallery.png",
+    aspect: "desktop",
+    zh: {
+      title: "视觉画廊",
+      alt: "HamHome 视觉画廊截图，按页面截图浏览收藏",
+    },
+    en: {
+      title: "Visual Gallery",
+      alt: "HamHome visual gallery screenshot showing saved page screenshots",
+    },
+  },
+  imageClipSave: {
+    file: "11-image-clip-save.png",
+    aspect: "popup",
+    zh: {
+      title: "图片剪藏",
+      alt: "HamHome 右键保存图片剪藏的页内浮窗截图",
+    },
+    en: {
+      title: "Image Clip",
+      alt: "HamHome in-page panel saving an image clip from the context menu",
+    },
+  },
+  healthCenter: {
+    file: "12-health-center.png",
+    aspect: "desktop",
+    zh: {
+      title: "书签健康中心",
+      alt: "HamHome 书签健康中心截图，展示失效、跳转与重复书签",
+    },
+    en: {
+      title: "Bookmark Health Center",
+      alt: "HamHome Bookmark Health Center showing broken, redirected, and duplicate bookmarks",
+    },
+  },
+  trash: {
+    file: "13-trash.png",
+    aspect: "desktop",
+    zh: {
+      title: "回收站",
+      alt: "HamHome 回收站截图，展示可恢复书签与剩余保留天数",
+    },
+    en: {
+      title: "Trash",
+      alt: "HamHome Trash screenshot with restorable bookmarks and remaining retention days",
     },
   },
 };
