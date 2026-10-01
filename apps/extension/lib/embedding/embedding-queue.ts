@@ -127,10 +127,17 @@ class EmbeddingQueue {
       return;
     }
 
-    // 检查是否需要更新
+    // Re-embed when the text changed or the vector came from another model/dimensions
+    if (!embeddingClient.getConfig()) {
+      await embeddingClient.loadConfig();
+    }
     const embeddingText = buildEmbeddingText(bookmark);
     const checksum = generateChecksum(embeddingText);
-    const needsUpdate = await vectorStore.needsUpdate(bookmark.id, checksum);
+    const needsUpdate = await vectorStore.needsUpdate(
+      bookmark.id,
+      checksum,
+      embeddingClient.getModelKey(),
+    );
 
     if (!needsUpdate) {
       logger.debug('Embedding up to date', { bookmarkId: bookmark.id });

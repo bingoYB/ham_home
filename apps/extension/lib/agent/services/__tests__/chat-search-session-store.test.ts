@@ -87,4 +87,50 @@ describe("ChatSearchSessionStore", () => {
     expect(saved.messages[1].steps?.[0]?.toolName).toBe("open_extension_view");
     expect(saved.messages[1].sources?.[0]?.url).toBe("https://example.com");
   });
+
+  it("stores tool transcripts for the model but hides them from the chat UI", async () => {
+    const store = new ChatSearchSessionStore(new InMemory());
+    const session = await store.createSession("Search");
+    const transcript = [
+      {
+        role: "assistant" as const,
+        content: "",
+        metadata: { toolCalls: [{ toolCallId: "call_1", toolName: "search_bookmarks", input: { q: "react" } }] },
+      },
+      {
+        role: "tool" as const,
+        content: '{"bookmarkIds":["b1","b2"]}',
+        metadata: { toolCallId: "call_1", toolName: "search_bookmarks" },
+      },
+    ];
+
+    await store.appendTurn(session.id, "find react", "Found 2 bookmarks", {}, transcript);
+
+    const snapshot = await store.getSessionSnapshot(session.id);
+    expect(snapshot.messages.map((message) => [message.role, message.content])).toEqual([
+      ["user", "find react"],
+      ["assistant", "Found 2 bookmarks"],
+    ]);
+
+    const runtimeMemory = new InMemory();
+    const seeded = await store.seedRuntimeMemory(session.id, runtimeMemory);
+    const replayed = await runtimeMemory.get({ sessionId: session.id });
+    expect(seeded).toBe(4);
+    expect(replayed.map((message) => message.role)).toEqual(["user", "assistant", "tool", "assistant"]);
+    expect(replayed[1].metadata?.toolCalls).toEqual(transcript[0].metadata.toolCalls);
+    expect(replayed[2]).toMatchObject({ content: '{"bookmarkIds":["b1","b2"]}', metadata: { toolCallId: "call_1" } });
+  });
+
+  it("keeps pinned skill ids in the structured state", async () => {
+    const store = new ChatSearchSessionStore(new InMemory());
+    const session = await store.createSession("Skills");
+
+    const saved = await store.saveState(session.id, {
+      ...createInitialChatSearchState(),
+      pinnedSkillIds: ["orders.export"],
+    });
+
+    expect(saved.state.pinnedSkillIds).toEqual(["orders.export"]);
+    expect((await store.createSession("Fresh")).state.pinnedSkillIds).toEqual([]);
+  });
 });

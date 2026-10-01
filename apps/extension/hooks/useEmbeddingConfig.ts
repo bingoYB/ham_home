@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { useTranslation } from "react-i18next";
 import { configStorage } from "@/lib/storage/config-storage";
+import { withValidEmbeddingDimensions } from "@/lib/agent/provider-config";
 import { getBackgroundService } from "@/lib/services";
 import type { QueueProgress } from "@/lib/embedding/embedding-queue";
 import type { VectorStoreStats } from "@/lib/storage/vector-store";
@@ -123,7 +124,9 @@ export function useEmbeddingConfig(): UseEmbeddingConfigReturn {
 
   const updateEmbeddingConfigHandler = async (updates: Partial<EmbeddingConfig>) => {
     try {
-      const updated = await configStorage.setEmbeddingConfig(updates);
+      const updated = await configStorage.setEmbeddingConfig(
+        withValidEmbeddingDimensions(embeddingConfig, updates),
+      );
       setEmbeddingConfig(updated);
     } catch (error) {
       console.error("[useEmbeddingConfig] Failed to update embedding config:", error);

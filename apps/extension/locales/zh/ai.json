@@ -69,12 +69,19 @@
     "empty": "可以问我插件功能、书签内容、数据统计，也可以让我调整安全配置项。",
     "placeholder": "问插件功能、配置项或书签...",
     "send": "发送",
+    "stop": "停止生成",
     "process": "执行过程",
     "sources": "相关书签",
     "status": {
       "thinking": "Agent 思考中...",
       "searching": "Agent 处理中...",
       "writing": "Agent 整理回答中..."
+    },
+    "approval": {
+      "title": "需要你的确认",
+      "approve": "允许",
+      "reject": "拒绝",
+      "timeoutHint": "{{minutes}} 分钟内未确认将自动取消"
     }
   },
   "settings": {

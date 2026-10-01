@@ -1347,9 +1347,9 @@ UI 复用 `@hamhome/ui-business/ai-search` 的 `SearchInputArea`，Extension 侧
 
 插件 app 页面右下角全局 Agent 入口。组件固定在视口右下角，折叠时显示圆形入口，展开后展示客服式对话窗口、session 切换、执行过程、书签来源与输入框。
 
-| Prop | Type | Required | Default | Description |
-| ---- | ---- | -------- | ------- | ----------- |
-| -    | -    | -        | -       | 组件内部通过 `useGlobalAgent()` 管理状态 |
+| Prop   | Type      | Required | Default | Description |
+| ------ | --------- | -------- | ------- | ----------- |
+| inline | `boolean` | -        | `false` | 折叠态以内联输入框渲染（用于书签面板），否则固定在视口右下角；状态由 `useGlobalAgent()` 管理 |
 
 **用法示例：**
 
@@ -1366,6 +1366,44 @@ import { GlobalAgentLauncher } from "@/components/agent/GlobalAgentLauncher";
 - assistant 消息可渲染 `AgentProcessStep[]`，展示 skill 匹配、tool 调用、工具输出摘要和失败原因
 - 书签搜索结果以 `Source[]` 渲染，点击来源会在新标签页打开对应 URL
 - 敏感配置不会在 UI 或 tool 输出里展示明文
+- Deleting bookmarks, categories, custom filters, or tab group rules pauses the turn and shows an `AgentApprovalCard`; the turn continues after the user allows or rejects it, and unanswered requests are rejected after 2 minutes
+- While a turn runs, the answer streams in live and the busy indicator shows the tool step in progress; `useAgentTurnProgress()` polls the background every 300 ms
+- While a turn runs, the send button becomes a stop button: the turn is aborted, nothing of it is saved, and its message goes back into the input
+- Long conversations stay within a token budget: earlier turns are summarized, and an "整理较早的对话" step appears in the process steps when that happens
+
+---
+
+### AgentApprovalCard
+
+Inline card in the agent chat that asks the user to approve a high-risk tool call (tools whose `metadata.riskLevel` is `"high"`). Purely presentational: `useGlobalAgent()` (via `useAgentTurnProgress()`) polls the pending request and sends the decision.
+
+| Prop         | Type                       | Required | Default | Description |
+| ------------ | -------------------------- | -------- | ------- | ----------- |
+| approval     | `AgentToolApprovalRequest` | ✓        | -       | Pending request: localized `title`, `target`, `detail`, and `expiresAt` |
+| isResponding | `boolean`                  | -        | `false` | Disables both buttons while the decision is being sent |
+| onApprove    | `() => void`               | ✓        | -       | Allow the tool call |
+| onReject     | `() => void`               | ✓        | -       | Reject the tool call |
+
+**用法示例：**
+
+```tsx
+import { AgentApprovalCard } from "@/components/agent/AgentApprovalCard";
+
+{agent.pendingApproval && (
+  <AgentApprovalCard
+    approval={agent.pendingApproval}
+    isResponding={agent.isRespondingToApproval}
+    onApprove={() => void agent.respondToApproval(true)}
+    onReject={() => void agent.respondToApproval(false)}
+  />
+)}
+```
+
+**行为说明：**
+
+- Shows what will happen (e.g. "删除书签"), the readable target (bookmark title, category name), and consequences such as "永久删除，无法恢复"
+- Displays the remaining minutes before the request is rejected automatically
+- A rejected call is not executed; the matching process step shows a "not approved" failure and the agent tells the user it was cancelled
 
 ---
 
@@ -2638,7 +2676,7 @@ AI 配置和用户设置存储，基于 **WXT Storage (sync)** 实现，支持�
 | `baseUrl` | `string` | - | - | OpenAI-compatible base url |
 | `apiKey` | `string` | - | - | API Key（云端 provider 需要） |
 | `model` | `string` | ✓ | `'text-embedding-3-small'` | Embedding 模型名 |
-| `dimensions` | `number` | - | - | 向量维度（部分 provider 支持指定） |
+| `dimensions` | `number` | - | - | Output vector size. Only sent when the model accepts it (`getEmbeddingDimensionSpec`); otherwise the model's native size is used |
 | `batchSize` | `number` | - | `16` | 批量 embedding 大小 |
 
 **支持 Embedding 的 Provider：**
@@ -3017,7 +3055,37 @@ AI 配置标签页，负责大模型服务商配置、模型选择、高级参�
 - 提供模型拉取（Fetch Models）功能，自动发现可用模型。
 - 包含语义搜索开关及向量索引统计信息展示。
 - 支持增量/全量索引重建及向量数据清理。
-- 高级设置中提供「图片剪藏 AI 分析」开关（默认开启）：关闭后保存图片剪藏不会把图片发送给模型；隐私页面无论开关状态都不会发送。
+- Incremental rebuild re-embeds bookmarks whose text changed or whose vector came from another embedding model or dimensions, so switching models does not need a full rebuild.
+- The embedding card shows `EmbeddingDimensionsField` only for models that accept a custom vector size; switching to a fixed-size model clears the stored size.
+- 高级设置中提供 temperature、请求版本（仅 OpenAI）以及「图片剪藏 AI 分析」开关（默认开启）：关闭后保存图片剪藏不会把图片发送给模型；隐私页面无论开关状态都不会发送。
+
+---
+
+### EmbeddingDimensionsField
+
+Vector size picker in the embedding settings card. It renders nothing when the selected model has a fixed size, so the setting only appears for models that support it (OpenAI `text-embedding-3-*`, Google `text-embedding-004` / `gemini-embedding-001`, Zhipu `embedding-3`, Qwen3 embedding, DashScope `text-embedding-v3/v4`; see `getEmbeddingDimensionSpec` in `lib/agent/provider-config.ts`).
+
+| Prop     | Type                                       | Required | Default | Description |
+| -------- | ------------------------------------------ | -------- | ------- | ----------- |
+| spec     | `EmbeddingDimensionSpec \| null`           | ✓        | -       | Native size and selectable sizes of the current model; `null` hides the field |
+| value    | `number`                                   | -        | -       | Effective size; `undefined` selects the model's native size |
+| onChange | `(dimensions: number \| undefined) => void` | ✓        | -       | Called with the picked size, or `undefined` for the native size |
+
+**用法示例：**
+
+```tsx
+<EmbeddingDimensionsField
+  spec={getEmbeddingDimensionSpec(embeddingConfig.provider, embeddingConfig.model)}
+  value={resolveEmbeddingDimensions(embeddingConfig)}
+  onChange={(dimensions) => updateEmbeddingConfig({ dimensions })}
+/>
+```
+
+**行为说明：**
+
+- The first option is the model's native size (stored as `undefined`); other options come from the model's spec
+- After changing the size, run an incremental rebuild so existing bookmarks get vectors of the new size
+- "Test connection" reports the vector size the provider actually returned
 
 ---
 

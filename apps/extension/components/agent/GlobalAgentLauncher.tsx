@@ -12,11 +12,13 @@ import {
   Plus,
   Send,
   Sparkles,
+  Square,
   Trash2,
   Wrench,
   X,
 } from "lucide-react";
 import { Button, ScrollArea, cn } from "@hamhome/ui";
+import { AgentApprovalCard } from "@/components/agent/AgentApprovalCard";
 import { useGlobalAgent } from "@/hooks/useGlobalAgent";
 import { getBackgroundService } from "@/lib/services/background-service-client";
 import { isContentScriptContext } from "@/utils/browser-api";
@@ -218,6 +220,9 @@ export function GlobalAgentLauncher({ inline = false }: { inline?: boolean }) {
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
   const isBusy = ["thinking", "searching", "writing"].includes(agent.status);
+  // The turn is still running in the background (not just animating the answer).
+  const isTurnRunning = agent.status === "thinking" || agent.status === "searching";
+  const runningStepTitle = [...agent.currentSteps].reverse().find((step) => step.status === "running")?.title;
   const activeSessionTitle = useMemo(
     () =>
       agent.sessions.find((session) => session.id === agent.currentSessionId)
@@ -227,7 +232,7 @@ export function GlobalAgentLauncher({ inline = false }: { inline?: boolean }) {
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [agent.messages, agent.currentAnswer, agent.currentSteps, agent.isOpen]);
+  }, [agent.messages, agent.currentAnswer, agent.currentSteps, agent.isOpen, agent.pendingApproval]);
 
   // 输入框随内容自动撑开高度（受 CSS max-height 限制，超出后滚动）
   useEffect(() => {
@@ -407,11 +412,19 @@ export function GlobalAgentLauncher({ inline = false }: { inline?: boolean }) {
                 sourcesTitle={t("agent.sources")}
               />
             )}
-            {isBusy && !agent.currentAnswer && (
+            {agent.pendingApproval && (
+              <AgentApprovalCard
+                approval={agent.pendingApproval}
+                isResponding={agent.isRespondingToApproval}
+                onApprove={() => void agent.respondToApproval(true)}
+                onReject={() => void agent.respondToApproval(false)}
+              />
+            )}
+            {isBusy && !agent.currentAnswer && !agent.pendingApproval && (
               <div className="flex justify-start animate-in fade-in duration-300">
                 <div className="flex items-center gap-2 rounded-2xl rounded-tl-sm border border-border/40 bg-muted/40 px-4 py-2.5 text-sm text-muted-foreground backdrop-blur-sm">
                   <Loader2 className="h-4 w-4 animate-spin text-indigo-500" />
-                  <span>{t(`agent.status.${agent.status}`)}</span>
+                  <span>{runningStepTitle ?? t(`agent.status.${agent.status}`)}</span>
                 </div>
               </div>
             )}
@@ -482,19 +495,32 @@ export function GlobalAgentLauncher({ inline = false }: { inline?: boolean }) {
               placeholder={t("agent.placeholder")}
               disabled={isBusy}
             />
-            <Button
-              type="submit"
-              size="icon"
-              className="h-11 w-11 shrink-0 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 text-white shadow-md transition-all hover:scale-105 hover:shadow-lg disabled:opacity-50 disabled:hover:scale-100"
-              disabled={isBusy || !agent.query.trim()}
-              title={t("agent.send")}
-            >
-              {isBusy ? (
-                <Loader2 className="h-5 w-5 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-            </Button>
+            {isTurnRunning ? (
+              <Button
+                type="button"
+                size="icon"
+                onClick={() => void agent.cancel()}
+                className="h-11 w-11 shrink-0 rounded-xl border border-indigo-500/30 bg-background text-indigo-600 shadow-md transition-all hover:scale-105 hover:bg-indigo-50 hover:shadow-lg dark:text-indigo-400 dark:hover:bg-indigo-500/10"
+                title={t("agent.stop")}
+                aria-label={t("agent.stop")}
+              >
+                <Square className="h-3.5 w-3.5 fill-current" />
+              </Button>
+            ) : (
+              <Button
+                type="submit"
+                size="icon"
+                className="h-11 w-11 shrink-0 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 text-white shadow-md transition-all hover:scale-105 hover:shadow-lg disabled:opacity-50 disabled:hover:scale-100"
+                disabled={isBusy || !agent.query.trim()}
+                title={t("agent.send")}
+              >
+                {isBusy ? (
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                ) : (
+                  <Send className="h-4 w-4" />
+                )}
+              </Button>
+            )}
           </div>
         </form>
       </div>

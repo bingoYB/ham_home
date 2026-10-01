@@ -20,6 +20,7 @@ app/components/
 ├── FeatureShowcase.tsx
 ├── ExtensionScreenshotFrame.tsx
 ├── extensionScreenshots.ts
+├── showcaseFeatures.tsx
 └── demos/
     ├── AIChatSearchDemo.tsx
     └── ...
@@ -99,7 +100,8 @@ app/components/
 
 ### 行为说明
 
-- 轮播展示真实插件截图：书签库、AI Agent、工作空间、Tab 分组、导入导出与同步。
+- 轮播展示真实插件截图：书签库、视觉画廊、AI Agent、书签健康中心、工作空间、Tab 分组、导入导出与同步。
+- 能力标签为 2×2 网格：文字与图片剪藏、Agent 帮你用插件、工作空间与 Tab 分组、隐私边界可控。
 - 截图路径由 `getExtensionScreenshotSrc()` 生成，自动带上 `NEXT_PUBLIC_BASE_PATH`。
 - 不再使用 Imgur 老截图。
 
@@ -133,7 +135,8 @@ app/components/
 
 ### 行为说明
 
-- `popupSave`（页内保存浮窗）和 `popupQuickPanel`（扩展快捷面板）使用竖向 popup 比例，其余截图使用桌面 3:2 比例。
+- `popupSave`（页内保存浮窗）、`popupQuickPanel`（扩展快捷面板）和 `imageClipSave`（图片剪藏浮窗）使用竖向 popup 比例，其余截图使用桌面 3:2 比例。
+- 截图 ID 与文件对应关系见 `extensionScreenshots.ts`：`01`–`09` 为原有截图，`10-visual-gallery`、`11-image-clip-save`、`12-health-center`、`13-trash` 对应视觉画廊、图片剪藏、书签健康中心和回收站。
 - 只负责展示截图，不包含业务交互。
 
 ---
@@ -157,8 +160,10 @@ app/components/
 
 ### 行为说明
 
-- 展示 AI 收藏、书签管理、AI Agent、工作空间、Tab 分组、导入导出与同步六个区块。
-- 内容说明覆盖真实实现：Defuddle/Readability/SingleFile、Agent 代办流程、混合检索、WebDAV 结构化同步、Obsidian Markdown 工作流等。
+- 展示 AI 收藏、富剪藏、书签库视图、健康中心与回收站、AI Agent、工作空间、Tab 分组、导入导出与同步八个区块。
+- 区块数据（图标、截图 ID、中英文标题/描述/要点）集中在 `showcaseFeatures.tsx` 的 `getShowcaseFeatures(isEn)`，组件本身只负责渲染。
+- 多截图布局按截图比例自适应：首张为 popup 比例时使用窄列 + 宽列，两张都是桌面截图时等宽两列；移动端纵向堆叠。
+- 内容说明覆盖真实实现：页面截图、文字/图片剪藏、视觉画廊、自定义时间范围、书签体检、30 天回收站、WebDAV 按网址对齐与删除墓碑、Obsidian Markdown 工作流等。
 - 每个区块使用真实截图和右侧能力要点，不再渲染旧的手写产品 demo。
 
 ---
@@ -211,14 +216,14 @@ app/components/
 
 ### 行为说明
 
-- 展示 AI 收藏、Agent 代办、工作空间、Tab 分组、WebDAV、隐私保护六个摘要。
+- 展示 AI 收藏、富剪藏、健康中心、Agent 代办、工作空间、Tab 分组、WebDAV、隐私保护八个摘要，桌面端 4 列。
 - 文案强调 HamHome 围绕真实浏览流程工作。
 
 ---
 
 ## LandingCapabilities
 
-更多能力网格，展示 Agent 代办插件、书签搜索、快照、Tab 规则、WebDAV、迁移、Provider 和隐私边界。
+更多能力网格，展示 Agent 代办插件、书签搜索、快照与截图、回收站、WebDAV、浏览器迁移、Provider 和隐私边界。
 
 ### Props
 
@@ -257,7 +262,8 @@ app/components/
 
 ### 行为说明
 
-- 明确 WebDAV 同步结构化数据，本地快照 Blob 默认仍在本机。
+- 明确 WebDAV 同步结构化数据（含剪藏与删除墓碑），本地快照文件与页面截图默认仍在本机。
+- 说明图片剪藏只在开启图片分析时发送给 AI 服务，隐私页面不会发送；隐私域名同时跳过 AI 分析和页面截图。
 - 明确 API Key、Base URL、隐私域名、WebDAV 凭据和浏览器快捷键由用户手动配置。
 
 ---
@@ -282,7 +288,8 @@ app/components/
 
 - 使用分类按钮切换 FAQ 类别。
 - 问答内容已对齐当前扩展实现，不再声明未实现的 WebDAV 加密同步能力。
-- AI FAQ 描述新版 Agent UI 与支持的 Provider 范围。
+- AI FAQ 描述新版 Agent UI、支持的 Provider 范围和图片剪藏 AI 分析。
+- 覆盖剪藏、页面截图存储位置、删除后进入回收站及墓碑同步、WebDAV 按网址对齐避免重复等问题。
 
 ---
 

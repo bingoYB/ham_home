@@ -280,15 +280,11 @@ describe("AiSdkModelClient", () => {
     streamError.responseBody = "data: {\"mock\":\"data\"}";
     aiMocks.generateText.mockRejectedValue(streamError);
 
-    const asyncIterable = {
-      [Symbol.asyncIterator]: async function* () {
-        yield "part 1 ";
-        yield "part 2";
-      }
-    };
-
     aiMocks.streamText.mockReturnValue({
-      textStream: asyncIterable,
+      fullStream: streamParts([
+        { type: "text-delta", id: "t1", text: "part 1 " },
+        { type: "text-delta", id: "t1", text: "part 2" },
+      ]),
       text: Promise.resolve("part 1 part 2"),
       toolCalls: Promise.resolve([{ toolCallId: "1", toolName: "toolA", args: { a: 1 } }]),
       usage: Promise.resolve({ inputTokens: 10, outputTokens: 5, totalTokens: 15 }),
@@ -316,6 +312,59 @@ describe("AiSdkModelClient", () => {
     ]);
   });
 
+  it("streams reasoning separately from answer text", async () => {
+    const client = new AiSdkModelClient({ model: {} as any });
+    aiMocks.streamText.mockReturnValue({
+      fullStream: streamParts([
+        { type: "reasoning-delta", id: "r1", text: "Thinking about it. " },
+        { type: "text-delta", id: "t1", text: "Answer." },
+        { type: "finish", finishReason: "stop" },
+      ]),
+      text: Promise.resolve("Answer."),
+      toolCalls: Promise.resolve([]),
+      usage: Promise.resolve({ inputTokens: 1, outputTokens: 1, totalTokens: 2 }),
+    });
+    const emit = vi.fn();
+    const request = createRequest([]);
+    request.emit = emit;
+
+    const result = await client.stream(request);
+
+    expect(emit.mock.calls.map(([event]) => event)).toEqual([
+      { type: "reasoning.delta", delta: "Thinking about it. " },
+      { type: "message.delta", delta: "Answer." },
+    ]);
+    expect(result.text).toBe("Answer.");
+  });
+
+  it("rethrows provider errors reported as stream parts", async () => {
+    const client = new AiSdkModelClient({ model: {} as any });
+    const providerError = new Error("429 Too Many Requests");
+    aiMocks.streamText.mockReturnValue({
+      fullStream: streamParts([
+        { type: "text-delta", id: "t1", text: "Par" },
+        { type: "error", error: providerError },
+      ]),
+      text: new Promise(() => undefined),
+      toolCalls: Promise.resolve([]),
+      usage: Promise.resolve(undefined),
+    });
+
+    await expect(client.stream(createRequest([]))).rejects.toBe(providerError);
+  });
+
+  it("wraps non-Error stream error parts", async () => {
+    const client = new AiSdkModelClient({ model: {} as any });
+    aiMocks.streamText.mockReturnValue({
+      fullStream: streamParts([{ type: "error", error: { code: "overloaded" } }]),
+      text: new Promise(() => undefined),
+      toolCalls: Promise.resolve([]),
+      usage: Promise.resolve(undefined),
+    });
+
+    await expect(client.stream(createRequest([]))).rejects.toThrow('{"code":"overloaded"}');
+  });
+
   it("rethrows error in generate if it doesn't match stream error criteria", async () => {
     const client = new AiSdkModelClient({ model: {} as any });
     aiMocks.generateText.mockRejectedValue(new Error("Normal Error"));
@@ -331,5 +380,13 @@ function createRequest(messages: AgentMessage[]): ModelGenerateRequest {
     tools: [],
     maxIterations: 1,
     toolContext: { agentId: "agent_test", sessionId: "session_test" },
+  };
+}
+
+function streamParts(parts: Array<Record<string, unknown>>): AsyncIterable<Record<string, unknown>> {
+  return {
+    async *[Symbol.asyncIterator]() {
+      yield* parts;
+    },
   };
 }

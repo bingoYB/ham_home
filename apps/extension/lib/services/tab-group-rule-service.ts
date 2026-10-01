@@ -1,4 +1,4 @@
-import type { JsonSchema } from "@hamhome/agent";
+import type { AgentCommand, JsonSchema } from "@hamhome/agent";
 import { z } from "zod";
 import type {
   TabGroupAICacheEntry,
@@ -7,8 +7,7 @@ import type {
   TabGroupRuleColor,
   TabGroupRuleMatchResult,
 } from "@/types";
-import { runExtensionCommand } from "@/lib/agent/command-runner";
-import { assertAgentConfigured, resolveAgentConfig } from "@/lib/agent/factory";
+import { createExtensionAgent } from "@/lib/agent/factory";
 import { containsPrivateContent } from "@/lib/privacy/privacy-detector";
 import { tabGroupRulesStorage } from "@/lib/storage/tab-group-rules-storage";
 
@@ -624,6 +623,17 @@ const AI_SYSTEM_PROMPT_EN = [
   "Length requirement: groupTitle must be no more than 5 Chinese characters or 2 English words.",
 ].join("\n");
 
+const suggestTabGroupCommand: AgentCommand<
+  Parameters<typeof buildAITabGroupPrompt>[0],
+  AITabGroupSuggestion
+> = {
+  name: "suggestTabGroup",
+  description: "Suggest a native browser tab group title.",
+  outputSchema: aiTabGroupSuggestionOutputSchema,
+  maxIterations: 1,
+  prompt: buildAITabGroupPrompt,
+};
+
 async function suggestAITabGroup(input: {
   url: string;
   title?: string;
@@ -632,31 +642,17 @@ async function suggestAITabGroup(input: {
   windowContext: WindowGroupingContext;
   customInstructions?: string;
 }): Promise<AITabGroupDecision> {
-  const config = await resolveAgentConfig();
-  assertAgentConfigured(config.rawConfig);
+  const { agent, config } = await createExtensionAgent();
+  const language = config.language === "zh" ? "zh" : "en";
 
-  const result = await runExtensionCommand<Record<string, never>, AITabGroupSuggestion>({
-    config,
-    temperature: 0.1,
-    maxIterations: 1,
-    systemPrompt:
-      config.language === "zh" ? AI_SYSTEM_PROMPT_ZH : AI_SYSTEM_PROMPT_EN,
-    command: {
-      name: "suggestTabGroup",
-      description: "Suggest a native browser tab group title.",
-      outputSchema: aiTabGroupSuggestionOutputSchema,
-      prompt: buildAITabGroupPrompt({
-        url: input.url,
-        title: input.title,
-        description: input.description,
-        metadata: input.metadata,
-        windowContext: input.windowContext,
-        customInstructions: input.customInstructions,
-        language: config.language === "zh" ? "zh" : "en",
-      }),
+  const result = await agent.commands.run(
+    suggestTabGroupCommand,
+    { ...input, language },
+    {
+      systemPrompt: language === "zh" ? AI_SYSTEM_PROMPT_ZH : AI_SYSTEM_PROMPT_EN,
+      temperature: 0.1,
     },
-    input: {},
-  });
+  );
 
   return normalizeAITabGroupSuggestion(aiTabGroupSuggestionSchema.parse(result.output));
 }

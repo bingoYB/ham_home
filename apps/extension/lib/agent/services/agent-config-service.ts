@@ -1,6 +1,8 @@
+import type { AIProvider } from "@/types";
 import { createExtensionAgent, resolveAgentConfig } from "../factory";
 import {
   getDefaultBaseUrl,
+  normalizeProviderBaseUrl,
   PROVIDER_DEFAULTS,
   requiresApiKey,
 } from "../provider-config";
@@ -11,17 +13,11 @@ export interface AvailableModelsResult {
 }
 
 class AgentConfigService {
-  private resolveModelsEndpoint(provider: string, baseUrl?: string): string {
-    const normalizedBaseUrl = (baseUrl || "").replace(/\/+$/, "");
+  private resolveModelsEndpoint(provider: AIProvider, baseUrl?: string): string {
+    const normalizedBaseUrl = normalizeProviderBaseUrl(provider, baseUrl);
 
     if (!normalizedBaseUrl) {
       throw new Error("请先配置 Base URL");
-    }
-
-    if (provider === "anthropic") {
-      return normalizedBaseUrl.endsWith("/v1")
-        ? `${normalizedBaseUrl}/models`
-        : `${normalizedBaseUrl}/v1/models`;
     }
 
     return normalizedBaseUrl.endsWith("/models")
@@ -92,17 +88,11 @@ class AgentConfigService {
 
   async testConnection(): Promise<{ success: boolean; message: string }> {
     try {
-      const { agent } = await createExtensionAgent({
-        name: "agent-config-test",
-        systemPrompt:
-          "You are a connection probe. Reply with exactly 'ok' and nothing else.",
-      });
-
-      const result = await agent.commands.run<{ prompt: string }, { success: boolean; message: string }>(
-        "testConnection",
-        { prompt: "Reply with exactly 'ok'." },
-        { temperature: 0, maxIterations: 1 },
-      );
+      const { agent } = await createExtensionAgent();
+      const result = await agent.commands.run<
+        Record<string, never>,
+        { success: boolean; message: string }
+      >("testConnection", {}, { temperature: 0, maxIterations: 1 });
 
       return {
         success: Boolean(result.output.success),

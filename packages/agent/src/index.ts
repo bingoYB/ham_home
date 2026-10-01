@@ -5,6 +5,7 @@ export {
   cosineSimilarity,
   createEmbeddingClient,
   rankBySimilarity,
+  supportsEmbeddingDimensions,
   type EmbeddingClient,
   type EmbeddingTestConnectionResult,
 } from "./llm/embedding";
@@ -21,6 +22,8 @@ export {
 export { EventBus } from "./core/events";
 export { DefaultSecurityPolicy, SecurityInterceptor, type DefaultSecurityPolicyOptions } from "./core/security";
 export { InMemory, IndexedDBMemory, type IndexedDBMemoryOptions, type InMemoryOptions } from "./memory/memory";
+export { TokenBudgetContextBuilder } from "./memory/context-window";
+export { estimateMessageTokens, estimateTextTokens, truncateTextToTokens } from "./utils/tokens";
 export { AiSdkModelClient } from "./llm/model";
 
 export { PageToolManager } from "./pages/pages";
@@ -28,12 +31,15 @@ export { resolveEmbeddingModel, resolveLanguageModel } from "./llm/providers";
 export {
   AgentSkillRuntime,
   InMemorySkillStore,
+  createActivateSkillTool,
   createDiscoverSkillTool,
   createFindSkillTool,
   createSkillViewTool,
   createUsageGuideSkill,
   defaultSkillMatcher,
   type AgentSkillRuntimeOptions,
+  type SkillResolveOptions,
+  type SkillRuntimeEvent,
 } from "./skills/skills";
 export {
   parseStructuredOutput,
@@ -48,6 +54,7 @@ export type {
   AgentContentPart,
   AgentSkill,
   ActiveSkill,
+  AiSdkProviderDefinition,
   AiSdkProviderName,
   AgentEvent,
   AgentMessage,
@@ -59,6 +66,8 @@ export type {
   CommandRunResult,
   CommandToolSelector,
   ContextBuilder,
+  ContextBuildInput,
+  ContextWindowOptions,
   DiscoverSkillInput,
   DiscoverSkillResult,
   DiscoverSkillToolOptions,
@@ -68,6 +77,7 @@ export type {
   FindSkillResult,
   FindSkillToolOptions,
   JsonSchema,
+  JsonSchemaTypeName,
   JsonValue,
 
   Memory,

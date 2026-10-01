@@ -1,5 +1,6 @@
 import type { Agent } from "../core/agent";
 import { CommandNotFoundError, ToolNotFoundError } from "../core/errors";
+import { InMemory } from "../memory/memory";
 import { parseStructuredOutput, validateJsonSchema } from "../utils/schema";
 import type {
   AgentCommand,
@@ -81,14 +82,26 @@ export class CommandRegistry {
     return this.list().map(({ prompt: _prompt, ...command }) => command);
   }
 
+  /**
+   * Runs a registered command by name, or a command definition directly.
+   * Passing a definition runs a one-off fixed task without registering it.
+   *
+   * Example:
+   * ```ts
+   * const { output } = await agent.commands.run(translateCommand, { text: "hello" });
+   * ```
+   */
   async run<TInput = unknown, TOutput = unknown>(
-    commandName: string,
+    commandOrName: string | AgentCommand<TInput, TOutput>,
     input: TInput,
     options: CommandRunOptions = {},
   ): Promise<CommandRunResult<TOutput>> {
-    const command = this.commands.get(commandName) as AgentCommand<TInput, TOutput> | undefined;
+    const command =
+      typeof commandOrName === "string"
+        ? (this.commands.get(commandOrName) as AgentCommand<TInput, TOutput> | undefined)
+        : commandOrName;
     if (!command) {
-      throw new CommandNotFoundError(commandName);
+      throw new CommandNotFoundError(commandOrName as string);
     }
 
     validateJsonSchema(command.inputSchema, input);
@@ -101,10 +114,13 @@ export class CommandRegistry {
     const { toolNames, unregisterTemporaryTools } = this.resolveTools(command, context);
     const prompt = this.renderPrompt(command, input, context);
     const attachments = this.resolveAttachments(command, input, context);
+    const useSessionMemory = options.useSessionMemory ?? command.useSessionMemory ?? false;
 
     try {
       const result = await this.agent.runCommand<TOutput>(prompt, {
         ...options,
+        // A fixed task gets its own memory unless it opts into the conversation.
+        memory: useSessionMemory ? undefined : new InMemory(),
         attachments: options.attachments ?? attachments,
         model: options.model ?? command.model,
         maxIterations: options.maxIterations ?? command.maxIterations,
@@ -117,6 +133,7 @@ export class CommandRegistry {
       const output = command.outputSchema ? parseStructuredOutput<TOutput>(result.text, command.outputSchema) : (result.text as TOutput);
 
       return {
+        runId: result.runId,
         command: command.name,
         output,
         rawMessage: result.rawMessage,

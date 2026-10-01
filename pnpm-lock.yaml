@@ -221,9 +221,6 @@ importers:
       '@ai-sdk/deepseek':
         specifier: ^2.0.35
         version: 2.0.35(zod@4.4.3)
-      '@ai-sdk/fal':
-        specifier: ^2.0.34
-        version: 2.0.34(zod@4.4.3)
       '@ai-sdk/fireworks':
         specifier: ^2.0.53
         version: 2.0.53(zod@4.4.3)
@@ -236,9 +233,6 @@ importers:
       '@ai-sdk/groq':
         specifier: ^3.0.39
         version: 3.0.39(zod@4.4.3)
-      '@ai-sdk/luma':
-        specifier: ^2.0.33
-        version: 2.0.33(zod@4.4.3)
       '@ai-sdk/mistral':
         specifier: ^3.0.37
         version: 3.0.37(zod@4.4.3)
@@ -674,12 +668,6 @@ packages:
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
 
-  '@ai-sdk/fal@2.0.34':
-    resolution: {integrity: sha512-g/YfKDGZgMDp0EY3+1X8EjWB4VX0l6WV80mD07wKJXZEtXzpAvNc1Bw0l58HWAsOENkKlIpfMR5akUHbjhylVw==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      zod: ^3.25.76 || ^4.1.8
-
   '@ai-sdk/fireworks@2.0.53':
     resolution: {integrity: sha512-HjeiGsdxSzrCkOf2l2V+K+opzlqxBtduBq6BCiohAdgQk2KdZmI/67SMkBM6Kdze/BjUXiZlv0d7zNICPhxVDA==}
     engines: {node: '>=18'}
@@ -706,12 +694,6 @@ packages:
 
   '@ai-sdk/groq@3.0.39':
     resolution: {integrity: sha512-BZAr6DjCbzWQ0Qn1/TSsHo/bmCt4JaAMb4A7HCSUZBQCAcOjne/03D0sVjHnQhUC3TpwcmYiv7tHAviK7BluRw==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      zod: ^3.25.76 || ^4.1.8
-
-  '@ai-sdk/luma@2.0.33':
-    resolution: {integrity: sha512-htvaJAfZUk5H3Hp7DNbWXA/QjMptVsgeHnqMF6ZFM36IQlGhgrYrVguooL0jGUOksKzOB2o8DH6Xe11wJxMOuw==}
     engines: {node: '>=18'}
     peerDependencies:
       zod: ^3.25.76 || ^4.1.8
@@ -7606,12 +7588,6 @@ snapshots:
       '@ai-sdk/provider-utils': 4.0.27(zod@4.4.3)
       zod: 4.4.3
 
-  '@ai-sdk/fal@2.0.34(zod@4.4.3)':
-    dependencies:
-      '@ai-sdk/provider': 3.0.10
-      '@ai-sdk/provider-utils': 4.0.27(zod@4.4.3)
-      zod: 4.4.3
-
   '@ai-sdk/fireworks@2.0.53(zod@4.4.3)':
     dependencies:
       '@ai-sdk/openai-compatible': 2.0.48(zod@4.4.3)
@@ -7640,12 +7616,6 @@ snapshots:
       zod: 4.4.3
 
   '@ai-sdk/groq@3.0.39(zod@4.4.3)':
-    dependencies:
-      '@ai-sdk/provider': 3.0.10
-      '@ai-sdk/provider-utils': 4.0.27(zod@4.4.3)
-      zod: 4.4.3
-
-  '@ai-sdk/luma@2.0.33(zod@4.4.3)':
     dependencies:
       '@ai-sdk/provider': 3.0.10
       '@ai-sdk/provider-utils': 4.0.27(zod@4.4.3)

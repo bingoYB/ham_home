@@ -86,12 +86,118 @@ describe("PageToolManager and CommandRegistry", () => {
       { maxSummaryLength: 120 },
     );
 
-    expect(modelClient.requests[0].tools.map((tool) => tool.name)).toEqual(["readPageContent", "skill_view", "discoverSkill"]);
+    // No skills are registered, so skill_view/discoverSkill have nothing to offer and stay hidden.
+    expect(modelClient.requests[0].tools.map((tool) => tool.name)).toEqual(["readPageContent"]);
     expect(result.output).toEqual({
       summary: "summary:hello page",
       tags: ["page", "test", "mvp"],
       category: "demo",
     });
+  });
+
+  it("runs an unregistered command definition with run-level prompt options", async () => {
+    const modelClient = new CommandModelClient();
+    const agent = createAgent({ modelClient, dynamicCapabilities: { enabled: false } });
+
+    const result = await agent.commands.run(
+      {
+        name: "describeImage",
+        prompt: (input: { topic: string }) => `describe ${input.topic}`,
+        maxIterations: 1,
+        outputSchema: {
+          type: "object",
+          properties: {
+            summary: { type: "string" },
+            tags: { type: "array", items: { type: "string" } },
+            category: { type: "string" },
+          },
+          required: ["summary", "tags", "category"],
+          additionalProperties: false,
+        },
+      },
+      { topic: "cat" },
+      {
+        systemPrompt: "You describe images.",
+        attachments: [{ type: "image", image: "aGVsbG8=", mediaType: "image/png" }],
+      },
+    );
+
+    const [request] = modelClient.requests;
+    expect(request.systemPrompt).toBe("You describe images.");
+    expect(request.messages.at(-1)).toMatchObject({
+      role: "user",
+      content: "describe cat",
+      attachments: [{ type: "image", image: "aGVsbG8=", mediaType: "image/png" }],
+    });
+    expect(result.output).toMatchObject({ category: "demo" });
+    expect(agent.commands.get("describeImage")).toBeUndefined();
+  });
+
+  it("drops the agent's base system prompt for commands that ignore it", async () => {
+    const modelClient = new CommandModelClient();
+    const agent = createAgent({ modelClient, systemPrompt: "You are a chat assistant." });
+
+    await agent.commands.run(
+      { name: "standalone", prompt: "classify", ignoreBaseSystemPrompt: true },
+      {},
+      { systemPrompt: "You classify text." },
+    );
+    await agent.commands.run({ name: "inherits", prompt: "classify" }, {}, { systemPrompt: "You classify text." });
+
+    expect(modelClient.requests[0].systemPrompt).toBe("You classify text.");
+    expect(modelClient.requests[1].systemPrompt).toBe("You are a chat assistant.\n\nYou classify text.");
+  });
+
+  it("runs commands on a throwaway memory by default", async () => {
+    const modelClient = new CommandModelClient();
+    const agent = createAgent({ modelClient });
+    await agent.run("earlier chat message");
+    const memoryBefore = await agent.exportMemory();
+
+    const result = await agent.commands.run({ name: "classify", prompt: "classify this" }, {});
+
+    const commandRequest = modelClient.requests.at(-1)!;
+    expect(commandRequest.messages.map((message) => message.content)).toEqual(["classify this"]);
+    expect(await agent.exportMemory()).toEqual(memoryBefore);
+    expect(result.runId).toMatch(/^run_/);
+  });
+
+  it("runs a command inside the conversation when it opts into session memory", async () => {
+    const modelClient = new CommandModelClient();
+    const agent = createAgent({ modelClient });
+    await agent.run("earlier chat message");
+    const inConversation = { name: "followUp", prompt: "summarize the chat", useSessionMemory: true };
+
+    await agent.commands.run(inConversation, {});
+    const commandRequest = modelClient.requests.at(-1)!;
+    // The run-level option overrides the command definition.
+    await agent.commands.run(inConversation, {}, { useSessionMemory: false });
+    const overriddenRequest = modelClient.requests.at(-1)!;
+
+    expect(commandRequest.messages.map((message) => message.content)).toEqual([
+      "earlier chat message",
+      expect.any(String),
+      "summarize the chat",
+    ]);
+    expect(overriddenRequest.messages.map((message) => message.content)).toEqual(["summarize the chat"]);
+    expect((await agent.exportMemory()).map((message) => message.content)).toEqual([
+      "earlier chat message",
+      expect.any(String),
+      "summarize the chat",
+      expect.any(String),
+    ]);
+  });
+
+  it("writes session-memory commands into the given session", async () => {
+    const agent = createAgent({ modelClient: new CommandModelClient() });
+    const activeSessionId = agent.sessionId;
+
+    await agent.commands.run({ name: "note", prompt: "remember this" }, {}, { useSessionMemory: true, sessionId: "notes" });
+
+    expect(await agent.exportMemory()).toEqual([]);
+    await agent.switchSession("notes");
+    expect((await agent.exportMemory()).map((message) => message.content)).toEqual(["remember this", expect.any(String)]);
+    expect(activeSessionId).not.toBe("notes");
   });
 
   it("validates command input and duplicate command names", async () => {

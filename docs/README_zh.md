@@ -27,19 +27,23 @@
 
 HamHome 是一款 AI 浏览器工作台，将书签、网页快照和标签页工作空间放在一起，帮助你保存值得留住的内容，也保存下次继续工作的现场。
 
-- **收藏时，少做整理**：保存网页后，用 AI 生成摘要、分类和标签，并保留快照供离线阅读。
-- **需要时，更容易找回**：用关键词或语义搜索查找收藏，也可以让内置 Agent 帮你搜索、总结已保存的内容。
+- **收藏时，少做整理**：保存网页后，用 AI 生成摘要、分类和标签，保留快照与页面截图；也可以只剪藏需要的那段文字或那张图片。
+- **需要时，更容易找回**：用关键词或语义搜索查找收藏，在视觉画廊里按页面截图浏览，也可以让内置 Agent 帮你搜索、总结已保存的内容。
 - **回来时，接着上次继续**：把一组标签页保存为工作空间，按需恢复；用分组规则整理正在浏览的页面。
 
 **本地优先，AI 自选。** 数据默认保存在浏览器本地，无需注册 HamHome 账号。AI 功能需连接你选择的服务，相关内容会发送给该服务处理；你也可以按需启用 WebDAV 同步或文件导入导出。
 
 ## 产品截图
 
-| **快速保存弹窗** | **书签库** |
+| **页内快速保存** | **图片剪藏** |
 | :--: | :--: |
-| ![快速保存弹窗](../apps/extension/output/screenshots/zh-light/01-popup-save.png) | ![书签库](../apps/extension/output/screenshots/zh-light/02-bookmark-library.png) |
+| ![页内快速保存](../apps/extension/output/screenshots/zh-light/01-popup-save.png) | ![图片剪藏](../apps/extension/output/screenshots/zh-light/11-image-clip-save.png) |
+| **书签库** | **视觉画廊** |
+| ![书签库](../apps/extension/output/screenshots/zh-light/02-bookmark-library.png) | ![视觉画廊](../apps/extension/output/screenshots/zh-light/10-visual-gallery.png) |
 | **批量整理书签** | **网页内侧边面板** |
 | ![批量整理书签](../apps/extension/output/screenshots/zh-light/03-bookmark-bulk-actions.png) | ![网页内侧边面板](../apps/extension/output/screenshots/zh-light/04-content-panel.png) |
+| **书签健康中心** | **回收站** |
+| ![书签健康中心](../apps/extension/output/screenshots/zh-light/12-health-center.png) | ![回收站](../apps/extension/output/screenshots/zh-light/13-trash.png) |
 | **AI Agent** | **工作空间** |
 | ![AI Agent](../apps/extension/output/screenshots/zh-light/05-ai-agent.png) | ![工作空间](../apps/extension/output/screenshots/zh-light/06-workspaces.png) |
 | **Tab 分组规则** | **导入导出与同步** |
@@ -49,10 +53,32 @@ HamHome 是一款 AI 浏览器工作台，将书签、网页快照和标签页�
 
 ### AI 辅助收藏
 
-- 支持通过插件弹窗、右键菜单、快捷键或网页内面板保存当前页面。
+- 支持通过工具栏快捷面板、右键菜单或快捷键保存当前页面。保存表单直接在当前网页内浮窗完成，AI 分析期间不打断浏览；也可以在设置中切换回在扩展弹窗内保存。
 - 使用 Defuddle、Mozilla Readability 与 SingleFile 风格捕获提取页面元信息、正文和快照。
 - 配置 AI 后，可生成摘要、分类、标签，并可按需翻译内容。
+- 保存时可同时截取当前可见区域的页面截图，与 HTML/Markdown 快照相互独立；截图时会隐藏 HamHome 自身界面，隐私页面默认跳过截图。
 - 在书签管理页对已有书签进行批量 AI 重新分析。
+
+### 文字与图片剪藏
+
+- 选中文字后右键即可保存为文字剪藏，书签保留原文，并通过 Text Fragment 在打开来源页时定位到这段文字。
+- 右键图片即可保存为图片剪藏，记录来源页、图片地址、尺寸、格式和主色。
+- 使用支持图像输入的模型时，AI 会为图片剪藏生成标题、摘要、分类和标签；图片分析可在设置中关闭，隐私页面上的图片始终不会发送。
+- 剪藏会以文字卡片、图片卡片的形式出现在收藏库中，并可按内容类型（书签 / 图片 / 文本）筛选。
+
+### 收藏库视图与筛选
+
+- 支持瀑布流卡片、紧凑列表和由页面截图组成的视觉画廊三种视图；悬停卡片即可预览保存时的截图。
+- 可按分类、标签、内容类型、时间范围（含日历选择的自定义时间范围）或自定义筛选器定位书签。
+- 对选中书签批量打标签、迁移分类、删除、同步快照到 Obsidian 或重新 AI 整理。
+- 书签列表、标签筛选和体检列表均为虚拟滚动，大量书签时依然流畅。
+
+### 书签健康中心与回收站
+
+- 可随时手动体检，也可设置每周或每月自动检查链接状态。只有 `404` / `410` 会被判定为失效；需要登录、访问受限、服务异常和超时会单独标记，不误判为死链。
+- 网址发生跳转时可一键采用新地址；按规范化网址（忽略追踪参数和锚点）识别重复书签，未体检也能直接筛出。
+- 一键清理重复项，每组保留最早收藏的一条。图片与文字剪藏不参与体检。
+- 删除的书签连同正文、快照、截图和剪藏先进入回收站，30 天内可随时恢复；到期或彻底删除后只保留轻量墓碑，让删除结果同步到其他设备。
 
 ### AI Agent 与搜索
 
@@ -77,35 +103,35 @@ HamHome 是一款 AI 浏览器工作台，将书签、网页快照和标签页�
 - AI 自动分组会参考标题、URL、页面元数据、已有分组名称和自定义分组要求，并按域名与要求缓存结果。
 - Chromium 浏览器通过 `chrome.tabGroups` 自动执行规则；Firefox 可保存规则，但原生自动分组取决于浏览器 API 支持。
 
-### 网页快照与 Obsidian
+### 网页快照、页面截图与 Obsidian
 
 - 支持保存本地 HTML 或 Markdown 快照，用于离线查看。
-- 可在书签管理页查看、下载、更新或删除快照。
+- 可在书签管理页查看、下载、更新或删除快照；在截图查看器中查看、下载或删除页面截图。
 - 支持通过 `obsidian://new` 流程把 Markdown 风格书签笔记同步到 Obsidian，并带剪贴板兜底和内容未变跳过逻辑。
-- 可在设置中查看与清理快照占用。
+- 可在设置中查看快照与页面截图的占用。
 
 ### 导入、导出与同步
 
-- JSON 完整备份包含书签、分类、工作空间、工作空间分类、Tab 分组规则和自动分组设置。
+- JSON 完整备份包含书签、剪藏、分类、工作空间、工作空间分类、Tab 分组规则和自动分组设置。
 - 可导出可直接浏览的 HTML 书签页。
 - 可导入 HamHome JSON 备份，或导入 Chrome、Firefox、Edge 等浏览器的标准书签 HTML 文件。
 - 可通过浏览器 bookmarks API 直接导入原生书签，支持保留目录层级或启用 AI 分析。
 - 可把 HamHome 中整理好的书签反向写回浏览器书签栏，并配置根文件夹、是否先清空、是否跳过重复项。
-- WebDAV 会在 `/HamHomeSync` 下同步结构化数据：设置、书签/分类数据、书签正文、工作空间、工作空间分类和 Tab 分组配置。本地 HTML/Markdown 快照 Blob 不作为 WebDAV 完整快照同步内容，除非通过导出或 Obsidian 工作流另行处理。
+- WebDAV 会在 `/HamHomeSync` 下同步结构化数据：设置、书签/分类数据、书签正文、剪藏、工作空间、工作空间分类和 Tab 分组配置。书签按网址对齐身份，多台设备同步不会产生重复；删除以墓碑形式同步；认证先尝试 Basic，服务器要求时自动切换 Digest。本地 HTML/Markdown 快照文件和页面截图默认只在本机，除非手动下载或通过 Obsidian 工作流另行处理。
 
 ### 存储与隐私保护
 
 - 主要数据保存在浏览器存储和 IndexedDB 中，无需 HamHome 托管账号。
 - 自带 AI Key 与端点。聊天模型 Provider 支持 OpenAI、Anthropic、Google Gemini、Azure OpenAI、DeepSeek、Groq、Mistral、Moonshot/Kimi、智谱/GLM、腾讯混元、NVIDIA NIM、SiliconFlow、Ollama 和自定义 OpenAI 兼容 API。
 - Embedding 可独立配置。语义搜索支持 OpenAI、Google、Azure、Mistral、智谱、混元、NVIDIA、SiliconFlow、Ollama 和自定义 OpenAI 兼容 API。
-- 可通过隐私域名和自动隐私检测，跳过敏感站点的 AI 分析。
+- 可通过隐私域名和自动隐私检测，让敏感站点跳过 AI 分析和页面截图。
 - API Key、Base URL、隐私域名、WebDAV 凭据和浏览器快捷键必须由用户手动配置；Agent 不会读取或代填这些敏感项。
 
 ### 现代扩展界面
 
-- 主应用包含书签、分类、标签、工作空间、Tab 分组、导入导出、隐私、设置和关于页面。
-- 弹窗保存面板适合快速收藏当前网页。
-- 网页内边缘触发书签面板支持左/右位置。
+- 主应用包含书签、书签体检、工作空间、Tab 分组、分类、标签、隐私、导入导出、回收站、设置和关于页面。
+- 工具栏快捷面板：一键保存当前页、打开书签面板，查看最近保存与常用设置。
+- 网页内边缘触发书签面板支持左/右位置，也可在设置中关闭。
 - 支持浅色、深色、跟随系统主题，以及中英文国际化。
 - 提供同步状态、快捷键展示、自定义筛选器、标签云、存储统计和向量索引控制。
 
@@ -185,7 +211,7 @@ pnpm --filter hamhome screenshots
 - **UI**：shadcn/ui 风格组件、Radix UI、lucide-react、共享 `@hamhome/ui` 与 `@hamhome/ui-business`
 - **AI**：`@hamhome/agent`、Provider 适配、Embedding 队列、混合检索
 - **内容提取**：Defuddle、Mozilla Readability、SingleFile 风格捕获、Turndown/Markdown 工作流
-- **存储**：WXT Storage、浏览器存储 API、IndexedDB 快照/AI 缓存/向量数据
+- **存储**：WXT Storage、浏览器存储 API、IndexedDB 快照/页面截图/AI 缓存/向量数据
 - **同步**：WebDAV、gzip 压缩书签正文分片、同步锁、本地凭据混淆
 - **测试**：Vitest + Playwright 扩展 E2E + 自动截图套件
 

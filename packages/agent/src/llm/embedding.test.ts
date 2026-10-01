@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { allProviders } from "./provider-definitions";
 import { AiSdkEmbeddingClient, cosineSimilarity, rankBySimilarity, type EmbeddingClient, type EmbeddingTestConnectionResult } from "./embedding";
 
 class MockEmbeddingClient implements EmbeddingClient {
@@ -90,6 +91,7 @@ describe("embedding utilities", () => {
     // Use an invalid config to trigger a connection failure
     const client = new AiSdkEmbeddingClient({
       provider: "openai",
+      providers: allProviders,
       model: "text-embedding-3-small",
       apiKey: "invalid-key-for-test",
       maxRetries: 0,

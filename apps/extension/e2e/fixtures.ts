@@ -36,17 +36,28 @@ type ExtensionFixtures = {
   e2eVariant: E2EVariant;
 };
 
-export const test = base.extend<ExtensionFixtures>({
+export type ExtensionOptions = {
+  /**
+   * 浏览器区域设置（影响 toLocaleString 等日期格式）。
+   * 默认不设置，沿用系统区域；截图项目按界面语言单独指定。
+   */
+  browserLocale: string | undefined;
+};
+
+export const test = base.extend<ExtensionFixtures & ExtensionOptions>({
+  browserLocale: [undefined, { option: true }],
+
   e2eVariant: async ({}, use, testInfo) => {
     await use(resolveE2EVariant(testInfo.project.name));
   },
 
-  context: async ({ e2eVariant }, use) => {
+  context: async ({ e2eVariant, browserLocale }, use) => {
     const headed = process.env.HEADED === "1";
     const context = await chromium.launchPersistentContext("", {
       // 新版无头 Chromium 支持加载扩展；HEADED=1 时显示窗口
       channel: "chromium",
       headless: !headed,
+      locale: browserLocale,
       args: [
         `--disable-extensions-except=${CHROME_MV3_DIR}`,
         `--load-extension=${CHROME_MV3_DIR}`,

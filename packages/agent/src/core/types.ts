@@ -8,8 +8,11 @@ export type JsonValue =
   | JsonValue[]
   | { [key: string]: JsonValue };
 
+export type JsonSchemaTypeName = "object" | "array" | "string" | "number" | "integer" | "boolean" | "null";
+
 export type JsonSchema = {
-  type?: "object" | "array" | "string" | "number" | "integer" | "boolean" | "null";
+  /** A single type, or a union such as `["string", "null"]` for nullable fields. */
+  type?: JsonSchemaTypeName | JsonSchemaTypeName[];
   description?: string;
   properties?: Record<string, JsonSchema>;
   required?: string[];
@@ -92,6 +95,8 @@ export interface Memory {
 export interface ToolExecutionContext {
   agentId: string;
   sessionId: string;
+  /** Id of the run that called the tool; matches `AgentEvent.runId`. */
+  runId?: string;
   toolCallId?: string;
   pageId?: string;
   moduleId?: string;
@@ -135,13 +140,22 @@ export interface ToolInterceptor {
   afterExecute?(toolName: string, input: unknown, output: unknown, context: ToolExecutionContext): Promise<unknown> | unknown;
 }
 
-export type AgentEvent =
+/**
+ * Lifecycle event. Events emitted while a run is in progress carry that run's
+ * `runId`, so listeners on a shared agent can tell concurrent runs apart; tool
+ * call events also carry the model's `toolCallId` when it provides one.
+ * Registry events emitted outside a run (`tool.registered`, `page.changed`,
+ * ...) have no `runId`.
+ */
+export type AgentEvent = (
   | { type: "message.delta"; delta: string }
+  /** Streamed reasoning ("thinking") text from models that expose it; `runStream()` only. */
+  | { type: "reasoning.delta"; delta: string }
   | { type: "message.completed"; message: AgentMessage }
-  | { type: "tool.call.started"; toolName: string; input: unknown }
+  | { type: "tool.call.started"; toolCallId?: string; toolName: string; input: unknown }
   | { type: "tool.call.requires_action"; toolCallId: string; toolName: string; input: unknown; reason?: string }
-  | { type: "tool.call.completed"; toolName: string; input: unknown; output: unknown }
-  | { type: "tool.call.failed"; toolName: string; input: unknown; error: Error }
+  | { type: "tool.call.completed"; toolCallId?: string; toolName: string; input: unknown; output: unknown }
+  | { type: "tool.call.failed"; toolCallId?: string; toolName: string; input: unknown; error: Error }
   | { type: "agent.iteration.started"; iteration: number }
   | { type: "agent.completed"; result: AgentRunResult }
   | { type: "agent.failed"; error: Error }
@@ -149,6 +163,8 @@ export type AgentEvent =
   | { type: "tool.unregistered"; toolName: string }
   | { type: "page.changed"; pageId: string; previousPageId?: string }
   | { type: "agent.invocationMode.fixed"; mode: "chat" | "response" }
+  /** Earlier turns no longer fit the context window; `summarized` tells whether they were summarized or dropped. */
+  | { type: "context.compacted"; droppedMessages: number; summarized: boolean }
   | { type: "skill.registered"; skillId: string; source?: SkillSource }
   | { type: "skill.unregistered"; skillId: string }
   | { type: "skill.reconciled"; result: SkillReconcileResult }
@@ -156,12 +172,18 @@ export type AgentEvent =
   | { type: "skill.unmounted"; skillId: string }
   | { type: "skill.tool.mounted"; skillId: string; toolName: string; reason: string }
   | { type: "skill.tool.unmounted"; skillId: string; toolName: string }
-  | { type: "skill.matched"; matches: SkillMatchResult[] };
+  | { type: "skill.matched"; matches: SkillMatchResult[] }
+) & { runId?: string };
 
 export type EventHandler<TEvent extends AgentEvent = AgentEvent> = (event: TEvent) => void;
 
 export interface AgentRunOptions {
   signal?: AbortSignal;
+  /**
+   * Id stamped on this run's events, tool contexts and result. Defaults to a
+   * generated id; pass your own (e.g. a UI turn id) to correlate them.
+   */
+  runId?: string;
   /** Multimodal attachments appended to the user message of this run. */
   attachments?: AgentContentPart[];
   maxIterations?: number;
@@ -175,11 +197,18 @@ export interface AgentRunOptions {
 }
 
 export interface AgentRunResult<TOutput = unknown> {
+  runId: string;
   text: string;
   output?: TOutput;
   rawMessage: AgentMessage;
   toolCalls: ToolCallSummary[];
   usage?: LanguageModelUsage | Record<string, unknown>;
+  /**
+   * Skills to keep active in the next turn: the pinned Skills of this run
+   * plus the ones the model activated. Pass it back as
+   * `skillContext.pinnedSkillIds` when the next turn uses a new agent.
+   */
+  pinnedSkillIds: string[];
 }
 
 export interface ModelGenerateRequest {
@@ -224,7 +253,6 @@ export type AiSdkProviderName =
   | "azure"
   | "amazon-bedrock"
   | "groq"
-  | "fal"
   | "deepinfra"
   | "mistral"
   | "togetherai"
@@ -232,27 +260,60 @@ export type AiSdkProviderName =
   | "fireworks"
   | "deepseek"
   | "cerebras"
-  | "perplexity"
-  | "luma";
+  | "perplexity";
+
+/**
+ * An AI SDK provider the agent can resolve by name. The core runtime bundles no
+ * provider: import the definitions you need from `@hamhome/agent/providers`
+ * and pass them in `providers`, so unused providers stay out of the bundle.
+ *
+ * Example:
+ * ```ts
+ * import { openaiProvider } from "@hamhome/agent/providers";
+ * createAgent({ providers: [openaiProvider], provider: "openai", model: "gpt-4.1-mini" });
+ * ```
+ */
+export interface AiSdkProviderDefinition {
+  name: AiSdkProviderName;
+  /** Model kinds the provider exposes; resolving any other kind fails early. */
+  supports: { language: boolean; embedding: boolean };
+  /**
+   * Creates the AI SDK provider from the factory options: `providerOptions`
+   * merged with the resolved `apiKey` and `baseURL`.
+   */
+  create(options: Record<string, unknown>): unknown;
+}
 
 export interface AiSdkProviderConfig {
   provider?: AiSdkProviderName;
+  /** Providers that `provider` may name. Not needed when `model` is a model instance. */
+  providers?: AiSdkProviderDefinition[];
   model?: string | LanguageModel;
   apiKey?: string;
   tokenProvider?: TokenProvider;
   baseUrl?: string;
+  /** Extra settings for the provider factory (e.g. `headers`), not per-call model options. */
   providerOptions?: Record<string, unknown>;
   invocationMode?: InvocationMode;
 }
 
 export interface EmbeddingClientConfig {
   provider?: AiSdkProviderName;
+  /** Providers that `provider` may name. Not needed when `model` is a model instance. */
+  providers?: AiSdkProviderDefinition[];
   model: string | EmbeddingModel;
   apiKey?: string;
   tokenProvider?: TokenProvider;
   baseUrl?: string;
+  /** Extra settings for the provider factory (e.g. `headers`), not per-call model options. */
   providerOptions?: Record<string, unknown>;
   maxRetries?: number;
+  /**
+   * Output vector size for models that support shortened embeddings. Forwarded
+   * to OpenAI / Azure / OpenAI-compatible (`dimensions`) and Google
+   * (`outputDimensionality`); other providers ignore it.
+   */
+  dimensions?: number;
 }
 
 export interface AgentConfig extends AiSdkProviderConfig {
@@ -270,12 +331,16 @@ export interface AgentConfig extends AiSdkProviderConfig {
   skills?: AgentSkill[];
   skillStore?: SkillStore;
   embeddingClient?: EmbeddingClient;
+  /** Custom history selection; takes precedence over `contextWindow`. */
   contextBuilder?: ContextBuilder;
+  /** Fits the history sent per model call into a token budget. Off by default. */
+  contextWindow?: ContextWindowOptions;
   dynamicCapabilities?: DynamicCapabilityOptions;
   skillMatcher?: SkillMatcher;
   skillView?: SkillViewToolOptions;
   discoverSkill?: DiscoverSkillToolOptions;
   findSkill?: FindSkillToolOptions;
+  /** Token budget for Skill documents returned by `skill_view` and `activateSkill`. */
   maxSkillContextTokens?: number;
 }
 
@@ -312,15 +377,25 @@ export interface AgentCommand<TInput = unknown, TOutput = unknown> {
   maxIterations?: number;
   metadata?: Record<string, unknown>;
   ignoreBaseSystemPrompt?: boolean;
+  /**
+   * Run inside the conversation: read its history and store the prompt, tool
+   * calls and output in it. Defaults to false, so a fixed task runs on a
+   * throwaway memory and neither sees nor grows the session.
+   */
+  useSessionMemory?: boolean;
 }
 
 export interface CommandRunOptions extends AgentRunOptions {
   model?: string | LanguageModel;
+  /** Session used when the command runs with session memory. Defaults to the active session. */
   sessionId?: string;
   ignoreBaseSystemPrompt?: boolean;
+  /** Overrides `AgentCommand.useSessionMemory` for this run. */
+  useSessionMemory?: boolean;
 }
 
 export interface CommandRunResult<TOutput = unknown> {
+  runId: string;
   command: string;
   output: TOutput;
   rawMessage: AgentMessage;
@@ -343,6 +418,8 @@ export interface EmbeddingTestConnectionResult {
   message: string;
   latencyMs: number;
   error?: string;
+  /** Vector size returned by the model; only set on success. */
+  dimensions?: number;
 }
 
 export interface EmbeddingClient {
@@ -465,6 +542,11 @@ export interface SkillViewToolOptions {
 export interface DiscoverSkillToolOptions {
   enabled?: boolean;
   keepWhenToolsRestricted?: boolean;
+  /**
+   * Also expose `activateSkill`, which mounts a discovered Skill's tools for
+   * the rest of the run. Defaults to true.
+   */
+  allowActivation?: boolean;
 }
 
 export interface SkillRequestContext {
@@ -475,12 +557,25 @@ export interface SkillRequestContext {
   userInput?: string;
   tags?: string[];
   metadata?: Record<string, unknown>;
+  /**
+   * Skills kept active for this run even when the request does not match
+   * them, usually `AgentRunResult.pinnedSkillIds` of the previous turn.
+   * When set, it replaces what the agent remembers for the session, so pass
+   * `[]` to drop every pinned Skill.
+   */
+  pinnedSkillIds?: string[];
 }
 
 export interface SkillPromptIndexOptions {
   activeOnly?: boolean;
   includeWhenToUse?: boolean;
   maxItems?: number;
+  /** `buildPromptIndex` only: include the skill_view guidance. Defaults to true. */
+  skillViewEnabled?: boolean;
+  /** `buildPromptIndex` only: include the discoverSkill guidance. Defaults to true. */
+  discoverSkillEnabled?: boolean;
+  /** `buildPromptIndex` only: include the activateSkill guidance. Defaults to false. */
+  activateSkillEnabled?: boolean;
 }
 
 export interface FindSkillInput {
@@ -539,6 +634,8 @@ export interface SkillViewResult {
   skill: SkillMetadata;
   active: boolean;
   documents?: SkillDocument[];
+  /** Documents left out because they did not fit `maxSkillContextTokens`. */
+  omittedDocumentIds?: string[];
   tools?: Array<Omit<AgentTool, "execute">>;
   metadata?: Record<string, unknown>;
 }
@@ -571,15 +668,51 @@ export interface SkillReconcileResult {
   unmountedSkillIds: string[];
   mountedToolNames: string[];
   unmountedToolNames: string[];
+  /** Requested pinned Skills that exist, are enabled and model-invocable. */
+  pinnedSkillIds: string[];
 }
 
+/**
+ * Chooses which stored messages are sent with each model call. The agent calls
+ * it before every model step with the full session history; what it returns
+ * is sent but never stored.
+ */
 export interface ContextBuilder {
-  build(input: {
-    sessionId: string;
-    userInput: string;
-    pageId?: string;
-    messages: AgentMessage[];
-    activeSkills: ActiveSkill[];
-    maxTokens?: number;
-  }): Promise<AgentMessage[]>;
+  build(input: ContextBuildInput): Promise<AgentMessage[]>;
+}
+
+export interface ContextBuildInput {
+  sessionId: string;
+  userInput: string;
+  pageId?: string;
+  messages: AgentMessage[];
+  activeSkills: ActiveSkill[];
+  maxTokens?: number;
+  signal?: AbortSignal;
+  /**
+   * Runs one plain completion with the agent's model, without tools or
+   * history. Provided by the agent, e.g. for summarizing dropped turns.
+   */
+  generateText?: (request: { systemPrompt: string; prompt: string; signal?: AbortSignal }) => Promise<string>;
+  /** Reports turns that no longer fit; the agent emits `context.compacted`. */
+  onCompacted?: (info: { droppedMessages: number; summarized: boolean }) => void;
+}
+
+/**
+ * Token budget for the history sent with each model call. When the history
+ * is over budget, the oldest turns go first; the newest turn is always kept.
+ */
+export interface ContextWindowOptions {
+  /** Estimated tokens of history sent per model call. */
+  maxTokens: number;
+  /** Tool results longer than this are cut down before sending, even under budget. */
+  maxToolResultTokens?: number;
+  /**
+   * Summarize turns that no longer fit with the agent's model instead of
+   * dropping them silently. Costs one extra model call whenever more turns
+   * fall out of the window. Defaults to false.
+   */
+  summarize?: boolean;
+  /** Replaces the built-in estimate (about 4 characters or 1 CJK character per token). */
+  estimateTokens?: (message: AgentMessage) => number;
 }

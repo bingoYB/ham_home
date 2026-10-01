@@ -1,13 +1,22 @@
 import type { LanguageModel } from "ai";
 import { CommandRegistry } from "../tools/commands";
-import { ToolExecutionError, ToolNotFoundError } from "./errors";
+import { ToolExecutionError, ToolNotFoundError, ToolPermissionError } from "./errors";
 import { EventBus } from "./events";
+import { TokenBudgetContextBuilder } from "../memory/context-window";
 import { InMemory } from "../memory/memory";
 import { AiSdkModelClient } from "../llm/model";
 import { PageToolManager } from "../pages/pages";
-import { AgentSkillRuntime, createDiscoverSkillTool, createSkillViewTool } from "../skills/skills";
-import { ToolRegistry } from "../tools/tools";
+import {
+  AgentSkillRuntime,
+  PINNED_SKILL_REASON,
+  createActivateSkillTool,
+  createDiscoverSkillTool,
+  createSkillViewTool,
+} from "../skills/skills";
+import { ToolRegistry, executeWithInterceptors } from "../tools/tools";
+import { createAbortError, forwardAbort, throwIfAborted, waitUnlessAborted } from "../utils/abort";
 import { validateJsonSchema } from "../utils/schema";
+import { mergeUsage } from "../utils/usage";
 import type {
   AgentConfig,
   AgentEvent,
@@ -15,9 +24,15 @@ import type {
   AgentRunOptions,
   AgentRunResult,
   JsonSchema,
+  Memory,
   MemoryEntry,
   MemorySession,
+  ContextBuilder,
   ModelClient,
+  ModelGenerateRequest,
+  ModelGenerateResult,
+  SecurityPolicy,
+  SkillReconcileResult,
   ToolExecutionContext,
   ToolCallSummary,
   AgentTool,
@@ -28,11 +43,28 @@ interface InternalRunOptions extends AgentRunOptions {
   model?: string | LanguageModel;
   outputSchema?: JsonSchema;
   invocationMode?: "response" | "chat" | "auto";
+  /** Session the run reads and writes. Defaults to the active session. */
   sessionId?: string;
+  /** Memory the run reads and writes. Defaults to the agent's memory. */
+  memory?: Memory;
   ignoreBaseSystemPrompt?: boolean;
 }
 
+/** Per-run values copied into every tool execution context of the run. */
+interface RunToolContext {
+  runId: string;
+  sessionId: string;
+  signal?: AbortSignal;
+  metadata?: Record<string, unknown>;
+  skillContext: SkillRequestContext;
+}
+
 type ModelCallMode = "generate" | "stream";
+
+/** Appended to the system prompt of the extra step that follows an exhausted tool loop. */
+const FINAL_ANSWER_INSTRUCTION =
+  "The tool-call limit for this request has been reached. Do not call any more tools. " +
+  "Answer the user now using the tool results gathered so far, and briefly say what is still missing if the task is incomplete.";
 
 /**
  * Main runtime entry for conversation, tool execution, page tools and commands.
@@ -54,17 +86,22 @@ export class Agent {
   private activeSessionId: string;
   private readonly memory;
   private readonly modelClient: ModelClient;
+  private readonly contextBuilder?: ContextBuilder;
   private readonly defaultMaxIterations: number;
   private readonly defaultTemperature?: number;
   private readonly baseSystemPrompt?: string;
   private fixedInvocationMode?: "response" | "chat";
   private pendingApprovals = new Map<string, (approved: boolean) => void>();
+  /** Skills the model activated, per session, kept active in later runs. */
+  private readonly pinnedSkillsBySession = new Map<string, string[]>();
 
   constructor(private readonly config: AgentConfig) {
     this.agentId = config.agentId ?? createId("agent");
     this.activeSessionId = config.sessionId ?? createId("session");
     this.memory = config.memory ?? new InMemory({ maxMessages: 40 });
     this.modelClient = config.modelClient ?? new AiSdkModelClient(config);
+    this.contextBuilder =
+      config.contextBuilder ?? (config.contextWindow ? new TokenBudgetContextBuilder(config.contextWindow) : undefined);
     this.defaultMaxIterations = config.maxIterations ?? 5;
     this.defaultTemperature = config.temperature;
     this.baseSystemPrompt = config.systemPrompt;
@@ -120,7 +157,11 @@ export class Agent {
   }
 
   /**
-   * Runs the agent and yields lifecycle events as they happen.
+   * Runs the agent and yields this run's lifecycle events as they happen.
+   * Only events stamped with this run's `runId` are yielded, so concurrent
+   * runs on the same agent never leak into each other's stream. Leaving the
+   * loop early (`break`, `return` or a thrown error) aborts the run, so an
+   * abandoned stream stops calling the model and tools.
    *
    * Example:
    * ```ts
@@ -128,17 +169,23 @@ export class Agent {
    * ```
    */
   async *runStream(input: string, options: AgentRunOptions = {}): AsyncIterable<AgentEvent> {
+    const runId = options.runId ?? createId("run");
+    const controller = new AbortController();
+    const stopForwarding = forwardAbort(options.signal, controller);
     const queue: AgentEvent[] = [];
     let wake: (() => void) | undefined;
     let done = false;
     let failure: Error | undefined;
     const off = this.on((event) => {
+      if (event.runId !== runId) {
+        return;
+      }
       queue.push(event);
       wake?.();
     });
 
     try {
-      void this.runInternal(input, options, "stream")
+      void this.runInternal(input, { ...options, runId, signal: controller.signal }, "stream")
         .catch((error: unknown) => {
           failure = error instanceof Error ? error : new Error(String(error));
         })
@@ -163,10 +210,15 @@ export class Agent {
       }
     } finally {
       off();
+      stopForwarding();
+      if (!done) {
+        controller.abort(createAbortError("The run stream was closed before the run finished."));
+      }
     }
   }
 
   clearMemory(): Promise<void> | void {
+    this.pinnedSkillsBySession.delete(this.sessionId);
     return this.memory.clear({ sessionId: this.sessionId });
   }
 
@@ -233,6 +285,7 @@ export class Agent {
    * Deletes a conversation session and switches to the newest remaining session.
    */
   async deleteSession(sessionId: string): Promise<void> {
+    this.pinnedSkillsBySession.delete(sessionId);
     if (!this.memory.deleteSession) {
       await this.memory.clear();
     } else {
@@ -260,12 +313,25 @@ export class Agent {
     options: InternalRunOptions = {},
     modelCallMode: ModelCallMode = "generate",
   ): Promise<AgentRunResult<TOutput>> {
+    const runId = options.runId ?? createId("run");
+    // Stamping the run id lets listeners on a shared agent tell concurrent
+    // runs apart.
+    const emit = (event: AgentEvent) => this.events.emit({ ...event, runId });
+    // Isolated commands pass a throwaway memory instead of the session's.
+    const memory = options.memory ?? this.memory;
+    const sessionId = options.sessionId ?? this.sessionId;
+    // A command on a throwaway memory is not part of the conversation, so it
+    // neither uses nor updates the session's pinned Skills.
+    const usesSessionMemory = options.memory === undefined;
     const isDebug = options.debug ?? this.config.debug ?? false;
     let debugOff: (() => void) | undefined;
 
     if (isDebug) {
       console.log(`[Agent.run] User initiated request: "${input}"`);
       debugOff = this.on((event) => {
+        if (event.runId !== runId) {
+          return;
+        }
         if (event.type === "tool.call.started") {
           console.log(`[Agent.run] Tool call started: ${event.toolName} with input:`, event.input);
         } else if (event.type === "tool.call.completed") {
@@ -285,70 +351,179 @@ export class Agent {
         attachments: options.attachments,
         metadata: options.metadata,
       };
-      await this.memory.add(userMessage, { sessionId: this.sessionId });
+      await memory.add(userMessage, { sessionId });
 
       const skillContext = this.resolveSkillContext(input, options);
-      const skillReconcile = await this.reconcileSkills(skillContext);
-      const skillPromptIndex = this.skills.buildPromptIndex();
-      const systemPrompt = mergePrompts(this.baseSystemPrompt, this.pages.currentSystemPrompt, skillPromptIndex, options.systemPrompt);
-      const toolContext = this.createToolContext(options.signal, options.metadata, skillContext);
-      const runTools = this.resolveRunTools(skillReconcile.mountedTools.map((mounted) => mounted.tool), options.tools);
+      const requestedPinnedSkillIds =
+        options.skillContext?.pinnedSkillIds ??
+        (usesSessionMemory ? this.pinnedSkillsBySession.get(sessionId) : undefined) ??
+        [];
+      const skillReconcile = await this.reconcileSkills(skillContext, runId, requestedPinnedSkillIds);
+      const runContext: RunToolContext = { runId, sessionId, signal: options.signal, metadata: options.metadata, skillContext };
+      const toolContext = this.createToolContext(runContext);
+
+      // Skills matched by this request's rules. Every other active Skill was
+      // chosen by the model, in this run (activateSkill) or an earlier one
+      // (pinned), and its tools are exposed even when `options.tools`
+      // restricts the run.
+      const ruleMatchedSkillIds = new Set(
+        skillReconcile.activeSkills
+          .filter((active) => active.reason !== PINNED_SKILL_REASON)
+          .map((active) => active.skill.id),
+      );
+      const modelChosenToolNames = () =>
+        this.skills
+          .listActive()
+          .filter((active) => !ruleMatchedSkillIds.has(active.skill.id))
+          .flatMap((active) => active.mountedTools);
+      const initialActiveSkillIds = new Set(this.skills.listActive().map((active) => active.skill.id));
+
+      let runTools = this.resolveRunTools(
+        skillReconcile.mountedTools.map((mounted) => mounted.tool),
+        options.tools,
+        modelChosenToolNames(),
+      );
+      const buildSystemPrompt = () =>
+        mergePrompts(
+          options.ignoreBaseSystemPrompt ? undefined : this.baseSystemPrompt,
+          this.pages.currentSystemPrompt,
+          this.skills.buildPromptIndex({
+            skillViewEnabled: runTools.toolMap.has("skill_view"),
+            discoverSkillEnabled: runTools.toolMap.has("discoverSkill"),
+            activateSkillEnabled: runTools.toolMap.has("activateSkill"),
+          }),
+          options.systemPrompt,
+        );
+      let systemPrompt = buildSystemPrompt();
+
+      let activeSkillKey = [...initialActiveSkillIds].join(",");
+      // After an activateSkill call, the next step sees the Skill's tools and
+      // its prompt index entry. Tools offered earlier stay available, so past
+      // tool calls in the history keep a matching definition.
+      const refreshAfterActivation = () => {
+        const activeSkills = this.skills.listActive();
+        const key = activeSkills.map((active) => active.skill.id).join(",");
+        if (key === activeSkillKey) {
+          return;
+        }
+        activeSkillKey = key;
+
+        const next = this.resolveRunTools(
+          this.skills.listMountedTools().map((mounted) => mounted.tool),
+          options.tools,
+          modelChosenToolNames(),
+        );
+        for (const tool of runTools.tools) {
+          if (!next.toolMap.has(tool.name)) {
+            next.tools.push(tool);
+            next.toolMap.set(tool.name, tool);
+          }
+        }
+        if (next.activeToolNames && runTools.activeToolNames) {
+          next.activeToolNames = [...new Set([...runTools.activeToolNames, ...next.activeToolNames])];
+        }
+        runTools = next;
+        systemPrompt = buildSystemPrompt();
+      };
 
       const targetMode = options.invocationMode ?? this.config.invocationMode ?? "auto";
       let currentMode: "response" | "chat" = targetMode === "auto" ? (this.fixedInvocationMode ?? "response") : targetMode;
 
       const maxIterations = options.maxIterations ?? this.defaultMaxIterations;
       let iteration = 0;
+      // Whether the latest model step asked for tools. Still true after the
+      // loop means it stopped on maxIterations instead of on an answer.
+      let hasPendingToolCalls = false;
 
       let finalResultText = "";
       let finalOutput: TOutput | undefined;
       const allToolCalls: ToolCallSummary[] = [];
-      let accumulatedUsage: any = undefined;
+      let accumulatedUsage: AgentRunResult["usage"];
       let lastAssistantMessage: AgentMessage | undefined;
 
-      while (iteration < maxIterations) {
-        this.events.emit({ type: "agent.iteration.started", iteration: iteration + 1 });
+      // One plain completion with the run's model; context builders use it,
+      // e.g. to summarize turns that no longer fit.
+      const generateText = async (request: { systemPrompt: string; prompt: string; signal?: AbortSignal }) => {
+        const result = await this.modelClient.generate({
+          model: options.model ?? this.config.model,
+          systemPrompt: request.systemPrompt,
+          messages: [{ role: "user", content: request.prompt }],
+          tools: [],
+          maxIterations: 1,
+          signal: request.signal ?? options.signal,
+          toolContext,
+          invocationMode: currentMode,
+        });
+        accumulatedUsage = mergeUsage(accumulatedUsage, result.usage);
+        return result.text;
+      };
 
-        const callModel = async (mode: "response" | "chat") => {
-          const params = {
-            model: options.model ?? this.config.model,
-            systemPrompt,
-            messages: await this.memory.get({ sessionId: this.sessionId }),
-            tools: runTools.tools,
-            activeToolNames: runTools.activeToolNames,
-            maxIterations: 1,
-            temperature: options.temperature ?? this.defaultTemperature,
-            signal: options.signal,
-            toolContext,
-            outputSchema: options.outputSchema,
-            emit: (event: AgentEvent) => this.events.emit(event),
-            invocationMode: mode,
-          };
+      // History sent with a model step: the stored session, fitted to the
+      // context window when a builder is configured. It is never stored.
+      const loadContext = async (): Promise<AgentMessage[]> => {
+        const history = await memory.get({ sessionId });
+        if (!this.contextBuilder) {
+          return history;
+        }
+        return this.contextBuilder.build({
+          sessionId,
+          userInput: input,
+          pageId: this.pages.currentPageId,
+          messages: history,
+          activeSkills: this.skills.listActive(),
+          signal: options.signal,
+          generateText,
+          onCompacted: (info) => emit({ type: "context.compacted", ...info }),
+        });
+      };
 
-          if (modelCallMode === "stream") {
-            if (!this.modelClient.stream) {
-              throw new Error("The configured modelClient does not support runStream.");
-            }
-            return this.modelClient.stream<TOutput>(params);
-          }
-
-          return this.modelClient.generate<TOutput>(params);
+      const callModel = async (
+        mode: "response" | "chat",
+        stepSystemPrompt: string | undefined,
+      ): Promise<ModelGenerateResult<TOutput>> => {
+        const params: ModelGenerateRequest = {
+          model: options.model ?? this.config.model,
+          systemPrompt: stepSystemPrompt,
+          messages: await loadContext(),
+          tools: runTools.tools,
+          activeToolNames: runTools.activeToolNames,
+          maxIterations: 1,
+          temperature: options.temperature ?? this.defaultTemperature,
+          signal: options.signal,
+          toolContext,
+          outputSchema: options.outputSchema,
+          emit,
+          invocationMode: mode,
         };
 
-        let result;
+        if (modelCallMode === "stream") {
+          if (!this.modelClient.stream) {
+            throw new Error("The configured modelClient does not support runStream.");
+          }
+          return this.modelClient.stream<TOutput>(params);
+        }
+
+        return this.modelClient.generate<TOutput>(params);
+      };
+
+      // Runs one model step and folds its text, output and usage into the run.
+      // In "auto" mode the first "response" failure retries once in "chat".
+      const runStep = async (stepSystemPrompt = systemPrompt): Promise<ModelGenerateResult<TOutput>> => {
+        let result: ModelGenerateResult<TOutput>;
         try {
-          result = await callModel(currentMode);
+          result = await callModel(currentMode, stepSystemPrompt);
           if (targetMode === "auto" && !this.fixedInvocationMode) {
             this.fixedInvocationMode = currentMode;
-            this.events.emit({ type: "agent.invocationMode.fixed", mode: currentMode });
+            emit({ type: "agent.invocationMode.fixed", mode: currentMode });
           }
         } catch (error: any) {
-          if (targetMode === "auto" && !this.fixedInvocationMode && currentMode === "response") {
+          // An abort is not a sign that "response" mode is unsupported.
+          if (targetMode === "auto" && !this.fixedInvocationMode && currentMode === "response" && !options.signal?.aborted) {
             console.log(`[Agent.run] Model call failed in "response" mode, switching to "chat" mode and retrying...`, error);
             currentMode = "chat";
-            result = await callModel(currentMode);
+            result = await callModel(currentMode, stepSystemPrompt);
             this.fixedInvocationMode = currentMode;
-            this.events.emit({ type: "agent.invocationMode.fixed", mode: currentMode });
+            emit({ type: "agent.invocationMode.fixed", mode: currentMode });
           } else {
             throw error;
           }
@@ -358,64 +533,95 @@ export class Agent {
         if (result.output) {
           finalOutput = result.output;
         }
+        accumulatedUsage = mergeUsage(accumulatedUsage, result.usage);
+        return result;
+      };
 
-        if (result.usage) {
-          if (!accumulatedUsage) {
-            accumulatedUsage = { ...result.usage };
-          } else if (typeof (result.usage as any).promptTokens === "number") {
-            accumulatedUsage.promptTokens = (accumulatedUsage.promptTokens || 0) + ((result.usage as any).promptTokens || 0);
-            accumulatedUsage.completionTokens = (accumulatedUsage.completionTokens || 0) + ((result.usage as any).completionTokens || 0);
-            accumulatedUsage.totalTokens = (accumulatedUsage.totalTokens || 0) + ((result.usage as any).totalTokens || 0);
-          }
-        }
+      while (iteration < maxIterations) {
+        throwIfAborted(options.signal);
+        emit({ type: "agent.iteration.started", iteration: iteration + 1 });
+
+        const result = await runStep();
 
         const assistantMessage: AgentMessage = {
           role: "assistant",
           content: result.text,
-          metadata: { toolCalls: result.toolCalls },
+          // A copy: the agent records outputs on `result.toolCalls` later,
+          // which must not leak into the stored message.
+          metadata: {
+            toolCalls: (result.toolCalls ?? []).map(({ toolCallId, toolName, input }) => ({ toolCallId, toolName, input })),
+          },
         };
         lastAssistantMessage = assistantMessage;
 
-        await this.memory.add(assistantMessage, { sessionId: this.sessionId });
+        await memory.add(assistantMessage, { sessionId });
 
-        if (!result.toolCalls || result.toolCalls.length === 0) {
+        hasPendingToolCalls = (result.toolCalls?.length ?? 0) > 0;
+        if (!hasPendingToolCalls) {
           break;
         }
 
         for (const call of result.toolCalls) {
           allToolCalls.push(call);
 
-          this.events.emit({ type: "tool.call.started", toolName: call.toolName, input: call.input });
+          emit({ type: "tool.call.started", toolCallId: call.toolCallId, toolName: call.toolName, input: call.input });
 
           try {
-            const specificToolContext = this.createToolContext(options.signal, options.metadata, skillContext, call.toolCallId);
+            const specificToolContext = this.createToolContext(runContext, call.toolCallId);
             const output = await this.executeRunTool(runTools.toolMap, call.toolName, call.input, specificToolContext);
             call.output = output;
-            this.events.emit({ type: "tool.call.completed", toolName: call.toolName, input: call.input, output });
+            emit({ type: "tool.call.completed", toolCallId: call.toolCallId, toolName: call.toolName, input: call.input, output });
           } catch (e) {
             const error = e instanceof Error ? e : new Error(String(e));
-            const wrapped = error.name === "ToolExecutionError" || error.name === "ToolNotFoundError" || error.name === "ToolValidationError"
+            const wrapped = error.name === "ToolExecutionError" || error.name === "ToolNotFoundError" || error.name === "ToolValidationError" || error.name === "ToolPermissionError"
               ? error
               : new ToolExecutionError(call.toolName, error);
 
             call.error = wrapped.message;
-            this.events.emit({ type: "tool.call.failed", toolName: call.toolName, input: call.input, error: wrapped });
+            emit({ type: "tool.call.failed", toolCallId: call.toolCallId, toolName: call.toolName, input: call.input, error: wrapped });
           }
 
-          await this.memory.add(
+          await memory.add(
             {
               role: "tool",
               content: JSON.stringify(call.error ? { error: call.error } : call.output),
               metadata: { toolCallId: call.toolCallId, toolName: call.toolName, input: call.input },
             },
-            { sessionId: this.sessionId },
+            { sessionId },
           );
         }
 
+        refreshAfterActivation();
         iteration++;
       }
 
+      if (hasPendingToolCalls) {
+        // The loop ran out of iterations right after executing tools, so the
+        // latest text belongs to a tool-calling step and is usually empty. One
+        // more step turns the gathered tool results into an answer.
+        throwIfAborted(options.signal);
+        emit({ type: "agent.iteration.started", iteration: iteration + 1 });
+
+        const result = await runStep(mergePrompts(systemPrompt, FINAL_ANSWER_INSTRUCTION));
+
+        // Tool calls of this step are never executed, so they are not stored:
+        // a tool call without a tool result makes the next request invalid.
+        lastAssistantMessage = { role: "assistant", content: result.text };
+        await memory.add(lastAssistantMessage, { sessionId });
+      }
+
+      const activatedSkillIds = this.skills
+        .listActive()
+        .map((active) => active.skill.id)
+        .filter((skillId) => !initialActiveSkillIds.has(skillId));
+      const pinnedSkillIds = [...new Set([...skillReconcile.pinnedSkillIds, ...activatedSkillIds])];
+      if (usesSessionMemory) {
+        this.pinnedSkillsBySession.set(sessionId, pinnedSkillIds);
+      }
+
       const runResult: AgentRunResult<TOutput> = {
+        runId,
+        pinnedSkillIds,
         text: finalResultText,
         output: finalOutput,
         rawMessage: lastAssistantMessage!,
@@ -424,9 +630,9 @@ export class Agent {
       };
 
       if (lastAssistantMessage) {
-        this.events.emit({ type: "message.completed", message: lastAssistantMessage });
+        emit({ type: "message.completed", message: lastAssistantMessage });
       }
-      this.events.emit({ type: "agent.completed", result: runResult });
+      emit({ type: "agent.completed", result: runResult });
 
       if (isDebug) {
         console.log(`[Agent.run] Request completed with text: "${runResult.text}"`);
@@ -434,7 +640,7 @@ export class Agent {
       return runResult;
     } catch (error) {
       const normalized = error instanceof Error ? error : new Error(String(error));
-      this.events.emit({ type: "agent.failed", error: normalized });
+      emit({ type: "agent.failed", error: normalized });
 
       if (isDebug) {
         console.error(`[Agent.run] Request failed with error:`, normalized);
@@ -457,7 +663,11 @@ export class Agent {
     };
   }
 
-  private async reconcileSkills(context: SkillRequestContext) {
+  private async reconcileSkills(
+    context: SkillRequestContext,
+    runId: string,
+    pinnedSkillIds: string[],
+  ): Promise<SkillReconcileResult> {
     if (this.config.dynamicCapabilities?.enabled === false) {
       return {
         activeSkills: this.skills.listActive(),
@@ -466,19 +676,36 @@ export class Agent {
         unmountedSkillIds: [],
         mountedToolNames: [],
         unmountedToolNames: [],
+        // Skills are not managed in this mode; keep the host's list intact.
+        pinnedSkillIds,
       };
     }
 
-    return this.skills.reconcile(context);
+    return this.skills.reconcile(context, { runId, pinnedSkillIds });
   }
 
-  private resolveRunTools(skillTools: AgentTool[], activeToolNames?: string[]) {
-    const skillViewEnabled = this.config.skillView?.enabled !== false && this.config.dynamicCapabilities?.enabled !== false;
-    const discoverSkillEnabled = (this.config.discoverSkill?.enabled ?? this.config.findSkill?.enabled) !== false && this.config.dynamicCapabilities?.enabled !== false;
+  /**
+   * @param alwaysAllowedToolNames Tools exposed even when `activeToolNames`
+   *   restricts the run, e.g. tools of a Skill the model activated.
+   */
+  private resolveRunTools(skillTools: AgentTool[], activeToolNames?: string[], alwaysAllowedToolNames: string[] = []) {
+    const dynamicCapabilitiesEnabled = this.config.dynamicCapabilities?.enabled !== false;
+    // Only expose skill tools that can return something: skill_view needs a
+    // viewable skill and discoverSkill needs an inactive skill to find.
+    const canViewSkills = this.skills.listActive().length > 0 || (this.config.skillView?.allowInactive === true && this.skills.list().length > 0);
+    const skillViewEnabled = this.config.skillView?.enabled !== false && dynamicCapabilitiesEnabled && canViewSkills;
+    const discoverSkillEnabled = (this.config.discoverSkill?.enabled ?? this.config.findSkill?.enabled) !== false && dynamicCapabilitiesEnabled && this.skills.hasDiscoverableSkills();
     const skillViewTool = skillViewEnabled
-      ? createSkillViewTool(this, { allowInactive: this.config.skillView?.allowInactive })
+      ? createSkillViewTool(this, {
+        allowInactive: this.config.skillView?.allowInactive,
+        maxDocumentTokens: this.config.maxSkillContextTokens,
+      })
       : undefined;
     const discoverSkillTool = discoverSkillEnabled ? createDiscoverSkillTool(this) : undefined;
+    const activateSkillTool =
+      discoverSkillEnabled && this.config.discoverSkill?.allowActivation !== false
+        ? createActivateSkillTool(this, { maxDocumentTokens: this.config.maxSkillContextTokens })
+        : undefined;
     // Skill tools are request-local capabilities. They are visible to this model
     // call and executable through the run-local map, but never registered as
     // global tools that could survive a later page or Skill change.
@@ -487,22 +714,25 @@ export class Agent {
       ...skillTools,
       ...(skillViewTool ? [skillViewTool] : []),
       ...(discoverSkillTool ? [discoverSkillTool] : []),
+      ...(activateSkillTool ? [activateSkillTool] : []),
     ];
     const shouldKeepSkillView = this.config.skillView?.keepWhenToolsRestricted !== false;
     const shouldKeepDiscoverSkill = (this.config.discoverSkill?.keepWhenToolsRestricted ?? this.config.findSkill?.keepWhenToolsRestricted) !== false;
-    const allowed = activeToolNames ? new Set(activeToolNames) : undefined;
+    const allowed = activeToolNames ? new Set([...activeToolNames, ...alwaysAllowedToolNames]) : undefined;
     const tools = !allowed
       ? unrestrictedTools
       : unrestrictedTools.filter(
         (tool) =>
           allowed.has(tool.name) ||
           (shouldKeepSkillView && tool.name === "skill_view") ||
-          (shouldKeepDiscoverSkill && tool.name === "discoverSkill"),
+          (shouldKeepDiscoverSkill && (tool.name === "discoverSkill" || tool.name === "activateSkill")),
       );
     const toolMap = new Map(tools.map((tool) => [tool.name, tool]));
     const retainedToolNames = [
       ...(shouldKeepSkillView && skillViewTool ? ["skill_view"] : []),
       ...(shouldKeepDiscoverSkill && discoverSkillTool ? ["discoverSkill"] : []),
+      ...(shouldKeepDiscoverSkill && activateSkillTool ? ["activateSkill"] : []),
+      ...alwaysAllowedToolNames,
     ];
 
     return {
@@ -518,6 +748,10 @@ export class Agent {
     input: unknown,
     context: ToolExecutionContext,
   ): Promise<unknown> {
+    // Remaining calls of an aborted step fail fast; each one still gets a tool
+    // result in memory, so the stored history stays valid for the next run.
+    throwIfAborted(context.signal);
+
     const tool = toolMap.get(toolName);
     if (!tool) {
       throw new ToolNotFoundError(toolName);
@@ -525,70 +759,71 @@ export class Agent {
 
     validateJsonSchema(tool.parameters, input);
 
-    if (this.config.securityPolicy) {
-      const permission = await this.config.securityPolicy.getToolPermission(toolName, input, context);
+    const securityPolicy = this.config.securityPolicy;
+    if (securityPolicy) {
+      const permission = await securityPolicy.getToolPermission(toolName, input, context);
       if (permission.mode === "deny") {
-        throw new Error(`Tool execution denied: ${permission.reason ?? "Security policy blocked execution."}`);
+        throw new ToolPermissionError(toolName, permission.reason ?? "Security policy blocked execution.");
       }
       if (permission.mode === "ask") {
-        const onAskHandler = (this.config.securityPolicy as any).onAsk;
-        let approved = false;
-        if (onAskHandler && typeof onAskHandler === "function") {
-            approved = await onAskHandler(toolName, input, context, permission.reason);
-        } else if (context.toolCallId) {
-            approved = await new Promise<boolean>((resolve) => {
-                this.pendingApprovals.set(context.toolCallId!, resolve);
-                this.events.emit({
-                    type: "tool.call.requires_action",
-                    toolCallId: context.toolCallId!,
-                    toolName,
-                    input,
-                    reason: permission.reason,
-                });
-            });
-            this.pendingApprovals.delete(context.toolCallId);
-        }
+        const approved = await this.requestApproval(securityPolicy, toolName, input, context, permission.reason);
         if (!approved) {
-           throw new Error(`Tool execution denied: User rejected the operation.`);
+          throw new ToolPermissionError(toolName, "User rejected the operation.");
         }
       }
     }
 
-    let currentInput = input;
-    const interceptors = this.config.interceptors ?? [];
-    for (const interceptor of interceptors) {
-      if (interceptor.beforeExecute) {
-        currentInput = await interceptor.beforeExecute(toolName, currentInput, context);
-      }
-    }
-
-    let output = await tool.execute(currentInput, context);
-
-    for (const interceptor of [...interceptors].reverse()) {
-      if (interceptor.afterExecute) {
-        output = await interceptor.afterExecute(toolName, currentInput, output, context);
-      }
-    }
-
-    return output;
+    return executeWithInterceptors(tool, input, context, this.config.interceptors ?? []);
   }
 
-  private createToolContext(
-    signal: AbortSignal | undefined,
-    metadata: Record<string, unknown> | undefined,
-    skillContext: SkillRequestContext,
-    toolCallId?: string
-  ): ToolExecutionContext {
+  /**
+   * Waits for the user's decision on an "ask" tool call, through `onAsk` or
+   * `approveToolCall()`. Aborting the run rejects the wait, so an unanswered
+   * approval never blocks the run forever.
+   */
+  private async requestApproval(
+    policy: SecurityPolicy,
+    toolName: string,
+    input: unknown,
+    context: ToolExecutionContext,
+    reason: string | undefined,
+  ): Promise<boolean> {
+    if (policy.onAsk) {
+      return waitUnlessAborted(Promise.resolve(policy.onAsk(toolName, input, context, reason)), context.signal);
+    }
+
+    const toolCallId = context.toolCallId;
+    if (!toolCallId) {
+      return false;
+    }
+
+    // The resolver is stored before the event fires, so a handler may call
+    // approveToolCall() synchronously.
+    const decision = new Promise<boolean>((resolve) => {
+      this.pendingApprovals.set(toolCallId, resolve);
+    });
+    this.events.emit({ type: "tool.call.requires_action", toolCallId, toolName, input, reason, runId: context.runId });
+
+    try {
+      return await waitUnlessAborted(decision, context.signal);
+    } finally {
+      this.pendingApprovals.delete(toolCallId);
+    }
+  }
+
+  private createToolContext(run: RunToolContext, toolCallId?: string): ToolExecutionContext {
+    const { skillContext } = run;
     return {
       agentId: this.agentId,
-      sessionId: this.sessionId,
+      sessionId: run.sessionId,
+      runId: run.runId,
       toolCallId,
       pageId: skillContext.pageId ?? this.pages.currentPageId,
       moduleId: skillContext.moduleId,
       url: skillContext.url ? String(skillContext.url) : undefined,
       intent: skillContext.intent,
-      signal,
-      metadata,
+      signal: run.signal,
+      metadata: run.metadata,
     };
   }
 }

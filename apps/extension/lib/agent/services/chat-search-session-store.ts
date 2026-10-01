@@ -1,5 +1,6 @@
 import {
   IndexedDBMemory,
+  type AgentMessage,
   type Memory,
   type MemoryEntry,
   type MemorySession,
@@ -16,6 +17,13 @@ import type {
 const AGENT_DB_NAME = "hamhome-global-agent";
 const AGENT_STATE_KEY = "agentState";
 const DEFAULT_SESSION_TITLE = "New conversation";
+/** Marks stored tool calls and tool results, which the model sees but the chat UI hides. */
+const TRANSCRIPT_KEY = "agentTranscript";
+/**
+ * Stored messages per session, tool transcripts included. What the model
+ * receives is bounded separately by the agent's context window.
+ */
+const MAX_STORED_MESSAGES = 400;
 
 /**
  * 创建对话搜索的结构化状态。
@@ -57,6 +65,7 @@ function readSessionState(session?: MemorySession): ConversationalSearchSession 
     lastIntent: state.lastIntent,
     lastQuery: state.lastQuery,
     history: Array.isArray(state.history) ? state.history.slice(-12) : [],
+    pinnedSkillIds: Array.isArray(state.pinnedSkillIds) ? state.pinnedSkillIds : [],
   };
 }
 
@@ -69,11 +78,16 @@ function toSummary(session: MemorySession): ChatSearchSessionSummary {
   };
 }
 
+function isTranscriptMessage(message: AgentMessage): boolean {
+  return message.role === "tool" || message.metadata?.[TRANSCRIPT_KEY] === true;
+}
+
 function toChatMessages(entries: MemoryEntry[]): ChatMessage[] {
   return entries
     .filter(
       (entry) =>
-        entry.message.role === "user" || entry.message.role === "assistant",
+        (entry.message.role === "user" || entry.message.role === "assistant") &&
+        !isTranscriptMessage(entry.message),
     )
     .map((entry) => ({
       role: entry.message.role as "user" | "assistant",
@@ -95,7 +109,7 @@ export class ChatSearchSessionStore {
   constructor(
     private readonly memory: Memory = new IndexedDBMemory({
       dbName: AGENT_DB_NAME,
-      maxMessages: 120,
+      maxMessages: MAX_STORED_MESSAGES,
     }),
   ) {}
 
@@ -187,18 +201,29 @@ export class ChatSearchSessionStore {
   }
 
   /**
-   * 将用户输入和最终回答写入持久化记忆。
+   * 将用户输入、本轮工具调用记录和最终回答写入持久化记忆。
+   *
+   * `transcript` holds the turn's assistant tool-call steps and tool results
+   * in order. They are replayed to the model in later turns but hidden from
+   * the chat UI.
    */
   async appendTurn(
     sessionId: string,
     userText: string,
     assistantText: string,
     assistantMetadata: Pick<ChatMessage, "sources" | "steps"> = {},
+    transcript: AgentMessage[] = [],
   ): Promise<void> {
     await this.memory.add(
       { role: "user", content: userText },
       { sessionId },
     );
+    for (const message of transcript) {
+      await this.memory.add(
+        { ...message, metadata: { ...message.metadata, [TRANSCRIPT_KEY]: true } },
+        { sessionId },
+      );
+    }
     await this.memory.add(
       {
         role: "assistant",
@@ -233,18 +258,19 @@ export class ChatSearchSessionStore {
   }
 
   /**
-   * 将持久化的可展示对话消息回放到本轮 Agent 的短期记忆中。
+   * 将持久化的完整对话（含工具调用记录）回放到本轮 Agent 的短期记忆中。
+   * Returns the number of messages replayed, so the caller can tell them
+   * apart from the messages the new turn adds.
    */
-  async seedRuntimeMemory(sessionId: string, runtimeMemory: Memory): Promise<void> {
+  async seedRuntimeMemory(sessionId: string, runtimeMemory: Memory): Promise<number> {
     await runtimeMemory.createSession?.({ id: sessionId });
     const entries = ((await this.memory.getEntries?.({ sessionId })) ||
       []) as MemoryEntry[];
 
     for (const entry of entries) {
-      if (entry.message.role === "user" || entry.message.role === "assistant") {
-        await runtimeMemory.add(entry.message, { sessionId });
-      }
+      await runtimeMemory.add(entry.message, { sessionId });
     }
+    return entries.length;
   }
 
   /**

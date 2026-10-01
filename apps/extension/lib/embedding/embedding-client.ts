@@ -2,13 +2,15 @@
  * Embedding 客户端封装
  * 基于 OpenAI-compatible Embedding 能力
  */
-import { createEmbeddingClient as createAgentEmbeddingClient } from "@hamhome/agent";
+import { createEmbeddingClient, type EmbeddingClient } from "@hamhome/agent";
 import {
   EMBEDDING_PROVIDER_DEFAULTS,
+  EXTENSION_AGENT_PROVIDERS,
   getDefaultEmbeddingModel,
   getEmbeddingModelKey,
   isEmbeddingSupported as checkSupported,
   resolveAgentProvider,
+  resolveEmbeddingDimensions,
 } from "@/lib/agent";
 import type { EmbeddingConfig } from '@/types';
 import { configStorage } from '@/lib/storage';
@@ -37,62 +39,26 @@ export class EmbeddingRateLimitError extends Error {
 }
 
 /**
- * Extension Embedding 客户端
- * 封装配置加载和错误处理
+ * Create the SDK embedding client for a stored embedding config.
  */
-interface EmbeddingClientConfig {
-  provider: EmbeddingConfig["provider"];
-  apiKey?: string;
-  baseUrl?: string;
-  model: string;
-  dimensions?: number;
-}
-
-interface EmbeddingClient {
-  embed(text: string): Promise<{ embedding: number[] }>;
-  embedMany(texts: string[]): Promise<{ embeddings: number[][] }>;
-  testConnection(): Promise<{ success: boolean; error?: string; dimensions?: number }>;
-}
-
-function createEmbeddingClient(config: EmbeddingClientConfig): EmbeddingClient {
-  const agentProvider = resolveAgentProvider(config.provider);
-  const client = createAgentEmbeddingClient({
-    provider: agentProvider,
+function createClientForConfig(config: EmbeddingConfig): EmbeddingClient {
+  return createEmbeddingClient({
+    providers: EXTENSION_AGENT_PROVIDERS,
+    provider: resolveAgentProvider(config.provider),
     apiKey: config.provider === "ollama" ? undefined : config.apiKey,
     baseUrl: config.baseUrl || EMBEDDING_PROVIDER_DEFAULTS[config.provider]?.baseUrl,
     model: config.model || getDefaultEmbeddingModel(config.provider),
-    providerOptions: config.dimensions
-      ? {
-          [agentProvider]: {
-            dimensions: config.dimensions,
-          },
-        }
-      : undefined,
+    dimensions: resolveEmbeddingDimensions(config),
   });
-
-  return {
-    async embed(text: string) {
-      return { embedding: await client.embed(text) };
-    },
-
-    async embedMany(texts: string[]) {
-      return { embeddings: await client.embedMany(texts) };
-    },
-
-    async testConnection() {
-      const result = await client.testConnection();
-      return {
-        success: result.success,
-        error: result.error || result.message,
-      };
-    },
-  };
 }
 
+/**
+ * Extension Embedding 客户端
+ * 封装配置加载和错误处理
+ */
 class ExtensionEmbeddingClient {
   private config: EmbeddingConfig | null = null;
   private client: EmbeddingClient | null = null;
-  private clientPromise: Promise<EmbeddingClient> | null = null;
 
   /**
    * 加载配置
@@ -100,7 +66,6 @@ class ExtensionEmbeddingClient {
   async loadConfig(): Promise<EmbeddingConfig> {
     this.config = await configStorage.getEmbeddingConfig();
     this.client = null; // 重置客户端
-    this.clientPromise = null;
     return this.config;
   }
 
@@ -136,29 +101,9 @@ class ExtensionEmbeddingClient {
   /**
    * 获取或创建客户端
    */
-  private async getOrCreateClient(): Promise<EmbeddingClient> {
-    if (this.client) {
-      return this.client;
-    }
-
-    if (!this.clientPromise && this.config) {
-      const clientConfig: EmbeddingClientConfig = {
-        provider: this.config.provider,
-        apiKey: this.config.apiKey,
-        baseUrl: this.config.baseUrl,
-        model: this.config.model || getDefaultEmbeddingModel(this.config.provider),
-        dimensions: this.config.dimensions,
-      };
-
-      this.clientPromise = Promise.resolve()
-        .then(() => createEmbeddingClient(clientConfig))
-        .catch((error) => {
-          this.clientPromise = null;
-          throw error;
-        });
-    }
-
-    this.client = await this.clientPromise!;
+  private getClient(): EmbeddingClient {
+    if (!this.config) throw new Error('EmbeddingClient not configured');
+    this.client ??= createClientForConfig(this.config);
     return this.client;
   }
 
@@ -191,9 +136,7 @@ class ExtensionEmbeddingClient {
     }
 
     try {
-      const client = await this.getOrCreateClient();
-      const result = await client.embed(text);
-      return result.embedding;
+      return await this.getClient().embed(text);
     } catch (error) {
       // 检测限流错误
       if (this.isRateLimitError(error)) {
@@ -220,9 +163,7 @@ class ExtensionEmbeddingClient {
     }
 
     try {
-      const client = await this.getOrCreateClient();
-      const result = await client.embedMany(texts);
-      return result.embeddings;
+      return await this.getClient().embedMany(texts);
     } catch (error) {
       // 检测限流错误
       if (this.isRateLimitError(error)) {
@@ -249,8 +190,12 @@ class ExtensionEmbeddingClient {
     }
 
     try {
-      const client = await this.getOrCreateClient();
-      return await client.testConnection();
+      const result = await this.getClient().testConnection();
+      return {
+        success: result.success,
+        error: result.success ? undefined : result.error || result.message,
+        dimensions: result.dimensions,
+      };
     } catch (error) {
       return {
         success: false,

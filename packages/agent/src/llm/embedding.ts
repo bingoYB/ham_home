@@ -1,6 +1,7 @@
 import { embed, embedMany, type EmbeddingModel } from "ai";
 import { resolveEmbeddingModel } from "./providers";
 import type {
+  AiSdkProviderName,
   EmbeddingClient,
   EmbeddingClientConfig,
   EmbeddingTestConnectionResult,
@@ -28,6 +29,7 @@ export class AiSdkEmbeddingClient implements EmbeddingClient {
       value: input,
       maxRetries: this.config.maxRetries,
       abortSignal: options.signal,
+      providerOptions: toEmbeddingCallOptions(this.config),
     });
     return [...result.embedding];
   }
@@ -38,6 +40,7 @@ export class AiSdkEmbeddingClient implements EmbeddingClient {
       values: input,
       maxRetries: this.config.maxRetries,
       abortSignal: options.signal,
+      providerOptions: toEmbeddingCallOptions(this.config),
     });
     return result.embeddings.map((embedding) => [...embedding]);
   }
@@ -58,6 +61,7 @@ export class AiSdkEmbeddingClient implements EmbeddingClient {
         success: true,
         message: `Connection successful. Returned vector of dimension ${vector.length}.`,
         latencyMs,
+        dimensions: vector.length,
       };
     } catch (err) {
       const latencyMs = Date.now() - start;
@@ -81,6 +85,20 @@ export class AiSdkEmbeddingClient implements EmbeddingClient {
  */
 export function createEmbeddingClient(config: EmbeddingClientConfig): EmbeddingClient {
   return new AiSdkEmbeddingClient(config);
+}
+
+/**
+ * Whether `EmbeddingClientConfig.dimensions` is forwarded for the provider. The
+ * model itself must also accept a custom size, which only the caller knows.
+ *
+ * Example:
+ * ```ts
+ * supportsEmbeddingDimensions("openai"); // true
+ * supportsEmbeddingDimensions("mistral"); // false
+ * ```
+ */
+export function supportsEmbeddingDimensions(provider: AiSdkProviderName | undefined): boolean {
+  return toEmbeddingCallOptions({ provider, model: "", dimensions: 1 }) !== undefined;
 }
 
 /**
@@ -136,4 +154,29 @@ export function rankBySimilarity<T>(
     .sort((left, right) => right.score - left.score);
 
   return typeof options.topK === "number" ? ranked.slice(0, options.topK) : ranked;
+}
+
+/**
+ * Maps `dimensions` onto the per-call option key each AI SDK embedding model reads.
+ * Azure reuses the OpenAI embedding model, so it reads the `openai` key too.
+ */
+function toEmbeddingCallOptions(
+  config: EmbeddingClientConfig,
+): Record<string, Record<string, number>> | undefined {
+  const { dimensions } = config;
+  if (!dimensions) {
+    return undefined;
+  }
+
+  switch (config.provider ?? "gateway") {
+    case "openai":
+    case "azure":
+      return { openai: { dimensions } };
+    case "openai-compatible":
+      return { openaiCompatible: { dimensions } };
+    case "google":
+      return { google: { outputDimensionality: dimensions } };
+    default:
+      return undefined;
+  }
 }

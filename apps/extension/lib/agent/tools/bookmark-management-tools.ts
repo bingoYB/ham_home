@@ -75,7 +75,7 @@ export function createBookmarkManagementTools(): AgentTool[] {
         required: ["id"],
         additionalProperties: false,
       },
-      metadata: { readOnly: false, riskLevel: "medium" },
+      metadata: { readOnly: false, riskLevel: "high" },
       async execute(input: { id: string }) {
         await bookmarkStorage.deleteCategory(input.id);
         return { success: true, deletedId: input.id };
@@ -150,7 +150,7 @@ export function createBookmarkManagementTools(): AgentTool[] {
         required: ["id"],
         additionalProperties: false,
       },
-      metadata: { readOnly: false, riskLevel: "medium" },
+      metadata: { readOnly: false, riskLevel: "high" },
       async execute(input: { id: string; permanent?: boolean }) {
         await bookmarkStorage.deleteBookmark(input.id, input.permanent);
         return { success: true, deletedId: input.id, permanent: input.permanent };

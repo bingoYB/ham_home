@@ -452,8 +452,21 @@ class BackgroundServiceImpl implements IBackgroundService {
   async globalAgentRunTurn(
     input: ConversationalSearchTurnInput,
     sessionId?: string,
+    turnId?: string,
   ): Promise<GlobalAgentTurnResult> {
-    return globalAgentService.runTurn(input, sessionId);
+    return globalAgentService.runTurn(input, sessionId, turnId);
+  }
+
+  async globalAgentGetTurnProgress(turnId: string) {
+    return globalAgentService.getTurnProgress(turnId);
+  }
+
+  async globalAgentCancelTurn(turnId: string) {
+    return globalAgentService.cancelTurn(turnId);
+  }
+
+  async globalAgentResolveApproval(approvalId: string, approved: boolean) {
+    return globalAgentService.resolveApproval(approvalId, approved);
   }
 
   async globalAgentListSessions() {

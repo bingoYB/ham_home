@@ -29,7 +29,9 @@ export class PlanManager {
   }
 
   getTools(): AgentTool[] {
-    const ns = this.namespace ? `${this.namespace}.` : "";
+    // `_` keeps tool names inside the `^[a-zA-Z0-9_-]+$` pattern that OpenAI
+    // and Anthropic require; a `.` separator is rejected with a 400.
+    const ns = this.namespace ? `${this.namespace}_` : "";
 
     return [
       {

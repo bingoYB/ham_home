@@ -1,8 +1,14 @@
 import { z } from "zod";
-import type { JsonSchema } from "@hamhome/agent";
-import { runExtensionCommand } from "../command-runner";
+import type { AgentCommand, JsonSchema } from "@hamhome/agent";
 import { getAgentErrorMessage } from "../errors";
-import { assertAgentConfigured, resolveAgentConfig } from "../factory";
+import { createExtensionAgent } from "../factory";
+
+type TargetLanguage = "zh" | "en";
+
+interface TranslateTextInput {
+  text: string;
+  targetLang: TargetLanguage;
+}
 
 const translationSchema = z.object({
   translatedText: z.string().trim().min(1),
@@ -19,30 +25,32 @@ const translationOutputSchema: JsonSchema = {
   additionalProperties: false,
 };
 
+function buildTranslationSystemPrompt(targetLang: TargetLanguage): string {
+  return targetLang === "zh"
+    ? "你是精准翻译助手。请保留原始含义、术语、Markdown 结构与列表格式，只返回翻译后的文本。"
+    : "You are a precise translation assistant. Preserve meaning, terminology, markdown structure, and list formatting. Return only the translated text.";
+}
+
+const translateTextCommand: AgentCommand<TranslateTextInput, TranslationOutput> = {
+  name: "translateText",
+  description: "Translate text into the target language.",
+  outputSchema: translationOutputSchema,
+  maxIterations: 1,
+  prompt: ({ text, targetLang }) => `targetLanguage: ${targetLang}\n\ntext:\n${text}`,
+};
+
 class TranslationService {
-  async translate(text: string, targetLang: "zh" | "en" = "zh"): Promise<string> {
-    const config = await resolveAgentConfig();
-    assertAgentConfigured(config.rawConfig);
+  async translate(text: string, targetLang: TargetLanguage = "zh"): Promise<string> {
+    const { agent } = await createExtensionAgent();
 
     try {
-      const result = await runExtensionCommand<Record<string, never>, TranslationOutput>({
-        config,
-        temperature: 0.1,
-        maxIterations: 1,
-        systemPrompt:
-          targetLang === "zh"
-            ? "你是精准翻译助手。请保留原始含义、术语、Markdown 结构与列表格式，只返回翻译后的文本。"
-            : "You are a precise translation assistant. Preserve meaning, terminology, markdown structure, and list formatting. Return only the translated text.",
-        command: {
-          name: "translateText",
-          description: "Translate text into the target language.",
-          outputSchema: translationOutputSchema,
-          prompt: `targetLanguage: ${targetLang}\n\ntext:\n${text}`,
-        },
-        input: {},
-      });
+      const { output } = await agent.commands.run(
+        translateTextCommand,
+        { text, targetLang },
+        { systemPrompt: buildTranslationSystemPrompt(targetLang), temperature: 0.1 },
+      );
 
-      return translationSchema.parse(result.output).translatedText.trim();
+      return translationSchema.parse(output).translatedText.trim();
     } catch (error) {
       throw new Error(getAgentErrorMessage(error, "翻译失败"));
     }

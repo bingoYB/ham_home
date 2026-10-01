@@ -27,19 +27,23 @@
 
 HamHome is an AI browser workspace that brings bookmarks, page snapshots, and tab sessions together. Save content worth keeping, along with the browsing context you want to return to.
 
-- **Save with less sorting.** Let AI generate summaries, categories, and tags, and keep page snapshots for offline reading.
-- **Find it when you need it.** Search saved content with keywords or semantic search, or ask the built-in Agent to find and summarize it.
+- **Save with less sorting.** Let AI generate summaries, categories, and tags, keep page snapshots and screenshots, or clip just the passage or image you need.
+- **Find it when you need it.** Search saved content with keywords or semantic search, browse page screenshots in the visual gallery, or ask the built-in Agent to find and summarize it.
 - **Pick up where you left off.** Save a set of tabs as a workspace, restore it when needed, and organize active tabs with grouping rules.
 
 **Local first. Your choice of AI.** Data stays in your browser by default, with no HamHome account required. AI features send relevant content to the provider you connect. WebDAV sync and file import/export are optional.
 
 ## Screenshots
 
-| **Quick Save Popup** | **Bookmark Library** |
+| **In-page Quick Save** | **Image Clip** |
 | :--: | :--: |
-| ![Quick Save Popup](apps/extension/output/screenshots/en-light/01-popup-save.png) | ![Bookmark Library](apps/extension/output/screenshots/en-light/02-bookmark-library.png) |
+| ![In-page Quick Save](apps/extension/output/screenshots/en-light/01-popup-save.png) | ![Image Clip](apps/extension/output/screenshots/en-light/11-image-clip-save.png) |
+| **Bookmark Library** | **Visual Gallery** |
+| ![Bookmark Library](apps/extension/output/screenshots/en-light/02-bookmark-library.png) | ![Visual Gallery](apps/extension/output/screenshots/en-light/10-visual-gallery.png) |
 | **Bulk Bookmark Actions** | **In-page Content Panel** |
 | ![Bulk Bookmark Actions](apps/extension/output/screenshots/en-light/03-bookmark-bulk-actions.png) | ![In-page Content Panel](apps/extension/output/screenshots/en-light/04-content-panel.png) |
+| **Bookmark Health Center** | **Trash** |
+| ![Bookmark Health Center](apps/extension/output/screenshots/en-light/12-health-center.png) | ![Trash](apps/extension/output/screenshots/en-light/13-trash.png) |
 | **AI Agent** | **Workspaces** |
 | ![AI Agent](apps/extension/output/screenshots/en-light/05-ai-agent.png) | ![Workspaces](apps/extension/output/screenshots/en-light/06-workspaces.png) |
 | **Tab Group Rules** | **Import, Export, and Sync** |
@@ -49,10 +53,32 @@ HamHome is an AI browser workspace that brings bookmarks, page snapshots, and ta
 
 ### AI-assisted bookmarking
 
-- Save the current page from the popup, context menu, keyboard shortcut, or in-page panel.
+- Save the current page from the toolbar quick panel, context menu, or keyboard shortcut. The save form opens right on the page, so AI analysis never interrupts browsing; you can switch back to saving inside the popup in settings.
 - Extract page metadata and readable content with Defuddle, Mozilla Readability, and SingleFile-based snapshot capture.
 - Generate summaries, categories, tags, and optional translations after the user configures an AI provider.
+- Capture a screenshot of the visible page with each save, independently of the HTML/Markdown snapshot. HamHome's own UI is hidden during capture, and private pages skip screenshots by default.
 - Re-analyze existing bookmarks in bulk from the management page.
+
+### Text and image clips
+
+- Right-click selected text to save it as a text clip. The bookmark keeps the exact quote and reopens the source page at that passage through a Text Fragment.
+- Right-click an image to save an image clip with its source page, image URL, size, format, and dominant colors.
+- With a vision-capable model, AI suggests titles, summaries, categories, and tags for image clips. Image analysis can be turned off, and images from private pages are never sent.
+- Clips appear in the library as text and image cards, and the content-type filter separates bookmarks, images, and text.
+
+### Library views and filters
+
+- Switch between masonry cards, a compact list, and a visual gallery built from saved page screenshots; hover a card to preview its screenshot.
+- Filter by category, tag, content type, time range (including custom date ranges picked from a calendar), or saved custom filters.
+- Batch tag, move, delete, sync snapshots to Obsidian, or re-run AI analysis on selected bookmarks.
+- Large libraries stay responsive: lists, tag filters, and the health list are virtualized.
+
+### Bookmark Health Center and Trash
+
+- Check bookmark links on demand, or schedule checks weekly or monthly. Only `404` / `410` count as broken; sign-in walls, rate limits, server errors, and timeouts are flagged separately instead of being treated as dead links.
+- Adopt a redirect's new URL in one click, and spot duplicates by normalized URL (tracking parameters and fragments ignored) even before any check has run.
+- Clean up each duplicate group in one click, keeping the earliest saved bookmark. Image and text clips are excluded from health checks.
+- Deleted bookmarks move to Trash together with their content, snapshots, screenshots, and clips, and can be restored for 30 days. After that, or after a permanent delete, only a lightweight tombstone remains so the deletion syncs to your other devices.
 
 ### AI Agent and search
 
@@ -77,35 +103,35 @@ HamHome is an AI browser workspace that brings bookmarks, page snapshots, and ta
 - AI auto-grouping can use page title, URL, metadata, existing group titles, and custom grouping instructions; results are cached by domain and instruction set.
 - Chromium browsers apply rules through `chrome.tabGroups`; Firefox can store rules but does not run native Tab Group automation where the API is unavailable.
 
-### Snapshots and Obsidian
+### Snapshots, screenshots, and Obsidian
 
 - Save local HTML or Markdown snapshots for offline reading.
-- View, download, update, or delete snapshots from bookmark management.
+- View, download, update, or delete snapshots from bookmark management; view, download, or delete page screenshots from the screenshot viewer.
 - Sync Markdown-style bookmark notes to Obsidian through the `obsidian://new` flow, with clipboard fallback and unchanged-content skipping.
-- Keep snapshot storage visible and manageable from settings.
+- Keep snapshot and screenshot storage visible from settings.
 
 ### Import, export, and sync
 
-- Export full HamHome JSON backups containing bookmarks, categories, workspaces, workspace categories, Tab Group rules, and auto-group settings.
+- Export full HamHome JSON backups containing bookmarks, clips, categories, workspaces, workspace categories, Tab Group rules, and auto-group settings.
 - Export a browsable HTML bookmark page.
 - Import HamHome JSON backups or standard browser bookmark HTML files from Chrome, Firefox, and Edge.
 - Import browser bookmarks directly through the browser bookmarks API, optionally preserving folder hierarchy or running AI analysis.
 - Write HamHome bookmarks back to the browser bookmark bar with root-folder, clear-first, and duplicate-skip options.
-- Sync structured data through WebDAV under `/HamHomeSync`: settings, bookmark/category data, bookmark text content, workspaces, workspace categories, and Tab Group configuration. Local HTML/Markdown snapshot blobs stay local unless you export or sync them through the Obsidian workflow.
+- Sync structured data through WebDAV under `/HamHomeSync`: settings, bookmark/category data, bookmark text content, clips, workspaces, workspace categories, and Tab Group configuration. Bookmarks are matched by URL so syncing several devices does not create duplicates, deletions sync as tombstones, and Basic auth falls back to Digest automatically. Local HTML/Markdown snapshot files and page screenshots stay on the device unless you download them or send notes through the Obsidian workflow.
 
 ### Privacy and storage controls
 
 - Store primary data in browser storage and IndexedDB; no HamHome-hosted account is required.
 - Bring your own AI key and endpoint. Supported chat providers include OpenAI, Anthropic, Google Gemini, Azure OpenAI, DeepSeek, Groq, Mistral, Moonshot/Kimi, Zhipu/GLM, Tencent Hunyuan, NVIDIA NIM, SiliconFlow, Ollama, and custom OpenAI-compatible APIs.
 - Configure embeddings separately for semantic search. Supported embedding providers include OpenAI, Google, Azure, Mistral, Zhipu, Hunyuan, NVIDIA, SiliconFlow, Ollama, and custom OpenAI-compatible APIs.
-- Keep sensitive domains out of AI analysis with privacy domain settings and automatic privacy detection.
+- Keep sensitive domains out of AI analysis and page screenshots with privacy domain settings and automatic privacy detection.
 - AI keys, Base URLs, privacy domains, WebDAV credentials, and browser shortcuts must be configured by the user; the Agent does not read or fill them.
 
 ### Modern extension UI
 
-- Full extension app with bookmarks, categories, tags, workspaces, Tab Groups, import/export, privacy, settings, and about pages.
-- Popup save panel for quick capture.
-- In-page edge-triggered bookmark panel with left/right positioning.
+- Full extension app with bookmarks, Bookmark Health, workspaces, Tab Groups, categories, tags, privacy, import/export, Trash, settings, and about pages.
+- Toolbar quick panel to save the current page, open the bookmark panel, and check recent saves and common settings.
+- In-page edge-triggered bookmark panel with left/right positioning; it can be turned off in settings.
 - Light, dark, and system themes with English and Chinese localization.
 - Sync status widget, shortcut display, custom filters, tag cloud, storage stats, and vector index controls.
 
@@ -185,7 +211,7 @@ pnpm --filter hamhome screenshots
 - **UI**: shadcn/ui-style primitives, Radix UI, lucide-react, shared `@hamhome/ui` and `@hamhome/ui-business`
 - **AI**: `@hamhome/agent`, provider adapters, embedding queue, hybrid retriever
 - **Extraction**: Defuddle, Mozilla Readability, SingleFile-style capture, Turndown/Markdown workflows
-- **Storage**: WXT Storage, browser storage APIs, IndexedDB for snapshots, AI cache, and vector data
+- **Storage**: WXT Storage, browser storage APIs, IndexedDB for snapshots, page screenshots, AI cache, and vector data
 - **Sync**: WebDAV, gzip-compressed bookmark content chunks, sync locks, local credential obfuscation
 - **Testing**: Vitest + Playwright extension E2E + generated screenshot suites
 

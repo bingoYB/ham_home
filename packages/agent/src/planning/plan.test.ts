@@ -13,13 +13,13 @@ describe("PlanManager", () => {
     const tools = manager.getTools();
 
     expect(tools.map((t) => t.name)).toEqual([
-      "plan.createTask",
-      "plan.updateTask",
-      "plan.getTasks",
-      "plan.deleteTask",
-      "plan.clearTasks",
-      "plan.enterPlanMode",
-      "plan.exitPlanMode",
+      "plan_createTask",
+      "plan_updateTask",
+      "plan_getTasks",
+      "plan_deleteTask",
+      "plan_clearTasks",
+      "plan_enterPlanMode",
+      "plan_exitPlanMode",
     ]);
   });
 
@@ -28,14 +28,24 @@ describe("PlanManager", () => {
     const tools = manager.getTools();
 
     expect(tools.map((t) => t.name)).toEqual([
-      "taskPlan.createTask",
-      "taskPlan.updateTask",
-      "taskPlan.getTasks",
-      "taskPlan.deleteTask",
-      "taskPlan.clearTasks",
-      "taskPlan.enterPlanMode",
-      "taskPlan.exitPlanMode",
+      "taskPlan_createTask",
+      "taskPlan_updateTask",
+      "taskPlan_getTasks",
+      "taskPlan_deleteTask",
+      "taskPlan_clearTasks",
+      "taskPlan_enterPlanMode",
+      "taskPlan_exitPlanMode",
     ]);
+  });
+
+  it("should only produce tool names that OpenAI and Anthropic accept", () => {
+    const names = [new PlanManager(), new PlanManager({ namespace: "taskPlan" })]
+      .flatMap((manager) => manager.getTools())
+      .map((tool) => tool.name);
+
+    for (const name of names) {
+      expect(name).toMatch(/^[a-zA-Z0-9_-]{1,64}$/);
+    }
   });
 
   it("should return tools with no namespace", () => {
@@ -53,9 +63,9 @@ describe("PlanManager", () => {
     ]);
   });
 
-  it("plan.createTask should create a new task item", () => {
+  it("plan_createTask should create a new task item", () => {
     const manager = new PlanManager();
-    const createTool = manager.getTools().find(t => t.name === "plan.createTask")!;
+    const createTool = manager.getTools().find(t => t.name === "plan_createTask")!;
 
     const result = createTool.execute({ subject: "Task 1", description: "Details", activeForm: "Running" }, {} as any) as any;
 
@@ -70,10 +80,10 @@ describe("PlanManager", () => {
     expect(manager.getPlan()[0]).toEqual(result.task);
   });
 
-  it("plan.updateTask should update fields of a specific task", () => {
+  it("plan_updateTask should update fields of a specific task", () => {
     const manager = new PlanManager();
-    const createTool = manager.getTools().find(t => t.name === "plan.createTask")!;
-    const updateTool = manager.getTools().find(t => t.name === "plan.updateTask")!;
+    const createTool = manager.getTools().find(t => t.name === "plan_createTask")!;
+    const updateTool = manager.getTools().find(t => t.name === "plan_updateTask")!;
 
     createTool.execute({ subject: "Task 1" }, {} as any);
     const plan = manager.getPlan();
@@ -87,19 +97,19 @@ describe("PlanManager", () => {
     expect(manager.getPlan()[0].status).toBe("in-progress");
   });
 
-  it("plan.updateTask should throw if task id is not found", () => {
+  it("plan_updateTask should throw if task id is not found", () => {
     const manager = new PlanManager();
-    const updateTool = manager.getTools().find(t => t.name === "plan.updateTask")!;
+    const updateTool = manager.getTools().find(t => t.name === "plan_updateTask")!;
 
     expect(() => {
       updateTool.execute({ id: "non-existent-id", status: "completed" }, {} as any);
     }).toThrow(/not found/);
   });
 
-  it("plan.getTasks should return the current list of tasks", () => {
+  it("plan_getTasks should return the current list of tasks", () => {
     const manager = new PlanManager();
-    const createTool = manager.getTools().find(t => t.name === "plan.createTask")!;
-    const getTool = manager.getTools().find(t => t.name === "plan.getTasks")!;
+    const createTool = manager.getTools().find(t => t.name === "plan_createTask")!;
+    const getTool = manager.getTools().find(t => t.name === "plan_getTasks")!;
 
     createTool.execute({ subject: "Task 1" }, {} as any);
 
@@ -107,10 +117,10 @@ describe("PlanManager", () => {
     expect(result.tasks).toEqual(manager.getPlan());
   });
 
-  it("plan.deleteTask should delete a specific task", () => {
+  it("plan_deleteTask should delete a specific task", () => {
     const manager = new PlanManager();
-    const createTool = manager.getTools().find(t => t.name === "plan.createTask")!;
-    const deleteTool = manager.getTools().find(t => t.name === "plan.deleteTask")!;
+    const createTool = manager.getTools().find(t => t.name === "plan_createTask")!;
+    const deleteTool = manager.getTools().find(t => t.name === "plan_deleteTask")!;
 
     createTool.execute({ subject: "Task 1" }, {} as any);
     const taskId = manager.getPlan()[0].id;
@@ -120,10 +130,10 @@ describe("PlanManager", () => {
     expect(manager.getPlan()).toHaveLength(0);
   });
 
-  it("plan.clearTasks should clear all tasks", () => {
+  it("plan_clearTasks should clear all tasks", () => {
     const manager = new PlanManager();
-    const createTool = manager.getTools().find(t => t.name === "plan.createTask")!;
-    const clearTool = manager.getTools().find(t => t.name === "plan.clearTasks")!;
+    const createTool = manager.getTools().find(t => t.name === "plan_createTask")!;
+    const clearTool = manager.getTools().find(t => t.name === "plan_clearTasks")!;
 
     createTool.execute({ subject: "Task 1" }, {} as any);
     createTool.execute({ subject: "Task 2" }, {} as any);
@@ -137,8 +147,8 @@ describe("PlanManager", () => {
 
   it("plan mode tools should toggle planMode state", () => {
     const manager = new PlanManager();
-    const enterTool = manager.getTools().find(t => t.name === "plan.enterPlanMode")!;
-    const exitTool = manager.getTools().find(t => t.name === "plan.exitPlanMode")!;
+    const enterTool = manager.getTools().find(t => t.name === "plan_enterPlanMode")!;
+    const exitTool = manager.getTools().find(t => t.name === "plan_exitPlanMode")!;
 
     expect(manager.isPlanMode()).toBe(false);
 

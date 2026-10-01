@@ -69,12 +69,19 @@
     "empty": "Ask about extension features, bookmarks, data summaries, or safe settings changes.",
     "placeholder": "Ask about features, settings, or bookmarks...",
     "send": "Send",
+    "stop": "Stop generating",
     "process": "Process",
     "sources": "Related bookmarks",
     "status": {
       "thinking": "Agent is thinking...",
       "searching": "Agent is processing...",
       "writing": "Agent is formulating answer..."
+    },
+    "approval": {
+      "title": "Needs your approval",
+      "approve": "Allow",
+      "reject": "Reject",
+      "timeoutHint": "Cancels automatically if not confirmed within {{minutes}} min"
     }
   },
   "settings": {

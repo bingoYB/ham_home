@@ -1,5 +1,6 @@
 import "fake-indexeddb/auto";
 import { describe, expect, it } from "vitest";
+import type { AgentMessage } from "../core/types";
 import { IndexedDBMemory, InMemory } from "./memory";
 
 describe("InMemory", () => {
@@ -17,6 +18,29 @@ describe("InMemory", () => {
 
     await memory.clear();
     expect(await memory.get()).toEqual([]);
+  });
+
+  it("never starts the trimmed history with an orphaned tool result", async () => {
+    const memory = new InMemory({ maxMessages: 3 });
+
+    for (const message of toolTurn("first")) {
+      await memory.add(message);
+    }
+    await memory.add({ role: "user", content: "second" });
+
+    // Plain count trimming would keep [tool, assistant, user].
+    expect((await memory.get()).map((message) => message.role)).toEqual(["assistant", "user"]);
+  });
+
+  it("keeps the newest user request while one turn exceeds the limit", async () => {
+    const memory = new InMemory({ maxMessages: 3 });
+
+    for (const message of toolTurn("first")) {
+      await memory.add(message);
+    }
+
+    // Plain count trimming would drop the request the tool loop is answering.
+    expect((await memory.get()).map((message) => message.content)).toEqual(["first", "", "{}", "done"]);
   });
 
   it("keeps messages isolated by session and deletes a session", async () => {
@@ -106,6 +130,18 @@ describe("IndexedDBMemory", () => {
     ]);
   });
 
+  it("trims without orphaning tool results or the newest user request", async () => {
+    const memory = new IndexedDBMemory({ dbName: uniqueDbName(), maxMessages: 3 });
+
+    for (const message of toolTurn("first")) {
+      await memory.add(message);
+    }
+    expect((await memory.get()).map((message) => message.role)).toEqual(["user", "assistant", "tool", "assistant"]);
+
+    await memory.add({ role: "user", content: "second" });
+    expect((await memory.get()).map((message) => message.role)).toEqual(["assistant", "user"]);
+  });
+
   it("clears and deletes sessions independently", async () => {
     const memory = new IndexedDBMemory({ dbName: uniqueDbName() });
 
@@ -126,6 +162,16 @@ describe("IndexedDBMemory", () => {
     expect((await memory.listSessions()).map((session) => session.id)).not.toContain("session-b");
   });
 });
+
+/** One user turn whose answer needed a single tool call. */
+function toolTurn(request: string): AgentMessage[] {
+  return [
+    { role: "user", content: request },
+    { role: "assistant", content: "", metadata: { toolCalls: [{ toolCallId: "call_1", toolName: "search", input: {} }] } },
+    { role: "tool", content: "{}", metadata: { toolCallId: "call_1", toolName: "search" } },
+    { role: "assistant", content: "done" },
+  ];
+}
 
 function uniqueDbName(): string {
   return `agent-memory-test-${crypto.randomUUID()}`;

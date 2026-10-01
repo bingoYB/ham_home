@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { allProviders } from "../llm/provider-definitions";
 import { createAgent } from "../index";
 // Only run this test if an API key is provided
 const shouldRun = !!process.env.OPENAI_API_KEY;
@@ -7,6 +8,7 @@ describe.runIf(shouldRun)("Agent Integration (Real API)", () => {
   it("can interact with a real language model", async () => {
     const agent = createAgent({
       provider: "openai",
+      providers: allProviders,
       model: process.env.TEST_MODEL || "gpt-4o-mini",
       apiKey: process.env.OPENAI_API_KEY,
       baseUrl: process.env.OPENAI_BASE_URL,
@@ -23,6 +25,7 @@ describe.runIf(shouldRun)("Agent Integration (Real API)", () => {
   it("can use a tool with a real language model", async () => {
     const agent = createAgent({
       provider: "openai",
+      providers: allProviders,
       model: process.env.TEST_MODEL || "gpt-4o-mini",
       apiKey: process.env.OPENAI_API_KEY,
       baseUrl: process.env.OPENAI_BASE_URL,
@@ -64,6 +67,7 @@ describe.runIf(shouldRun)("Agent Integration (Real API)", () => {
   it("can generate structured JSON output", async () => {
     const agent = createAgent({
       provider: "openai",
+      providers: allProviders,
       model: process.env.TEST_MODEL || "gpt-4o-mini",
       apiKey: process.env.OPENAI_API_KEY,
       baseUrl: process.env.OPENAI_BASE_URL,
@@ -113,6 +117,7 @@ describe.runIf(shouldRun)("Agent Integration (Real API)", () => {
   it("can run built-in testConnection command with real API", async () => {
     const agent = createAgent({
       provider: "openai",
+      providers: allProviders,
       model: process.env.TEST_MODEL || "gpt-4o-mini",
       apiKey: process.env.OPENAI_API_KEY,
       baseUrl: process.env.OPENAI_BASE_URL,

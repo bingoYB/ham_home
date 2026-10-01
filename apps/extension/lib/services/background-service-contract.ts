@@ -7,6 +7,7 @@ import type {
 } from "@/lib/search/semantic-retriever";
 import type { GlobalAgentTurnResult } from "@/lib/agent/services/global-agent-service";
 import type {
+  AgentTurnProgress,
   AnalysisResult,
   ImageClipMetadata,
   BookmarkEmbedding,
@@ -78,10 +79,21 @@ export interface IBackgroundService {
     coverage: number;
   }>;
   getShortcuts(): Promise<ShortcutCommand[]>;
+  /**
+   * Run one global agent turn. Pass `turnId` so the UI can poll its progress
+   * and approvals for high-risk tool calls; without it those calls are rejected.
+   */
   globalAgentRunTurn(
     input: ConversationalSearchTurnInput,
     sessionId?: string,
+    turnId?: string,
   ): Promise<GlobalAgentTurnResult>;
+  /** Live steps, streamed answer and pending approval of a running turn; null once it finished. */
+  globalAgentGetTurnProgress(turnId: string): Promise<AgentTurnProgress | null>;
+  /** Stop a running turn; nothing of it is saved. False when it is not running. */
+  globalAgentCancelTurn(turnId: string): Promise<boolean>;
+  /** Approve or reject a pending tool call; false when it already expired. */
+  globalAgentResolveApproval(approvalId: string, approved: boolean): Promise<boolean>;
   globalAgentListSessions(): Promise<ChatSearchSessionSummary[]>;
   globalAgentCreateSession(title?: string): Promise<ChatSearchSessionSnapshot>;
   globalAgentGetSession(sessionId?: string): Promise<ChatSearchSessionSnapshot>;

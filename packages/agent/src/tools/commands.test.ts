@@ -131,6 +131,34 @@ describe("CommandRegistry", () => {
     expect(unregisterToolSpy).toHaveBeenCalled(); // Ensure finally block runs
   });
 
+  it("runs a command definition without registering it", async () => {
+    const registry = new CommandRegistry(agent);
+    const command = {
+      name: "one_off",
+      prompt: (input: { text: string }) => `echo ${input.text}`,
+      outputSchema: {
+        type: "object" as const,
+        properties: { result: { type: "string" as const } },
+        required: ["result"],
+        additionalProperties: false,
+      },
+    };
+
+    const result = await registry.run(command, { text: "hi" }, { systemPrompt: "Be brief." });
+
+    expect(result).toMatchObject({ command: "one_off", output: { result: "success" } });
+    expect(agent.runCommand).toHaveBeenCalledWith(
+      "echo hi",
+      expect.objectContaining({ systemPrompt: "Be brief.", outputSchema: command.outputSchema }),
+    );
+    expect(registry.get("one_off")).toBeUndefined();
+  });
+
+  it("throws CommandNotFoundError for unknown command names", async () => {
+    const registry = new CommandRegistry(agent);
+    await expect(registry.run("missing", {})).rejects.toThrow('Command "missing" was not found.');
+  });
+
   it("run method throws ToolNotFoundError for unknown string tools", async () => {
     const registry = new CommandRegistry(agent);
     agent.tools.get.mockReturnValue(undefined);

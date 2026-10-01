@@ -7,6 +7,10 @@ import type {
   ThemeMode,
   WebDAVConfig,
 } from "@/types";
+import {
+  getEmbeddingDimensionSpec,
+  withValidEmbeddingDimensions,
+} from "../provider-config";
 
 type SafeSettingsPatch = Partial<{
   settings: Record<string, unknown>;
@@ -238,7 +242,6 @@ export function sanitizeSafeSettingsUpdate(
       "provider",
       "model",
       "temperature",
-      "maxTokens",
       "enableTranslation",
       "enableSmartCategory",
       "enableTagSuggestion",
@@ -282,16 +285,6 @@ export function sanitizeSafeSettingsUpdate(
     aiConfig.temperature = rawAIConfig.temperature;
   } else if ("temperature" in rawAIConfig) {
     reject(rejected, "aiConfig", "temperature", "temperature must be between 0 and 2");
-  }
-
-  if (
-    Number.isInteger(rawAIConfig.maxTokens) &&
-    Number(rawAIConfig.maxTokens) > 0 &&
-    Number(rawAIConfig.maxTokens) <= 8000
-  ) {
-    aiConfig.maxTokens = Number(rawAIConfig.maxTokens);
-  } else if ("maxTokens" in rawAIConfig) {
-    reject(rejected, "aiConfig", "maxTokens", "maxTokens must be an integer between 1 and 8000");
   }
 
   for (const key of [
@@ -387,4 +380,52 @@ export function sanitizeSafeSettingsUpdate(
   }
 
   return { settings, aiConfig, embeddingConfig, webdavConfig, rejected };
+}
+
+/**
+ * Check `dimensions` against the embedding model the update targets: a size the
+ * model does not accept is rejected (keeping the current one), and switching to
+ * a model that cannot use the current size clears it.
+ *
+ * Example:
+ * ```ts
+ * constrainEmbeddingDimensions(sanitizeSafeSettingsUpdate(input), await configStorage.getEmbeddingConfig());
+ * ```
+ */
+export function constrainEmbeddingDimensions(
+  update: SanitizedSafeSettingsUpdate,
+  current: EmbeddingConfig,
+): SanitizedSafeSettingsUpdate {
+  if (Object.keys(update.embeddingConfig).length === 0) {
+    return update;
+  }
+
+  const { dimensions, ...rest } = update.embeddingConfig;
+  const target = { ...current, ...rest };
+  const spec = getEmbeddingDimensionSpec(target.provider, target.model);
+  const isAccepted =
+    dimensions === undefined ||
+    (!!spec && (dimensions === spec.defaultDimensions || spec.options.includes(dimensions)));
+
+  if (isAccepted) {
+    return {
+      ...update,
+      embeddingConfig: withValidEmbeddingDimensions(current, update.embeddingConfig),
+    };
+  }
+
+  return {
+    ...update,
+    embeddingConfig: withValidEmbeddingDimensions(current, rest),
+    rejected: [
+      ...update.rejected,
+      {
+        scope: "embeddingConfig",
+        key: "dimensions",
+        reason: spec
+          ? `supported values: ${[spec.defaultDimensions, ...spec.options].join(", ")}`
+          : "the embedding model does not support custom dimensions",
+      },
+    ],
+  };
 }
