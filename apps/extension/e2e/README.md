@@ -55,6 +55,11 @@ pnpm test:e2e:report
   - `E2E_AI_BASE_URL`、`E2E_AI_API_KEY`、`E2E_AI_MODEL`、`E2E_AI_PROVIDER`
   - `E2E_EMBEDDING_BASE_URL`、`E2E_EMBEDDING_API_KEY`、`E2E_EMBEDDING_MODEL`、`E2E_EMBEDDING_PROVIDER`
   - `E2E_INJECT_AI_CONFIG=0` 可关闭自动注入
+- **AI mock 服务**：需要模型应答的用例（如 `global-agent.spec.ts`）用
+  `helpers/mock-ai-server.ts` 的 `startMockAiServer()` 在随机端口启动 OpenAI 兼容
+  `/v1/chat/completions` mock（支持按段延迟的 SSE 流式和非流式应答），在
+  `resetExtensionData(...)` 之后调用 `pointAiConfigToMock(worker, server.baseUrl)`
+  把 AI 配置指向它；`server.requests` 记录请求体以及是否被客户端中断。
 - **截图报告**：配置中 `screenshot: only-on-failure` 自动捕获失败截图；
   核心流程用例会通过 `attachStepScreenshot(...)` 主动附加成功路径的关键节点截图，
   例如空态入口、筛选结果、导入成功、popup 保存前表单、设置失败态等。
