@@ -10,9 +10,13 @@ The screenshots below are generated from the extension screenshot test suite and
 
 ## Quick Tour
 
-| Save current page | Manage your library |
+| Save current page | Clip an image |
 | :--: | :--: |
-| ![Save current page](../apps/extension/output/screenshots/en-light/01-popup-save.png) | ![Bookmark library](../apps/extension/output/screenshots/en-light/02-bookmark-library.png) |
+| ![Save current page](../apps/extension/output/screenshots/en-light/01-popup-save.png) | ![Image clip](../apps/extension/output/screenshots/en-light/11-image-clip-save.png) |
+| Manage your library | Browse the visual gallery |
+| ![Bookmark library](../apps/extension/output/screenshots/en-light/02-bookmark-library.png) | ![Visual gallery](../apps/extension/output/screenshots/en-light/10-visual-gallery.png) |
+| Check bookmark health | Restore from Trash |
+| ![Bookmark Health Center](../apps/extension/output/screenshots/en-light/12-health-center.png) | ![Trash](../apps/extension/output/screenshots/en-light/13-trash.png) |
 | Search with Agent | Restore workspaces |
 | ![AI Agent search](../apps/extension/output/screenshots/en-light/05-ai-agent.png) | ![Workspaces](../apps/extension/output/screenshots/en-light/06-workspaces.png) |
 | Automate Tab Groups | Import, export, and sync |
@@ -21,9 +25,9 @@ The screenshots below are generated from the extension screenshot test suite and
 ## First Setup
 
 1. Install HamHome from the browser store or a GitHub Release package.
-2. Open the HamHome app from the extension icon, context menu, or the page opened after installation.
-3. In `Settings -> General`, choose language, theme, panel side, auto-save snapshot, omnibox search, and browser shortcuts.
-4. In `Settings -> AI`, choose a provider, model, API key, Base URL, advanced options, and preset tags. Click the connection test before relying on AI features.
+2. Open the HamHome app from the context menu item `Open HamHome`, the quick panel behind the extension icon, or the page opened after installation.
+3. In `Settings -> General`, choose language, theme, panel side, auto-save snapshot, default page screenshots, private page screenshots, automatic bookmark checks, omnibox search, and browser shortcuts.
+4. In `Settings -> AI`, choose a provider, model, API key, Base URL, advanced options, and preset tags, and decide whether image clips may be sent for AI analysis. Click the connection test before relying on AI features.
 5. Optional: enable `Embedding` in `Settings -> AI` if you want semantic search. Configure an embedding provider/model, test it, then run an incremental or full vector rebuild.
 6. Optional: in `Settings -> Storage`, configure WebDAV if you want multi-device sync.
 
@@ -31,8 +35,10 @@ AI features are optional. You can save, edit, search, import, export, and organi
 
 ## Main Entry Points
 
-- **Popup save panel**: click the extension icon, use the context menu item `Save to HamHome`, or use the suggested shortcut `Ctrl+Shift+X` / `Command+Shift+X`.
-- **Main app**: use the context menu item `Open HamHome`, the quick action in the popup, or open the extension app page.
+- **Save current page**: use the suggested shortcut `Ctrl+Shift+X` / `Command+Shift+X`, the context menu item `Save current page`, or `Save current page` in the quick panel. The save form opens as an overlay on the page; turn on `Save in Extension Popup` in `Settings -> General` if you prefer the popup.
+- **Clip text or an image**: select text and choose `Save selection` from the context menu, or right-click an image and choose `Save image`.
+- **Quick panel**: click the extension icon to save the current page, open the in-page bookmark panel, and check recent saves and common settings.
+- **Main app**: use the context menu item `Open HamHome`, the quick panel, or open the extension app page.
 - **In-page bookmark panel**: move to the configured screen edge and click the trigger, or use `Ctrl+Shift+L` / `Command+Shift+L`.
 - **Save current window as workspace**: use the context menu item, the Workspaces page button, or `Ctrl+Shift+Y` / `Command+Shift+Y`.
 - **Address bar search**: type `ham`, press Space/Tab, then enter a query. This searches bookmarks and workspaces when omnibox search is enabled.
@@ -43,16 +49,24 @@ Browser shortcuts are controlled by the browser. Use `chrome://extensions/shortc
 
 ![Save panel](../apps/extension/output/screenshots/en-light/01-popup-save.png)
 
-Open the save panel on the page you want to capture. HamHome reads the page title, URL, metadata, readable text, and favicon when available.
+Start a save on the page you want to capture. The save panel opens right on the page, and HamHome reads the page title, URL, metadata, readable text, and favicon when available. AI analysis runs in the panel without interrupting your browsing.
 
 In the save panel you can:
 
 - Edit title and description.
 - Choose a category and add tags.
 - Request AI suggestions for summary/category/tags.
+- Save or skip a page screenshot of the visible area.
 - Save or skip a local snapshot.
 - If snapshot saving is enabled, also sync a Markdown-style note to Obsidian.
 - Update or delete the bookmark if the current URL is already saved.
+
+Page screenshot behavior:
+
+- Only the visible part of the page is captured, and HamHome's own UI is hidden while capturing.
+- Turn on `Save Page Screenshots by Default` in `Settings -> General` to start every save with the screenshot switch on; each save can still opt out.
+- Private pages skip screenshots by default. Set `Private Page Screenshots` to `Allow choice` if you want to decide per page.
+- Screenshots are stored locally in IndexedDB and are not part of WebDAV sync or JSON backups.
 
 Snapshot and Obsidian behavior:
 
@@ -60,6 +74,17 @@ Snapshot and Obsidian behavior:
 - Obsidian sync opens an `obsidian://new` URL and writes notes under the `HamHome` folder by default.
 - Obsidian sync needs Obsidian installed and the Obsidian URL scheme enabled.
 - If the generated note is unchanged, HamHome can skip duplicate Obsidian writes.
+
+## Clip Text and Images
+
+![Image clip](../apps/extension/output/screenshots/en-light/11-image-clip-save.png)
+
+Clips save the part of a page you care about instead of the whole page.
+
+- **Text clips**: select text, right-click, and choose `Save selection`. The clip keeps the exact quote and its source page, and opening it jumps to that passage through a Text Fragment.
+- **Image clips**: right-click an image and choose `Save image`. The clip keeps the image URL, source page, size, format, and dominant colors.
+- AI suggests tags and a category for clips. With a vision-capable model it also writes a title and summary for images; turn off `AI analysis for image clips` in `Settings -> AI` to keep images away from the provider. Images on private pages are never sent.
+- Clips appear in the library as text and image cards. Click a card to see the full quote or image details, and use the content-type filter to show only bookmarks, images, or text.
 
 ## Browse and Organize Bookmarks
 
@@ -70,11 +95,17 @@ The bookmark library is the main place for reviewing, filtering, editing, and cl
 Useful workflows:
 
 - Search by title, URL, description, content, category, tag, domain, or time range.
-- Switch between dense management views and visual cards where available.
+- Filter by content type (bookmarks, images, text), or pick a custom date range from the calendar in the filter menu.
+- Switch between masonry cards, a compact list, and the visual gallery.
+- Hover a card that has a page screenshot to preview it, or open the screenshot viewer to download or delete it.
 - Edit title, URL, description, category, and tags.
-- Open, copy, delete, or restore bookmarks depending on their state.
+- Open, copy, or delete bookmarks. Deleted bookmarks go to Trash first.
 - View, download, update, delete, or sync snapshots.
-- Use custom filters from `Settings -> General` to save repeated search conditions.
+- Save repeated search conditions as custom filters from the filter menu or `Settings -> General`.
+
+![Visual gallery](../apps/extension/output/screenshots/en-light/10-visual-gallery.png)
+
+The visual gallery shows only bookmarks that have a page screenshot, which makes it a quick way to browse product UIs, landing pages, and other visual references.
 
 Bulk actions are available after selecting bookmarks.
 
@@ -87,6 +118,26 @@ Bulk workflows include:
 - Delete selected bookmarks.
 - Re-run AI analysis on selected bookmarks.
 - Sync selected snapshots to Obsidian when snapshots are available.
+
+## Bookmark Health Center and Trash
+
+![Bookmark Health Center](../apps/extension/output/screenshots/en-light/12-health-center.png)
+
+Open `Bookmark Health` to keep a large library tidy. It checks bookmark collections only; image and text clips are excluded.
+
+- Click `Run Full Check` to check every link, or refresh a single row. To check in the background, set `Automatic Bookmark Check` to weekly or monthly in `Settings -> General`.
+- Only `404` / `410` responses are marked as broken. Sign-in requirements, rate limits, server errors, network errors, and timeouts get their own status so a temporary failure is never treated as a dead link.
+- When a link redirects, `Use New URL` updates the bookmark to the final address.
+- Duplicates are found by normalized URL (tracking parameters, fragments, and parameter order are ignored) and are available even before the first check. `Clean duplicates` keeps the earliest bookmark in each group and moves the rest to Trash.
+- Filter by all, needs attention, broken, duplicates, or unchecked, and delete selected rows in bulk.
+
+![Trash](../apps/extension/output/screenshots/en-light/13-trash.png)
+
+Deleted bookmarks, including those removed from the Health Center, wait in `Trash` for 30 days together with their content, snapshots, screenshots, and clips.
+
+- Restore selected bookmarks, delete them forever, or empty the whole trash.
+- Each row shows how many days are left before it is purged.
+- After 30 days, or after a permanent delete, HamHome frees the data and keeps only a lightweight tombstone so the deletion also reaches your other devices through WebDAV.
 
 ## Categories and Tags
 
@@ -201,7 +252,7 @@ Import options:
 
 Export options:
 
-- JSON export is the full HamHome backup format. It includes bookmarks, categories, workspaces, workspace categories, Tab Group rules, and auto-group settings.
+- JSON export is the full HamHome backup format. It includes bookmarks, clips, categories, workspaces, workspace categories, Tab Group rules, and auto-group settings.
 - HTML export generates a readable bookmark page.
 - Browser sync writes HamHome bookmarks back to the browser bookmark bar. You can create/use a `HamHome` root folder, clear the target area first, and skip duplicates globally.
 
@@ -211,14 +262,18 @@ It syncs structured data under `/HamHomeSync`:
 
 - Settings.
 - Bookmark metadata and bookmark text content.
+- Text and image clips.
 - Bookmark categories.
 - Workspaces and workspace categories.
 - Tab Group rules and auto-group settings.
+- Trash state and deletion tombstones, so deletions reach every device.
 
-It does not sync local snapshot blobs as full WebDAV snapshot files. Use JSON export or Obsidian sync when you need to move snapshot/note content.
+It does not upload local snapshot files or page screenshots. Download snapshots or use Obsidian sync when you need to move snapshot or note content elsewhere.
 
 WebDAV behavior:
 
+- Bookmarks are matched by URL, so the same page saved on two devices merges into one bookmark instead of duplicating.
+- Basic authentication is tried first, with automatic fallback to Digest when the server asks for it. Authentication errors come with an actionable error code.
 - Manual sync is available from the Storage tab.
 - Background sync runs periodically.
 - Local bookmark changes schedule a delayed sync.
@@ -231,18 +286,19 @@ HamHome is local-first, but some optional features intentionally call external s
 
 Local by default:
 
-- Bookmarks, categories, settings, workspaces, Tab Group rules, AI cache, vector data, and snapshots are stored in browser storage/IndexedDB.
+- Bookmarks, clips, categories, settings, workspaces, Tab Group rules, AI cache, vector data, snapshots, and page screenshots are stored in browser storage/IndexedDB.
 
 May leave your browser only when enabled:
 
-- AI analysis may send page URL, title, excerpt/content, category names, and tags to your chosen AI provider.
+- AI analysis may send page URL, title, excerpt/content, category names, and tags to your chosen AI provider. Text clips send the selected text.
+- Image clip analysis sends the image to your AI provider while `AI analysis for image clips` is on. Images on private pages are never sent.
 - Embedding search sends bookmark/query text to your embedding provider while vectors are built or searched.
 - WebDAV sends structured sync data to your WebDAV server.
 - Obsidian sync opens an Obsidian URL with generated note content or clipboard handoff.
 
 The Agent will not read or fill API keys, Base URLs, privacy domains, WebDAV credentials, Obsidian-sensitive values, or browser shortcut settings. Configure those manually in settings.
 
-Use privacy domains and automatic privacy detection for sites that should never be analyzed by AI.
+Use privacy domains and automatic privacy detection for sites that should never be analyzed by AI. The same detection keeps page screenshots off private pages by default.
 
 ## Troubleshooting
 
@@ -260,8 +316,16 @@ Confirm sync is enabled, URL/username/password are filled, and manual sync is no
 
 ### Storage keeps growing
 
-Snapshots and vectors are the usual causes. Use `Settings -> Storage` to inspect bookmark, workspace, snapshot, and vector data. You can clear snapshots or vectors separately, or export a backup before clearing business data.
+Snapshots, page screenshots, and vectors are the usual causes. Use `Settings -> Storage` to inspect bookmark, workspace, snapshot, screenshot, and vector data. You can clear snapshots or vectors separately, delete individual screenshots from the screenshot viewer, or export a backup before clearing business data. Items in Trash keep their data until they are restored or purged, so empty the trash to free space right away.
 
 ### Tab Groups are not applied
 
 Confirm the browser supports `chrome.tabGroups`, the rule is enabled, the tab is not pinned, and no earlier rule has matched. For AI grouping, verify AI settings and make sure domain auto grouping is not enabled at the same time.
+
+### The Health Center shows sign-in required or rate limited
+
+These statuses mean the site answered but did not let the check through, for example a page behind a login or a site that throttles automated requests. HamHome keeps them separate from broken links on purpose. Open the page to confirm, and delete it only if it is really gone.
+
+### I deleted a bookmark by mistake
+
+Open `Trash` and restore it. Deleted bookmarks stay there for 30 days with their content, snapshots, screenshots, and clips.
