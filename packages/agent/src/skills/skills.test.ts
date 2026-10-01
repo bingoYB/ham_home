@@ -245,7 +245,13 @@ describe("Agent skill integration", () => {
         },
       ],
     };
-    const agent = createAgent({ modelClient, skills: [skill], maxIterations: 3 });
+    const inactiveSkill: AgentSkill = {
+      id: "refunds",
+      name: "Refunds",
+      description: "Refund handling guidance.",
+      match: { pageIds: ["orders.refund"] },
+    };
+    const agent = createAgent({ modelClient, skills: [skill, inactiveSkill], maxIterations: 3 });
 
     const result = await agent.run("创建订单", { skillContext: { pageId: "orders.create" } });
 
@@ -253,10 +259,31 @@ describe("Agent skill integration", () => {
     expect(requests[0].tools.map((tool) => tool.name)).toEqual(expect.arrayContaining(["skill_view", "discoverSkill", "readOrderDraft"]));
     expect(requests[0].systemPrompt).toContain("orders");
     expect(requests[0].systemPrompt).toContain("Call skill_view");
+    expect(requests[0].systemPrompt).toContain("Call discoverSkill");
     expect(agent.tools.get("readOrderDraft")).toBeUndefined();
     expect(result.toolCalls[0]?.toolName).toBe("skill_view");
     expect(result.toolCalls[0]?.output).toEqual(expect.objectContaining({ active: true }));
     expect(result.toolCalls[1]?.output).toEqual({ customer: "Ada" });
+  });
+
+  it("omits discoverSkill and its guidance when every skill is already active", async () => {
+    const requests: ModelGenerateRequest[] = [];
+    const modelClient: ModelClient = {
+      async generate(request) {
+        requests.push(request);
+        return { text: "done", toolCalls: [] };
+      },
+    };
+    const agent = createAgent({
+      modelClient,
+      skills: [{ id: "guide", name: "Guide", description: "Global usage guide." }],
+    });
+
+    await agent.run("how do I use this?");
+
+    expect(requests[0].tools.map((tool) => tool.name)).toEqual(["skill_view"]);
+    expect(requests[0].systemPrompt).toContain("Call skill_view");
+    expect(requests[0].systemPrompt).not.toContain("discoverSkill");
   });
 
   it("can strictly exclude skill base tools when tools are restricted", async () => {

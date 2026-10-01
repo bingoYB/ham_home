@@ -1,6 +1,7 @@
 
 import type {
   ActiveSkill,
+  AgentEvent,
   AgentSkill,
   AgentTool,
   DiscoverSkillInput,
@@ -19,26 +20,34 @@ import type {
   SkillRequestContext,
   SkillReconcileResult,
   SkillStore,
+  SkillDocument,
   SkillToolDefinition,
   SkillViewInput,
   SkillViewResult,
 } from "../core/types";
+import { estimateTextTokens, truncateTextToTokens } from "../utils/tokens";
+
+/** Events emitted by the Skill runtime; a subset of `AgentEvent`. */
+export type SkillRuntimeEvent = Extract<AgentEvent, { type: `skill.${string}` }>;
 
 export interface AgentSkillRuntimeOptions {
   matcher?: SkillMatcher;
   store?: SkillStore;
   events?: {
-    emit(event:
-      | { type: "skill.registered"; skillId: string; source?: AgentSkill["source"] }
-      | { type: "skill.unregistered"; skillId: string }
-      | { type: "skill.reconciled"; result: SkillReconcileResult }
-      | { type: "skill.mounted"; skillId: string; reason: string }
-      | { type: "skill.unmounted"; skillId: string }
-      | { type: "skill.tool.mounted"; skillId: string; toolName: string; reason: string }
-      | { type: "skill.tool.unmounted"; skillId: string; toolName: string }
-      | { type: "skill.matched"; matches: SkillMatchResult[] }): void;
+    emit(event: SkillRuntimeEvent): void;
   };
 }
+
+/** Options for request-time matching. */
+export interface SkillResolveOptions {
+  /** Run that triggered the matching; stamped on the emitted events. */
+  runId?: string;
+  /** Skills kept active even when the request does not match them. */
+  pinnedSkillIds?: string[];
+}
+
+/** `ActiveSkill.reason` of a Skill that is active only because it is pinned. */
+export const PINNED_SKILL_REASON = "pinned";
 
 /**
  * Local Skill store used when the host app does not provide persistence.
@@ -87,6 +96,7 @@ export class InMemorySkillStore implements SkillStore {
 export class AgentSkillRuntime {
   private readonly skills = new Map<string, { skill: AgentSkill; enabled: boolean }>();
   private readonly active = new Map<string, ActiveSkill>();
+  private mounted: MountedSkillTool[] = [];
   private readonly matcher: SkillMatcher;
   private readonly store?: SkillStore;
   private readonly events?: AgentSkillRuntimeOptions["events"];
@@ -107,7 +117,7 @@ export class AgentSkillRuntime {
 
     this.skills.set(id, { skill: normalized, enabled: options.enabled ?? true });
     void this.store?.put(normalized);
-    this.events?.emit({ type: "skill.registered", skillId: id, source: normalized.source });
+    this.emit({ type: "skill.registered", skillId: id, source: normalized.source });
     return () => {
       this.unregister(id);
     };
@@ -123,7 +133,7 @@ export class AgentSkillRuntime {
     this.active.delete(skillId);
     void this.store?.delete(skillId);
     if (existed) {
-      this.events?.emit({ type: "skill.unregistered", skillId });
+      this.emit({ type: "skill.unregistered", skillId });
     }
     return existed;
   }
@@ -140,19 +150,71 @@ export class AgentSkillRuntime {
     return this.skills.get(skillId)?.skill;
   }
 
-  async resolve(input: SkillRequestContext): Promise<SkillMatchResult[]> {
+  /** Tools of the active skills, as mounted by the last `reconcile()` and later `activate()` calls. */
+  listMountedTools(): MountedSkillTool[] {
+    return [...this.mounted];
+  }
+
+  /**
+   * Activates an enabled, model-invocable Skill outside request matching, e.g.
+   * after the model found it with `discoverSkill`. It stays active, with its
+   * tools mounted, until the next `reconcile()`, i.e. for the rest of the run.
+   * Tool-level match rules are checked against `options.context`.
+   *
+   * Example:
+   * ```ts
+   * runtime.activate("orders.export", { context: { pageId: "orders" } });
+   * ```
+   */
+  activate(
+    skillId: string,
+    options: { reason?: string; runId?: string; context?: SkillRequestContext } = {},
+  ): ActiveSkill | undefined {
+    const record = this.skills.get(skillId);
+    if (!record?.enabled || record.skill.modelInvocable === false) {
+      return undefined;
+    }
+    const existing = this.active.get(skillId);
+    if (existing) {
+      return existing;
+    }
+
+    const reason = options.reason ?? "activated";
+    const tools = resolveSkillTools({ skill: record.skill, score: 0, reason, matchedBy: [] }, options.context ?? {});
+    const activeSkill: ActiveSkill = {
+      skill: record.skill,
+      mountedAt: Date.now(),
+      reason,
+      mountedTools: tools.map((tool) => tool.toolName),
+    };
+    this.active.set(skillId, activeSkill);
+    this.mounted = [...this.mounted, ...tools];
+
+    this.emit({ type: "skill.mounted", skillId, reason }, options.runId);
+    for (const tool of tools) {
+      this.emit({ type: "skill.tool.mounted", skillId, toolName: tool.toolName, reason }, options.runId);
+    }
+    return activeSkill;
+  }
+
+  /** Whether `discover()` can find anything: some model-invocable skill is not active. */
+  hasDiscoverableSkills(): boolean {
+    return this.list().some((skill) => skill.modelInvocable !== false && !this.active.has(skill.id));
+  }
+
+  async resolve(input: SkillRequestContext, options: SkillResolveOptions = {}): Promise<SkillMatchResult[]> {
     const matches = [...this.skills.values()]
       .filter((record) => record.enabled)
       .map((record) => this.matcher(record.skill, input))
       .filter((match): match is SkillMatchResult => Boolean(match))
       .sort((left, right) => right.score - left.score);
 
-    this.events?.emit({ type: "skill.matched", matches });
+    this.emit({ type: "skill.matched", matches }, options.runId);
     return matches;
   }
 
-  async reconcile(input: SkillRequestContext): Promise<SkillReconcileResult> {
-    const matches = await this.resolve(input);
+  async reconcile(input: SkillRequestContext, options: SkillResolveOptions = {}): Promise<SkillReconcileResult> {
+    const matches = await this.resolve(input, options);
     const previousSkillIds = new Set(this.active.keys());
     const previousToolNames = new Set(this.listActive().flatMap((skill) => skill.mountedTools));
     const nextActive = new Map<string, ActiveSkill>();
@@ -177,6 +239,31 @@ export class AgentSkillRuntime {
       nextActive.set(match.skill.id, activeSkill);
     }
 
+    // Pinned Skills (typically activated by the model in an earlier turn)
+    // stay active when this request does not match them.
+    const pinnedSkillIds: string[] = [];
+    for (const skillId of new Set(options.pinnedSkillIds ?? [])) {
+      const record = this.skills.get(skillId);
+      if (!record?.enabled || record.skill.modelInvocable === false) {
+        continue;
+      }
+      pinnedSkillIds.push(skillId);
+      if (nextActive.has(skillId)) {
+        continue;
+      }
+      const tools = resolveSkillTools(
+        { skill: record.skill, score: 0, reason: PINNED_SKILL_REASON, matchedBy: [] },
+        input,
+      );
+      nextActive.set(skillId, {
+        skill: record.skill,
+        mountedAt: this.active.get(skillId)?.mountedAt ?? Date.now(),
+        reason: PINNED_SKILL_REASON,
+        mountedTools: tools.map((tool) => tool.toolName),
+      });
+      mountedTools.push(...tools);
+    }
+
     // Diff previous and next snapshots for eventing and optional cleanup.
     const mountedSkillIds = [...nextActive.keys()].filter((skillId) => !previousSkillIds.has(skillId));
     const unmountedSkillIds = [...previousSkillIds].filter((skillId) => !nextActive.has(skillId));
@@ -186,20 +273,21 @@ export class AgentSkillRuntime {
 
     this.active.clear();
     nextActive.forEach((value, key) => this.active.set(key, value));
+    this.mounted = mountedTools;
 
     for (const skillId of mountedSkillIds) {
-      this.events?.emit({ type: "skill.mounted", skillId, reason: nextActive.get(skillId)?.reason ?? "matched" });
+      this.emit({ type: "skill.mounted", skillId, reason: nextActive.get(skillId)?.reason ?? "matched" }, options.runId);
     }
     for (const skillId of unmountedSkillIds) {
-      this.events?.emit({ type: "skill.unmounted", skillId });
+      this.emit({ type: "skill.unmounted", skillId }, options.runId);
     }
     for (const tool of mountedTools) {
       if (mountedToolNames.includes(tool.toolName)) {
-        this.events?.emit({ type: "skill.tool.mounted", skillId: tool.skillId, toolName: tool.toolName, reason: tool.reason });
+        this.emit({ type: "skill.tool.mounted", skillId: tool.skillId, toolName: tool.toolName, reason: tool.reason }, options.runId);
       }
     }
     for (const toolName of unmountedToolNames) {
-      this.events?.emit({ type: "skill.tool.unmounted", skillId: findSkillIdByToolName(toolName, this.active) ?? "unknown", toolName });
+      this.emit({ type: "skill.tool.unmounted", skillId: findSkillIdByToolName(toolName, this.active) ?? "unknown", toolName }, options.runId);
     }
 
     const result: SkillReconcileResult = {
@@ -209,8 +297,9 @@ export class AgentSkillRuntime {
       unmountedSkillIds,
       mountedToolNames,
       unmountedToolNames,
+      pinnedSkillIds,
     };
-    this.events?.emit({ type: "skill.reconciled", result });
+    this.emit({ type: "skill.reconciled", result }, options.runId);
     return result;
   }
 
@@ -239,8 +328,15 @@ export class AgentSkillRuntime {
 
     const lines = [
       "Current global and page-active skills are listed below as a prompt index.",
-      "Only skill metadata is shown here. Call skill_view with a skillId before relying on a skill's detailed rules, documents, or tool guidance.",
-      "Call discoverSkill only when the current skills and tools do not appear able to satisfy the user's request; it searches inactive skills from other contexts.",
+      options.skillViewEnabled === false
+        ? "Only skill metadata is shown here."
+        : "Only skill metadata is shown here. Call skill_view with a skillId before relying on a skill's detailed rules, documents, or tool guidance.",
+      ...(options.discoverSkillEnabled === false
+        ? []
+        : [
+          "Call discoverSkill only when the current skills and tools do not appear able to satisfy the user's request; it searches inactive skills from other contexts." +
+            (options.activateSkillEnabled ? " Then call activateSkill with a returned skillId to load that skill and use its tools." : ""),
+        ]),
       "",
       "Available skills:",
     ];
@@ -253,6 +349,10 @@ export class AgentSkillRuntime {
     }
 
     return lines.join("\n");
+  }
+
+  private emit(event: SkillRuntimeEvent, runId?: string): void {
+    this.events?.emit(runId ? { ...event, runId } : event);
   }
 
   view(input: SkillViewInput, options: { allowInactive?: boolean } = {}): SkillViewResult | undefined {
@@ -312,7 +412,10 @@ export class AgentSkillRuntime {
  * await skillView.execute({ skillId: "orders" }, context);
  * ```
  */
-export function createSkillViewTool(agent: { skills: AgentSkillRuntime }, options: { allowInactive?: boolean } = {}): AgentTool {
+export function createSkillViewTool(
+  agent: { skills: AgentSkillRuntime },
+  options: { allowInactive?: boolean; maxDocumentTokens?: number } = {},
+): AgentTool {
   return {
     name: "skill_view",
     description: "View the detailed documents and tool metadata for a currently active skill.",
@@ -341,7 +444,7 @@ export function createSkillViewTool(agent: { skills: AgentSkillRuntime }, option
         options,
       );
 
-      return result ?? { error: `Skill is not active or does not exist: ${args.skillId}` };
+      return result ? limitViewDocuments(result, options.maxDocumentTokens) : { error: `Skill is not active or does not exist: ${args.skillId}` };
     },
   };
 }
@@ -358,7 +461,8 @@ export function createSkillViewTool(agent: { skills: AgentSkillRuntime }, option
 export function createDiscoverSkillTool(agent: { skills: AgentSkillRuntime }): AgentTool {
   return {
     name: "discoverSkill",
-    description: "Discover inactive platform skills when the current active skills and tools cannot satisfy the user's request.",
+    description:
+      "Discover inactive platform skills when the current active skills and tools cannot satisfy the user's request. Results list skill metadata only.",
     parameters: {
       type: "object",
       properties: {
@@ -387,6 +491,58 @@ export function createDiscoverSkillTool(agent: { skills: AgentSkillRuntime }): A
         tags: args.tags,
         topK: args.topK ?? 5,
       });
+    },
+  };
+}
+
+/**
+ * Creates the model-visible tool that activates a Skill found by
+ * `discoverSkill`: its tools become callable for the rest of the run and its
+ * documents are returned, limited to `maxDocumentTokens`.
+ *
+ * Example:
+ * ```ts
+ * const activateSkill = createActivateSkillTool(agent);
+ * await activateSkill.execute({ skillId: "orders.export" }, context);
+ * ```
+ */
+export function createActivateSkillTool(
+  agent: { skills: AgentSkillRuntime },
+  options: { maxDocumentTokens?: number } = {},
+): AgentTool {
+  return {
+    name: "activateSkill",
+    description:
+      "Activate a skill returned by discoverSkill. Its tools become available for the rest of this request, and its documents are returned.",
+    parameters: {
+      type: "object",
+      properties: {
+        skillId: { type: "string", description: "The id of a skill returned by discoverSkill." },
+      },
+      required: ["skillId"],
+      additionalProperties: false,
+    },
+    metadata: {
+      readOnly: true,
+      riskLevel: "low",
+    },
+    execute: async (input, context) => {
+      const { skillId } = input as { skillId: string };
+      const activeSkill = agent.skills.activate(skillId, {
+        reason: "activated by model",
+        runId: context.runId,
+        context: { pageId: context.pageId, moduleId: context.moduleId, url: context.url, intent: context.intent },
+      });
+      if (!activeSkill) {
+        return { error: `Skill does not exist or cannot be activated: ${skillId}` };
+      }
+
+      const view = agent.skills.view({ skillId, includeDocuments: true, includeTools: true }, { allowInactive: true });
+      return {
+        activated: true,
+        mountedTools: activeSkill.mountedTools,
+        ...(view ? limitViewDocuments(view, options.maxDocumentTokens) : {}),
+      };
     },
   };
 }
@@ -538,6 +694,37 @@ function toSkillMetadata(skill: AgentSkill): SkillMetadata {
     modelInvocable: skill.modelInvocable,
     source: skill.source,
   };
+}
+
+/**
+ * Keeps Skill documents within `maxTokens`, in order: the document that
+ * crosses the budget is truncated and the rest are listed as omitted.
+ */
+function limitViewDocuments(view: SkillViewResult, maxTokens: number | undefined): SkillViewResult {
+  if (!maxTokens || !view.documents?.length) {
+    return view;
+  }
+
+  let remaining = maxTokens;
+  const documents: SkillDocument[] = [];
+  const omittedDocumentIds: string[] = [];
+  for (const document of view.documents) {
+    if (remaining <= 0) {
+      omittedDocumentIds.push(document.id);
+      continue;
+    }
+    const titleTokens = estimateTextTokens(document.title);
+    const cost = titleTokens + estimateTextTokens(document.content);
+    if (cost <= remaining) {
+      documents.push(document);
+      remaining -= cost;
+      continue;
+    }
+    documents.push({ ...document, content: truncateTextToTokens(document.content ?? "", Math.max(0, remaining - titleTokens)) });
+    remaining = 0;
+  }
+
+  return { ...view, documents, ...(omittedDocumentIds.length ? { omittedDocumentIds } : {}) };
 }
 
 function omitToolExecute(tool: AgentTool): Omit<AgentTool, "execute"> {

@@ -1,5 +1,5 @@
 import { SchemaValidationError } from "../core/errors";
-import type { JsonSchema, JsonValue } from "../core/types";
+import type { JsonSchema, JsonSchemaTypeName, JsonValue } from "../core/types";
 
 /**
  * Validates common JSON Schema fields used by SDK tools and commands.
@@ -58,17 +58,35 @@ function validateValue(schema: JsonSchema, value: unknown, path: string): void {
     throw new SchemaValidationError(`${path} must be one of ${JSON.stringify(schema.enum)}.`);
   }
 
-  if (schema.type) {
-    validateType(schema.type, value, path);
+  const types = toTypeList(schema.type);
+  if (types.length > 0) {
+    validateType(types, value, path);
+    // Object/array keywords only apply to a value of that kind, so a union
+    // such as `["object", "null"]` accepts null without checking `required`.
+    if (types.includes("object") && isRecord(value)) {
+      validateObject(schema, value, path);
+    }
+    if (types.includes("array") && Array.isArray(value)) {
+      validateArray(schema, value, path);
+    }
+    return;
   }
 
-  if (schema.type === "object" || schema.properties || schema.required) {
+  // Untyped schemas still imply an object or array through their keywords.
+  if (schema.properties || schema.required) {
     validateObject(schema, value, path);
   }
 
-  if (schema.type === "array" || schema.items) {
+  if (schema.items) {
     validateArray(schema, value, path);
   }
+}
+
+function toTypeList(type: JsonSchema["type"]): JsonSchemaTypeName[] {
+  if (type === undefined) {
+    return [];
+  }
+  return Array.isArray(type) ? type : [type];
 }
 
 function validateStrictSchemaNode(
@@ -82,7 +100,7 @@ function validateStrictSchemaNode(
   visited.add(schema);
 
   const properties = schema.properties;
-  if (schema.type === "object" || properties !== undefined) {
+  if (toTypeList(schema.type).includes("object") || properties !== undefined) {
     if (schema.additionalProperties !== false) {
       throw new SchemaValidationError(
         `${path}.additionalProperties must be false for strict structured output.`,
@@ -153,19 +171,27 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function validateType(type: JsonSchema["type"], value: unknown, path: string): void {
-  const actual = Array.isArray(value) ? "array" : value === null ? "null" : typeof value;
-
-  if (type === "integer") {
-    if (typeof value !== "number" || !Number.isInteger(value)) {
-      throw new SchemaValidationError(`${path} must be an integer.`);
-    }
+function validateType(types: JsonSchemaTypeName[], value: unknown, path: string): void {
+  if (types.some((type) => matchesType(type, value))) {
     return;
   }
 
-  if (type && actual !== type) {
-    throw new SchemaValidationError(`${path} must be ${type}, received ${actual}.`);
+  if (types.length === 1 && types[0] === "integer") {
+    throw new SchemaValidationError(`${path} must be an integer.`);
   }
+
+  throw new SchemaValidationError(`${path} must be ${types.join(" or ")}, received ${getJsonType(value)}.`);
+}
+
+function matchesType(type: JsonSchemaTypeName, value: unknown): boolean {
+  if (type === "integer") {
+    return typeof value === "number" && Number.isInteger(value);
+  }
+  return getJsonType(value) === type;
+}
+
+function getJsonType(value: unknown): string {
+  return Array.isArray(value) ? "array" : value === null ? "null" : typeof value;
 }
 
 function validateObject(schema: JsonSchema, value: unknown, path: string): void {

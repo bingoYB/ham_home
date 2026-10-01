@@ -105,26 +105,7 @@ export class ToolRegistry {
 
     validateJsonSchema(tool.parameters, input);
 
-    let currentInput = input;
-
-    // Execute beforeExecute interceptors
-    for (const interceptor of this.interceptors) {
-      if (interceptor.beforeExecute) {
-        currentInput = await interceptor.beforeExecute(toolName, currentInput, context) ?? currentInput;
-      }
-    }
-
-    let output = await tool.execute(currentInput, context);
-
-    // Execute afterExecute interceptors (in reverse order)
-    for (let i = this.interceptors.length - 1; i >= 0; i--) {
-      const interceptor = this.interceptors[i];
-      if (interceptor.afterExecute) {
-        output = await interceptor.afterExecute(toolName, currentInput, output, context) ?? output;
-      }
-    }
-
-    return output;
+    return executeWithInterceptors(tool, input, context, this.interceptors);
   }
 
   private resolveName(name: string, options: ToolRegisterOptions): string {
@@ -133,12 +114,50 @@ export class ToolRegistry {
     }
 
     if (options.onConflict === "namespace") {
+      // `_` keeps the name inside the `^[a-zA-Z0-9_-]+$` pattern that OpenAI
+      // and Anthropic require for tool names; `.` is rejected with a 400.
       const namespace = options.namespace ?? "tool";
-      return `${namespace}.${name}`;
+      return `${namespace}_${name}`;
     }
 
     return name;
   }
+}
+
+/**
+ * Runs a tool between `beforeExecute` interceptors (in order) and
+ * `afterExecute` interceptors (in reverse order). An interceptor that returns
+ * `undefined` keeps the current input or output, so observe-only interceptors
+ * can return nothing.
+ *
+ * Example:
+ * ```ts
+ * const output = await executeWithInterceptors(tool, input, context, [auditInterceptor]);
+ * ```
+ */
+export async function executeWithInterceptors(
+  tool: AgentTool,
+  input: unknown,
+  context: ToolExecutionContext,
+  interceptors: ToolInterceptor[],
+): Promise<unknown> {
+  let currentInput = input;
+  for (const interceptor of interceptors) {
+    if (interceptor.beforeExecute) {
+      currentInput = (await interceptor.beforeExecute(tool.name, currentInput, context)) ?? currentInput;
+    }
+  }
+
+  let output = await tool.execute(currentInput, context);
+
+  for (let index = interceptors.length - 1; index >= 0; index -= 1) {
+    const interceptor = interceptors[index];
+    if (interceptor.afterExecute) {
+      output = (await interceptor.afterExecute(tool.name, currentInput, output, context)) ?? output;
+    }
+  }
+
+  return output;
 }
 
 function isSameScope(left: ToolScope, right: ToolScope): boolean {

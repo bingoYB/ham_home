@@ -136,7 +136,8 @@ export class InMemory implements Memory {
   }
 
   private trim(entries: StoredMemoryEntry[]): StoredMemoryEntry[] {
-    return this.maxMessages && entries.length > this.maxMessages ? entries.slice(-this.maxMessages) : entries;
+    const start = findRetainedStart(entries.map((entry) => entry.message), this.maxMessages);
+    return start > 0 ? entries.slice(start) : entries;
   }
 }
 
@@ -264,7 +265,7 @@ export class IndexedDBMemory implements Memory {
 
     const db = await this.open();
     const entries = await this.getSessionEntries(sessionId);
-    const stale = entries.slice(0, Math.max(0, entries.length - this.maxMessages));
+    const stale = entries.slice(0, findRetainedStart(entries.map((entry) => entry.message), this.maxMessages));
     if (stale.length === 0) {
       return;
     }
@@ -312,6 +313,36 @@ export class IndexedDBMemory implements Memory {
 
     return this.dbPromise;
   }
+}
+
+/**
+ * Returns the index of the first message kept under `maxMessages`.
+ *
+ * Plain count trimming can corrupt the history sent to the model, so the cut
+ * point moves in two cases:
+ * - past leading `tool` messages whose tool call was trimmed away, because
+ *   providers reject a tool result without its preceding tool call;
+ * - back to the newest user message, so a long tool loop never drops the
+ *   request it is answering. The limit is therefore soft while one turn alone
+ *   exceeds it.
+ *
+ * Example:
+ * ```ts
+ * findRetainedStart([user, assistantWithToolCall, tool, assistant, user2], 3); // 3
+ * ```
+ */
+function findRetainedStart(messages: AgentMessage[], maxMessages: number | undefined): number {
+  if (!maxMessages || messages.length <= maxMessages) {
+    return 0;
+  }
+
+  let start = messages.length - maxMessages;
+  while (start < messages.length && messages[start].role === "tool") {
+    start += 1;
+  }
+
+  const lastUserIndex = messages.map((message) => message.role).lastIndexOf("user");
+  return lastUserIndex >= 0 ? Math.min(start, lastUserIndex) : start;
 }
 
 function normalizeSession(session: Partial<MemorySession>): MemorySession {

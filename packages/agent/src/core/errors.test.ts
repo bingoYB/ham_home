@@ -63,4 +63,13 @@ describe("errors", () => {
     expect(err.name).toBe("SchemaValidationError");
     expect(err.message).toBe("bad schema");
   });
+
+  it("keeps built-in names when the class name changes, as minifiers do", () => {
+    // A minifier renames `class ToolPermissionError` to something like `class c1`.
+    const Renamed = class c1 extends ToolPermissionError {};
+    expect(new Renamed("my_tool").name).toBe("ToolPermissionError");
+
+    class CustomAgentError extends WebAgentError {}
+    expect(new CustomAgentError("custom").name).toBe("CustomAgentError");
+  });
 });

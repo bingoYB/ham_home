@@ -45,6 +45,39 @@ describe("Schema Validation", () => {
     expect(() => validateJsonSchema({ type: "integer" }, 1.5)).toThrow("$ must be an integer.");
     expect(() => validateJsonSchema({ type: "integer" }, "1")).toThrow("$ must be an integer.");
   });
+
+  it("accepts any member of a type union such as nullable fields", () => {
+    const schema = {
+      type: "object" as const,
+      properties: { note: { type: ["string", "null"] as Array<"string" | "null"> } },
+      required: ["note"],
+    };
+
+    expect(() => validateJsonSchema(schema, { note: "x" })).not.toThrow();
+    expect(() => validateJsonSchema(schema, { note: null })).not.toThrow();
+    expect(() => validateJsonSchema(schema, { note: 1 })).toThrow("$.note must be string or null, received number.");
+  });
+
+  it("applies object and array keywords only to values of that kind in a union", () => {
+    const nullableObject = {
+      type: ["object", "null"] as Array<"object" | "null">,
+      properties: { id: { type: "string" as const } },
+      required: ["id"],
+    };
+    const listOrText = { type: ["array", "string"] as Array<"array" | "string">, items: { type: "number" as const } };
+
+    expect(() => validateJsonSchema(nullableObject, null)).not.toThrow();
+    expect(() => validateJsonSchema(nullableObject, { id: "a" })).not.toThrow();
+    expect(() => validateJsonSchema(nullableObject, {})).toThrow("$.id is required.");
+    expect(() => validateJsonSchema(listOrText, "text")).not.toThrow();
+    expect(() => validateJsonSchema(listOrText, ["a"])).toThrow("$[0] must be number, received string.");
+  });
+
+  it("matches integers through number and integer members of a union", () => {
+    expect(() => validateJsonSchema({ type: ["integer", "null"] }, 2)).not.toThrow();
+    expect(() => validateJsonSchema({ type: ["integer", "null"] }, 2.5)).toThrow("$ must be integer or null, received number.");
+    expect(() => validateJsonSchema({ type: ["number", "string"] }, 2.5)).not.toThrow();
+  });
 });
 
 describe("parseStructuredOutput", () => {
@@ -114,6 +147,16 @@ describe("validateStrictJsonSchema", () => {
       required: ["success"],
       additionalProperties: false,
     })).toThrow("Missing: message");
+  });
+
+  it("checks nullable objects declared with a type union", () => {
+    expect(() => validateStrictJsonSchema({ type: ["object", "null"] })).toThrow("additionalProperties must be false");
+    expect(() => validateStrictJsonSchema({
+      type: ["object", "null"],
+      properties: {},
+      required: [],
+      additionalProperties: false,
+    })).not.toThrow();
   });
 
   it("rejects objects that allow additional properties", () => {

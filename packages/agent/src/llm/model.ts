@@ -9,6 +9,7 @@ import {
   type ToolSet,
 } from "ai";
 import { resolveLanguageModel } from "./providers";
+import { throwIfAborted } from "../utils/abort";
 import { validateStrictJsonSchema } from "../utils/schema";
 import type {
   AgentMessage,
@@ -21,6 +22,8 @@ import type {
 
 /**
  * Vercel AI SDK backed model client used by the default Agent runtime.
+ * Each call is a single model step: the Agent owns the iteration loop and
+ * emits `agent.iteration.started` itself.
  *
  * Example:
  * ```ts
@@ -47,9 +50,6 @@ export class AiSdkModelClient implements ModelClient {
         temperature: request.temperature,
         abortSignal: request.signal,
         experimental_context: request.toolContext,
-        experimental_onStepStart: ({ stepNumber }) => {
-          request.emit?.({ type: "agent.iteration.started", iteration: stepNumber + 1 });
-        },
       });
 
       const toolCalls: ModelGenerateResult["toolCalls"] = (result.toolCalls ?? []).map((call) => ({
@@ -87,16 +87,24 @@ export class AiSdkModelClient implements ModelClient {
       temperature: request.temperature,
       abortSignal: request.signal,
       experimental_context: request.toolContext,
-      experimental_onStepStart: ({ stepNumber }) => {
-        request.emit?.({ type: "agent.iteration.started", iteration: stepNumber + 1 });
-      },
     });
 
-    for await (const chunk of result.textStream) {
-      if (chunk) {
-        request.emit?.({ type: "message.delta", delta: chunk });
+    for await (const part of result.fullStream) {
+      if (part.type === "text-delta") {
+        if (part.text) {
+          request.emit?.({ type: "message.delta", delta: part.text });
+        }
+      } else if (part.type === "reasoning-delta") {
+        if (part.text) {
+          request.emit?.({ type: "reasoning.delta", delta: part.text });
+        }
+      } else if (part.type === "error") {
+        // streamText reports provider failures as stream parts instead of
+        // rejecting; rethrow so callers see the same error as with generate.
+        throw toError(part.error);
       }
     }
+    throwIfAborted(request.signal);
 
     const text = await result.text;
     const aiToolCalls = await result.toolCalls;
@@ -273,4 +281,18 @@ function toToolResultOutput(result: unknown) {
   }
 
   return { type: "json", value: result === undefined ? null : result };
+}
+
+function toError(error: unknown): Error {
+  if (error instanceof Error) {
+    return error;
+  }
+  if (typeof error === "string") {
+    return new Error(error);
+  }
+  try {
+    return new Error(JSON.stringify(error));
+  } catch {
+    return new Error(String(error));
+  }
 }

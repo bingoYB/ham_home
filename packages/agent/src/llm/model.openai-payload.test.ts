@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
+import { allProviders } from "./provider-definitions";
 import { createAgent } from "../core/agent";
 
 describe("OpenAI strict structured-output payload", () => {
@@ -27,6 +28,7 @@ describe("OpenAI strict structured-output payload", () => {
       });
       const agent = createAgent({
         provider: "openai",
+        providers: allProviders,
         model: "gpt-4.1-mini",
         apiKey: "test-key",
         providerOptions: { fetch: fetchMock },

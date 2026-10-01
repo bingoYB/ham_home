@@ -15,7 +15,7 @@ describe("ToolRegistry", () => {
     registry.register({ name: "read", description: "namespaced", execute }, { onConflict: "namespace", namespace: "page" });
 
     expect(registry.get("read")?.description).toBe("replacement");
-    expect(registry.get("page.read")?.description).toBe("namespaced");
+    expect(registry.get("page_read")?.description).toBe("namespaced");
 
     registry.unregister("read");
     expect(registry.get("read")).toBeUndefined();

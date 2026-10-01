@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { allProviders } from "./provider-definitions";
 import { createEmbeddingClient, cosineSimilarity } from "../index";
 
 
@@ -9,6 +10,7 @@ describe.runIf(shouldRun)("Embedding Integration (Real API)", () => {
   it("can generate embeddings and calculate similarity", async () => {
     const client = createEmbeddingClient({
       provider: "openai",
+      providers: allProviders,
       model: process.env.EMBEDDING_MODEL || "text-embedding-3-small",
       apiKey: process.env.EMBEDDING_API_KEY,
       baseUrl: process.env.EMBEDDING_BASE_URL,
@@ -31,6 +33,7 @@ describe.runIf(shouldRun)("Embedding Integration (Real API)", () => {
   it("testConnection verifies embedding service connectivity", async () => {
     const client = createEmbeddingClient({
       provider: "openai",
+      providers: allProviders,
       model: process.env.EMBEDDING_MODEL || "text-embedding-3-small",
       apiKey: process.env.EMBEDDING_API_KEY,
       baseUrl: process.env.EMBEDDING_BASE_URL,
