@@ -1,5 +1,6 @@
 import fs from "fs/promises";
 import path from "path";
+import sharp from "sharp";
 import type {
   BrowserContext,
   Locator,
@@ -10,6 +11,7 @@ import type {
 import { expect, extPageUrl } from "../fixtures";
 import {
   getStorageState,
+  indexedDbNames,
   resetExtensionData,
   seedBookmarks,
   seedCategories,
@@ -36,7 +38,30 @@ import {
   demoEmbeddings,
   demoSnapshotHtml,
 } from "./screenshot-data";
-import type { AIConfig, ChatMessage, EmbeddingConfig } from "../../types";
+import {
+  DEMO_GALLERY_SITES,
+  DEMO_IMAGE_CLIPS,
+  DEMO_INSPIRATION_CATEGORY,
+  ICON_SET_ANALYSIS,
+  ICON_SET_IMAGE_URL,
+  IMAGE_CLIP_HOST,
+  demoHealthRecords,
+  showcaseBookmarks,
+  showcaseClips,
+} from "./screenshot-rich-data";
+import {
+  GALLERY_PAGE_SIZE,
+  clipArtwork,
+  galleryPageHtml,
+  type ArtworkSpec,
+} from "./screenshot-visuals";
+import type {
+  AIConfig,
+  AnalysisResult,
+  BookmarkScreenshotMetadata,
+  ChatMessage,
+  EmbeddingConfig,
+} from "../../types";
 
 export const APP_VIEWPORT = { width: 1440, height: 960 };
 export const POPUP_VIEWPORT = { width: 420, height: 640 };
@@ -64,13 +89,15 @@ export async function prepareScreenshotState(
       theme: screenshotTheme(variant),
       panelPosition: "left",
       autoSaveSnapshot: true,
+      autoSaveScreenshot: true,
       enableOmniboxSearch: true,
     },
   });
 
   await clearExtraDatabases(worker);
-  await seedCategories(worker, DEMO_CATEGORIES);
-  await seedBookmarks(worker, DEMO_BOOKMARKS);
+  await seedCategories(worker, [...DEMO_CATEGORIES, DEMO_INSPIRATION_CATEGORY]);
+  await seedBookmarks(worker, showcaseBookmarks(Date.now()));
+  await seedClipsAndHealth(worker);
   await seedWorkspaces(worker, DEMO_WORKSPACES, DEMO_WORKSPACE_CATEGORIES);
   await seedTabGroupRules(worker, DEMO_TAB_GROUP_RULES, {
     aiAutoGroupEnabled: true,
@@ -102,7 +129,11 @@ export async function prepareScreenshotState(
   }
 
   await seedScreenshotConfig(worker, variant);
-  await seedAICache(worker);
+  await seedAICache(worker, [
+    { key: POPUP_CURRENT_PAGE.url, analysis: POPUP_AI_ANALYSIS },
+    // Image clips use a versioned cache key, see background analyzeClip()
+    { key: `clip-image-v2:${ICON_SET_IMAGE_URL}`, analysis: ICON_SET_ANALYSIS },
+  ]);
   await seedAgentSession(worker, DEMO_AGENT_MESSAGES);
 
   // Give WXT storage watchers a short beat before pages read the seeded state.
@@ -432,9 +463,12 @@ async function seedScreenshotConfig(
   );
 }
 
-async function seedAICache(worker: Worker): Promise<void> {
+async function seedAICache(
+  worker: Worker,
+  entries: Array<{ key: string; analysis: AnalysisResult }>,
+): Promise<void> {
   await worker.evaluate(
-    async ({ url, analysis, baseTime }) => {
+    async ({ entries: cacheEntries, baseTime }) => {
       const openDb = (
         name: string,
         version: number,
@@ -464,21 +498,187 @@ async function seedAICache(worker: Worker): Promise<void> {
         }
       });
       await transactionDone(db.transaction("analyses", "readwrite"), (tx) => {
-        tx.objectStore("analyses").put({
-          id: url,
-          url,
-          analysisResult: analysis,
-          createdAt: baseTime,
-          expiresAt: Date.now() + 24 * 60 * 60 * 1000,
-        });
+        const store = tx.objectStore("analyses");
+        for (const { key, analysis } of cacheEntries) {
+          store.put({
+            id: key,
+            url: key,
+            analysisResult: analysis,
+            createdAt: baseTime,
+            expiresAt: Date.now() + 24 * 60 * 60 * 1000,
+          });
+        }
       });
     },
+    { entries, baseTime: SCREENSHOT_BASE_TIME },
+  );
+}
+
+async function seedClipsAndHealth(worker: Worker): Promise<void> {
+  const health = Object.fromEntries(
+    demoHealthRecords().map((record) => [record.bookmarkId, record]),
+  );
+  await worker.evaluate(
+    async ({ clips, healthMap }) => {
+      await chrome.storage.local.set({
+        bookmarkClips: clips,
+        bookmarkHealth: healthMap,
+      });
+    },
+    { clips: showcaseClips(), healthMap: health },
+  );
+}
+
+/**
+ * Render the fictional gallery pages and clip artworks, store the pages as
+ * bookmark screenshots and serve the artworks at their image clip URLs.
+ */
+export async function seedShowcaseVisuals(
+  context: BrowserContext,
+  worker: Worker,
+): Promise<void> {
+  const renderer = await context.newPage();
+  const screenshots: Array<{
+    bookmarkId: string;
+    sourceUrl: string;
+    image: string;
+    thumbnail: string;
+    imageSize: number;
+    thumbnailSize: number;
+  }> = [];
+
+  for (const site of DEMO_GALLERY_SITES) {
+    const png = await renderHtml(renderer, {
+      ...GALLERY_PAGE_SIZE,
+      html: galleryPageHtml(site.template),
+    });
+    const image = await sharp(png).webp({ quality: 86 }).toBuffer();
+    const thumbnail = await sharp(png)
+      .resize({ width: 640 })
+      .webp({ quality: 82 })
+      .toBuffer();
+    screenshots.push({
+      bookmarkId: site.id,
+      sourceUrl: site.url,
+      image: image.toString("base64"),
+      thumbnail: thumbnail.toString("base64"),
+      imageSize: image.length,
+      thumbnailSize: thumbnail.length,
+    });
+  }
+
+  const artworks = new Map<string, Buffer>();
+  for (const item of DEMO_IMAGE_CLIPS) {
+    artworks.set(
+      new URL(item.clip.imageSourceUrl!).pathname,
+      await renderHtml(renderer, clipArtwork(item.artwork)),
+    );
+  }
+  artworks.set(
+    new URL(ICON_SET_IMAGE_URL).pathname,
+    await renderHtml(renderer, clipArtwork("iconSet")),
+  );
+  await renderer.close();
+
+  await context.route(`${IMAGE_CLIP_HOST}/**`, async (route) => {
+    const body = artworks.get(new URL(route.request().url()).pathname);
+    if (!body) return route.fulfill({ status: 404 });
+    return route.fulfill({ status: 200, contentType: "image/png", body });
+  });
+
+  await worker.evaluate(
+    async ({ items, dbName, imageStore, thumbnailStore, size, capturedAt }) => {
+      const db = await new Promise<IDBDatabase>((resolve, reject) => {
+        // Same schema as lib/storage/bookmark-screenshot-storage.ts (version 1)
+        const request = indexedDB.open(dbName, 1);
+        request.onerror = () => reject(request.error);
+        request.onsuccess = () => resolve(request.result);
+        request.onupgradeneeded = () => {
+          const database = request.result;
+          for (const name of [imageStore, thumbnailStore]) {
+            if (!database.objectStoreNames.contains(name)) {
+              database.createObjectStore(name, { keyPath: "bookmarkId" });
+            }
+          }
+        };
+      });
+      const toBlob = (base64: string) => {
+        const bytes = Uint8Array.from(atob(base64), (char) => char.charCodeAt(0));
+        return new Blob([bytes], { type: "image/webp" });
+      };
+
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction([imageStore, thumbnailStore], "readwrite");
+        for (const item of items) {
+          tx.objectStore(imageStore).put({
+            bookmarkId: item.bookmarkId,
+            blob: toBlob(item.image),
+          });
+          tx.objectStore(thumbnailStore).put({
+            bookmarkId: item.bookmarkId,
+            blob: toBlob(item.thumbnail),
+          });
+        }
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+      db.close();
+
+      const index: Record<string, BookmarkScreenshotMetadata> = {};
+      items.forEach((item, order) => {
+        index[item.bookmarkId] = {
+          id: `shot-${item.bookmarkId}`,
+          bookmarkId: item.bookmarkId,
+          sourceUrl: item.sourceUrl,
+          mimeType: "image/webp",
+          width: size.width,
+          height: size.height,
+          size: item.imageSize,
+          thumbnailSize: item.thumbnailSize,
+          capturedAt: capturedAt - order * 60 * 60 * 1000,
+          updatedAt: capturedAt - order * 60 * 60 * 1000,
+        };
+      });
+      await chrome.storage.local.set({ bookmarkScreenshotIndex: index });
+    },
     {
-      url: POPUP_CURRENT_PAGE.url,
-      analysis: POPUP_AI_ANALYSIS,
-      baseTime: SCREENSHOT_BASE_TIME,
+      items: screenshots,
+      dbName: indexedDbNames.assets,
+      imageStore: indexedDbNames.assetImageStore,
+      thumbnailStore: indexedDbNames.assetThumbnailStore,
+      size: GALLERY_PAGE_SIZE,
+      capturedAt: SCREENSHOT_BASE_TIME,
     },
   );
+}
+
+async function renderHtml(page: Page, spec: ArtworkSpec): Promise<Buffer> {
+  await page.setViewportSize({ width: spec.width, height: spec.height });
+  await page.setContent(spec.html, { waitUntil: "load" });
+  await page.evaluate(async () => {
+    if ("fonts" in document) await document.fonts.ready;
+  });
+  return page.screenshot({ type: "png", animations: "disabled" });
+}
+
+/** Wait until the named images have actually decoded, not just mounted */
+export async function waitForImagesLoaded(
+  page: Page,
+  names: string[],
+): Promise<void> {
+  for (const name of names) {
+    const image = page.getByRole("img", { name, exact: true }).first();
+    await expect(image).toBeVisible();
+    await expect
+      .poll(() =>
+        image.evaluate(
+          (element) =>
+            (element as HTMLImageElement).complete &&
+            (element as HTMLImageElement).naturalWidth > 0,
+        ),
+      )
+      .toBe(true);
+  }
 }
 
 async function seedAgentSession(
