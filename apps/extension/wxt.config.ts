@@ -47,6 +47,8 @@ export default defineConfig({
   manifest: ({ browser }) => ({
     // 使用 i18n 多语言消息占位符配置扩展名称
     name: "__MSG_extName__",
+    // The full name carries the product category; browsers fall back to this where space is tight
+    short_name: "HamHome",
     // 使用 i18n 多语言消息占位符配置扩展描述
     description: "__MSG_extDescription__",
     // 设置扩展的默认语言区域为简体中文
@@ -60,7 +62,7 @@ export default defineConfig({
       "storage", // 保存用户书签数据、分类、标签、设置、AI 配置等本地/同步数据
       "unlimitedStorage", // 本地保存网页快照、页面内容和向量索引，避免数据量增大后触发默认存储配额限制
       "activeTab", // 仅在用户主动操作当前标签页时，读取当前页面信息并执行保存、快照、面板切换等操作
-      "tabs", // 读取当前窗口标签页标题、URL、图标和固定状态，用于保存/恢复工作空间
+      "tabs", // Tab titles, URLs, icons and pinned state: saving / restoring workspaces, the tab center, idle archiving and the tab budget
       ...(browser !== "firefox"
         ? ["tabGroups"] // 使用 Chromium 原生 Tab Groups API，按用户规则自动创建和更新浏览器标签页分组
         : []),
@@ -68,7 +70,7 @@ export default defineConfig({
       "clipboardWrite", // 将 Obsidian 笔记内容写入剪贴板后通过 Obsidian 协议保存
       "contextMenus", // 在网页右键菜单中提供“收藏到 HamHome”入口，方便用户快速保存当前页面或链接
       "bookmarks", // 读取浏览器原生书签树，用于导入用户已有书签到 HamHome
-      "alarms", // 创建后台定时任务，定期执行 WebDAV 同步，并在本地书签变更后延迟触发同步
+      "alarms", // Background schedules: WebDAV sync, bookmark health checks, trash and tab archive retention, idle tab archiving, read later expiry
     ],
 
     // 声明需要在页面上下文中可访问的资源
@@ -117,6 +119,14 @@ export default defineConfig({
           mac: "Command+Shift+L",
         },
         description: "__MSG_commandTogglePanel__",
+      },
+      // Read later & close the current tab (takes Chrome's last suggested shortcut slot, 4 at most)
+      "read-later-close": {
+        suggested_key: {
+          default: "Alt+Shift+R",
+          mac: "Alt+Shift+R",
+        },
+        description: "__MSG_commandReadLater__",
       },
     },
 

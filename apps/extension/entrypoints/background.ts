@@ -2,7 +2,7 @@
  * Background Script - Service Worker
  * 处理快捷键、消息通信、安装事件
  */
-import { browser } from "wxt/browser";
+import { browser, type Browser } from "wxt/browser";
 import { registerBackgroundService } from "@/lib/services/background-service-server";
 import { configStorage } from "@/lib/storage";
 import { bookmarkStorage } from "@/lib/storage/bookmark-storage";
@@ -14,11 +14,16 @@ import { workspaceService } from "@/lib/services/workspace-service";
 import { tabGroupRuleService } from "@/lib/services/tab-group-rule-service";
 import { bookmarkHealthService } from "@/lib/services/bookmark-health-service";
 import { bookmarkRetentionService } from "@/lib/services/bookmark-retention-service";
+import { readLaterService } from "@/lib/services/read-later-service";
+import { registerTabLifecycleBackground } from "@/lib/services/tab-lifecycle-background";
+import { readLaterStorage } from "@/lib/storage/read-later-storage";
+import { tabLifecycleConfigStorage } from "@/lib/storage/tab-lifecycle-config-storage";
 import {
   safeOpenPopup,
   safeSendMessageToActiveTab,
   safeCreateTab,
   getExtensionURL,
+  isFirefox,
 } from "@/utils/browser-api";
 import type {
   Language,
@@ -34,6 +39,9 @@ const HIGHLIGHT_CONTEXT_MENU_ID = "save-highlight-to-hamhome";
 const IMAGE_CONTEXT_MENU_ID = "save-image-to-hamhome";
 const WORKSPACE_CONTEXT_MENU_ID = "save-window-workspace";
 const MANAGE_HAMHOME_CONTEXT_MENU_ID = "manage-hamhome";
+const READ_LATER_PAGE_MENU_ID = "read-later-page";
+const READ_LATER_LINK_MENU_ID = "read-later-link";
+const READ_LATER_TAB_MENU_ID = "read-later-tab";
 const BOOKMARK_HEALTH_ALARM_ID = "bookmark-health-periodic-scan";
 const BOOKMARK_RETENTION_ALARM_ID = "bookmark-retention-sweep";
 
@@ -120,6 +128,11 @@ const MANAGE_MENU_TITLES: Record<Language, string> = {
   zh: "打开 HamHome",
 };
 
+const READ_LATER_MENU_TITLES: Record<Language, { page: string; link: string }> = {
+  en: { page: "Read later", link: "Read link later" },
+  zh: { page: "稍后读", link: "稍后读此链接" },
+};
+
 /**
  * 获取右键菜单标题（根据用户语言设置）
  */
@@ -127,6 +140,7 @@ async function getContextMenuTitles(): Promise<{
   bookmark: (typeof MENU_TITLES)[Language];
   workspace: string;
   manage: string;
+  readLater: (typeof READ_LATER_MENU_TITLES)[Language];
 }> {
   try {
     // 优先从用户设置中获取语言
@@ -137,6 +151,7 @@ async function getContextMenuTitles(): Promise<{
         bookmark: MENU_TITLES[language],
         workspace: WORKSPACE_MENU_TITLES[language],
         manage: MANAGE_MENU_TITLES[language],
+        readLater: READ_LATER_MENU_TITLES[language],
       };
     }
   } catch (error) {
@@ -151,6 +166,7 @@ async function getContextMenuTitles(): Promise<{
       bookmark: MENU_TITLES.zh,
       workspace: WORKSPACE_MENU_TITLES.zh,
       manage: MANAGE_MENU_TITLES.zh,
+      readLater: READ_LATER_MENU_TITLES.zh,
     };
   }
 
@@ -159,6 +175,7 @@ async function getContextMenuTitles(): Promise<{
     bookmark: MENU_TITLES.en,
     workspace: WORKSPACE_MENU_TITLES.en,
     manage: MANAGE_MENU_TITLES.en,
+    readLater: READ_LATER_MENU_TITLES.en,
   };
 }
 
@@ -185,6 +202,16 @@ async function createContextMenu() {
       { id: HIGHLIGHT_CONTEXT_MENU_ID, title: titles.bookmark.highlight, contexts: ["selection"] as const },
       { id: IMAGE_CONTEXT_MENU_ID, title: titles.bookmark.image, contexts: ["image"] as const },
       {
+        id: READ_LATER_PAGE_MENU_ID,
+        title: titles.readLater.page,
+        contexts: ["page"] as const,
+      },
+      {
+        id: READ_LATER_LINK_MENU_ID,
+        title: titles.readLater.link,
+        contexts: ["link"] as const,
+      },
+      {
         id: WORKSPACE_CONTEXT_MENU_ID,
         title: titles.workspace,
         contexts: ["page"] as const,
@@ -204,6 +231,19 @@ async function createContextMenu() {
         if (!err?.message?.includes("duplicate id")) {
           console.warn(`[HamHome Background] 创建菜单 ${config.id} 失败:`, err);
         }
+      }
+    }
+
+    // Firefox has a tab context menu (Chromium has no "tab" context)
+    if (isFirefox()) {
+      try {
+        await browser.contextMenus.create({
+          id: READ_LATER_TAB_MENU_ID,
+          title: titles.readLater.page,
+          contexts: ["tab" as Browser.contextMenus.ContextType],
+        });
+      } catch (err) {
+        console.warn("[HamHome Background] 创建标签页菜单失败:", err);
       }
     }
 
@@ -232,6 +272,17 @@ async function updateContextMenuTitle() {
     await browser.contextMenus.update(MANAGE_HAMHOME_CONTEXT_MENU_ID, {
       title: titles.manage,
     });
+    await browser.contextMenus.update(READ_LATER_PAGE_MENU_ID, {
+      title: titles.readLater.page,
+    });
+    await browser.contextMenus.update(READ_LATER_LINK_MENU_ID, {
+      title: titles.readLater.link,
+    });
+    if (isFirefox()) {
+      await browser.contextMenus
+        .update(READ_LATER_TAB_MENU_ID, { title: titles.readLater.page })
+        .catch(() => undefined);
+    }
     console.log("[HamHome Background] 右键菜单标题已更新:", titles);
   } catch (error) {
     console.warn("[HamHome Background] 更新右键菜单标题失败:", error);
@@ -366,6 +417,25 @@ function escapeXml(unsafe: string) {
 const newlyCreatedTabs = new Set<number>();
 
 /**
+ * Read later & close, from the shortcut or the context menu, for the tab it was triggered on
+ */
+async function readLaterFromBackground(tab?: Browser.tabs.Tab): Promise<void> {
+  try {
+    let target = tab;
+    if (target?.id == null) {
+      [target] = await browser.tabs.query({ active: true, lastFocusedWindow: true });
+    }
+    if (target?.id == null) return;
+    const result = await readLaterService.addTab(target.id, { source: "manual" });
+    if (!result.ok) {
+      console.warn("[HamHome Background] 稍后读失败:", result.error);
+    }
+  } catch (error) {
+    console.error("[HamHome Background] 稍后读失败:", error);
+  }
+}
+
+/**
  * 触发保存书签流程
  * 优先在当前页面内展示保存浮窗（AI 分析期间不阻塞用户操作）；
  * 用户在设置中开启「在扩展弹窗中保存」，或当前页面无法注入 content script
@@ -405,6 +475,9 @@ export default defineBackground(() => {
 
   // 注册 proxy service（必须在最顶部同步执行）
   registerBackgroundService();
+
+  // Tab lifecycle: activity, auto archive, tab budget, read later expiry (listeners must register synchronously)
+  registerTabLifecycleBackground();
 
   // 开发态：把 .env.local 里的 AI / Embedding / 同步配置写入存储（生产构建会被移除）
   void applyDevConfigPreset();
@@ -466,6 +539,12 @@ export default defineBackground(() => {
     bookmarkClipStorage.watch(() => {
       browser.alarms.create("webdav-local-change-sync", { delayInMinutes: 5 });
     });
+    readLaterStorage.watch(() => {
+      browser.alarms.create("webdav-local-change-sync", { delayInMinutes: 5 });
+    });
+    tabLifecycleConfigStorage.watchSettings(() => {
+      browser.alarms.create("webdav-local-change-sync", { delayInMinutes: 5 });
+    });
   });
 
   // 调试：输出已注册的快捷键
@@ -522,9 +601,11 @@ export default defineBackground(() => {
   createContextMenu();
 
   // 监听快捷键
-  browser.commands.onCommand.addListener(async (command) => {
+  browser.commands.onCommand.addListener(async (command, tab) => {
     console.log("[HamHome Background] 快捷键触发:", command);
-    if (command === "save-bookmark") {
+    if (command === "read-later-close") {
+      await readLaterFromBackground(tab);
+    } else if (command === "save-bookmark") {
       await triggerSaveBookmarkFlow("shortcut");
     } else if (command === "save-workspace") {
       await saveCurrentWindowWorkspaceFromBackground();
@@ -559,6 +640,19 @@ export default defineBackground(() => {
               }
             : undefined;
       await triggerSaveBookmarkFlow("contextMenu", clip);
+    } else if (
+      info.menuItemId === READ_LATER_PAGE_MENU_ID ||
+      info.menuItemId === READ_LATER_TAB_MENU_ID
+    ) {
+      await readLaterFromBackground(tab);
+    } else if (info.menuItemId === READ_LATER_LINK_MENU_ID && info.linkUrl) {
+      await readLaterService.addLink({
+        url: info.linkUrl,
+        // Firefox provides the link text; on Chromium the content script fills it in
+        text: (info as { linkText?: string }).linkText,
+        sourceTabId: tab?.id,
+        sourceUrl: tab?.url,
+      });
     } else if (info.menuItemId === WORKSPACE_CONTEXT_MENU_ID) {
       await saveCurrentWindowWorkspaceFromBackground();
     } else if (info.menuItemId === MANAGE_HAMHOME_CONTEXT_MENU_ID) {
@@ -674,10 +768,13 @@ export default defineBackground(() => {
         return;
       }
 
-      const [allBookmarks, matchedWorkspaces] = await Promise.all([
+      const [allBookmarks, matchedWorkspaces, readLaterEntries] = await Promise.all([
         bookmarkStorage.getBookmarks({ isDeleted: false }),
         workspaceStorage.searchWorkspaces(query, 3),
+        readLaterStorage.getAll(),
       ]);
+      const readLaterLabel =
+        settings?.language === "en" ? "Read later" : "稍后读";
 
       // 1. 关键词粗筛
       const keywordLower = query.toLowerCase();
@@ -733,10 +830,14 @@ export default defineBackground(() => {
         .map(({ bookmark }) => {
           const safeTitle = escapeXml(bookmark.title || "未知内容");
           const safeUrl = escapeXml(bookmark.url);
+          const entry = readLaterEntries[bookmark.id];
+          const queued = !!entry && entry.removedAt == null && entry.status !== "read";
           // 使用 <url> 和 <match> XML 标签增强显示效果（仅部分浏览器支持，但通常会向前兼容处理）
           return {
             content: bookmark.url,
-            description: `<match>${safeTitle}</match> <url>${safeUrl}</url>`,
+            description: `<match>${safeTitle}</match> <url>${safeUrl}</url>${
+              queued ? ` <dim>· ${readLaterLabel}</dim>` : ""
+            }`,
           };
         });
 

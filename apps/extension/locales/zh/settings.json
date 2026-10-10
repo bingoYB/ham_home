@@ -331,7 +331,9 @@
         "htmlFormat": "HTML 格式",
         "htmlSubtitle": "可浏览的网页",
         "htmlDesc": "生成美观的 HTML 页面，可直接在浏览器中查看",
-        "currentStats": "当前共有 {{bookmarkCount}} 个书签，{{categoryCount}} 个分类"
+        "currentStats": "当前共有 {{bookmarkCount}} 个书签，{{categoryCount}} 个分类",
+        "includeTabArchive": "同时导出标签页归档",
+        "includeTabArchiveDesc": "默认不包含。归档里可能含有登录链接或一次性令牌，分享导出文件前请注意。"
       },
       "import": {
         "title": "导入数据",
@@ -378,7 +380,9 @@
         "unsupportedFormat": "不支持的文件格式，请选择 JSON 或 HTML 文件",
         "unknown": "未知错误",
         "bookmarksApiNotSupported": "当前浏览器不支持书签 API，请在 Chrome / Edge / Firefox 中使用"
-      }
+      },
+      "importLifecycleDetails": "；稍后读状态 {{readLater}} 条，标签页归档 {{archived}} 条",
+      "importLifecycleSettings": "；已恢复标签页设置"
     },
     "privacy": {
       "title": "隐私设置",
@@ -414,6 +418,20 @@
         "autoSaveDesc": "保存书签时自动保存网页快照，以便离线查看",
         "tip": "提示",
         "tipContent": "快照功能会将网页 HTML 保存在本地，可能占用较多存储空间。如果你关心存储空间，可以关闭此功能。"
+      },
+      "tabActivity": {
+        "title": "标签页活动记录",
+        "descriptionOn": "为了显示闲置时长、自动归档和整理建议，HamHome 会在本地记录标签页的使用情况。",
+        "descriptionOff": "标签页活动记录已关闭，HamHome 不会记录标签页的使用情况。",
+        "what": "记录什么",
+        "whatDesc": "每个打开中的标签页的网址、首次出现和最后一次使用的时间，以及你使用浏览器的日期（最近 120 天）。不记录页面内容，也不记录你手动关闭的标签页。",
+        "where": "存在哪里",
+        "whereDesc": "只保存在当前设备的扩展存储中：不上传到任何服务器，不参与 WebDAV 同步，不包含在导出中。不会主动发送给 AI：只有你使用 AI 整理或向助手询问标签页时，才会把非隐私页面的标题、去除敏感参数的网址和闲置时长发给 AI。",
+        "archive": "标签页归档",
+        "archiveDesc": "HamHome 关闭的标签页（标题、网址与关闭原因）保存在本地归档中，默认保留 90 天；不同步，JSON 导出默认不包含。",
+        "manage": "在“标签页 → 规则”中关闭或清空",
+        "stats": "本地统计",
+        "statsDesc": "“本周概览”用到的数字：每天打开的标签页数量（峰值与平均）、超出预算时长，以及归档、恢复和稍后读的次数。只有数字，没有标题和网址；保存在本设备 90 天，不同步、不导出。活动记录关闭时不统计打开数。"
       }
     },
     "categories": {

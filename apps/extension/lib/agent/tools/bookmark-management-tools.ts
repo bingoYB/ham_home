@@ -1,9 +1,18 @@
 import type { AgentTool } from "@hamhome/agent";
 import { bookmarkStorage } from "@/lib/storage";
+import { readLaterStorage } from "@/lib/storage/read-later-storage";
 import type {
   CreateBookmarkInput,
+  LocalBookmark,
   UpdateBookmarkInput,
 } from "@/types";
+
+/** The live bookmark for this URL when it only exists in the read later queue */
+async function findQueueOnlyBookmark(url: string): Promise<LocalBookmark | null> {
+  const bookmark = await bookmarkStorage.getBookmarkByUrl(url);
+  if (!bookmark) return null;
+  return (await readLaterStorage.get(bookmark.id))?.queueOnly ? bookmark : null;
+}
 
 export function createBookmarkManagementTools(): AgentTool[] {
   return [
@@ -105,6 +114,21 @@ export function createBookmarkManagementTools(): AgentTool[] {
       },
       metadata: { readOnly: false, riskLevel: "medium" },
       async execute(input: CreateBookmarkInput) {
+        // A URL that is only in the read later queue moves into the library instead
+        const queued = await findQueueOnlyBookmark(input.url);
+        if (queued) {
+          const bookmark = await bookmarkStorage.updateBookmark(queued.id, {
+            title: input.title,
+            description: input.description,
+            tags: input.tags,
+            categoryId: input.categoryId || null,
+            ...(input.content !== undefined ? { content: input.content } : {}),
+            ...(input.favicon ? { favicon: input.favicon } : {}),
+          });
+          const { readLaterService } = await import("@/lib/services/read-later-service");
+          await readLaterService.keep([queued.id]);
+          return bookmark;
+        }
         return await bookmarkStorage.createBookmark({
           ...input,
           categoryId: input.categoryId || null,

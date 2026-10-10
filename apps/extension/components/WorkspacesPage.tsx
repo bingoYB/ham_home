@@ -32,6 +32,8 @@ import { WorkspaceSection, WORKSPACE_DROP_TYPE } from "@/components/workspaces/W
 import { WorkspacePageDialogs } from "@/components/workspaces/WorkspacePageDialogs";
 import { useWorkspacesPage } from "@/components/workspaces/useWorkspacesPage";
 import { WorkspacePageBookmarkDialog } from "@/components/workspaces/WorkspacePageBookmarkDialog";
+import { WorkspaceBudgetSwitchDialog } from "@/components/workspaces/WorkspaceBudgetSwitchDialog";
+import { useWorkspaceBudgetSwitch } from "@/hooks/useWorkspaceBudgetSwitch";
 import { DraggableTabCard, TAB_DRAG_TYPE } from "@/components/workspaces/DraggableTabCard";
 import { PAGE_DRAG_TYPE } from "@/components/workspaces/WorkspacePageTile";
 
@@ -46,7 +48,8 @@ type DraggingItem =
 
 export function WorkspacesPage() {
   const { t } = useTranslation("bookmark");
-  const state = useWorkspacesPage({});
+  const budgetSwitch = useWorkspaceBudgetSwitch();
+  const state = useWorkspacesPage({ beforeRestore: budgetSwitch.beforeRestore });
   const [draggingItem, setDraggingItem] = useState<DraggingItem | null>(null);
   const [dragOverWorkspaceId, setDragOverWorkspaceId] = useState<string | null>(null);
   /** Tracks where a drag would be inserted */
@@ -399,6 +402,7 @@ export function WorkspacesPage() {
           page={state.savingBookmarkPage}
           onOpenChange={(open) => !open && state.setSavingBookmarkPage(null)}
         />
+        <WorkspaceBudgetSwitchDialog prompt={budgetSwitch.prompt} onChoose={budgetSwitch.answer} />
       </div>
       <DragOverlay dropAnimation={null}>
         {dragOverlayPage ? (

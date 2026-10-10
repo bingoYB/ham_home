@@ -295,7 +295,15 @@
       "recommended": "建议转书签 {{count}} 页",
       "success": "工作空间分析完成",
       "failed": "工作空间分析失败"
-    }
+    },
+    "budgetSwitch": {
+      "title": "恢复后会超出标签预算",
+      "description": "恢复“{{name}}”将打开 {{count}} 个标签页，超出预算 {{over}} 个。",
+      "switch": "保存当前窗口为工作空间并切换",
+      "openAnyway": "仍然打开",
+      "cancel": "取消"
+    },
+    "clickToEdit": "点击编辑"
   },
   "popup": {
     "save": "收藏",
@@ -316,8 +324,33 @@
     "quickActions": "快捷操作",
     "noRecentSavesHint": "保存的书签将展示在这里",
     "autoSaveSnapshotDesc": "保存网页时自动生成快照",
-    "omniboxSearchDesc": "在地址栏中展示书签搜索建议",
-    "viewShortcutsDesc": "查看所有快捷键及使用说明"
+    "omniboxSearchDesc": "在地址栏输入 ham + 空格，即可搜索书签内容",
+    "viewShortcutsDesc": "查看所有快捷键及使用说明",
+    "readLaterAndClose": "稍后读并关闭",
+    "openHamHome": "打开 HamHome",
+    "readLaterTab": "稍后读（{{count}}）",
+    "noReadLater": "稍后读是空的",
+    "noReadLaterHint": "点“稍后读并关闭”或在链接上右键就能放进来",
+    "tabs": {
+      "title": "标签页",
+      "budgetLabel": "标签预算占用",
+      "over": "超出 {{count}} 个",
+      "summary": "{{stale}} 个超过 {{threshold}} 未打开 · {{duplicates}} 组重复",
+      "tidyUp": "整理一下",
+      "autoArchived": "今天自动归档了 {{count}} 个",
+      "view": "查看",
+      "restoreAll": "全部恢复",
+      "pending": "{{count}} 个标签页等待归档",
+      "archiveAll": "全部归档",
+      "consent": "自动整理已在其他设备开启，等待本机确认",
+      "review": "去确认",
+      "setup": "让闲置标签页自动离开标签栏",
+      "setupLink": "开启"
+    },
+    "triage": {
+      "empty": "没有可以整理的标签页",
+      "viewAll": "查看全部（{{count}}）"
+    }
   },
   "inPageSave": {
     "title": "保存到 HamHome",
@@ -329,7 +362,9 @@
     "errors": {
       "cannotBookmarkPage": "无法收藏浏览器内部页面",
       "extractFailed": "读取页面内容失败，请刷新后重试"
-    }
+    },
+    "readLater": "稍后读",
+    "readLaterHint": "不急着收藏？放进稍后读（会按设置关闭标签页）"
   },
   "savePanel": {
     "alreadyBookmarked": "此页面已收藏，可更新信息",
@@ -517,7 +552,8 @@
     },
     "list": {
       "loading": "正在加载规则...",
-      "empty": "暂无分组规则，创建第一条规则后会自动监听新打开的 Tab。"
+      "empty": "暂无分组规则，创建第一条规则后会自动监听新打开的 Tab。",
+      "protected": "受保护"
     },
     "form": {
       "createTitle": "新建规则",
@@ -534,7 +570,9 @@
       "removeMatcher": "删除匹配规则",
       "matchRulesHint": "可以添加多条匹配规则。任一条件命中后，Tab 会自动加入这个分组。",
       "collapsed": "创建后折叠分组",
-      "enabled": "启用规则"
+      "enabled": "启用规则",
+      "protectTabs": "保护分组中的标签页",
+      "protectTabsHint": "开启后，自动归档和自动腾位不会关闭这个分组里的标签页"
     },
     "matchTypes": {
       "domain": "域名部分",
@@ -643,6 +681,557 @@
       "endsWith": "结尾是",
       "greaterThan": "大于",
       "lessThan": "小于"
+    },
+    "readLater": {
+      "title": "稍后读 · {{count}} 篇未读",
+      "viewAll": "全部",
+      "expand": "展开稍后读",
+      "collapse": "折叠稍后读"
     }
+  },
+  "readLater": {
+    "title": "稍后读",
+    "navTitle": "稍后读",
+    "description": "打算近期消费的阅读队列：未读 30 天会过期，读完的好内容一键收藏",
+    "pageDescription": "把“以后再看”从标签栏移到这里。未读条目超过期限会转入“已过期”，不会被删除；仅在稍后读中的条目不会出现在收藏库里。",
+    "searchPlaceholder": "搜索标题、网址、摘要或备注",
+    "addFailed": "加入稍后读失败，请重试",
+    "actionFailed": "操作失败，请重试",
+    "addedAt": "{{time}}加入",
+    "minutes": "约 {{count}} 分钟",
+    "daysLeft": "{{count}} 天后过期",
+    "expiresToday": "今天过期",
+    "inLibrary": "已在收藏库",
+    "snapshotMissing": "快照未保存",
+    "notePlaceholder": "为什么想读？（可选）",
+    "emptySearch": "没有找到匹配的条目",
+    "emptyHint": "新发现的好内容，用快捷键 {{shortcut}} 一键放进来。",
+    "empty": {
+      "unread": "稍后读已清空。新发现的好内容，用快捷键一键放进来。",
+      "read": "还没有读完的条目",
+      "expired": "没有过期的条目"
+    },
+    "views": {
+      "unread": "未读",
+      "read": "已读",
+      "expired": "已过期"
+    },
+    "status": {
+      "reading": "阅读中"
+    },
+    "sort": {
+      "label": "排序",
+      "newest": "最新加入",
+      "oldest": "最早加入",
+      "shortest": "阅读时长由短到长",
+      "expiring": "即将过期"
+    },
+    "filters": {
+      "domain": "域名",
+      "allDomains": "全部域名",
+      "source": "来源",
+      "allSources": "全部来源",
+      "kept": "是否已收藏",
+      "keptAll": "全部",
+      "keptOnly": "已收藏",
+      "queueOnly": "仅稍后读"
+    },
+    "sources": {
+      "manual": "手动",
+      "link": "链接",
+      "tab-center": "标签页中心",
+      "archive": "归档",
+      "triage": "整理建议",
+      "agent": "AI 助手",
+      "import": "导入"
+    },
+    "actions": {
+      "open": "阅读",
+      "markRead": "标记已读",
+      "keep": "收藏到书签库",
+      "requeue": "重新加入",
+      "delete": "删除",
+      "dequeue": "移出稍后读",
+      "note": "写备注"
+    },
+    "stats": {
+      "unread": "未读 {{count}}",
+      "expiringSoon": "{{count}} 篇将在 3 天内过期",
+      "completion": "最近 30 天完成率 {{rate}}%（已读 {{read}} / 已过期 {{expired}}）",
+      "noCompletion": "最近 30 天还没有读完或过期的条目"
+    },
+    "confirmDelete": {
+      "title": "删除所选条目",
+      "description": "删除所选的 {{count}} 个条目？仅在稍后读中的条目会移入回收站（保留 30 天），已收藏的书签只会移出稍后读。"
+    },
+    "toast": {
+      "markedRead": "已标记 {{count}} 个为已读",
+      "requeued": "已重新加入 {{count}} 个",
+      "kept": "已收藏 {{count}} 个到书签库",
+      "removed": "已删除 {{count}} 个"
+    },
+    "settings": {
+      "title": "稍后读设置",
+      "closeTabOnAdd": "加入后关闭标签页",
+      "saveSnapshotOnAdd": "加入时保存离线快照",
+      "expireAfter": "未读多久后过期",
+      "days": "{{count}} 天",
+      "never": "永不过期",
+      "autoSummary": "AI 摘要（TL;DR）",
+      "summary": {
+        "manual-only": "仅单条手动加入时生成",
+        "all": "所有加入都生成",
+        "off": "不生成"
+      }
+    },
+    "triage": {
+      "open": "分拣模式",
+      "title": "分拣稍后读",
+      "description": "一次一张卡片，用键盘快速处理队列",
+      "read": "阅读",
+      "keep": "收藏",
+      "markRead": "已读",
+      "remove": "删除",
+      "keys": "R 阅读 · S 收藏 · D 已读 · X 删除 · J/K 切换",
+      "done": "队列已处理完"
+    }
+  },
+  "tabCenter": {
+    "title": "标签页",
+    "navTitle": "标签页",
+    "description": "查看打开中的标签页、归档与整理规则",
+    "pageDescription": "一眼看清每个标签页闲置了多久、哪些重复、哪些受保护，批量送往稍后读、收藏库、工作空间或归档。HamHome 关闭的每个标签页都能在“归档”中找回。",
+    "views": {
+      "open": "打开中",
+      "archive": "归档",
+      "rules": "规则"
+    },
+    "searchPlaceholder": "搜索标题或网址",
+    "current": "当前",
+    "approxIdle": "≈ {{time}}",
+    "estimatedHint": "HamHome 尚未记录到这个标签页的使用，时间来自浏览器，仅供参考",
+    "emptyFilter": "没有符合条件的标签页",
+    "actionFailed": "操作失败，请重试",
+    "readLaterAdded": "已加入稍后读 {{count}} 个",
+    "bookmarked": "已收藏 {{count}} 个（{{existing}} 个已在书签库）",
+    "archived": "已移入归档 {{count}} 个",
+    "duplicatesClosed": "已关闭 {{count}} 个重复标签页",
+    "closed": "已关闭 {{count}} 个标签页",
+    "locked": "已锁定 {{count}} 个标签页",
+    "unlocked": "已解锁 {{count}} 个标签页",
+    "renewed": "已为 {{count}} 个标签页重新计时",
+    "closeDuplicates": "关闭重复项（{{count}}）",
+    "stats": {
+      "budget": "预算 {{count}}/{{limit}}",
+      "open": "打开 {{count}}",
+      "expiring": "即将归档 {{count}}",
+      "stale": "超过阈值未打开 {{count}}",
+      "duplicates": "重复 {{count}} 组",
+      "protected": "受保护 {{count}}"
+    },
+    "groupBy": {
+      "label": "分组",
+      "window": "按窗口",
+      "group": "按 Tab 分组",
+      "domain": "按域名"
+    },
+    "sort": {
+      "label": "排序",
+      "position": "按位置",
+      "recent": "最近使用",
+      "idle": "最久未用"
+    },
+    "filters": {
+      "label": "筛选",
+      "idle": "闲置 > 1 天",
+      "expiring": "即将归档",
+      "duplicates": "重复",
+      "protected": "受保护"
+    },
+    "groupHeader": {
+      "window": "窗口 {{index}}",
+      "currentWindow": "当前窗口",
+      "untitledGroup": "未命名分组",
+      "ungrouped": "未分组",
+      "noDomain": "其他"
+    },
+    "status": {
+      "pinned": "固定",
+      "locked": "锁定",
+      "audible": "播放中",
+      "saving": "保存中",
+      "protectedDomain": "受保护域名",
+      "dirtyForm": "有未提交内容",
+      "archivesTomorrow": "明天归档",
+      "archivesIn": "{{time}}归档",
+      "archivingSoon": "即将归档",
+      "expired": "已过期",
+      "pendingConfirm": "待确认归档",
+      "duplicate": "重复 ×{{count}}",
+      "discarded": "已休眠"
+    },
+    "actions": {
+      "readLater": "稍后读",
+      "bookmark": "收藏",
+      "workspace": "加入工作空间",
+      "archive": "归档关闭",
+      "lock": "锁定",
+      "unlock": "解锁",
+      "renew": "续期（重新计时）",
+      "closeWithoutRecord": "关闭（不保留记录）",
+      "more": "更多操作"
+    },
+    "closeWithoutRecord": {
+      "title": "关闭但不保留记录",
+      "description": "直接关闭所选的 {{count}} 个标签页，不写入归档，之后只能从浏览器历史中找回。",
+      "confirm": "直接关闭"
+    },
+    "tidyUp": {
+      "button": "一键整理",
+      "title": "整理建议",
+      "description": "基于 {{count}} 个标签页的本地规则生成，不使用 AI；关闭的标签页都会进入归档。",
+      "nothing": "现在没有需要整理的标签页",
+      "apply": "应用选中建议（{{count}}）",
+      "cancel": "取消",
+      "applied": "已归档 {{archived}} 个，加入稍后读 {{queued}} 个",
+      "groups": {
+        "duplicates": "关闭重复（{{count}}）",
+        "lowValue": "归档低价值页（{{count}}）",
+        "readLater": "放进稍后读（{{count}}）",
+        "archive": "归档闲置标签页（{{count}}）",
+        "workspace": "收起为工作空间“{{name}}”（{{count}}）"
+      },
+      "hints": {
+        "duplicates": "保留最近使用的一个",
+        "lowValue": "搜索结果、登录与验证页、空白标签页",
+        "readLater": "文章类页面，闲置超过 1 天",
+        "archive": "超过闲置阈值或即将归档",
+        "workspace": "同一分组或同一域名下的 5 个以上闲置标签页"
+      }
+    },
+    "workspace": {
+      "title": "加入工作空间",
+      "description": "把 {{count}} 个页面加入工作空间，已在其中的网址会跳过",
+      "target": "工作空间",
+      "new": "新建工作空间",
+      "name": "名称",
+      "defaultName": "整理的标签页",
+      "confirm": "加入",
+      "cancel": "取消",
+      "added": "已加入 {{count}} 个页面"
+    },
+    "reasons": {
+      "expired": "闲置过期",
+      "budget": "超出预算",
+      "manual": "手动归档",
+      "duplicate": "重复",
+      "triage": "整理建议"
+    },
+    "archive": {
+      "searchPlaceholder": "搜索归档的标题或网址",
+      "empty": "归档是空的。HamHome 关闭的标签页会出现在这里，可以随时恢复。",
+      "latest": "最近一次：{{time}} · {{reason}} · {{count}} 个",
+      "restore": "恢复",
+      "restoreBatch": "恢复这一批",
+      "restored": "已恢复 {{count}} 个标签页",
+      "delete": "删除",
+      "deleted": "已从归档删除 {{count}} 个",
+      "deleteTitle": "从归档删除",
+      "deleteConfirm": "从归档中删除所选的 {{count}} 个条目？删除后不会进入回收站，无法恢复。",
+      "cleared": "归档已清空",
+      "idleWhenClosed": "闲置 {{time}}",
+      "closeCount": "已归档 {{count}} 次",
+      "bookmarked": "已收藏",
+      "automatic": "自动",
+      "tabCount": "{{count}} 个",
+      "selectBatch": "选择这一批",
+      "dateGroups": {
+        "today": "今天",
+        "yesterday": "昨天",
+        "week": "本周",
+        "earlier": "更早"
+      },
+      "filters": {
+        "reason": "关闭原因",
+        "allReasons": "全部原因",
+        "domain": "域名",
+        "allDomains": "全部域名",
+        "time": "时间",
+        "allTime": "全部时间"
+      }
+    },
+    "consent": {
+      "autoArchive": "自动归档已在另一台设备上开启。为避免同步设置在本机直接关闭标签页，需要你在本机确认一次。",
+      "autoMakeRoom": "自动腾位已在另一台设备上开启，需要你在本机确认一次才会生效。",
+      "enableHere": "在本机开启"
+    },
+    "pending": {
+      "message": "{{count}} 个标签页已超过闲置阈值，等待你确认归档",
+      "keep": "保留并重新计时",
+      "archive": "全部归档"
+    },
+    "onboarding": {
+      "title": "让关闭变得零风险",
+      "steps": {
+        "0": "先看看现在的标签页，再决定怎么整理",
+        "1": "现有标签页怎么处理，哪些永远不动",
+        "2": "设置完成"
+      },
+      "summary": "你现在打开了 {{tabs}} 个标签页，分布在 {{windows}} 个窗口；约 {{stale}} 个超过闲置阈值没有打开；另有 {{duplicates}} 组重复。",
+      "estimated": "HamHome 刚开始记录，闲置时间基于浏览器记录，仅供参考。",
+      "plan": {
+        "recommended": "推荐方案",
+        "recommendedDesc": "7 天自动归档（只计算你使用浏览器的日子）+ 标签预算 15（仅提示）+ 稍后读",
+        "custom": "自定义",
+        "customDesc": "只开启自动归档，阈值、预算等在“规则”中自己调整"
+      },
+      "existing": {
+        "label": "现有标签页",
+        "fromToday": "从今天开始计时（推荐）",
+        "fromTodayDesc": "现有标签页从此刻起计算闲置时间，不会因为过去的闲置被马上关闭",
+        "tidyNow": "现在整理一下",
+        "tidyNowDesc": "打开整理面板，预选重复页和超过阈值未打开的标签页，由你确认后执行"
+      },
+      "protection": {
+        "title": "这些标签页永远不会被自动关闭",
+        "recommended": "推荐同时保护这些域名："
+      },
+      "done": "HamHome 关闭的每个标签页，都能在“归档”中找回。",
+      "skip": "暂不开启",
+      "back": "上一步",
+      "next": "下一步",
+      "enable": "开启",
+      "start": "开始使用"
+    },
+    "rules": {
+      "tracking": {
+        "title": "活动记录",
+        "description": "记录每个标签页最后一次使用的时间和你使用浏览器的日子，用于显示闲置时长、自动归档和整理建议。",
+        "label": "记录标签页活动",
+        "privacy": "只保存在本设备，不同步、不导出；只有你使用 AI 整理或询问助手时，AI 才会看到非隐私页面的标题、去除敏感参数的网址和闲置时长。关闭后会停止记录并清空已有记录。",
+        "offTitle": "关闭活动记录",
+        "offDescription": "关闭后会停止记录并清空已有的活动记录；自动归档和自动腾位将不可用，已归档的标签页不受影响。",
+        "offConfirm": "关闭并清空"
+      },
+      "autoArchive": {
+        "title": "自动归档",
+        "description": "闲置超过阈值的标签页自动关闭，关闭前先写入归档，可搜索、可一键恢复。首次开启不追溯：从开启时刻开始计时。",
+        "enable": "开启自动归档",
+        "needsTracking": "需要先开启活动记录",
+        "threshold": "闲置阈值",
+        "thresholdHint": "浏览器启动后 15 分钟内不执行；每次最多归档 30 个",
+        "thresholdOption": {
+          "hour": "{{count}} 小时",
+          "day": "{{count}} 天"
+        },
+        "countBy": "计时方式",
+        "countByHint": {
+          "usage-days": "7 天未打开（只计算你使用浏览器的日子），休假回来不会被批量清理",
+          "calendar": "按自然时间计算，不管期间是否使用浏览器"
+        },
+        "countByOption": {
+          "usage-days": "按使用日",
+          "calendar": "按自然日"
+        },
+        "mode": "执行方式",
+        "modeHint": {
+          "auto": "到期自动归档，可在弹窗或归档中整批撤销",
+          "confirm": "到期后等待你确认，图标会显示提醒",
+          "mark-only": "只在标签页中心标记“已过期”，不关闭"
+        },
+        "modeOption": {
+          "auto": "自动归档",
+          "confirm": "先确认",
+          "mark-only": "仅标记"
+        }
+      },
+      "protection": {
+        "title": "保护规则",
+        "alwaysOn": "固定标签页、各窗口当前显示的标签页、你锁定的标签页、正在用 HamHome 保存的标签页，任何情况下都不会被自动关闭。",
+        "audible": "保护正在播放声音（或 10 分钟内播放过）的标签页",
+        "grouped": "保护 Tab 分组内的标签页",
+        "groupedHint": "默认不保护：自动分组会让大部分标签页永不过期。也可以在 Tab 分组规则里只保护某个分组",
+        "dirtyForms": "保护有未提交输入的页面",
+        "dirtyFormsHint": "页面中有你编辑过但还没提交的内容时不关闭",
+        "minOpenTabs": "至少保留的标签页数",
+        "minOpenTabsHint": "打开的标签页不超过这个数量时不再归档；0 表示不限制"
+      },
+      "domains": {
+        "title": "保护域名",
+        "placeholder": "例如 mail.google.com 或 *.slack.com",
+        "add": "添加",
+        "invalid": "请输入有效的域名",
+        "empty": "还没有保护域名",
+        "remove": "移除 {{domain}}"
+      },
+      "locked": {
+        "title": "已锁定的标签页（{{count}}）",
+        "empty": "在标签页列表中点击锁形图标即可锁定，浏览器重启后锁定依然有效"
+      },
+      "sweep": {
+        "done": "上次检查 {{time}}，归档了 {{count}} 个",
+        "error": "上次检查 {{time}} 写入归档失败，没有关闭任何标签页",
+        "skipped": {
+          "tracking-off": "上次检查 {{time}}：活动记录已关闭",
+          "inactive": "上次检查 {{time}}：自动归档未开启",
+          "startup-grace": "上次检查 {{time}}：浏览器刚启动，15 分钟内不归档",
+          "min-open-tabs": "上次检查 {{time}}：标签页数量未超过保留数"
+        }
+      },
+      "retention": {
+        "title": "归档保留",
+        "description": "归档只保存在本设备；超过保留期或超过 {{max}} 条时，从最旧的开始清理。",
+        "keep": "保留时间",
+        "days": "{{count}} 天",
+        "forever": "永久",
+        "clear": "清空归档",
+        "count": "当前 {{count}} 条",
+        "clearTitle": "清空归档",
+        "clearDescription": "删除归档中的全部 {{count}} 条记录？删除后无法恢复。",
+        "clearConfirm": "清空"
+      },
+      "budget": {
+        "title": "标签预算",
+        "description": "给打开的标签页设一个上限，固定标签页不计入。超出时默认只做温和提示，从不阻止打开新标签页。",
+        "enable": "开启标签预算",
+        "limit": "预算上限",
+        "limitHint": "5–100 个",
+        "scope": "计数范围",
+        "scopeOption": {
+          "all-windows": "所有窗口",
+          "per-window": "每个窗口"
+        },
+        "overAction": "超出时",
+        "overActionHint": {
+          "badge-only": "只让图标数字变红",
+          "nudge": "在当前页面右下角轻提示一次，冷却 15 分钟",
+          "auto-archive": "自动归档最久未用、闲置 1 小时以上的标签页，并显示撤销"
+        },
+        "overActionOption": {
+          "badge-only": "仅图标",
+          "nudge": "页内轻提示",
+          "auto-archive": "自动腾位"
+        },
+        "makeRoomTitle": "开启自动腾位",
+        "makeRoomDescription": "超出预算时会自动归档最久未用的标签页（只处理闲置 60 分钟以上、10 分钟内没有新打开、且不受保护的标签页），每次只腾出超出的数量，都可以撤销。",
+        "makeRoomConfirm": "开启",
+        "showBadge": "在图标上显示标签页数量",
+        "showBadgeHint": "预算关闭时也显示打开的标签页数",
+        "paused": "超预算提示已暂停",
+        "resume": "恢复提示"
+      }
+    },
+    "overview": {
+      "button": "本周概览",
+      "title": "本周概览",
+      "description": "最近 7 天的标签页情况。只统计本设备，不上传、不同步，保留 90 天。",
+      "openTabs": "打开的标签页（不含固定）",
+      "averagePeak": "日均 {{average}} 个 · 峰值 {{peak}} 个",
+      "lessThanLastWeek": "比上周少 {{percent}}%",
+      "moreThanLastWeek": "比上周多 {{percent}}%",
+      "sameAsLastWeek": "与上周持平",
+      "noSamples": "还没有记录",
+      "samplingOff": "活动记录已关闭，不统计打开的标签页数量。",
+      "overBudgetTime": "本周超出预算 {{duration}}",
+      "neverOverBudget": "本周没有超出预算",
+      "budgetLine": "预算 {{limit}}",
+      "noData": "当天没有记录",
+      "dayTooltip": "平均 {{average}} 个，峰值 {{peak}} 个",
+      "today": "今天",
+      "legendAverage": "平均",
+      "legendPeak": "峰值",
+      "archiveTitle": "归档与恢复",
+      "autoArchived": "自动归档",
+      "manualArchived": "手动归档",
+      "restored": "恢复",
+      "readLaterTitle": "稍后读",
+      "readLaterAdded": "加入",
+      "readLaterRead": "读完",
+      "readLaterExpired": "过期",
+      "fewData": "统计刚开始记录，过几天再来看看趋势。"
+    },
+    "aiTriage": {
+      "button": "AI 整理",
+      "title": "AI 整理建议",
+      "description": "基于 {{count}} 个标签页的标题与网址，不发送页面内容。勾选后应用，关闭的标签页都能在归档中找回。",
+      "privacy": "只发送标题、网址（去掉敏感参数）、闲置时长和分组名；隐私页面、固定和受保护的标签页只用本地规则判断。",
+      "loading": "正在分析 {{count}} 个标签页…",
+      "notConfigured": "AI 整理需要先配置 AI 服务",
+      "notConfiguredHint": "也可以使用不依赖 AI 的“一键整理”。",
+      "openSettings": "去配置 AI",
+      "failed": "AI 整理失败，请稍后重试",
+      "nothing": "没有需要整理的标签页",
+      "cached": "{{count}} 个使用了 24 小时内的分析结果",
+      "skipped": "另有 {{count}} 个标签页超出单次上限，下次再分析",
+      "partialFailure": "{{count}} 个标签页分析失败",
+      "rerun": "重新分析",
+      "apply": "应用选中建议（{{count}}）",
+      "applied": "已整理：保留 {{kept}} 个，稍后读 {{queued}} 个，收藏 {{bookmarked}} 个，归档 {{archived}} 个",
+      "uncategorized": "未分类",
+      "groups": {
+        "keep": "继续保留（{{count}}）",
+        "readLater": "放进稍后读（{{count}}）",
+        "bookmark": "收藏到书签库（{{count}}）",
+        "workspace": "收起为工作空间（{{count}}）",
+        "close": "可以关闭（{{count}}）"
+      },
+      "hints": {
+        "keep": "勾选的标签页重新开始闲置计时",
+        "readLater": "加入稍后读并关闭",
+        "bookmark": "收藏后关闭，可在归档中找回",
+        "close": "关闭前写入归档，可随时恢复"
+      },
+      "local": {
+        "pinned": "固定标签页",
+        "protected": "受保护，不会被关闭",
+        "private": "隐私页面，未发送给 AI",
+        "notWeb": "非网页，未发送给 AI",
+        "duplicate": "重复标签页（本地规则）",
+        "lowValue": "搜索、登录或空白页（本地规则）",
+        "idle": "闲置已久（本地规则）",
+        "article": "待阅读内容（本地规则）"
+      }
+    }
+  },
+  "tabFeedback": {
+    "undo": "撤销",
+    "undone": "已撤销",
+    "undoExpired": "撤销已过期",
+    "failed": "操作失败，请重试",
+    "saved": "已保存",
+    "readLater": {
+      "added": "已加入稍后读",
+      "alreadyQueued": "已在稍后读中（{{time}}加入）",
+      "alreadyQueuedShort": "已在稍后读中",
+      "renew": "续期",
+      "note": "写备注",
+      "notePlaceholder": "为什么想读？（可选）",
+      "saveNote": "保存"
+    },
+    "archived": {
+      "label": "已移入归档",
+      "single": "已将《{{title}}》移入归档",
+      "multiple": "已将 {{count}} 个标签页移入归档"
+    },
+    "nudge": {
+      "label": "标签预算提示",
+      "title": "已打开 {{count}} 个标签页，超出预算 {{over}} 个",
+      "oldest": "最久未看：",
+      "hiddenTitle": "标签页 {{index}}",
+      "readLater": "放进稍后读",
+      "archive": "归档关闭",
+      "reviewAll": "整理全部",
+      "notToday": "今天不再提醒",
+      "snoozeHour": "1 小时内不提醒",
+      "handled": "已处理"
+    }
+  },
+  "readingBar": {
+    "question": "读完了吗？",
+    "markRead": "标记已读",
+    "keep": "收藏到书签库",
+    "notYet": "还没读完",
+    "markedRead": "已标记为已读",
+    "kept": "已收藏到书签库并标记已读"
   }
 }

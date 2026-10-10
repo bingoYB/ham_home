@@ -586,6 +586,59 @@
   - 刷新后顺序保持。
   - 重复 URL 拖入目标工作区时显示已存在提示。
 
+### TABLIFE-001 Read later & close, undo from the in-page toast
+
+- Setup: two pages open; the popup quick panel bound to the article tab.
+- Steps: click "Read later & close" in the popup, then "Undo" in the toast shown in the remaining tab.
+- Checks: the article tab closes; a queue-only bookmark and an unread `source: "manual"` entry with a reading time exist; undo reopens the tab and removes both.
+
+### TABLIFE-002 Read later queue stays out of the library
+
+- Setup: one library bookmark, two queue-only items (one added 28 days ago).
+- Steps: open `#all` and `#read-later`; keep one item, mark it read, switch to the read view.
+- Checks: queue-only items are hidden from the library; note and "expiring soon" hint show; kept items appear in the library.
+
+### TABLIFE-003 Tab center: archive a tab and restore it
+
+- Setup: two pages open.
+- Steps: dismiss the onboarding, "Archive & close" one row, restore it from the archive view.
+- Checks: the tab closes and gets one archive entry; restoring reopens it and empties the archive.
+
+### TABLIFE-004 Auto archive only closes unprotected tabs idle for 7+ usage days
+
+- Setup: auto archive on with consent; pinned, locked, current and plain tabs all idle 10 days.
+- Steps: fire the `tab-lifecycle-sweep` alarm; restore all from the popup's "auto archived today" row.
+- Checks: only the plain tab is archived; the popup shows the count and restores it.
+
+### TABLIFE-005 Tab budget nudge when over budget
+
+- Setup: budget on, limit 5, nudge mode.
+- Steps: open 6 pages; click "Not today" in the nudge.
+- Checks: the nudge shows on the current page and records `budgetNudge.dismissedDate`.
+
+### TABLIFE-006 In-page save overlay: read later instead
+
+- Steps: send `START_SAVE_FLOW`, click the overlay's "Read later" button.
+- Checks: the tab closes; a queue-only bookmark with an unread entry exists.
+
+### TABLIFE-007 Edge panel Read later quick list
+
+- Setup: one library bookmark, two unread and one read queue items.
+- Steps: toggle the edge panel (retried until the content UI answers), open the newest item.
+- Checks: only unread items are listed; opening one creates its tab and marks it `reading`.
+
+### TABLIFE-008 Weekly overview
+
+- Setup: `local:tabLifecycleStats` seeded for this week and the week before.
+- Steps: open the tab center's "This week" dialog.
+- Checks: the chart renders; the summary shows the average and the change against last week; archive and read later counts match.
+
+### TABLIFE-009 AI tidy-up sends only titles and cleaned URLs
+
+- Setup: mock OpenAI-compatible server; pages idle 5 / 3 days, a private sign-in page and a recently used page.
+- Steps: open "AI tidy-up", expand "Keep", apply the selected suggestions.
+- Checks: one AI request whose prompt has no `sig=` value, no private page and no page content; suggestions are grouped by destination with local reasons for local tabs; applying archives (`reason: "triage"`), queues (`source: "triage"`) and keeps tabs as suggested.
+
 ## 变体覆盖
 
 核心用例不再单独维护英文版或暗色版 spec，而是在 Playwright project 层复跑同一套

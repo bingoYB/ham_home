@@ -39,7 +39,7 @@ function getCapabilities(isEn: boolean): CapabilityItem[] {
   if (isEn) {
     return [
       { title: 'Agent-assisted control', desc: 'Understands HamHome features and settings, then opens views, checks status, runs tools, and handles safe setup.', icon: Bot, tone: tones[0] },
-      { title: 'Bookmark Search', desc: 'Hybrid retrieval combines exact matches and embedding similarity, with content-type and custom date-range filters.', icon: Search, tone: tones[1] },
+      { title: 'Collection Search', desc: 'Hybrid retrieval combines exact matches and embedding similarity, with content-type and custom date-range filters.', icon: Search, tone: tones[1] },
       { title: 'Snapshots & Screenshots', desc: 'Keep local HTML or Markdown snapshots and visible-page screenshots, and optionally send notes to Obsidian.', icon: FileText, tone: tones[2] },
       { title: 'Trash & Recovery', desc: 'Deleted bookmarks stay restorable for 30 days, then are purged to free up space.', icon: RotateCcw, tone: tones[3] },
       { title: 'WebDAV Sync', desc: 'Sync settings, bookmarks, clips, workspaces, and rules; deletions travel as tombstones.', icon: RefreshCw, tone: tones[4] },
@@ -51,7 +51,7 @@ function getCapabilities(isEn: boolean): CapabilityItem[] {
 
   return [
     { title: 'Agent 代办插件', desc: '理解 HamHome 的功能与设置，能打开页面、检查状态、执行工具并处理安全配置。', icon: Bot, tone: tones[0] },
-    { title: '书签搜索', desc: '混合检索同时结合精确命中和向量相似度，还可按内容类型和自定义时间范围筛选。', icon: Search, tone: tones[1] },
+    { title: '收藏搜索', desc: '混合检索同时结合精确命中和向量相似度，还可按内容类型和自定义时间范围筛选。', icon: Search, tone: tones[1] },
     { title: '快照与截图', desc: '本地保存 HTML/Markdown 快照和可见区域页面截图，也可同步笔记到 Obsidian。', icon: FileText, tone: tones[2] },
     { title: '回收站', desc: '删除的书签保留 30 天可随时恢复，到期后自动彻底清除并释放空间。', icon: RotateCcw, tone: tones[3] },
     { title: 'WebDAV 同步', desc: '同步设置、书签、剪藏、工作空间和规则，删除以墓碑形式同步到其他设备。', icon: RefreshCw, tone: tones[4] },
@@ -64,10 +64,10 @@ function getCapabilities(isEn: boolean): CapabilityItem[] {
 export function LandingCapabilities({ isEn }: LandingCapabilitiesProps) {
   const capabilities = getCapabilities(isEn);
   const texts = {
-    kicker: isEn ? 'More current capabilities' : '更多当前能力',
+    kicker: isEn ? 'Tools for your collections and tabs' : '收藏与标签页管理工具',
     title: isEn
-      ? 'More than a bookmark manager: clips, snapshots, search, recovery, sync, and boundaries in one extension'
-      : '不只是书签管理：剪藏、快照、搜索、回收站、同步和隐私边界都在同一套插件流程里',
+      ? 'Search, review, recover and sync your saved content'
+      : '查找、查看、恢复和同步你的收藏内容',
   };
 
   return (

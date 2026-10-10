@@ -144,7 +144,7 @@ const SHOWCASE_DEFINITIONS: ShowcaseDefinition[] = [
     icon: <Bot className="h-5 w-5" />,
     screenshotIds: ["aiAgent"],
     en: {
-      title: "Let the Agent understand and operate HamHome for you",
+      title: "Use natural language to search, summarize and manage",
       description:
         "The Agent can read HamHome's feature and settings context, explain how the extension works, open views, inspect status, run tools, and handle safe configuration changes.",
       bullets: [
@@ -154,7 +154,7 @@ const SHOWCASE_DEFINITIONS: ShowcaseDefinition[] = [
       ],
     },
     zh: {
-      title: "让 Agent 理解插件，并替你完成常见操作",
+      title: "用自然语言查找、总结和管理收藏",
       description:
         "Agent 可以读取 HamHome 的功能与配置上下文，解释插件怎么用，打开页面，检查状态，执行工具，并处理安全白名单内的配置调整。",
       bullets: [
@@ -200,7 +200,7 @@ const SHOWCASE_DEFINITIONS: ShowcaseDefinition[] = [
       bullets: [
         "Manual rules always run first",
         "Group title, color, collapsed state, order, and match conditions",
-        "AI grouping uses metadata, existing group names, and custom instructions",
+        "AI grouping uses metadata and custom instructions; native automation runs on Chrome/Edge",
       ],
     },
     zh: {
@@ -210,7 +210,7 @@ const SHOWCASE_DEFINITIONS: ShowcaseDefinition[] = [
       bullets: [
         "手动规则始终优先匹配",
         "可配置组名、颜色、折叠状态、排序和匹配条件",
-        "AI 分组会参考页面元数据、已有组名和自定义要求",
+        "AI 分组参考页面元数据与自定义要求；原生自动分组在 Chrome/Edge 运行",
       ],
     },
   },

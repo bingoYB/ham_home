@@ -6,6 +6,12 @@
 
 ```text
 app/components/
+├── SiteDocument.tsx
+├── LandingPage.tsx
+├── GuidePage.tsx
+├── JsonLd.tsx
+├── LegacyLanguageNotice.tsx
+├── NotFoundContent.tsx
 ├── Header.tsx
 ├── Footer.tsx
 ├── PrivacyPolicyContent.tsx
@@ -28,7 +34,7 @@ app/components/
 
 ## HomePage
 
-首页页面组件，组合导航、Hero、真实截图功能展示、能力网格、隐私说明、FAQ、底部 CTA 和页脚。
+首页路由组件，组合产品结构化数据与 `LandingPage`；`/zh/`、`/en/` 静态生成，旧 `/` 保留中文兼容入口。
 
 ### Props
 
@@ -44,7 +50,7 @@ app/components/
 
 ### 行为说明
 
-- 使用 `useWebPreferences()` 管理语言与主题。
+- 页面语言由路由确定并传入 `LandingPage`，首屏 HTML 与 metadata 对齐。
 - 将 `isEn` 与 `isDark` 传入 Hero 和功能展示区，自动选择中英文、明暗主题截图。
 - 不再依赖 mock bookmark 数据渲染主落地页展示，主展示内容以自动截图为准。
 
@@ -61,7 +67,8 @@ app/components/
 | isDark | boolean | 是 | - | 当前是否为深色主题 |
 | isEn | boolean | 是 | - | 当前是否为英文模式 |
 | onToggleTheme | (e?: React.MouseEvent) => void | 是 | - | 切换主题回调 |
-| onToggleLanguage | () => void | 是 | - | 切换语言回调 |
+| languageSwitchHref | string | 是 | - | 当前页面另一语言版本的路径（不含 base path，由 `Link` 补全） |
+| onLanguageSwitch | () => void | 是 | - | 点击语言链接时的回调，用于记录显式语言偏好 |
 
 ### Usage
 
@@ -70,14 +77,16 @@ app/components/
   isDark={isDark}
   isEn={isEn}
   onToggleTheme={toggleTheme}
-  onToggleLanguage={toggleLanguage}
+  languageSwitchHref={languageSwitchHref}
+  onLanguageSwitch={rememberLanguageSwitch}
 />
 ```
 
 ### 行为说明
 
 - 下载菜单通过 `getDownloadChannels()` 和 `getRecommendedDownloadChannel()` 自动推荐当前浏览器渠道。
-- 副标题与落地页定位一致：AI 浏览器工作台。
+- 副标题来自 `PRODUCT_COPY`：AI 网页收藏与标签页管理 / AI Web Clipper & Tab Manager。
+- 语言切换是带 `hrefLang` 与 `lang` 的真实链接（`Link`，关闭预取），静态 HTML 中即可发现另一语言版本；目标保留指南或隐私页面路径，点击时记录显式语言偏好。下载菜单抽取为 `DownloadDropdown`。
 
 ---
 
@@ -101,7 +110,9 @@ app/components/
 ### 行为说明
 
 - 轮播展示真实插件截图：书签库、视觉画廊、AI Agent、书签健康中心、工作空间、Tab 分组、导入导出与同步。
-- 能力标签为 2×2 网格：文字与图片剪藏、Agent 帮你用插件、工作空间与 Tab 分组、隐私边界可控。
+- 能力标签为 2×2 网格：文字与图片剪藏、Agent 辅助管理与操作、工作空间与 Tab 分组、隐私边界可控。
+- 唯一的 `h1` 由 Logo、品牌名 HamHome 和类别标签组成（如「HamHome — AI 网页收藏与标签页管理」，与页面 title 一致）；Logo 为装饰图（空 alt），类别前有仅供读屏的「—」分隔。
+- 最终口号「借助 AI，让收藏有序，让标签页井然。」与对应英文作为 `h1` 之后的大号段落，来自 `PRODUCT_COPY`；轮播交给 `HeroScreenshotCarousel`。
 - 截图路径由 `getExtensionScreenshotSrc()` 生成，自动带上 `NEXT_PUBLIC_BASE_PATH`。
 - 不再使用 Imgur 老截图。
 
@@ -217,7 +228,7 @@ app/components/
 ### 行为说明
 
 - 展示 AI 收藏、富剪藏、健康中心、Agent 代办、工作空间、Tab 分组、WebDAV、隐私保护八个摘要，桌面端 4 列。
-- 文案强调 HamHome 围绕真实浏览流程工作。
+- 文案按保存内容、找回收藏、理顺标签页展开，AI 与 Agent 作为可选辅助能力。
 
 ---
 
@@ -286,9 +297,9 @@ app/components/
 
 ### 行为说明
 
-- 使用分类按钮切换 FAQ 类别。
+- 四个类别与全部答案始终存在于初始 HTML；分类锚点滚动到对应区域，原生 `details/summary` 折叠答案。
 - 问答内容已对齐当前扩展实现，不再声明未实现的 WebDAV 加密同步能力。
-- AI FAQ 描述新版 Agent UI、支持的 Provider 范围和图片剪藏 AI 分析。
+- FAQ 数据统一在 `app/lib/faq.ts`；通用类第一题为「什么是 HamHome？」（默认展开），先给出产品定义；覆盖 Agent 任务示例、不配置 AI 的能力、账号要求、Embedding 独立配置与图片分析。
 - 覆盖剪藏、页面截图存储位置、删除后进入回收站及墓碑同步、WebDAV 按网址对齐避免重复等问题。
 
 ---
@@ -338,3 +349,199 @@ app/components/
 
 - 展示悬浮 Agent 面板风格：会话标题、过程步骤、参考卡片、建议 chip 和输入区。
 - 该组件保留给旧 demo 引用；当前落地页主功能展示使用真实截图。
+
+
+## LandingPage
+
+客户端首页组合组件；渲染既有功能与截图、四类任务指南、Agent 示例、完整 FAQ。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| language | SupportedLanguage | 是 | — | 路由确定的 zh/en，初始 HTML 不根据浏览器语言覆盖 |
+
+```tsx
+<LandingPage language="en" />
+```
+
+主题由 `useWebPreferences(language)` 管理；语言切换导航到独立 URL。
+
+## SiteDocument
+
+两个根布局共用的文档外壳，保持初始 `html lang`、样式与现有 Clarity 脚本一致。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| language | SupportedLanguage | 是 | — | HTML 文档语言 |
+| children | ReactNode | 是 | — | 页面内容 |
+
+```tsx
+<SiteDocument language="zh">{children}</SiteDocument>
+```
+
+`(legacy)` 保留原有链接；`(localized)/[lang]` 静态生成语言根布局。
+
+## JsonLd
+
+服务端输出 `<script type="application/ld+json">`，只负责渲染；数据由 `app/lib/structured-data.ts` 的纯函数生成。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| data | Record<string, unknown> | 是 | — | 结构化数据对象 |
+
+```tsx
+<JsonLd data={buildSoftwareApplicationJsonLd('en')} />
+<JsonLd data={buildGuideJsonLd('en', guide)} />
+```
+
+- `buildSoftwareApplicationJsonLd(language)`：首页 `SoftwareApplication`，`@id` 按语言区分（`/zh/#software`、`/en/#software`），包含作者、开源许可、免费 `offers`（价格 0）及 GitHub/商店 `sameAs`。
+- `buildGuideJsonLd(language, guide)`：指南页 `TechArticle`（标题、描述、语言、更新日期、作者、真实截图、`about` 指向同语言产品节点）与 `BreadcrumbList`。
+- `serializeJsonLd` 转义 `<`；不生成评分、评论或安装量。
+
+## LegacyLanguageNotice
+
+旧 `/` 与 `/privacy-policy/` 的英文提示条。兼容页面固定输出中文并 canonical 到 `/zh/`，因此不做自动跳转；水合后若访客偏好英文，显示指向对应英文页面的链接。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| - | - | - | - | 无 props |
+
+```tsx
+<SiteDocument language="zh">
+  <LegacyLanguageNotice />
+  {children}
+</SiteDocument>
+```
+
+- 状态由 `useLegacyLanguageNotice()` 管理：偏好来自 `resolvePreferredLanguage()`（先读显式切换记录，再读浏览器语言）。
+- 首屏 HTML 不渲染提示，避免水合差异；点击链接会记录英文偏好，关闭按钮只在当前页面隐藏。
+- 只挂在 `(legacy)` 布局，正式语言页面不显示。
+
+## LandingGuides
+
+四类任务指南的内部链接网格：AI 收藏、语义搜索、工作空间、隐私与同步。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| language | SupportedLanguage | 是 | — | 文案与链接语言 |
+
+```tsx
+<LandingGuides language="zh" />
+```
+
+数据来自 `app/lib/guides.ts`，首页与指南页复用同一套链接。
+
+## GuidePage
+
+指南展示组件，组合直接答案、操作步骤、真实截图、使用条件、证据链接与安装按钮。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| language | SupportedLanguage | 是 | — | 页面语言 |
+| guide | LocalizedGuide | 是 | — | 静态指南内容与截图（`GuideCopy` + `slug` + `screenshot`） |
+
+```tsx
+<GuidePage language="en" guide={guide} />
+```
+
+`generateStaticParams` 生成全部八篇指南；页面保留对应语言的导航、隐私链接与使用文档。路由同时输出 `TechArticle` 与面包屑 JSON-LD，`og:type` 为 `article`。
+
+## AgentExamples
+
+用请求与结果说明可选 Agent 的实际价值：查找收藏、总结网页、检查同步状态。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| isEn | boolean | 是 | — | 示例语言 |
+
+```tsx
+<AgentExamples isEn={false} />
+```
+
+这是任务示例展示，不执行真实插件操作，不暗示通用自主 Agent。
+
+## HeroScreenshotCarousel
+
+首屏截图轮播，复用 `ExtensionScreenshotFrame`；状态与自动播放由 `useScreenshotCarousel` 管理。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| isEn | boolean | 是 | — | 截图与按钮语言 |
+| isDark | boolean | 是 | — | 截图主题 |
+
+```tsx
+<HeroScreenshotCarousel isEn={true} isDark={false} />
+```
+
+保留四秒自动播放；卸载时清理定时器与 carousel `select` 监听。
+
+## DownloadDropdown
+
+浏览器下载渠道下拉菜单，从原 `Header` 抽取，推荐渠道与下载行为保持一致。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| isEn | boolean | 是 | — | 渠道标签语言 |
+
+```tsx
+<DownloadDropdown isEn={true} />
+```
+
+复用 `app/lib/download.ts`，无独立渠道地址副本。
+
+## Footer
+
+品牌定位、浏览器标识、对应语言隐私政策与 GitHub 链接。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| isEn | boolean | 是 | — | 定位文案与链接语言 |
+
+```tsx
+<Footer isEn={false} />
+```
+
+品牌定位来自 `PRODUCT_COPY`，隐私链接使用 `localizedPath`。
+
+## PrivacyPolicyContent
+
+中英文隐私说明页面；标题、描述、正文与更新时间来自 `app/lib/privacy-policy.ts`（`PRIVACY_POLICY_COPY`、`PRIVACY_POLICY_SECTIONS`、`PRIVACY_POLICY_UPDATED_AT`）。正文按扩展实际实现说明数据范围、存储位置（含浏览器同步存储）、权限用途和会接收数据的服务（AI、Embedding、WebDAV、网站图标服务等），修改正文时同步更新日期。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| language | SupportedLanguage | 否 | zh | 初始语言，由正式语言路由传入 |
+
+```tsx
+<PrivacyPolicyContent language="en" />
+```
+
+首页链接与语言切换保留对应语言路径，不根据浏览器偏好替换初始文档语言。
+
+## NotFoundContent
+
+全局 404 页面内容，由 `app/global-not-found.tsx` 包在 `SiteDocument language="zh"` 中渲染，并导出为 `404.html`（GitHub Pages 对不存在的路径返回该文件）。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| - | - | - | - | 无 props |
+
+```tsx
+<SiteDocument language="zh">
+  <NotFoundContent />
+</SiteDocument>
+```
+
+- 中文为主、附英文说明，提供「返回中文首页」与「Go to English home」两个入口。
+- 入口使用带 base path 的普通 `<a>`：404 页拥有独立文档，用客户端 `Link` 跳到其他根布局时页面不会切换。
+- 主题通过 `useSystemTheme()` 跟随系统深浅色；页面由 Next 自动输出 `noindex`。
+- 两个根布局之外没有共享布局，因此依赖 `next.config.js` 中的 `experimental.globalNotFound`（Next 16.1）；`verify:export` 会检查 `404.html` 的语言、样式、noindex、首页入口与图标，升级 Next 后可据此发现回归。
+
+## Web 语言、SEO 与验证约定
+
+- `useWebPreferences(language)` 返回对象，负责主题切换，并提供 `languageSwitchHref`（另一语言的同一页面）与 `rememberLanguageSwitch`；只有显式切换语言才写入偏好，页面挂载不会覆盖它。显式语言路由优先于历史本地偏好。跟随系统深浅色的逻辑在 `useSystemTheme()`，404 页同样复用。
+- `app/lib/site.ts` 统一类别、口号、介绍、作者、语言标签、有效官网地址和内容更新时间；`languageAlternates(path)` 生成 hreflang，`x-default` 指向 canonical 的中文页面（不指向旧 `/`），页面 metadata 与 sitemap 共用。
+- `createPageMetadata(language, { path, title, description, type })` 统一 canonical、hreflang、OG 与资源 URL；指南传 `type: 'article'`，隐私页传入专属标题与描述。
+- 站点图标统一为 `SITE_ICONS`（16/32/48/128 PNG 与 apple-touch-icon），随部署走 base path，正式页面与 404 页共用。
+- 社交分享图 `public/og-image.png`（1200×630）由 `node apps/extension/scripts/generate-og-image.mjs` 生成，文案与 `PRODUCT_COPY` 一致；修改定位时同步更新脚本中的文案并重新生成。
+- `sitemap` 只列出正式语言路由；首页与指南的 `lastModified` 用 `CONTENT_UPDATED_AT`，隐私页用 `PRIVACY_POLICY_UPDATED_AT`。
+- 保留 `/` 与 `/privacy-policy/` 为兼容入口；目录静态导出用 `trailingSlash: true`。
+- 验证：先运行 `pnpm --filter web test`（vitest，覆盖语言路由、hreflang 与结构化数据），再运行 `NEXT_PUBLIC_BASE_PATH=/ham_home pnpm build:web`，然后 `pnpm --filter web verify:export`。该脚本检查 14 个 HTML 页面的语言、canonical 与 hreflang（含 x-default）、页头可抓取的语言切换链接、OG（含分享图文件与尺寸）、首页 `h1`、FAQ 首题与完整性、产品与指南结构化数据、隐私页描述、图标、内部链接和资源，以及 `404.html`、sitemap 与 robots。

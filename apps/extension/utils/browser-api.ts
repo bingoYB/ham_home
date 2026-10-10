@@ -235,6 +235,18 @@ export async function safeBroadcastToTabs(
 }
 
 /**
+ * Create a periodic alarm unless it already exists with the same period.
+ * alarms.create replaces an existing alarm and restarts its countdown, and the MV3
+ * service worker runs its setup again on every wake-up, so creating it unconditionally
+ * keeps pushing the alarm back.
+ */
+export async function ensurePeriodicAlarm(name: string, periodInMinutes: number): Promise<void> {
+  const existing = await browser.alarms.get(name);
+  if (existing?.periodInMinutes === periodInMinutes) return;
+  await browser.alarms.create(name, { periodInMinutes });
+}
+
+/**
  * 快捷键信息
  */
 export interface ShortcutCommand {

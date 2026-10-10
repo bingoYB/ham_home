@@ -7,22 +7,64 @@
 import { browser } from "wxt/browser";
 import "../style.css";
 import { configStorage } from "@/lib/storage/config-storage";
-import { extractPageContent } from "@/utils/page-extract";
+import { TAB_MESSAGES } from "@/lib/tabs/tab-messages";
+import { extractPageContent, extractReadingContent } from "@/utils/page-extract";
+import { getContextLinkText, hasDirtyForm, installPageSignals } from "@/utils/page-signals";
 import { saveFlowBus, type SaveFlowTrigger } from "@/utils/save-flow-bus";
+import { tabFeedbackBus } from "@/utils/tab-feedback-bus";
+import { readingSessionBus } from "@/utils/reading-session-bus";
 import { registerSingleFileTestHelpers, handleExtractSingleFileHtmlResponse } from "@/utils/single-file-capture";
 import { keepShadowRootDocumentStyles } from "@/utils/shadow-root-style-guard";
 import { enrichClipContext } from "@/utils/clip-context";
 
 let captureUiContainer: HTMLElement | null = null;
 
-// 监听来自 Popup/Background 的消息
-browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+// Messages from the popup and the background
+function handleMessage(
+  message: any,
+  _sender: unknown,
+  sendResponse: (response?: unknown) => void,
+): boolean {
+  if (message.type === TAB_MESSAGES.ping) {
+    sendResponse({ ok: true });
+    return false;
+  }
+
   if (message.type === "EXTRACT_CONTENT") {
     extractPageContent().then((content) => {
       sendResponse(content);
     });
 
     return true; // 保持消息通道开放
+  }
+
+  if (message.type === TAB_MESSAGES.extractReading) {
+    extractReadingContent()
+      .then(sendResponse)
+      .catch(() => sendResponse(null));
+    return true;
+  }
+
+  if (message.type === TAB_MESSAGES.queryDirtyForm) {
+    sendResponse({ dirty: hasDirtyForm() });
+    return false;
+  }
+
+  if (message.type === TAB_MESSAGES.contextLink) {
+    sendResponse({ text: getContextLinkText(message.linkUrl) });
+    return false;
+  }
+
+  if (message.type === TAB_MESSAGES.feedback) {
+    tabFeedbackBus.emit(message.feedback);
+    sendResponse({ ok: true });
+    return false;
+  }
+
+  if (message.type === TAB_MESSAGES.readingSession) {
+    readingSessionBus.emit(message.session);
+    sendResponse({ ok: true });
+    return false;
   }
 
   if (message.type === "EXTRACT_HTML") {
@@ -77,7 +119,7 @@ browser.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   }
 
   return false;
-});
+}
 
 // 导出 WXT content script 配置
 export default defineContentScript({
@@ -85,6 +127,11 @@ export default defineContentScript({
   cssInjectionMode: "ui",
   async main(ctx) {
     // registerSingleFileTestHelpers();
+
+    // The listener follows ctx: when an old instance is invalidated (update, re-injection) it is removed, so two instances never answer at once
+    browser.runtime.onMessage.addListener(handleMessage);
+    ctx.onInvalidated(() => browser.runtime.onMessage.removeListener(handleMessage));
+    installPageSignals();
 
     // 动态导入 React 组件
     const { mountContentUI } = await import("@/components/contentUi/index");

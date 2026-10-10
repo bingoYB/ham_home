@@ -5,6 +5,7 @@ const mocks = vi.hoisted(() => ({
   getSubjectIndex: vi.fn(),
   deleteMany: vi.fn(),
   set: vi.fn(),
+  getReadLater: vi.fn(),
 }));
 
 vi.mock("@/lib/storage/bookmark-storage", () => ({
@@ -13,6 +14,10 @@ vi.mock("@/lib/storage/bookmark-storage", () => ({
 
 vi.mock("@/lib/storage/bookmark-clip-storage", () => ({
   bookmarkClipStorage: { getSubjectIndex: mocks.getSubjectIndex },
+}));
+
+vi.mock("@/lib/storage/read-later-storage", () => ({
+  readLaterStorage: { getAll: mocks.getReadLater },
 }));
 
 vi.mock("@/lib/storage/bookmark-health-storage", () => ({
@@ -41,6 +46,7 @@ describe("BookmarkHealthService scan scope", () => {
     vi.clearAllMocks();
     mocks.deleteMany.mockResolvedValue(undefined);
     mocks.set.mockResolvedValue(undefined);
+    mocks.getReadLater.mockResolvedValue({});
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => new Response(null, { status: 200 })),
@@ -70,6 +76,22 @@ describe("BookmarkHealthService scan scope", () => {
     expect(fetch).toHaveBeenCalledTimes(1);
     expect(mocks.set).toHaveBeenCalledTimes(1);
     expect(mocks.deleteMany).toHaveBeenCalledWith(["image", "text"]);
+  });
+
+  it("never checks bookmarks that are only in the read later queue", async () => {
+    mocks.getBookmarks.mockResolvedValue([
+      bookmark("library", "https://example.com/library"),
+      bookmark("queued", "https://example.com/queued"),
+    ]);
+    mocks.getSubjectIndex.mockResolvedValue({});
+    mocks.getReadLater.mockResolvedValue({
+      queued: { bookmarkId: "queued", status: "unread", queueOnly: true, source: "manual", addedAt: 1, updatedAt: 1 },
+    });
+
+    const { BookmarkHealthService } = await import("../bookmark-health-service");
+    const records = await new BookmarkHealthService().scan();
+
+    expect(records.map((record) => record.bookmarkId)).toEqual(["library"]);
   });
 
   it("does not check a content item requested by id", async () => {

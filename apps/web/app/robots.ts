@@ -1,5 +1,6 @@
 export const dynamic = 'force-static';
 import { MetadataRoute } from 'next';
+import { siteUrl } from './lib/site';
 
 export default function robots(): MetadataRoute.Robots {
   return {
@@ -7,6 +8,6 @@ export default function robots(): MetadataRoute.Robots {
       userAgent: '*',
       allow: '/',
     },
-    sitemap: 'https://hamhome.app/sitemap.xml',
+    sitemap: `${siteUrl()}sitemap.xml`,
   };
 }

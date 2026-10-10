@@ -2,7 +2,8 @@ export const LANGUAGE_STORAGE_KEY = 'hamhome.web.language';
 
 export type SupportedLanguage = 'zh' | 'en';
 
-export function resolveInitialLanguage(): SupportedLanguage {
+/** Visitor's preferred language: an explicit switch first, then the browser languages. */
+export function resolvePreferredLanguage(): SupportedLanguage {
   if (typeof window === 'undefined') {
     return 'zh';
   }

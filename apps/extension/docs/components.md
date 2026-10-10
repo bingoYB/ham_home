@@ -107,6 +107,8 @@
 - 浏览器内部页、隐私页面等无法保存时展示提示浮窗并自动消失。
 - 保存成功后展示成功提示并自动关闭；Esc 可随时关闭浮窗。
 - 面板渲染在 shadow root 内，分类下拉等 Popover 需通过 `portalContainer` 指定 portal 容器。
+- While the overlay is open, `useTabBusySignal` marks the tab as busy (renewed every 7.5 minutes), so auto archive and making room never close it mid-save.
+- Unless a clip (selection / image) is being saved, the header shows a **Read later** button (`ReadLaterInsteadButton`). It closes the overlay and sends `HAMHOME_READ_LATER_THIS_TAB`; the background queues the tab, closes it as configured and shows the usual undo toast.
 
 ### PopupSaveView
 
@@ -136,6 +138,13 @@ Popup 快捷面板，扩展图标点击后的默认视图。保存书签的 AI �
 - 常用设置区可直接切换「默认保存快照」「地址栏搜索增强」，改动实时写入设置。
 - 面板高度收口在浏览器给 Popup 的上限（600px）：底部状态栏固定，上方内容整体滚动，内容不够高时面板仍按内容收窄。
 - 内容滚动区用原生滚动容器加 `scrollbar-slim`，没有用 `ScrollArea`：`ScrollArea` 的 viewport 靠 `height: 100%` 撑开，在 `max-height` 收口的弹性盒里百分比会按收口前的内容高度计算，viewport 会比容器更高并把底栏顶出可视区。
+
+**Tab lifecycle additions:**
+
+- Quick actions are: save current page, **Read later & close** (`readLaterTab`, shortcut `read-later-close`), save window as workspace, open HamHome; settings moved to the header icon.
+- `PopupTabsCard` shows budget usage, stale / duplicate tabs, today's automatic archiving (view / restore all) and pending confirmations; "Tidy up" expands `PopupTriagePanel` in place (most idle first, with read later / bookmark / archive buttons per tab).
+- `PopupRecentSection` switches between recent saves and the Read later queue (unread items, newest first); opening a queue item calls `readLaterOpen`, which marks it as reading.
+- Recent saves only list library bookmarks; queue-only read later items stay out.
 
 ## BookmarkSubjectDialog / ImageClipMetadata
 
@@ -269,6 +278,8 @@ Popup 快捷面板，扩展图标点击后的默认视图。保存书签的 AI �
 - AI 命令推荐只会更新候选页面选择，不会直接写入书签，仍需用户在确认框中提交。
 - 保存弹窗会提示重复 URL，默认去重保存；用户也可以选择保留全部页面。
 - 工作空间保存和分析完成后，会关闭本次保存预览中的浏览器 Tab；重复 URL 即使被去重未写入工作空间，也会一并关闭。
+- With the tab budget on, restoring a workspace that would go over the budget first asks (`useWorkspaceBudgetSwitch` + `WorkspaceBudgetSwitchDialog`, passed to `useWorkspacesPage` as `beforeRestore`): save the current window as a workspace and switch, restore anyway, or cancel.
+- Restored tabs are marked as bulk-opened before they are created, so they trigger no budget nudge or making room for 2 minutes.
 
 ## TabGroupsPage
 
@@ -369,6 +380,7 @@ Tab 分组规则弹窗表单组件，负责渲染规则名称、目标分组名�
 - 匹配对象下拉项包含域名部分、URL、页面标题和页面标题(忽略大小写)，不展示旧版正则对象。
 - 匹配条件下拉项包含包含、完全相等、前缀为、后缀为和正则匹配。
 - 点击加号会在当前条件后新增一条匹配条件；点击减号删除该条件，至少保留一条条件。
+- **Protect tabs in this group** (`form.protectTabs`, saved as `TabGroupRule.protectTabs`): while the rule is enabled, tabs in a group with this rule's title (trimmed, case-insensitive) count as protected, so auto archive and making room never close them, even with the global "protect grouped tabs" switch off.
 
 ### TabGroupRuleList
 
@@ -399,6 +411,7 @@ Tab 分组规则列表组件，按规则名称、目标分组、颜色和折叠�
 - 空列表时显示空状态，引导用户创建第一条规则。
 - 每个分组面板显示该分组下的所有匹配条件，启停操作会同步更新该分组下的全部底层规则。
 - 列表组件只触发上层回调，不直接修改规则存储。
+- Rule groups with `protectTabs` show a "Protected" badge next to their title.
 
 ### WorkspacePageDialogs
 
@@ -824,6 +837,8 @@ Tab 分组规则列表组件，按规则名称、目标分组、颜色和折叠�
   （见 `utils/shadow-root-style-guard.ts`），被页面移除后整条 `translate` 声明会失效
 - 当前页面不可见或失去活跃状态时，content UI 不响应打开指令并自动收起面板
 - 侧边栏头部下方展示 `PinnedSection`，用于快速访问置顶分类和置顶书签
+- Below it, `ReadLaterQuickSection` lists the newest unread Read later items (via `useReadLaterQuickList`, loaded only while the panel is open). It is hidden while searching or filtering; opening an item marks it as reading and closes the panel.
+- The bookmark list only contains library bookmarks (`getBookmarks()` leaves queue-only read later items out).
 
 ---
 
@@ -1706,6 +1721,1547 @@ const { snapshotUrl, loading, error, openSnapshot, closeSnapshot } =
 
 ---
 
+## tabCenter
+
+The tab center page (route `#tabs`, `#tabs?view=archive`, `#tabs?view=rules`) shows open tabs, the tab archive and the rules for the tab lifecycle features (activity tracking, auto archive, tab budget), plus the weekly overview and the rule-based / AI tidy-up dialogs. `components/TabCenterPage.tsx` is the entry; everything else lives in `components/tabCenter/` (with `overview/`, `aiTriage/` and `rules/`). Data and actions come from hooks (`useOpenTabsSnapshot`, `useOpenTabActions`, `useTabArchive`, `useTabLifecycleSettings`, `useTabTidy`, `useTabAITriage`, ...); strings use the `bookmark` namespace under `tabCenter.*`.
+
+### TabCenterPage
+
+Route-level page of the tab center, lazy-loaded by `entrypoints/app/App.tsx` for the `tabs` view. It picks the Open, Archive or Rules view from the `view` query parameter and owns the shared header, the onboarding and the weekly overview dialog.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| currentView | `string` | ✓ | - | Current app view, e.g. `tabs` or `tabs?view=rules`; `view=archive` / `view=rules` pick those views, anything else shows Open |
+| onViewChange | `(view: string) => void` | ✓ | - | App navigation; called with `tabs`, `tabs?view=archive`, `tabs?view=rules` or `settings?tab=ai` |
+
+**Usage:**
+
+```tsx
+<TabCenterPage currentView={currentView} onViewChange={handleViewChange} />
+```
+
+**Behavior:**
+
+- Builds one header (`TabCenterHeader`, `ConsentBanner`, plus `PendingConfirmBanner` once a snapshot exists) and passes it to the active view; the Open view shows only a spinner while the first snapshot loads.
+- After lifecycle settings load, opens `TabLifecycleOnboarding` once per mount when onboarding was never completed and auto archive is off in the (synced) settings. When another device already turned it on, `ConsentBanner` asks for this device's consent instead, so the synced settings are kept.
+- Turning auto archive on in Rules accepts the synced consent when another device turned it on (`lifecycle.acceptConsent("autoArchive")`), opens the onboarding if it was never completed, otherwise calls `lifecycle.setAutoArchiveEnabled(true)`.
+- Finishing the onboarding with the custom plan switches to Rules; with "Tidy up now" it switches to Open with the returned tabs preselected.
+- The weekly overview gets `budgetLimit` only while the tab budget is enabled; "Resume hints" in Rules calls `getBackgroundService().resumeBudgetNudge()`.
+
+### TabCenterHeader
+
+Title, description, "This week" button and the Open / Archive / Rules switch at the top of every tab center view; part of the shared header built by `TabCenterPage`.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| view | `TabCenterView` | ✓ | - | Active view: `"open"`, `"archive"` or `"rules"` |
+| openCount | `number` | ✓ | - | Count on the Open tab |
+| archiveCount | `number` | ✓ | - | Count on the Archive tab |
+| onViewChange | `(view: TabCenterView) => void` | ✓ | - | Called with the chosen view |
+| onOpenOverview | `() => void` | ✓ | - | Opens the weekly overview dialog |
+
+**Usage:**
+
+```tsx
+<TabCenterHeader
+  view={view}
+  openCount={snapshot?.stats.total ?? 0}
+  archiveCount={archiveCount}
+  onViewChange={setView}
+  onOpenOverview={() => setOverviewOpen(true)}
+/>
+```
+
+**Behavior:**
+
+- The file also exports the `TabCenterView` type (`"open" | "archive" | "rules"`).
+- Open and Archive show their counts next to the label; Rules shows none.
+- Test IDs: `tab-center-overview`, `tab-center-view-open`, `tab-center-view-archive`, `tab-center-view-rules`.
+
+### ConsentBanner
+
+Amber banner in the shared header, exported from `TabCenterBanners.tsx`: auto archive or automatic make room was turned on on another device (synced settings) and still needs this device's consent before it closes tabs here.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| autoArchive | `boolean` | ✓ | - | Auto archive waits for consent on this device |
+| autoMakeRoom | `boolean` | ✓ | - | Automatic make room waits for consent on this device |
+| onAccept | `(kind: "autoArchive" \| "autoMakeRoom") => void` | ✓ | - | "Turn on here" for one feature |
+
+**Usage:**
+
+```tsx
+<ConsentBanner
+  autoArchive={lifecycle.pendingConsents.autoArchive}
+  autoMakeRoom={lifecycle.pendingConsents.autoMakeRoom}
+  onAccept={(kind) => void lifecycle.acceptConsent(kind)}
+/>
+```
+
+**Behavior:**
+
+- Renders nothing when both flags are false; otherwise one line per pending feature, each with its own "Turn on here" button.
+- `TabCenterPage` accepts through `lifecycle.acceptConsent(kind)` (background `acceptSyncedTabConsent`).
+- Test ID: `tab-consent-banner`.
+
+### PendingConfirmBanner
+
+Banner in the shared header, exported from `TabCenterBanners.tsx`, for the "Ask first" (`confirm`) auto archive mode: tabs past the idle threshold that wait for confirmation.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| pending | `PendingArchiveConfirmation[]` | ✓ | - | Tabs waiting for confirmation |
+| onConfirm | `() => void` | ✓ | - | "Archive all" |
+| onKeep | `() => void` | ✓ | - | "Keep and restart the timer" |
+
+**Usage:**
+
+```tsx
+<PendingConfirmBanner
+  pending={snapshot.pendingConfirm}
+  onConfirm={() => void actions.confirmPending()}
+  onKeep={() => void actions.keepPending()}
+/>
+```
+
+**Behavior:**
+
+- Renders nothing when `pending` is empty; otherwise shows the count with both buttons.
+- `TabCenterPage` calls `confirmPending()` / `keepPending()` from `useOpenTabActions` without tab IDs, so they archive every pending tab or restart the idle time of every pending tab.
+- Test ID: `tab-pending-confirm`.
+
+### TabLifecycleOnboarding
+
+First-run dialog of the tab center (also shown the first time auto archive is turned on) that shows the current state and a plan before anything is closed. Rendered by `TabCenterPage`; its state comes from `useTabLifecycleOnboarding`.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| open | `boolean` | ✓ | - | Dialog visibility |
+| onboarding | `UseTabLifecycleOnboardingResult` | ✓ | - | Step, choices, summary and `finish` / `skip` from `useTabLifecycleOnboarding` |
+| onOpenChange | `(open: boolean) => void` | ✓ | - | Dialog open state changes |
+| onDone | `(outcome: OnboardingOutcome) => void` | ✓ | - | Called with the outcome when "Start" is pressed on the last step |
+
+**Usage:**
+
+```tsx
+const onboarding = useTabLifecycleOnboarding(snapshot, lifecycle, onboardingOpen);
+
+<TabLifecycleOnboarding
+  open={onboardingOpen}
+  onboarding={onboarding}
+  onOpenChange={setOnboardingOpen}
+  onDone={handleOnboardingDone}
+/>
+```
+
+**Behavior:**
+
+- Step 0: summary of open tabs, windows, stale tabs and duplicate groups (plus an "estimated" note when `summary.estimated`), and the Recommended / Custom plan as radio cards (internal `ChoiceCard`).
+- Step 1: how to treat existing tabs ("Start counting from today" / "Tidy up now"), the always-on protections and, when there are any, checkboxes for recommended protected domains (all checked on each opening).
+- "Turn on" on step 1 awaits `onboarding.finish()` (spinner while `saving`), keeps the outcome and moves to step 2; "Start" there closes the dialog and calls `onDone(outcome)`.
+- "Skip" (steps 0 and 1) awaits `onboarding.skip()`, which marks onboarding as completed, then closes.
+- Dismissing with the close button or Esc neither completes onboarding (it opens again on the next visit) nor, on step 2, calls `onDone`.
+
+### OpenTabsView
+
+The tab center's Open view, rendered by `TabCenterPage` once a snapshot exists: stats, toolbar, batch bar and a virtualized list of open tabs grouped by window, tab group or domain, plus the workspace, tidy-up and AI tidy-up dialogs.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| snapshot | `OpenTabsSnapshot` | ✓ | - | Live open tabs snapshot |
+| header | `ReactNode` | ✓ | - | Shared tab center header rendered at the top |
+| preselectTabIds | `number[]` | | - | Tabs to select when the view opens (onboarding "Tidy up now") |
+| onPreselectConsumed | `() => void` | | - | Called after `preselectTabIds` were applied |
+| onOpenAISettings | `() => void` | ✓ | - | AI tidy-up without an AI config: go to the AI settings |
+
+**Usage:**
+
+```tsx
+<OpenTabsView
+  snapshot={snapshot}
+  header={header}
+  preselectTabIds={preselect}
+  onPreselectConsumed={clearPreselect}
+  onOpenAISettings={() => onViewChange("settings?tab=ai")}
+/>
+```
+
+**Behavior:**
+
+- List state (search, grouping, sort, filters, selection) comes from `useOpenTabsList`; rows are virtualized with `useScrollAreaVirtualList`, and "No tabs match" shows when no row is left.
+- A non-empty `preselectTabIds` replaces the selection, then `onPreselectConsumed` is called.
+- Row and batch actions go through `useOpenTabActions`; batch actions run on the selected tab IDs and clear the selection afterwards.
+- "Tidy up" resets `useTabTidy` (every suggestion selected) and opens `TabTidyDialog`; "AI tidy-up" opens `TabAITriageDialog`; "Add to workspace" opens `AddToWorkspaceDialog` with the selected tabs.
+- Grouping by tab group is offered only when `chrome.tabGroups` exists.
+
+### OpenTabsStatsBar
+
+Summary line above the open tabs list (e.g. "Budget 47/15 · 6 archiving soon · 3 duplicate groups") with duplicate cleanup and the two tidy-up entries; rendered by `OpenTabsView`.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| snapshot | `OpenTabsSnapshot` | ✓ | - | Source of budget, stats and auto archive state |
+| onCloseDuplicates | `() => void` | ✓ | - | "Close duplicates (n)" |
+| onTidyUp | `() => void` | ✓ | - | Opens the rule-based tidy-up |
+| onAITriage | `() => void` | ✓ | - | Opens the AI tidy-up |
+
+**Usage:**
+
+```tsx
+<OpenTabsStatsBar
+  snapshot={snapshot}
+  onCloseDuplicates={() => void actions.closeDuplicates()}
+  onTidyUp={() => {
+    tidy.reset();
+    setTidyOpen(true);
+  }}
+  onAITriage={() => setAITriageOpen(true)}
+/>
+```
+
+**Behavior:**
+
+- Starts with "Budget count/limit" while the budget is on, otherwise "N open"; the line turns red when `budget.level === "over"`.
+- "Archiving soon" (expiring + expired) appears only while auto archive is active; idle past threshold, duplicate groups and protected counts are always shown.
+- "Close duplicates" shows `stats.redundantDuplicates` and is disabled when it is 0.
+- Test IDs: `open-tabs-stats`, `tab-center-ai-triage`, `tab-center-tidy`.
+
+### OpenTabsToolbar
+
+Search field, grouping and sort selects and filter chips of the open tabs list; controlled by `useOpenTabsList` in `OpenTabsView`.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| query | `string` | ✓ | - | Search text |
+| groupBy | `OpenTabsGroupBy` | ✓ | - | `"window"`, `"group"` or `"domain"` |
+| sort | `OpenTabsSort` | ✓ | - | `"position"`, `"recent"` or `"idle"` |
+| filters | `ReadonlySet<OpenTabsFilter>` | ✓ | - | Active filter chips |
+| supportsGroups | `boolean` | ✓ | - | Browser supports tab groups |
+| onQueryChange | `(query: string) => void` | ✓ | - | Search input changed |
+| onGroupByChange | `(groupBy: OpenTabsGroupBy) => void` | ✓ | - | Grouping selected |
+| onSortChange | `(sort: OpenTabsSort) => void` | ✓ | - | Sort selected |
+| onToggleFilter | `(filter: OpenTabsFilter) => void` | ✓ | - | Filter chip clicked |
+
+**Usage:**
+
+```tsx
+<OpenTabsToolbar
+  query={list.query}
+  groupBy={list.groupBy}
+  sort={list.sort}
+  filters={list.filters}
+  supportsGroups={supportsGroups}
+  onQueryChange={list.setQuery}
+  onGroupByChange={list.setGroupBy}
+  onSortChange={list.setSort}
+  onToggleFilter={list.toggleFilter}
+/>
+```
+
+**Behavior:**
+
+- The "By tab group" option is hidden when `supportsGroups` is false.
+- Filter chips (Idle > 1 day, Archiving soon, Duplicates, Protected) are toggle buttons with `aria-pressed`; the list shows tabs matching any active filter.
+- Fully controlled: searching, grouping and sorting happen in `useOpenTabsList`.
+
+### OpenTabsBatchBar
+
+Sticky bar of batch actions for the selected open tabs; rendered by `OpenTabsView`.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| visibleTabIds | `number[]` | ✓ | - | IDs of the tabs currently listed |
+| selectedTabs | `OpenTabInfo[]` | ✓ | - | Selected tabs |
+| onToggleSelectAll | `(tabIds: number[]) => void` | ✓ | - | Select-all checkbox; called with `visibleTabIds` |
+| onReadLater | `() => void` | ✓ | - | Read later |
+| onBookmark | `() => void` | ✓ | - | Bookmark |
+| onWorkspace | `() => void` | ✓ | - | Add to workspace |
+| onArchive | `() => void` | ✓ | - | Archive & close |
+| onLock | `() => void` | ✓ | - | Lock |
+| onUnlock | `() => void` | ✓ | - | Unlock |
+| onRenew | `() => void` | ✓ | - | Renew (restart idle timer), in the "More" menu |
+| onCloseWithoutRecord | `() => void` | ✓ | - | Close without keeping a record, in the "More" menu |
+
+**Usage:**
+
+```tsx
+// run(action) applies the action to the selected tab IDs, then clears the selection
+<OpenTabsBatchBar
+  visibleTabIds={list.visibleTabIds}
+  selectedTabs={list.selectedTabs}
+  onToggleSelectAll={(ids) => list.selectOnly(list.selected.size === ids.length ? [] : ids)}
+  onReadLater={run(actions.readLater)}
+  onBookmark={run(actions.bookmark)}
+  onWorkspace={() => setWorkspaceTabs(list.selectedTabs)}
+  onArchive={run((ids) => actions.archive(ids))}
+  onLock={run((ids) => actions.setLocked(ids, true))}
+  onUnlock={run((ids) => actions.setLocked(ids, false))}
+  onRenew={run(actions.renew)}
+  onCloseWithoutRecord={run(actions.closeWithoutRecord)}
+/>
+```
+
+**Behavior:**
+
+- The checkbox is checked when the selected count equals the visible count and disabled when nothing is listed; the label switches between "Select all" and "N selected".
+- Every action button, including the "More" menu trigger, is disabled while nothing is selected.
+- "Close without keeping a record" is styled destructive; `useOpenTabActions().closeWithoutRecord` asks for confirmation before closing.
+- Test ID: `open-tabs-archive` on the archive button.
+
+### OpenTabsGroupHeader
+
+Group header row of the open tabs list ("Window 1 (23)", a tab group or a domain) with a checkbox selecting the whole group; rendered by `OpenTabsView` for `header` rows.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| label | `OpenTabsGroupLabel` | ✓ | - | Window, tab group, ungrouped or domain label |
+| count | `number` | ✓ | - | Tabs in the group |
+| selectedCount | `number` | ✓ | - | Selected tabs in the group |
+| onToggleAll | `(selected: boolean) => void` | ✓ | - | Select or deselect the whole group |
+
+**Usage:**
+
+```tsx
+<OpenTabsGroupHeader
+  label={row.label}
+  count={row.count}
+  selectedCount={row.tabIds.filter((id) => list.selected.has(id)).length}
+  onToggleAll={(value) => list.setSelected(row.tabIds, value)}
+/>
+```
+
+**Behavior:**
+
+- Text by kind: "Window N" (plus a "Current window" chip when focused), the group title or "Untitled group", "Not grouped", or the domain ("Other" when empty).
+- Tab groups show a colored dot mapped from the Chrome group color name; unknown colors fall back to grey.
+- The checkbox is unchecked, indeterminate or checked from `selectedCount` vs `count`.
+
+### OpenTabRow
+
+One open tab in the list (memoized): checkbox, favicon, title, domain, status badges, idle time and quick actions; rendered by `OpenTabsView` for `tab` rows.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| tab | `OpenTabInfo` | ✓ | - | Tab to show |
+| selected | `boolean` | ✓ | - | Row is selected |
+| archiveMode | `TabArchiveMode` | ✓ | - | Auto archive mode, for the archive badge |
+| thresholdUnit | `TabIdleUnit` | ✓ | - | Idle threshold unit, for the archive badge |
+| pendingConfirm | `boolean` | ✓ | - | Tab waits for archive confirmation |
+| onToggleSelect | `(tabId: number) => void` | ✓ | - | Checkbox toggled |
+| onFocus | `(tabId: number) => void` | ✓ | - | Title clicked: switch to the tab |
+| onLockToggle | `(tab: OpenTabInfo) => void` | ✓ | - | Lock / unlock button |
+| onReadLater | `(tabId: number) => void` | ✓ | - | Read later button |
+| onArchive | `(tabId: number) => void` | ✓ | - | Archive & close button |
+
+**Usage:**
+
+```tsx
+// onFocus, onLockToggle, onReadLater and onArchive are memoized wrappers around useOpenTabActions
+<OpenTabRow
+  tab={row.tab}
+  selected={list.selected.has(row.tab.tabId)}
+  archiveMode={snapshot.autoArchive.mode}
+  thresholdUnit={snapshot.autoArchive.threshold.unit}
+  pendingConfirm={pending.has(row.tab.tabId)}
+  onToggleSelect={list.toggleSelect}
+  onFocus={onFocus}
+  onLockToggle={onLockToggle}
+  onReadLater={onReadLater}
+  onArchive={onArchive}
+/>
+```
+
+**Behavior:**
+
+- Clicking the title calls `onFocus` (URL in the tooltip); the favicon goes through `useSafeFavicon`, with a grey placeholder when there is none.
+- The idle column shows "Current" for the active tab, "≈ time" with an "estimate" tooltip when `activityEstimated`, otherwise the relative last-active time.
+- Quick actions sit at 60% opacity until the row is hovered or focused; the lock button turns into Unlock for locked tabs, and archive is disabled for pinned tabs.
+- Selected rows get a primary border and tint; the row carries `data-testid="open-tab-row"` and `data-tab-id`.
+
+### TabStatusBadges
+
+State of an open tab as small icon + text badges (never color alone); rendered inside `OpenTabRow`.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| tab | `OpenTabInfo` | ✓ | - | Tab whose state is shown |
+| archiveMode | `TabArchiveMode` | ✓ | - | `"auto"`, `"confirm"` or `"mark-only"` |
+| thresholdUnit | `TabIdleUnit` | ✓ | - | Unit of the idle threshold |
+| pendingConfirm | `boolean` | ✓ | - | Tab waits for archive confirmation |
+
+**Usage:**
+
+```tsx
+<TabStatusBadges
+  tab={tab}
+  archiveMode={archiveMode}
+  thresholdUnit={thresholdUnit}
+  pendingConfirm={pendingConfirm}
+/>
+```
+
+**Behavior:**
+
+- Badges in order: Pinned, Locked, Playing, Saving, Protected domain, Unsaved input, the archive badge, "Duplicate ×N" (when `duplicateCount > 1`) and Sleeping (discarded).
+- The archive badge appears only for tabs without any protection reason: "Waiting for confirmation" when pending; for expired tabs "Expired" in `mark-only` mode, otherwise "Archiving soon"; for expiring tabs "Archives tomorrow" (day threshold, at most 1 usage day left) or "Archives <relative time>".
+- Tones (internal `StatusBadge`): Locked is info (sky), the archive badge warning (amber), the rest neutral.
+
+### AddToWorkspaceDialog
+
+Dialog that adds pages (open tabs or archived tabs) to an existing workspace or a new one; used by `OpenTabsView` (selected tabs) and `TabArchiveView` (archive entries).
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| open | `boolean` | ✓ | - | Dialog visibility |
+| pages | `WorkspacePageInput[]` | ✓ | - | Pages to add (`title`, `url`, optional `favicon`) |
+| onOpenChange | `(open: boolean) => void` | ✓ | - | Dialog open state changes |
+| onAdded | `(count: number) => void` | | - | Called with the number of pages added |
+
+**Usage:**
+
+```tsx
+<AddToWorkspaceDialog
+  open={!!workspaceTabs}
+  pages={(workspaceTabs ?? []).map((tab) => ({ title: tab.title, url: tab.url, favicon: tab.favicon }))}
+  onOpenChange={(open) => !open && setWorkspaceTabs(null)}
+  onAdded={() => list.clearSelection()}
+/>
+```
+
+**Behavior:**
+
+- Each opening resets the target to "New workspace" and clears the name; the name field shows only for a new workspace, and an empty name falls back to "Tidied tabs".
+- Existing workspaces come from `useAddToWorkspace`; `addPages` skips URLs already in the target workspace (and duplicate URLs for a new one).
+- Success shows "Added N pages", calls `onAdded(count)` and closes; failure shows an error toast and keeps the dialog open.
+- "Add" is disabled while saving or when `pages` is empty.
+
+### TabTidyDialog
+
+Rule-based (no AI) tidy-up suggestions grouped by destination, opened from "Tidy up" in `OpenTabsStatsBar`; every group and every tab can be unchecked before applying.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| open | `boolean` | ✓ | - | Dialog visibility |
+| tabCount | `number` | ✓ | - | Open tab count for the description |
+| tabs | `Map<number, OpenTabInfo>` | ✓ | - | Open tabs by ID, for titles and domains |
+| tidy | `UseTabTidyResult` | ✓ | - | Suggestions, selection and `apply` from `useTabTidy` |
+| onOpenChange | `(open: boolean) => void` | ✓ | - | Dialog open state changes |
+
+**Usage:**
+
+```tsx
+// tidy = useTabTidy(snapshot); tabsById = new Map(snapshot.tabs.map((tab) => [tab.tabId, tab]))
+<TabTidyDialog open={tidyOpen} tabCount={snapshot.stats.total} tabs={tabsById} tidy={tidy} onOpenChange={setTidyOpen} />
+```
+
+**Behavior:**
+
+- Groups in order: close duplicates, archive low-value pages, move to Read later, archive idle tabs, then one "Fold into workspace" group per suggestion; empty groups are hidden, and "Nothing to tidy up right now" shows when there is no suggestion.
+- Each group (internal `TidyGroup`) has a tri-state checkbox and a hint and starts collapsed; expanding lists every tab with its own checkbox, title and domain.
+- "Apply selected (N)" is disabled while applying or when nothing is selected, shows a spinner while applying, and closes the dialog when `tidy.apply()` resolves `true`.
+- Applying creates a workspace per workspace group and archives those tabs, queues Read later tabs and closes them, and archives the rest; every archive uses the reason `triage`.
+
+### TabAITriageDialog
+
+AI tidy-up dialog, opened from "AI tidy-up" in `OpenTabsStatsBar`: suggestions grouped by destination (keep, read later, bookmark, workspace, close), based only on titles and cleaned URLs.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| open | `boolean` | ✓ | - | Dialog visibility |
+| snapshot | `OpenTabsSnapshot` | ✓ | - | Snapshot to analyze |
+| tabs | `Map<number, OpenTabInfo>` | ✓ | - | Open tabs by ID, for the rows |
+| onOpenChange | `(open: boolean) => void` | ✓ | - | Dialog open state changes |
+| onOpenAISettings | `() => void` | ✓ | - | "Set up AI" when no AI service is configured |
+
+**Usage:**
+
+```tsx
+<TabAITriageDialog
+  open={aiTriageOpen}
+  snapshot={snapshot}
+  tabs={tabsById}
+  onOpenChange={setAITriageOpen}
+  onOpenAISettings={onOpenAISettings}
+/>
+```
+
+**Behavior:**
+
+- Uses `useTabAITriage(snapshot)` and starts an analysis when it opens (from closed) with status `idle`; a finished result survives closing and reopening until it is applied, and "Analyze again" re-runs it (disabled while loading or applying).
+- States: spinner with the tab count while loading; "needs an AI service" with a "Set up AI" button (`notConfigured`); a failure message with the error detail (`error`); "Nothing to tidy up" for an empty result.
+- With a result, the description shows the analyzed count, a note lists cached, skipped (over the per-run limit) and failed counts, and one `TriageGroupSection` follows per destination; everything is preselected except tabs that local rules keep.
+- "Apply selected (N)" is enabled only in `ready` with a selection and closes the dialog on success.
+- Applying restarts the idle time of kept tabs, bookmarks (with the suggested category) or adds to a matching or new workspace before archiving, queues Read later tabs and archives `close` tabs; every archive uses the reason `triage`.
+- Test IDs: `ai-triage-dialog`, `ai-triage-not-configured`, `ai-triage-apply`.
+
+### TriageGroupSection
+
+One destination of the AI tidy-up (in `aiTriage/`): a group checkbox and every tab with its target and reason; rendered by `TabAITriageDialog` for each entry of `useTabAITriage().groups`.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| group | `TriageGroup` | ✓ | - | Destination and its suggestions |
+| tabs | `Map<number, OpenTabInfo>` | ✓ | - | Open tabs by ID; suggestions for tabs not in it are skipped |
+| selected | `ReadonlySet<number>` | ✓ | - | Selected tab IDs |
+| onToggle | `(tabIds: number[], selected: boolean) => void` | ✓ | - | Select or deselect tabs |
+
+**Usage:**
+
+```tsx
+<TriageGroupSection
+  key={group.destination}
+  group={group}
+  tabs={tabs}
+  selected={triage.selected}
+  onToggle={triage.toggle}
+/>
+```
+
+**Behavior:**
+
+- Renders nothing when none of the group's tabs is in `tabs` any more.
+- Starts expanded except for the `keep` group; the header shows the destination with its count and a hint (for `workspace`, the quoted workspace names).
+- The tri-state group checkbox toggles every visible tab of the group.
+- Each row (internal `TriageRow`) shows the title, "→ category" for bookmarks ("Uncategorized" when none) or "→ workspace", and "domain · reason"; tabs decided by local rules show the localized local reason instead of the AI reason.
+- Test ID: `ai-triage-group-<destination>`.
+
+### TabWeeklyOverviewDialog
+
+"This week" dialog opened from `TabCenterHeader`: open tabs over the last 7 days, time over budget, and archive / Read later counts. Local stats of this device only.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| open | `boolean` | ✓ | - | Dialog visibility; the overview loads while open |
+| budgetLimit | `number` | | - | Tab budget limit while the budget is on |
+| onOpenChange | `(open: boolean) => void` | ✓ | - | Dialog open state changes |
+
+**Usage:**
+
+```tsx
+<TabWeeklyOverviewDialog
+  open={overviewOpen}
+  budgetLimit={lifecycle.settings.budget.enabled ? lifecycle.settings.budget.limit : undefined}
+  onOpenChange={setOverviewOpen}
+/>
+```
+
+**Behavior:**
+
+- Fetches `getTabWeeklyOverview()` through `useTabWeeklyOverview(open)` each time it opens; a spinner shows until the first overview arrives.
+- The open tabs section (internal `OpenTabsSection`) shows "average · peak" with the change against last week (or "Nothing recorded yet") above `WeeklyOpenTabsChart`.
+- When sampling is off (activity tracking disabled), a dashed "not counted" note replaces the summary and the chart.
+- With `budgetLimit` and sampling on, adds "Over budget for <duration> this week" or "Never over budget this week".
+- `OverviewStatGrid` follows; a "Stats just started" note shows while `trackedDays <= 1`.
+
+### WeeklyOpenTabsChart
+
+Bar chart (in `overview/`) with one column per day: the light bar is the peak, the solid bar the time-weighted average, and a dashed line marks the tab budget; rendered by `TabWeeklyOverviewDialog` while sampling is on.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| days | `TabStatsDayPoint[]` | ✓ | - | Days, oldest first, ending today |
+| budgetLimit | `number` | | - | Budget limit, shown as a line |
+
+**Usage:**
+
+```tsx
+<WeeklyOpenTabsChart days={overview.days} budgetLimit={budgetLimit} />
+```
+
+**Behavior:**
+
+- 120px high; bars scale to the largest of 1, `budgetLimit` and the highest peak, plus 10% headroom.
+- Days with a peak of 0 show a flat placeholder; each column's tooltip gives "average, peak", or "Nothing recorded" when `averageOpen` is null.
+- The last column is labeled "Today", the others with the short weekday in the UI language; a legend explains Average and Peak.
+- Test ID: `weekly-open-tabs-chart`.
+
+### OverviewStatGrid
+
+Two cards (in `overview/`) with the week's counts: Archive (auto archived, archived by you, restored) and Read later (added, finished, expired); rendered by `TabWeeklyOverviewDialog`.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| overview | `TabWeeklyOverview` | ✓ | - | Weekly overview with the counts |
+
+**Usage:**
+
+```tsx
+<OverviewStatGrid overview={overview} />
+```
+
+**Behavior:**
+
+- Reads `autoArchived`, `manualArchived`, `restored`, `readLaterAdded`, `readLaterRead` and `readLaterExpired`; values use tabular numbers.
+- Two columns from the `sm` breakpoint, stacked below; each value has `data-testid="overview-<key>"`.
+
+### TabArchiveView
+
+The tab center's Archive view, rendered by `TabCenterPage`: every tab HamHome closed, grouped by day and batch, searchable and filterable, virtualized for up to 10,000 entries, with restore / Read later / bookmark / workspace / delete per entry or in batch.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| header | `ReactNode` | ✓ | - | Shared tab center header rendered at the top |
+
+**Usage:**
+
+```tsx
+<TabArchiveView header={header} />
+```
+
+**Behavior:**
+
+- Data and actions come from `useTabArchive`; a "Latest: time · reason · N tabs" card offers "Restore this batch" for the newest batch that still has entries.
+- `BatchSelectionToolbar` (select all covers the filtered entries) holds restore, Read later, bookmark, add to workspace and delete; they are disabled without a selection and clear it when done.
+- Deleting more than one entry asks for a destructive confirmation first; a single delete from a row does not.
+- Restoring one entry from its row also switches to the restored tab (`restore([id], true)`); batch restores do not switch.
+- A row's bookmark opens `WorkspacePageBookmarkDialog` (the save panel), while the batch bookmark saves in the background; rows show "Bookmarked" when the normalized URL is already in the library.
+- Empty state (`archive-empty`): "The archive is empty…" without entries, "No tabs match" when filters hide everything.
+
+### ArchiveToolbar
+
+Search and filters above the archive list: search (titles and URLs), reason, domain and time; rendered by `TabArchiveView`.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| filter | `ArchiveFilterState` | ✓ | - | Current `query`, `reason`, `domain` and `dateGroup` |
+| domains | `string[]` | ✓ | - | Domains present in the archive |
+| onChange | `(patch: Partial<ArchiveFilterState>) => void` | ✓ | - | Called with the changed field only |
+
+**Usage:**
+
+```tsx
+<ArchiveToolbar filter={archive.filter} domains={archive.domains} onChange={archive.setFilter} />
+```
+
+**Behavior:**
+
+- Each select (internal `ToolbarSelect`) starts with an "all" option: reasons from `ARCHIVE_REASONS`, the first 200 of `domains`, and Today / Yesterday / This week / Earlier.
+- The search field calls `onChange({ query })` on every keystroke.
+- Test ID: `archive-search` on the search input.
+
+### ArchiveDateHeader
+
+Day group heading of the archive list, e.g. "Today (12)"; exported from `ArchiveListHeaders.tsx` and rendered by `TabArchiveView` for `date` rows.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| group | `ArchiveDateGroup` | ✓ | - | `"today"`, `"yesterday"`, `"week"` or `"earlier"` |
+| count | `number` | ✓ | - | Entries in the group |
+
+**Usage:**
+
+```tsx
+<ArchiveDateHeader group={row.group} count={row.count} />
+```
+
+**Behavior:**
+
+- Props are typed inline (`{ group: ArchiveDateGroup; count: number }`); the label comes from `tabCenter.archive.dateGroups.<group>`.
+- Display only: no actions.
+
+### ArchiveBatchHeader
+
+Batch block header of the archive list ("10:32 · Idle too long · 6 tabs · Restore this batch"); exported from `ArchiveListHeaders.tsx` and rendered by `TabArchiveView` for `batch` rows.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| batch | `TabArchiveBatch` | | - | Batch record; time and reason are omitted when missing |
+| count | `number` | ✓ | - | Entries of the batch in this block |
+| selectedCount | `number` | ✓ | - | Selected entries of this block |
+| onToggleAll | `(selected: boolean) => void` | ✓ | - | Select or deselect the block |
+| onRestore | `() => void` | ✓ | - | "Restore this batch" |
+
+**Usage:**
+
+```tsx
+<ArchiveBatchHeader
+  batch={row.batch}
+  count={row.entryIds.length}
+  selectedCount={row.entryIds.filter((id) => selectedIds.has(id)).length}
+  onToggleAll={(value) =>
+    value
+      ? selectAll(Array.from(new Set([...selectedIds, ...row.entryIds])))
+      : selectAll(Array.from(selectedIds).filter((id) => !row.entryIds.includes(id)))
+  }
+  onRestore={() => void archive.restore(row.entryIds)}
+/>
+```
+
+**Behavior:**
+
+- Shows the close time, the reason, "automatic" for automatic batches and "N tabs", then a "Restore this batch" button.
+- The checkbox is unchecked, indeterminate or checked from `selectedCount` vs `count`.
+- In `TabArchiveView`, `onRestore` restores only the entries listed in this block (`row.entryIds`), so active filters apply.
+
+### ArchiveEntryRow
+
+One archived tab (memoized): title, domain, idle time when closed, close time, reason, close count and row actions; rendered by `TabArchiveView` for `entry` rows.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| entry | `TabArchiveEntry` | ✓ | - | Archived tab |
+| selected | `boolean` | ✓ | - | Row is selected |
+| bookmarked | `boolean` | ✓ | - | URL is already in the library |
+| onToggleSelect | `(id: string) => void` | ✓ | - | Checkbox toggled |
+| onRestore | `(entry: TabArchiveEntry) => void` | ✓ | - | Title click or restore button |
+| onReadLater | `(entry: TabArchiveEntry) => void` | ✓ | - | Read later button |
+| onBookmark | `(entry: TabArchiveEntry) => void` | ✓ | - | Bookmark button |
+| onWorkspace | `(entry: TabArchiveEntry) => void` | ✓ | - | Add to workspace button |
+| onDelete | `(entry: TabArchiveEntry) => void` | ✓ | - | Delete button |
+
+**Usage:**
+
+```tsx
+<ArchiveEntryRow
+  entry={row.entry}
+  selected={selectedIds.has(row.entry.id)}
+  bookmarked={libraryUrls.has(normalizeBookmarkUrl(row.entry.url))}
+  onToggleSelect={toggleSelect}
+  onRestore={(entry) => void archive.restore([entry.id], true)}
+  onReadLater={(entry) => void archive.readLater([entry.id])}
+  onBookmark={setBookmarkEntry}
+  onWorkspace={(entry) => setWorkspaceEntries([entry])}
+  onDelete={(entry) => void removeEntries([entry.id])}
+/>
+```
+
+**Behavior:**
+
+- Clicking the title calls `onRestore` (URL in the tooltip).
+- Meta line: domain, "idle <duration>" (`closedAt - lastActiveAt`), close time, reason badge, "archived N times" when `closeCount > 1`, and a green "Bookmarked" badge.
+- Five icon actions (internal `RowAction`: restore, Read later, bookmark, workspace, delete) sit at 60% opacity until hover or focus.
+- Test ID: `archive-entry-row`.
+
+### TabRulesView
+
+The tab center's Rules view, rendered by `TabCenterPage`: cards for activity tracking, auto archive and protections, archive retention and the tab budget.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| header | `ReactNode` | ✓ | - | Shared tab center header rendered at the top |
+| snapshot | `OpenTabsSnapshot \| null` | ✓ | - | Open tabs snapshot, for the locked tabs list |
+| lifecycle | `UseTabLifecycleSettingsResult` | ✓ | - | Settings, state and setters from `useTabLifecycleSettings` |
+| onEnableAutoArchive | `() => void` | ✓ | - | Auto archive switch turned on |
+| onResumeNudge | `() => void` | ✓ | - | "Resume hints" for paused budget hints |
+
+**Usage:**
+
+```tsx
+<TabRulesView
+  header={header}
+  snapshot={snapshot}
+  lifecycle={lifecycle}
+  onEnableAutoArchive={enableAutoArchive}
+  onResumeNudge={() => void getBackgroundService().resumeBudgetNudge()}
+/>
+```
+
+**Behavior:**
+
+- Turning auto archive on calls `onEnableAutoArchive` (the page may show the onboarding first); turning it off calls `lifecycle.setAutoArchiveEnabled(false)` directly.
+- While auto archive is active, the switch row shows the last sweep: archived count, archive write error, or why it was skipped (tracking off, inactive, startup grace, minimum open tabs).
+- Locked tabs come from `snapshot` (none while it is `null`) and unlock via `useOpenTabActions().setLocked([tabId], false)`; the archive count and "Clear archive" come from `useTabArchiveCount`.
+- Budget hints count as paused while `state.budgetNudge` has a `dismissedDate` or a future `snoozedUntil`.
+- Other options are saved with `lifecycle.update(...)`; the grouped-tab protection is offered only when `chrome.tabGroups` exists.
+
+### ActivityTrackingCard
+
+Rules card for local tab activity tracking: what it is for, where it is stored, and the switch; rendered by `TabRulesView`.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| enabled | `boolean` | ✓ | - | Activity tracking is on |
+| onChange | `(enabled: boolean) => Promise<void>` | ✓ | - | Turn tracking on or off |
+
+**Usage:**
+
+```tsx
+<ActivityTrackingCard enabled={settings.activityTracking} onChange={lifecycle.setActivityTracking} />
+```
+
+**Behavior:**
+
+- Turning it on calls `onChange(true)` right away.
+- Turning it off first asks for a destructive confirmation ("Turn off and wipe"), since tracking stops and the recorded activity is wiped; cancelling leaves it on.
+
+### AutoArchiveCard
+
+Rules card for auto archive: switch, idle threshold, usage-day counting, mode, optional protections, protected domains and locked tabs; rendered by `TabRulesView`.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| rule | `TabAutoArchiveSettings` | ✓ | - | Auto archive settings |
+| active | `boolean` | ✓ | - | Auto archive is effective on this device (switch state) |
+| trackingEnabled | `boolean` | ✓ | - | Activity tracking is on |
+| supportsGroups | `boolean` | ✓ | - | Browser supports tab groups |
+| lockedTabs | `OpenTabInfo[]` | ✓ | - | Currently locked tabs |
+| lastSweepText | `string` | | - | Last sweep summary under the switch |
+| onToggle | `(enabled: boolean) => void` | ✓ | - | Switch toggled |
+| onChange | `(patch: Partial<TabAutoArchiveSettings>) => void` | ✓ | - | A setting changed |
+| onAddDomain | `(input: string) => Promise<boolean>` | ✓ | - | Add a protected domain; resolves `false` for invalid input |
+| onRemoveDomain | `(domain: string) => void` | ✓ | - | Remove a protected domain |
+| onUnlock | `(tabId: number) => void` | ✓ | - | Unlock a locked tab |
+
+**Usage:**
+
+```tsx
+<AutoArchiveCard
+  rule={settings.autoArchive}
+  active={lifecycle.autoArchiveActive}
+  trackingEnabled={settings.activityTracking}
+  supportsGroups={supportsGroups}
+  lockedTabs={lockedTabs}
+  lastSweepText={lifecycle.autoArchiveActive ? sweepText(state.lastSweep) : undefined}
+  onToggle={(enabled) => (enabled ? onEnableAutoArchive() : void lifecycle.setAutoArchiveEnabled(false))}
+  onChange={(patch) => void lifecycle.update({ autoArchive: patch })}
+  onAddDomain={lifecycle.addProtectedDomain}
+  onRemoveDomain={(domain) => void lifecycle.removeProtectedDomain(domain)}
+  onUnlock={(tabId) => void actions.setLocked([tabId], false)}
+/>
+```
+
+**Behavior:**
+
+- Without activity tracking the switch is disabled, its row dimmed, and the hint reads "Turn on activity tracking first"; otherwise `lastSweepText` is shown.
+- Idle threshold options come from `IDLE_THRESHOLD_OPTIONS` (12 hours, 1/3/7/14/30 days); the "Count" select (usage days / calendar days) only appears for day thresholds.
+- Mode: Archive (`auto`), Ask first (`confirm`) or Mark only (`mark-only`), each with its own hint.
+- Protection: an always-on note, switches for audible tabs, grouped tabs (only with `supportsGroups`) and unsaved input, plus "Keep at least this many tabs" (0 to `MIN_OPEN_TABS_MAX` = 50) via `NumberSettingInput`.
+- Ends with `ProtectedDomainsEditor` and the locked tabs list, each with an "Unlock" button (or a hint when none is locked).
+- Test ID: `auto-archive-switch`.
+
+### ArchiveRetentionCard
+
+Rules card for how long archived tabs are kept, with "Clear archive"; rendered by `TabRulesView`.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| retentionDays | `TabArchiveRetentionDays` | ✓ | - | `30`, `90`, `180` or `null` (forever) |
+| entryCount | `number` | ✓ | - | Entries currently in the archive |
+| onChange | `(retentionDays: TabArchiveRetentionDays) => void` | ✓ | - | Retention selected |
+| onClear | `() => Promise<void>` | ✓ | - | Clear the whole archive |
+
+**Usage:**
+
+```tsx
+<ArchiveRetentionCard
+  retentionDays={settings.archive.retentionDays}
+  entryCount={archive.count}
+  onChange={(retentionDays) => void lifecycle.update({ archive: { retentionDays } })}
+  onClear={archive.clear}
+/>
+```
+
+**Behavior:**
+
+- "Keep for" offers 30, 90 and 180 days or Forever (`null`); the description names the `ARCHIVE_MAX_ENTRIES` cap (10,000).
+- "Clear archive" shows the entry count, is disabled when it is 0, and calls `onClear` only after a destructive confirmation.
+
+### TabBudgetCard
+
+Rules card for the tab budget: switch, limit, counting scope, what happens over budget and the icon badge; rendered by `TabRulesView`.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| budget | `TabBudgetSettings` | ✓ | - | Budget settings |
+| autoMakeRoomActive | `boolean` | ✓ | - | Automatic make room is effective on this device |
+| nudgePaused | `boolean` | ✓ | - | Budget hints are dismissed or snoozed |
+| onChange | `(patch: Partial<TabBudgetSettings>) => void` | ✓ | - | A setting changed |
+| onOverActionChange | `(action: TabBudgetOverAction) => void` | ✓ | - | Over-budget action selected |
+| onResumeNudge | `() => void` | ✓ | - | "Resume hints" |
+
+**Usage:**
+
+```tsx
+<TabBudgetCard
+  budget={settings.budget}
+  autoMakeRoomActive={lifecycle.autoMakeRoomActive}
+  nudgePaused={nudgePaused}
+  onChange={(patch) => void lifecycle.update({ budget: patch })}
+  onOverActionChange={(action) => void lifecycle.setOverBudgetAction(action)}
+  onResumeNudge={onResumeNudge}
+/>
+```
+
+**Behavior:**
+
+- The limit uses `NumberSettingInput` (`BUDGET_LIMIT_MIN`–`BUDGET_LIMIT_MAX`, 5–100); scope is all windows or each window.
+- Over-budget action: Icon only (`badge-only`), In-page hint (`nudge`) or Make room (`auto-archive`); choosing Make room asks for confirmation before `onOverActionChange`.
+- A stored `auto-archive` action that is not active on this device shows as `nudge`.
+- "Show the tab count on the icon" appears only while the budget is off; a "Resume hints" row appears while `nudgePaused`.
+- Test ID: `budget-switch`.
+
+### ProtectedDomainsEditor
+
+Input plus removable badges for domains whose tabs are never closed automatically; rendered inside `AutoArchiveCard`.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| domains | `string[]` | ✓ | - | Protected domains |
+| disabled | `boolean` | | - | Disables the input and the Add button |
+| onAdd | `(input: string) => Promise<boolean>` | ✓ | - | Add the typed domain; resolve `false` when it is invalid |
+| onRemove | `(domain: string) => void` | ✓ | - | Remove a domain |
+
+**Usage:**
+
+```tsx
+<ProtectedDomainsEditor domains={rule.protectedDomains} onAdd={onAddDomain} onRemove={onRemoveDomain} />
+```
+
+**Behavior:**
+
+- Adds on the "Add" button or Enter; blank input is ignored.
+- When `onAdd` resolves `false`, shows "Enter a valid domain" and sets `aria-invalid`, keeping the text; success clears the input, and typing clears the error.
+- Lists the domains as badges with a remove button, or "No protected domains yet"; `disabled` does not affect the remove buttons.
+
+### NumberSettingInput
+
+Number field (in `rules/`) that keeps a draft while typing and commits a clamped value on blur or Enter, so typing "15" does not stop at "1"; used by `AutoArchiveCard` and `TabBudgetCard`.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| id | `string` | | - | Input ID, for a `RuleRow` label |
+| value | `number` | ✓ | - | Committed value |
+| min | `number` | ✓ | - | Lower bound |
+| max | `number` | ✓ | - | Upper bound |
+| onCommit | `(value: number) => void` | ✓ | - | Called with the new value |
+
+**Usage:**
+
+```tsx
+<NumberSettingInput
+  id="budget-limit"
+  value={budget.limit}
+  min={BUDGET_LIMIT_MIN}
+  max={BUDGET_LIMIT_MAX}
+  onCommit={(limit) => onChange({ limit })}
+/>
+```
+
+**Behavior:**
+
+- On blur or Enter the draft is rounded and clamped to `[min, max]` (`resolveNumberDraft`); an empty field or non-numeric input falls back to `value`, so clearing the field to retype never commits the minimum.
+- `onCommit` fires only when the result differs from `value`; the draft resyncs whenever `value` changes.
+
+### RuleRow
+
+Layout row of the rules cards (in `rules/`): label and optional description on the left, a control on the right; used by every rules card.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| label | `string` | ✓ | - | Row label |
+| description | `string` | | - | Hint under the label |
+| htmlFor | `string` | | - | ID of the control the label belongs to |
+| disabled | `boolean` | | - | Dims the row |
+| children | `ReactNode` | ✓ | - | Control on the right |
+
+**Usage:**
+
+```tsx
+<RuleRow label={t("bookmark:tabCenter.rules.budget.enable")} htmlFor="budget-enabled">
+  <Switch id="budget-enabled" checked={budget.enabled} onCheckedChange={(value) => onChange({ enabled: value })} />
+</RuleRow>
+```
+
+**Behavior:**
+
+- `disabled` only dims the row (60% opacity); the child control has to be disabled separately.
+- The description is omitted when empty, and the row wraps on narrow widths.
+
+---
+
+## readLater
+
+The Read later page (route `#read-later`) is a reading queue kept as a state of a bookmark: queue-only items stay out of library views, and unread items expire after N days (14, 30, 60 or never).
+
+### ReadLaterPage
+
+The Read later queue page, lazy-loaded by `entrypoints/app/App.tsx` for the `read-later` view. It composes `useReadLaterQueue` with the header, `ReadLaterStats`, `ReadLaterToolbar`, `BatchSelectionToolbar`, a virtualized `ReadLaterCard` list and `ReadLaterTriageDialog`.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| currentView | `string` | ✓ | - | Hash view, e.g. `"read-later?q=pricing"`; its `q` parameter seeds the search box |
+
+**Usage:**
+
+```tsx
+// entrypoints/app/App.tsx, "read-later" case (lazy import inside <Suspense>)
+<ReadLaterPage currentView={currentView} />
+```
+
+**Behavior:**
+
+- Search starts from the hash `q` value (initial value only; typing does not write back to the hash) and matches title, URL, description and note; every term must match.
+- "Triage" opens `ReadLaterTriageDialog` and is disabled when nothing is unread; the dialog only gets items while the Unread view is active. Clicking the expiring-soon stat switches to Unread sorted by "Expiring soon".
+- Batch bar: "Mark as read" (Unread view) or "Add again" (Read / Expired views), "Keep in library" and "Delete", applied to the selected items visible in the current list. Selection clears on view change and after each batch action.
+- Deleting more than one item asks for confirmation first; queue-only items go to the trash, library bookmarks only leave the queue. Keep from a card or from triage passes `classify: true` (AI fills in empty category / tags / summary); batch keep passes `false`.
+- Every action runs through the background service and shows a success toast (e.g. "Marked 2 as read") or "Something went wrong, please try again".
+- The list is virtualized (`useScrollAreaVirtualList`, 112px estimate, 8px gap). Empty states: "Nothing matches your search" while searching, otherwise one per view; the Unread view also shows the `read-later-close` shortcut (falls back to `Alt+Shift+R`).
+
+### ReadLaterCard
+
+One item of the read later queue, rendered by `ReadLaterPage` for each virtual row; exported wrapped in `memo`.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| item | `ReadLaterItem` | ✓ | - | Queue entry joined with its bookmark and domain |
+| selected | `boolean` | ✓ | - | Checkbox state; also highlights the card |
+| expireAfterDays | `ReadLaterExpireAfterDays` | ✓ | - | Expiry setting used for the days-left hint |
+| onToggleSelect | `() => void` | ✓ | - | Checkbox toggled |
+| onOpen | `() => void` | ✓ | - | Title or "Read" clicked |
+| onMarkRead | `() => void` | ✓ | - | "Mark as read" (unread / reading items) |
+| onKeep | `() => void` | ✓ | - | "Keep in library" (queue-only items) |
+| onRequeue | `() => void` | ✓ | - | "Add again" (read / expired items) |
+| onRemove | `() => void` | ✓ | - | Delete, or remove from Read later for library bookmarks |
+| onSaveNote | `(note: string) => void` | ✓ | - | Edited note committed |
+
+**Usage:**
+
+```tsx
+<ReadLaterCard
+  item={item}
+  selected={selectedIds.has(id)}
+  expireAfterDays={queue.settings.expireAfterDays}
+  onToggleSelect={() => toggleSelect(id)}
+  onOpen={() => void queue.open(id)}
+  onMarkRead={() => void queue.markRead([id])}
+  onKeep={() => void queue.keep([id], true)}
+  onRequeue={() => void queue.requeue([id])}
+  onRemove={() => void removeWithConfirm([id])}
+  onSaveNote={(note) => void queue.updateNote(id, note)}
+/>
+```
+
+**Behavior:**
+
+- The title (falls back to the URL) and the "Read" action call `onOpen`; the page opens the item in a new tab and marks it as reading.
+- Meta row (internal `ReadLaterMeta`): domain, "added X ago", "~N min" when estimated, and for unread / reading items "expires in N days" or "expires today" (amber at 3 days or less, absent when expiry is "Never"); badges for "Reading", a non-manual source, "In library" (not queue-only) and "Snapshot not saved".
+- Shows the bookmark description (the TL;DR) and the "why read" note, each clamped to two lines.
+- Actions follow the state: "Mark as read" for unread / reading, "Add again" for read / expired, "Keep in library" only for queue-only items. The trash button reads "Delete" for queue-only items and "Remove from Read later" for library bookmarks.
+- "Add a note" turns the note into an inline input (max 200 characters). Enter or blur commits, calling `onSaveNote` only when the trimmed text differs from the saved note; Escape closes the input.
+
+### ReadLaterSettingsMenu
+
+Read later settings dropdown in the `ReadLaterPage` header.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| settings | `ReadLaterSettings` | ✓ | - | Current read later settings |
+| onChange | `(patch: Partial<ReadLaterSettings>) => void` | ✓ | - | Called with the changed field only |
+
+**Usage:**
+
+```tsx
+<ReadLaterSettingsMenu settings={queue.settings} onChange={(patch) => void queue.updateSettings(patch)} />
+```
+
+**Behavior:**
+
+- Trigger: an outline "Read later settings" button (`data-testid="read-later-settings"`).
+- Checkboxes: "Close the tab after adding" (`closeTabOnAdd`) and "Save an offline snapshot when adding" (`saveSnapshotOnAdd`).
+- Radio groups: "Expire unread items after" 14 / 30 / 60 days or Never (`READ_LATER_EXPIRY_OPTIONS`, Never is `null`), and "AI summary (TL;DR)": only for single manual adds, for every add, or off (`autoSummary`).
+- Each change calls `onChange` with just that field; the page saves it with `useReadLaterQueue().updateSettings` (`tabLifecycleConfigStorage`).
+
+### ReadLaterStats
+
+Queue health strip under the `ReadLaterPage` header.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| unread | `number` | ✓ | - | Unread count (unread and reading items) |
+| expiringSoon | `number` | ✓ | - | Pending items expiring within 3 days |
+| completion | `{ read: number; expired: number; rate: number \| null }` | ✓ | - | Last 30 days; `rate` is `null` when nothing was read or expired |
+| onShowExpiring | `() => void` | ✓ | - | Expiring-soon hint clicked |
+
+**Usage:**
+
+```tsx
+<ReadLaterStats
+  unread={queue.counts.unread}
+  expiringSoon={queue.expiringSoon}
+  completion={queue.completion}
+  onShowExpiring={() => {
+    queue.setView("unread");
+    queue.setSort("expiring");
+  }}
+/>
+```
+
+**Behavior:**
+
+- Always shows "N unread".
+- "N items expire within 3 days" shows only when `expiringSoon > 0`, as an amber button (`data-testid="read-later-expiring-soon"`) that calls `onShowExpiring`.
+- Completion as "Completion in the last 30 days: X% (R read / E expired)", with `rate` rounded to a whole percent; "Nothing read or expired in the last 30 days" when `rate` is `null`.
+
+### ReadLaterToolbar
+
+View tabs, sort and filters of `ReadLaterPage`.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| view | `ReadLaterView` | ✓ | - | Active view tab |
+| counts | `Record<ReadLaterView, number>` | ✓ | - | Item count per view, shown in each tab |
+| sort | `ReadLaterSort` | ✓ | - | Current sort |
+| filters | `ReadLaterFilters` | ✓ | - | Domain / source / kept filters |
+| domains | `string[]` | ✓ | - | Domains offered by the domain filter |
+| onViewChange | `(view: ReadLaterView) => void` | ✓ | - | View tab changed |
+| onSortChange | `(sort: ReadLaterSort) => void` | ✓ | - | Sort changed |
+| onFiltersChange | `(patch: Partial<ReadLaterFilters>) => void` | ✓ | - | Called with the changed filter only |
+
+**Usage:**
+
+```tsx
+<ReadLaterToolbar
+  view={queue.view}
+  counts={queue.counts}
+  sort={queue.sort}
+  filters={queue.filters}
+  domains={queue.domains}
+  onViewChange={queue.setView}
+  onSortChange={queue.setSort}
+  onFiltersChange={queue.setFilters}
+/>
+```
+
+**Behavior:**
+
+- Tabs for Unread / Read / Expired, each with its count (`data-testid="read-later-view-<view>"`).
+- Sort: Newest first, Oldest first, Shortest read first, Expiring soon.
+- Filters: domain ("All domains" plus `domains`), source ("All sources" plus manual, link, tab-center, archive, triage, agent, import) and "In library" (All / In library / Queue only).
+- All four selects are the internal `FilterSelect`; its label is only the trigger's `aria-label`, so the trigger shows the current value.
+
+### ReadLaterTriageDialog
+
+Keyboard-driven dialog for clearing unread items one card at a time, opened by the "Triage" button of `ReadLaterPage`.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| open | `boolean` | ✓ | - | Dialog open state |
+| items | `ReadLaterItem[]` | ✓ | - | Cards to go through, in list order |
+| onOpenChange | `(open: boolean) => void` | ✓ | - | Open state changed |
+| onRead | `(bookmarkId: string) => void` | ✓ | - | Read (R) |
+| onKeep | `(bookmarkId: string) => void` | ✓ | - | Keep in library (S) |
+| onMarkRead | `(bookmarkId: string) => void` | ✓ | - | Mark read (D) |
+| onRemove | `(bookmarkId: string) => void` | ✓ | - | Delete (X) |
+
+**Usage:**
+
+```tsx
+<ReadLaterTriageDialog
+  open={triageOpen}
+  items={queue.view === "unread" ? queue.items : []}
+  onOpenChange={setTriageOpen}
+  onRead={(id) => void queue.open(id)}
+  onKeep={(id) => void queue.keep([id], true)}
+  onMarkRead={(id) => void queue.markRead([id])}
+  onRemove={(id) => void queue.remove([id])}
+/>
+```
+
+**Behavior:**
+
+- Starts at the first card each time it opens and shows "i / n · domain · added X ago", the title, the description (up to five lines) and the note; "All done" when there are no items.
+- Keys and matching buttons (internal `TriageButton`): R read (opens it in a new tab, then moves on), S keep in library (queue-only items only, then moves on; the button is disabled otherwise), D mark read, X delete, J / K next / previous.
+- D and X do not advance: the item leaves the unread list and the next one takes its place (the index is clamped to the list length).
+- Keys are ignored with Cmd / Ctrl / Alt held or while typing in an input or textarea.
+
+## popup (tab lifecycle)
+
+Cards added to the popup (`components/popup/QuickPanel.tsx`) for open tabs and Read later.
+
+### PopupTabsCard
+
+Tabs overview card in the popup, between the quick actions and the recent list.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| snapshot | `OpenTabsSnapshot \| null` | ✓ | - | Open tabs snapshot; nothing renders while `null` |
+| recent | `TabArchiveRecentSummary` | ✓ | - | Automatic archive batches of the last 24 hours |
+| needsConsent | `boolean` | ✓ | - | Auto archive / auto make-room waits for this device's consent |
+| onboardingDone | `boolean` | ✓ | - | Tab lifecycle onboarding completed |
+| triageOpen | `boolean` | ✓ | - | Tidy up panel expanded |
+| onToggleTriage | `() => void` | ✓ | - | "Tidy up" clicked |
+| onViewArchive | `() => void` | ✓ | - | "View" on the archived-today line |
+| onRestoreRecent | `() => void` | ✓ | - | "Restore all" on the archived-today line |
+| onConfirmPending | `() => void` | ✓ | - | "Archive all" on the pending line |
+| onOpenTabCenter | `() => void` | ✓ | - | "View" (pending), "Review" and "Set up" links |
+
+**Usage:**
+
+```tsx
+<PopupTabsCard
+  snapshot={snapshot}
+  recent={recentArchive.summary}
+  needsConsent={lifecycle.pendingConsents.autoArchive || lifecycle.pendingConsents.autoMakeRoom}
+  onboardingDone={!!lifecycle.state.onboardingCompletedAt}
+  triageOpen={triageOpen}
+  onToggleTriage={() => setTriageOpen((open) => !open)}
+  onViewArchive={() => openTab(getExtensionURL("app.html#tabs?view=archive"))}
+  onRestoreRecent={() => {
+    void recentArchive.restoreAll().then((count) =>
+      toast.success(t("bookmark:tabCenter.archive.restored", { count })),
+    );
+  }}
+  onConfirmPending={() => void tabActions.confirmPending()}
+  onOpenTabCenter={() => openTab(getExtensionURL("app.html#tabs"))}
+/>
+```
+
+**Behavior:**
+
+- Renders nothing until `snapshot` loads. The header shows `count / limit` with the tab budget on (red when over, plus "N over"), otherwise the total number of open tabs.
+- With the budget on, a progress bar colored by `budget.level` (emerald normal, amber warning, red over), capped at 100%.
+- Summary line "N not opened for over <threshold> · M duplicate groups" (threshold from the auto archive rule) with a "Tidy up" toggle (`aria-expanded`, rotating chevron) that calls `onToggleTriage`.
+- Conditional lines: "N tabs archived today · View · Restore all" when `recent.count > 0`; "N tabs waiting to be archived · View · Archive all" for `snapshot.pendingConfirm`; a consent notice with "Review" when `needsConsent`; "Let idle tabs leave the tab bar automatically · Set up" when onboarding is not done and both auto archive and the budget are off.
+
+### PopupTriagePanel
+
+The "Tidy up" panel the popup shows under `PopupTabsCard` while `triageOpen` is true.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| tabs | `OpenTabInfo[]` | ✓ | - | Tabs to offer, already sorted; the first 8 are shown |
+| onReadLater | `(tabId: number) => void` | ✓ | - | Row "Read later" |
+| onBookmark | `(tabId: number) => void` | ✓ | - | Row "Bookmark" |
+| onArchive | `(tabId: number) => void` | ✓ | - | Row "Archive & close" |
+| onViewAll | `() => void` | ✓ | - | "View all (N)" clicked |
+
+**Usage:**
+
+```tsx
+{triageOpen && (
+  <PopupTriagePanel
+    tabs={triageTabs}
+    onReadLater={(tabId) => void tabActions.readLater([tabId])}
+    onBookmark={(tabId) => void tabActions.bookmark([tabId])}
+    onArchive={(tabId) => void tabActions.archive([tabId])}
+    onViewAll={() => openTab(getExtensionURL("app.html#tabs"))}
+  />
+)}
+```
+
+**Behavior:**
+
+- Lists the first 8 of `tabs` (the popup passes unprotected tabs, least recently used first) with favicon, title and idle time from `displayLastActiveAt`.
+- In the popup, "Read later" (source `tab-center`) and "Archive & close" close the tab and show a toast with Undo; "Bookmark" keeps the tab open.
+- "No tabs to tidy up" when `tabs` is empty. The footer "View all (N)" counts every tab in `tabs`, not only the eight shown; the popup opens the tab center.
+
+### PopupRecentSection
+
+Tabbed "Recently saved | Read later (N)" list in the popup, below the tabs card.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| recentBookmarks | `LocalBookmark[]` | ✓ | - | Recently saved bookmarks |
+| readLaterItems | `ReadLaterItem[]` | ✓ | - | Read later items to list |
+| readLaterCount | `number` | ✓ | - | Pending count shown in the tab label |
+| onOpenBookmark | `(bookmark: LocalBookmark) => void` | ✓ | - | Saved row clicked |
+| onOpenReadLater | `(item: ReadLaterItem) => void` | ✓ | - | Read later row clicked |
+| onViewAll | `(tab: RecentTab) => void` | ✓ | - | "View all" with the active tab (`RecentTab` is the file-local `"saves" \| "readLater"`) |
+
+**Usage:**
+
+```tsx
+<PopupRecentSection
+  recentBookmarks={recentBookmarks}
+  readLaterItems={readLaterQueue.slice(0, RECENT_LIMIT)}
+  readLaterCount={readLaterQueue.length}
+  onOpenBookmark={(bookmark) => openTab(bookmark.url)}
+  onOpenReadLater={openReadLaterItem}
+  onViewAll={(tab) =>
+    openTab(getExtensionURL(tab === "readLater" ? "app.html#read-later" : "app.html"))
+  }
+/>
+```
+
+**Behavior:**
+
+- Opens on "Recently saved"; the active tab is local state. The Read later tab has `data-testid="popup-read-later-tab"`.
+- Rows show the favicon (hidden if it fails to load; a bookmark or book icon when missing), the title and a relative time (saved time, or time added to the queue).
+- Each tab has its own empty state; the Read later one hints at "Read later & close" and right-clicking a link.
+- In the popup the list holds the 5 newest pending items and `readLaterCount` is the full pending count; opening one calls `readLaterOpen` (new tab, marked as reading) and closes the popup.
+
+## contentUi feedback
+
+In-page UI rendered in the content script's shadow root (undo toasts, the tab budget nudge and the "finished reading?" bar); none of these components use a portal today, so any popover, tooltip, select or dialog added to them must portal into the container from `const { container: portalContainer } = useContentUI()`.
+
+### TabFeedbackLayer
+
+Renders the lifecycle feedback the background sends to this tab; mounted once in `components/contentUi/App.tsx`, outside the side panel gate, so it also works with the edge panel turned off.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| panelPosition | `PanelPosition` | ✓ | - | Side of the edge panel; feedback goes to the other bottom corner |
+
+**Usage:**
+
+```tsx
+<TabFeedbackLayer panelPosition={panelPosition} />
+```
+
+**Behavior:**
+
+- Reads `useTabFeedback()`; renders nothing without a message, otherwise one `FeedbackCard` keyed by `feedbackId`, so a new message replaces the current one.
+- `budgetNudge` renders `BudgetNudge`, `readLater` renders `ReadLaterToast`, and `archived` renders an inline message ("Moved "Title" to the archive" or "Moved N tabs to the archive") with Undo (spinner while working, hidden once undone).
+- The card sits in the bottom corner opposite the edge panel (`panelPosition === "right"` puts it on the left).
+- Closes after 8 seconds unless hovered, focused, held while a note is being written, or an action is running; Esc closes it without swallowing the key from the page.
+- Actions call the background service: undo (`undoTabAction`; an expired token shows the failed message), renew, save note, read later one tab (source `triage`, closes it) or archive it (reason `budget`), review all (opens the tab center), not today / pause for an hour (`dismissBudgetNudge`).
+
+### FeedbackCard
+
+Shared shell of the in-page toasts, the budget nudge and the reading bar; used by `TabFeedbackLayer` and `ReadingDoneBar`.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| side | `"left" \| "right"` | ✓ | - | Bottom corner to pin to |
+| role | `"status" \| "region"` | ✓ | - | `status` for toasts, `region` for the nudge and the reading bar |
+| label | `string` | ✓ | - | Accessible label |
+| closeLabel | `string` | ✓ | - | Title and `aria-label` of the close button |
+| testId | `string` | ✓ | - | Value of `data-hamhome-tab-feedback` |
+| className | `string` |  | - | Extra classes for the shell |
+| onClose | `() => void` | ✓ | - | Close (X) clicked |
+| onHoldChange | `(held: boolean) => void` | ✓ | - | `true` on hover / focus inside, `false` when it leaves |
+| children | `ReactNode` | ✓ | - | Card body |
+
+**Usage:**
+
+```tsx
+<FeedbackCard
+  key={state.feedbackId}
+  side={side}
+  role="status"
+  label={t("bookmark:tabFeedback.archived.label")}
+  closeLabel={closeLabel}
+  testId="archived"
+  onClose={state.dismiss}
+  onHoldChange={state.hold}
+>
+  {/* archived message and Undo button */}
+</FeedbackCard>
+```
+
+**Behavior:**
+
+- Fixed at `bottom-4` on the left or right, 360px wide (at most the viewport minus 2rem), `z-[100001]` (one layer above the in-page save overlay), sliding in from the bottom; it never takes focus on its own.
+- `role="status"` also sets `aria-live="polite"`; `region` has no live region.
+- Mouse enter / focus inside call `onHoldChange(true)` and mouse leave / blur call `onHoldChange(false)`, which pauses and resumes the parent's auto-close timer.
+- `testId` is written to `data-hamhome-tab-feedback`, not `data-testid`.
+
+### BudgetNudge
+
+Body of the budget nudge that `TabFeedbackLayer` shows when the tab budget is exceeded; the file also exports the `BudgetNudgeCandidate` type (`{ tabId: number; title: string; lastActiveAt: number }`).
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| openCount | `number` | ✓ | - | Open tabs counted by the budget |
+| over | `number` | ✓ | - | Tabs over the budget |
+| candidates | `BudgetNudgeCandidate[]` | ✓ | - | Least recently used tabs |
+| hideTitles | `boolean` | ✓ | - | Show "Tab N" instead of titles |
+| handledTabIds | `ReadonlySet<number>` | ✓ | - | Candidates already handled in this nudge |
+| status | `TabFeedbackStatus` | ✓ | - | Action status; `working` disables the row buttons |
+| onReadLater | `(tabId: number) => void` | ✓ | - | Row "Read later" |
+| onArchive | `(tabId: number) => void` | ✓ | - | Row "Archive & close" |
+| onReviewAll | `() => void` | ✓ | - | "Review all" |
+| onNotToday | `() => void` | ✓ | - | "Not today" |
+| onSnooze | `() => void` | ✓ | - | "Pause for an hour" |
+
+**Usage:**
+
+```tsx
+<BudgetNudge
+  openCount={feedback.openCount}
+  over={feedback.over}
+  candidates={feedback.candidates}
+  hideTitles={feedback.hideTitles}
+  handledTabIds={state.handledTabIds}
+  status={state.status}
+  onReadLater={(tabId) => void state.readLaterTab(tabId)}
+  onArchive={(tabId) => void state.archiveTab(tabId)}
+  onReviewAll={state.openTabCenter}
+  onNotToday={() => void state.dismissToday()}
+  onSnooze={() => void state.snoozeHour()}
+/>
+```
+
+**Behavior:**
+
+- Headline "N tabs open, M over budget", then a "Least recently viewed:" list with each tab's idle time when there are candidates.
+- Titles become "Tab 1", "Tab 2", … when `hideTitles` is set or a title is empty (private pages).
+- Row buttons are disabled while `status` is `working`; a handled row is dimmed and shows "Done" in place of its buttons, and the card stays open for the next tab.
+- Footer: "Review all", "Pause for an hour" and "Not today"; in `TabFeedbackLayer` all three close the card.
+
+### ReadLaterToast
+
+Body of the read later toast, rendered by `TabFeedbackLayer` for `readLater` messages (for example after "Read later & close").
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| title | `string` | ✓ | - | Page title |
+| alreadyQueued | `boolean` | ✓ | - | The URL was already in the queue |
+| addedAt | `number` | ✓ | - | Time added; the original time when already queued |
+| canUndo | `boolean` | ✓ | - | An undo token exists |
+| noteEditable | `boolean` | ✓ | - | Offer "Add a note" |
+| status | `TabFeedbackStatus` | ✓ | - | Action status |
+| onUndo | `() => void` | ✓ | - | "Undo" |
+| onRenew | `() => void` | ✓ | - | "Renew" |
+| onSaveNote | `(note: string) => void` | ✓ | - | Note submitted |
+| onHoldChange | `(held: boolean) => void` | ✓ | - | Holds the auto-close timer while a note is written |
+
+**Usage:**
+
+```tsx
+<ReadLaterToast
+  title={feedback.title}
+  alreadyQueued={feedback.alreadyQueued}
+  addedAt={feedback.addedAt}
+  canUndo={!!feedback.undoToken}
+  noteEditable={feedback.noteEditable}
+  status={state.status}
+  onUndo={() => void state.undo()}
+  onRenew={() => void state.renew()}
+  onSaveNote={(note) => void state.saveNote(note)}
+  onHoldChange={state.hold}
+/>
+```
+
+**Behavior:**
+
+- Headline "Added to Read later", or "Already in Read later (added X ago)" when `alreadyQueued`; after an undo or a failed action it reads "Undone" or "Something went wrong, please try again". The page title is shown below.
+- Buttons: "Undo" when `canUndo` (spinner while working), "Renew" for already queued items (re-queues it as unread with a fresh expiry; hidden once done), "Add a note" when `noteEditable`. "Saved" appears after a successful renew or note; all buttons are disabled while working and the row disappears after an undo.
+- "Add a note" swaps the buttons for an autofocused input (max 200 characters) and Save; starting a note calls `onHoldChange(true)`, submitting calls `onSaveNote` then `onHoldChange(false)`.
+
+### ReadingDoneBar
+
+"Finished reading?" bar for pages opened from Read later; mounted once in `components/contentUi/App.tsx` next to `TabFeedbackLayer`.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| panelPosition | `PanelPosition` | ✓ | - | Side of the edge panel; the bar goes to the other bottom corner |
+
+**Usage:**
+
+```tsx
+<ReadingDoneBar panelPosition={panelPosition} />
+```
+
+**Behavior:**
+
+- Driven by `useReadingDoneBar`: only on pages the background reports as opened from the queue (not yet read, same URL); other pages render nothing.
+- Appears once per page load, when the reader scrolls past 85% of the page or the pointer leaves through the top of the window, and only while still on the article URL.
+- "Mark as read" marks the item read; "Keep in library" (queue-only items only) keeps it with AI classification and marks it read; "Not yet", the close button and Esc only hide the bar.
+- After success it shows "Marked as read" or "Kept in your library and marked as read" and hides itself after 2.5 seconds; on failure the buttons stay for a retry.
+- No auto-close timer: `onHoldChange` is a no-op.
+
+## Other additions
+
+Read later and tab lifecycle pieces in other component folders: the in-page edge panel, the in-page save overlay, the Privacy page and the Workspaces page.
+
+### ReadLaterQuickSection
+
+Read later quick list in the in-page edge panel (`BookmarkPanel`), below the pinned section.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| items | `ReadLaterQuickItem[]` | ✓ | - | Newest unread items |
+| unreadCount | `number` | ✓ | - | All unread items, shown in the header |
+| onOpen | `(bookmarkId: string) => void` | ✓ | - | Row clicked |
+| onViewAll | `() => void` | ✓ | - | "View all" clicked |
+
+**Usage:**
+
+```tsx
+{!hasFilters && (
+  <ReadLaterQuickSection
+    items={readLater.items}
+    unreadCount={readLater.unreadCount}
+    onOpen={(bookmarkId) => {
+      readLater.open(bookmarkId);
+      onClose();
+    }}
+    onViewAll={() => {
+      readLater.openAll();
+      onClose();
+    }}
+  />
+)}
+```
+
+**Behavior:**
+
+- Renders nothing when `items` is empty; `BookmarkPanel` also hides it while searching or filtering.
+- Header "Read later · N unread" (N counts all unread items) with "View all", which opens the Read later page and closes the panel.
+- Shows 3 rows, with a Show more / Show less toggle when there are more; the panel loads up to 8 items via `useReadLaterQuickList`, only while it is open.
+- Each row (internal `QuickRow`) shows the favicon (book icon fallback), the title and "Reading · ~N min · domain" (each part only when known); clicking opens the item in a new tab, marks it as reading and closes the panel.
+
+### ReadLaterInsteadButton
+
+Header action of the in-page save overlay (`InPageSaveFlow`), next to the close button: put the page in Read later instead of saving it.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| onClick | `() => void` | ✓ | - | Button clicked |
+
+**Usage:**
+
+```tsx
+{!clipContext && <ReadLaterInsteadButton onClick={readLaterInstead} />}
+```
+
+**Behavior:**
+
+- Small ghost "Read later" button with the hint "Not ready to keep it? Put it in Read later (closes the tab as configured)" (`data-testid="inpage-save-read-later"`).
+- Hidden when the overlay was opened for a clip (`clipContext` set).
+- The overlay's handler closes the overlay and sends `readLaterThisTab` to the background, which adds the tab with source `manual`; the tab closes only when `closeTabOnAdd` is on and the tab is not pinned.
+
+### TabActivityPrivacyCard
+
+Card on the Privacy page (`PrivacyPage`) that discloses what tab activity tracking, the tab archive and the local stats record, and where they are kept.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| trackingEnabled | `boolean` | ✓ | - | Activity tracking is on; picks the description |
+| onOpenRules | `() => void` | ✓ | - | Manage button clicked |
+
+**Usage:**
+
+```tsx
+<TabActivityPrivacyCard
+  trackingEnabled={lifecycleSettings.activityTracking}
+  onOpenRules={() => {
+    window.location.hash = 'tabs?view=rules';
+  }}
+/>
+```
+
+**Behavior:**
+
+- The description depends on `trackingEnabled`: tab usage is recorded locally, or tracking is off and nothing is recorded.
+- Four fixed blocks: What is recorded, Where it is kept (this device only; never uploaded, synced, exported or sent to AI), Tab archive, and Local stats.
+- "Turn off or wipe under Tabs → Rules" calls `onOpenRules`; the Privacy page navigates to `#tabs?view=rules`.
+
+### WorkspaceBudgetSwitchDialog
+
+Dialog on the Workspaces page shown when restoring a workspace would go over the tab budget; driven by `useWorkspaceBudgetSwitch`.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| prompt | `BudgetSwitchPrompt \| null` | ✓ | - | `{ name, pageCount, over }`; the dialog is open while non-null |
+| onChoose | `(choice: BudgetSwitchChoice) => void` | ✓ | - | `"switch"`, `"open"` or `"cancel"` |
+
+**Usage:**
+
+```tsx
+<WorkspaceBudgetSwitchDialog prompt={budgetSwitch.prompt} onChoose={budgetSwitch.answer} />
+```
+
+**Behavior:**
+
+- Text: "Restoring "{name}" opens {pageCount} tabs, {over} over budget."
+- Choices: "Cancel", "Open anyway" and "Save current window as a workspace and switch" (primary). Closing the dialog any other way (Esc, overlay click, X button) counts as `cancel`.
+- The hook only prompts when the budget is on and `count + pageCount - limit > 0`; otherwise the restore runs directly.
+- `switch` saves the current window as a workspace (when it has pages) and closes those tabs before restoring; `open` restores as usual; `cancel` aborts the restore.
+
+---
+
 ## Hooks
 
 ### useGlobalAgent
@@ -2255,7 +3811,7 @@ const handleDeleteSnapshot = async (bookmarkId: string) => {
 
 ```ts
 interface IBackgroundService {
-  /** 获取所有书签 */
+  /** Library bookmarks: queue-only read later items are left out */
   getBookmarks(): Promise<LocalBookmark[]>;
   /** 获取所有分类 */
   getCategories(): Promise<LocalCategory[]>;
@@ -2307,6 +3863,59 @@ interface IBackgroundService {
   getEmbeddingsByModel(modelKey: string): Promise<BookmarkEmbedding[]>;
   /** 获取 embedding 覆盖率统计 */
   getEmbeddingCoverageStats(): Promise<{ total: number; withEmbedding: number; coverage: number }>;
+
+  // ========== Read later ==========
+
+  readLaterTab(tabId: number, options?: { source?: ReadLaterSource; note?: string; closeTab?: boolean }): Promise<ReadLaterAddResult>;
+  readLaterTabs(tabIds: number[], source: ReadLaterSource, options?: { closeTabs?: boolean }): Promise<ReadLaterBatchResult>;
+  readLaterArchiveEntries(entryIds: string[]): Promise<ReadLaterBatchResult>;
+  readLaterBookmarks(bookmarkIds: string[]): Promise<ReadLaterBatchResult>;
+  /** Newest unread items for the in-page edge panel */
+  getReadLaterQuickList(limit?: number): Promise<ReadLaterQuickList>;
+  /** Open in a new tab and mark as reading */
+  readLaterOpen(bookmarkId: string): Promise<boolean>;
+  readLaterMarkRead(bookmarkIds: string[]): Promise<void>;
+  readLaterRequeue(bookmarkIds: string[]): Promise<void>;
+  readLaterKeep(bookmarkIds: string[], classify: boolean): Promise<void>;
+  readLaterRemove(bookmarkIds: string[]): Promise<{ trashed: number; dequeued: number }>;
+  readLaterUpdateNote(bookmarkId: string, note: string): Promise<void>;
+
+  // ========== Tab archive & tab center ==========
+
+  /** Archive first, then close; protected tabs are skipped for automatic reasons */
+  archiveTabs(tabIds: number[], reason: TabArchiveReason): Promise<ArchiveActionResult>;
+  closeDuplicateTabs(tabIds?: number[]): Promise<ArchiveActionResult>;
+  closeTabsWithoutRecord(tabIds: number[]): Promise<number>;
+  restoreArchiveEntries(entryIds: string[], activate?: boolean): Promise<TabRestoreResult>;
+  restoreArchiveBatches(batchIds: string[]): Promise<TabRestoreResult>;
+  deleteArchiveEntries(entryIds: string[]): Promise<void>;
+  clearTabArchive(): Promise<void>;
+  /** `categoryByTabId` files tabs into existing categories (AI tidy-up) */
+  bookmarkTabs(tabIds: number[], options?: { categoryByTabId?: Record<number, string> }): Promise<QuickBookmarkResult>;
+  bookmarkArchiveEntries(entryIds: string[]): Promise<QuickBookmarkResult>;
+  setTabsLocked(tabIds: number[], locked: boolean): Promise<void>;
+  /** Reset the idle timer */
+  renewTabs(tabIds: number[]): Promise<void>;
+  /** Local stats of the last 7 days against the week before (this device only) */
+  getTabWeeklyOverview(): Promise<TabWeeklyOverview>;
+  focusTab(tabId: number): Promise<void>;
+  /** Undo from an in-page toast; false when the token expired */
+  undoTabAction(token: string): Promise<boolean>;
+
+  // ========== Lifecycle settings & budget ==========
+
+  dismissBudgetNudge(mode: "today" | "hour"): Promise<void>;
+  resumeBudgetNudge(): Promise<void>;
+  confirmPendingArchive(tabIds?: number[]): Promise<number>;
+  keepPendingArchive(tabIds?: number[]): Promise<void>;
+  /** Turning auto archive on records consent for this device; never retroactive */
+  setAutoArchiveEnabled(enabled: boolean, patch?: Partial<TabAutoArchiveSettings>): Promise<TabLifecycleSettings>;
+  /** "auto-archive" (make room automatically) also needs this device's consent */
+  setOverBudgetAction(action: TabBudgetOverAction): Promise<TabLifecycleSettings>;
+  acceptSyncedTabConsent(kind: "autoArchive" | "autoMakeRoom"): Promise<void>;
+  setTabActivityTracking(enabled: boolean): Promise<void>;
+  completeTabCenterOnboarding(): Promise<void>;
+  runTabLifecycleSweep(): Promise<TabLifecycleSweepSummary>;
 
   // ========== 其他方法 ==========
 
@@ -2909,6 +4518,1469 @@ AI 分析结果缓存，基于 **IndexedDB** 实现（适合大数据存储）�
 
 ---
 
+## Hooks (tab lifecycle & read later)
+
+Hooks for the tab center, the popup tabs card, the Read later page and the in-page lifecycle UI. Hooks marked "content script only" run inside the content UI; the others run in extension pages (app page, popup).
+
+### useAddToWorkspace
+
+Adds pages (open tabs or archived tabs) to an existing workspace or a new one. URLs already in the target workspace, and duplicate URLs in the input, are skipped.
+
+```ts
+function useAddToWorkspace(): UseAddToWorkspaceResult
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| workspaces | `Workspace[]` | All workspaces, kept current through `workspaceStorage.watchWorkspaces` |
+| addPages | `(target: WorkspaceTarget, pages: WorkspacePageInput[]) => Promise<number>` | `{ name }` creates a workspace, `{ workspaceId }` appends to an existing one. Resolves with the number of pages added. Throws `"workspace-missing"` for an unknown ID |
+
+Exported types: `WorkspacePageInput { title; url; favicon? }`, `WorkspaceTarget = { workspaceId: string } | { name: string }`.
+
+**Usage:**
+
+```tsx
+// components/tabCenter/AddToWorkspaceDialog.tsx
+const { workspaces, addPages } = useAddToWorkspace();
+const added = await addPages(
+  target === NEW_WORKSPACE ? { name: name.trim() || t("tabCenter.workspace.defaultName") } : { workspaceId: target },
+  pages,
+);
+```
+
+---
+
+### useOpenTabActions
+
+Actions on open tabs for the tab center and the popup. Each action calls the background service and shows a toast. When the result carries an `undoToken`, the toast has an Undo action (`undoTabAction`). Failures show `tabCenter.actionFailed`.
+
+```ts
+function useOpenTabActions(): UseOpenTabActionsResult
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| focus | `(tabId: number) => Promise<void>` | Activates the tab and focuses its window |
+| readLater | `(tabIds: number[]) => Promise<void>` | Calls `readLaterTabs(tabIds, "tab-center", { closeTabs: true })`. Toast has Undo |
+| bookmark | `(tabIds: number[]) => Promise<void>` | Calls `bookmarkTabs`. Toast shows the created and existing counts |
+| archive | `(tabIds: number[], reason?: TabArchiveReason) => Promise<void>` | Calls `archiveTabs` (default reason `"manual"`). Toast has Undo |
+| closeDuplicates | `(tabIds?: number[]) => Promise<void>` | Archives redundant duplicates with reason `"duplicate"`, optionally only within `tabIds`. Toast has Undo |
+| setLocked | `(tabIds: number[], locked: boolean) => Promise<void>` | Locks or unlocks tabs |
+| renew | `(tabIds: number[]) => Promise<void>` | Restarts the idle time |
+| closeWithoutRecord | `(tabIds: number[]) => Promise<void>` | Asks for confirmation in a destructive dialog, then closes the non-pinned tabs without archiving them |
+| confirmPending | `(tabIds?: number[]) => Promise<void>` | Confirm mode: archives the tabs waiting for confirmation (all of them when `tabIds` is omitted) |
+| keepPending | `(tabIds?: number[]) => Promise<void>` | Confirm mode: keeps those tabs and restarts their idle time |
+
+**Usage:**
+
+```tsx
+// components/tabCenter/OpenTabsView.tsx
+const actions = useOpenTabActions();
+const onLockToggle = useCallback((tab: OpenTabInfo) => void actions.setLocked([tab.tabId], !tab.locked), [actions]);
+const onArchive = useCallback((tabId: number) => void actions.archive([tabId]), [actions]);
+```
+
+---
+
+### useOpenTabCount
+
+Number of non-incognito tabs in normal windows, used for the sidebar badge. It runs one `tabs.query` after tab created, removed, attached or detached events, debounced by 300 ms. **Returns a plain `number`, not an object.**
+
+```ts
+function useOpenTabCount(): number
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| (return value) | `number` | Open tab count. It is `0` until loaded and stays `0` where the tabs API is unavailable |
+
+**Usage:**
+
+```tsx
+// entrypoints/app/App.tsx
+const openTabCount = useOpenTabCount();
+// sidebar item
+{ title: t("bookmark:tabCenter.navTitle"), url: "#tabs", icon: PanelsTopLeft, isActive: currentViewBase === "tabs", badge: openTabCount }
+```
+
+---
+
+### useOpenTabsList
+
+View state of the tab center's open tabs list: search, grouping, sorting, filters, virtual-list rows (`buildOpenTabsRows`) and a selection of tab IDs. Closed tabs drop out of the selection automatically.
+
+```ts
+function useOpenTabsList(snapshot: OpenTabsSnapshot | null): UseOpenTabsListResult
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| query, setQuery | `string`, `(query: string) => void` | Search on title and URL. Every term must match |
+| groupBy, setGroupBy | `OpenTabsGroupBy`, setter | `"window"` (default), `"group"` or `"domain"` |
+| sort, setSort | `OpenTabsSort`, setter | `"position"` (default), `"recent"` or `"idle"` |
+| filters | `ReadonlySet<OpenTabsFilter>` | Active filters (`idle`, `expiring`, `duplicates`, `protected`). A tab matching any one of them is shown |
+| toggleFilter | `(filter: OpenTabsFilter) => void` | Toggles one filter |
+| setFilters | `(filters: OpenTabsFilter[]) => void` | Replaces all filters |
+| rows | `OpenTabsRow[]` | Group header rows and tab rows for the virtual list |
+| visibleTabIds | `number[]` | Tab IDs of the visible tab rows |
+| selected | `ReadonlySet<number>` | Selected tab IDs |
+| toggleSelect | `(tabId: number) => void` | Toggles one tab |
+| setSelected | `(tabIds: number[], selected: boolean) => void` | Adds or removes several tabs |
+| selectOnly | `(tabIds: number[]) => void` | Replaces the selection |
+| clearSelection | `() => void` | Clears the selection |
+| selectedTabs | `OpenTabInfo[]` | Snapshot tabs that are selected |
+
+**Usage:**
+
+```tsx
+// components/tabCenter/OpenTabsView.tsx
+const list = useOpenTabsList(snapshot);
+<OpenTabsToolbar
+  query={list.query}
+  groupBy={list.groupBy}
+  sort={list.sort}
+  filters={list.filters}
+  supportsGroups={supportsGroups}
+  onQueryChange={list.setQuery}
+  onGroupByChange={list.setGroupBy}
+  onSortChange={list.setSort}
+  onToggleFilter={list.toggleFilter}
+/>
+```
+
+---
+
+### useOpenTabsSnapshot
+
+Live `OpenTabsSnapshot` for extension pages, read directly with `tabLifecycleService.getSnapshot()`. This works because extension pages share the IndexedDB origin with the background. The snapshot reloads 400 ms after tab and window events, relevant `tabs.onUpdated` changes, `storage.session` changes, and lifecycle settings or state changes. It also refreshes once a minute so relative times stay current.
+
+```ts
+function useOpenTabsSnapshot(): UseOpenTabsSnapshotResult
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| snapshot | `OpenTabsSnapshot \| null` | `null` until the first load |
+| loading | `boolean` | `true` until the first load has finished |
+| error | `string \| null` | Message of the last load error |
+| refresh | `() => Promise<void>` | Reloads immediately |
+
+**Usage:**
+
+```tsx
+// components/TabCenterPage.tsx
+const { snapshot, loading } = useOpenTabsSnapshot();
+// components/popup/QuickPanel.tsx
+const { snapshot } = useOpenTabsSnapshot();
+```
+
+---
+
+### useReadLaterQueue
+
+State of the Read later page:
+
+- Views (unread, read, expired), sorting, search and filters (domain, source, kept).
+- Queue health: items expiring soon and the 30-day completion rate.
+- Item actions, run through the background.
+
+The hook needs `BookmarkContext` (`allBookmarks`, `readLaterEntries`). Settings are watched from `tabLifecycleConfigStorage`.
+
+```ts
+function useReadLaterQueue(initialQuery?: string): UseReadLaterQueueResult
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| settings | `ReadLaterSettings` | Read later settings, kept current |
+| view, setView | `ReadLaterView`, setter | `"unread"` (default), `"read"` or `"expired"` |
+| sort, setSort | `ReadLaterSort`, setter | `"newest"` (default), `"oldest"`, `"shortest"` or `"expiring"` |
+| query, setQuery | `string`, setter | Search on title, URL, description and note |
+| filters, setFilters | `ReadLaterFilters`, `(patch: Partial<ReadLaterFilters>) => void` | Domain, source and kept (`all` / `kept` / `queueOnly`) filters. `setFilters` merges the patch |
+| items | `ReadLaterItem[]` | Items of the current view after filters, search and sorting |
+| counts | `Record<ReadLaterView, number>` | Item count per view |
+| domains | `string[]` | Sorted domains of all items |
+| expiringSoon | `number` | Pending items that expire within 3 days |
+| completion | `{ read: number; expired: number; rate: number \| null }` | Read divided by (read + expired) over the last 30 days |
+| updateSettings | `(patch: Partial<ReadLaterSettings>) => Promise<void>` | Writes Read later settings |
+| open | `(bookmarkId: string) => Promise<void>` | Opens the item in a new tab and marks it as reading |
+| markRead | `(ids: string[]) => Promise<void>` | Marks items as read (toast) |
+| requeue | `(ids: string[]) => Promise<void>` | Moves items back to unread and renews their expiry (toast) |
+| keep | `(ids: string[], classify: boolean) => Promise<void>` | Keeps items in the library. With `classify`, AI fills in an empty category, tags and summary (toast) |
+| remove | `(ids: string[]) => Promise<void>` | Queue-only items go to the trash. Library bookmarks only leave the queue (toast) |
+| updateNote | `(id: string, note: string) => Promise<void>` | Sets the note. An empty note clears it |
+
+Exported types: `ReadLaterKeptFilter`, `ReadLaterFilters`. Failed actions show `readLater.actionFailed`.
+
+**Usage:**
+
+```tsx
+// components/ReadLaterPage.tsx
+const queue = useReadLaterQueue(readQuery(currentView));
+<ReadLaterStats
+  unread={queue.counts.unread}
+  expiringSoon={queue.expiringSoon}
+  completion={queue.completion}
+  onShowExpiring={() => {
+    queue.setView("unread");
+    queue.setSort("expiring");
+  }}
+/>
+```
+
+---
+
+### useReadLaterQuickList
+
+Newest unread Read later items (at most 8) for the in-page edge panel, which runs in the content UI. The list loads through the background only while `active` is true. It reloads when the queue or the bookmarks change, so titles of links added without opening them fill in later.
+
+```ts
+function useReadLaterQuickList(active: boolean): UseReadLaterQuickListResult
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| items | `ReadLaterQuickItem[]` | Newest unread items (at most 8) |
+| unreadCount | `number` | Count of all unread items, not only the listed ones |
+| open | `(bookmarkId: string) => void` | Opens the item in a new tab and marks it as reading |
+| openAll | `() => void` | Opens the Read later page (`openOptionsPage("read-later")`) |
+
+**Usage:**
+
+```tsx
+// components/bookmarkPanel/BookmarkPanel.tsx
+const readLater = useReadLaterQuickList(isOpen);
+<ReadLaterQuickSection
+  items={readLater.items}
+  unreadCount={readLater.unreadCount}
+  onOpen={(bookmarkId) => {
+    readLater.open(bookmarkId);
+    onClose();
+  }}
+  onViewAll={() => {
+    readLater.openAll();
+    onClose();
+  }}
+/>
+```
+
+---
+
+### useReadingDoneBar
+
+"Finished reading?" bar for pages opened from Read later. Content script only. The session comes from `readingSessionBus`. The bar appears once, while the page URL still matches the session, in either of two cases:
+
+- The reader scrolls past 85% of the page.
+- The pointer leaves the window through the top.
+
+Esc hides the bar. The confirmation message hides itself after 2.5 s.
+
+```ts
+function useReadingDoneBar(): UseReadingDoneBarResult
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| session | `ReadingSession \| null` | Page opened from Read later. `null` on all other pages |
+| visible | `boolean` | Whether the bar is shown |
+| state | `ReadingDoneState` | `"idle"`, `"working"`, `"read"`, `"kept"` or `"failed"` |
+| markRead | `() => Promise<void>` | Calls `readLaterMarkRead([bookmarkId])` |
+| keep | `() => Promise<void>` | Calls `readLaterKeep([id], true)`, then `readLaterMarkRead([id])` |
+| dismiss | `() => void` | Hides the bar |
+
+**Usage:**
+
+```tsx
+// components/contentUi/feedback/ReadingDoneBar.tsx
+const bar = useReadingDoneBar();
+if (!bar.session || !bar.visible) return null;
+const working = bar.state === "working";
+// ...
+<Button size="sm" disabled={working} onClick={() => void bar.markRead()}>{t("bookmark:readingBar.markRead")}</Button>
+{bar.session.queueOnly && (
+  <Button variant="secondary" size="sm" disabled={working} onClick={() => void bar.keep()}>{t("bookmark:readingBar.keep")}</Button>
+)}
+```
+
+---
+
+### useRecentAutoArchive
+
+Data for "N tabs archived automatically today": automatic batches from the last 24 hours (`RECENT_AUTO_BATCH_MS`) that were not undone and still hold entries, plus restoring all of them at once. The data is read from `tabArchiveStorage` and reloaded on `watchVersion`.
+
+```ts
+function useRecentAutoArchive(): UseRecentAutoArchiveResult
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| summary | `TabArchiveRecentSummary` | `{ batchIds, count }` of those batches |
+| restoreAll | `() => Promise<number>` | Calls `restoreArchiveBatches(summary.batchIds)` and resolves with the restored count (`0` when there is nothing to restore) |
+
+**Usage:**
+
+```tsx
+// components/popup/QuickPanel.tsx
+const recentArchive = useRecentAutoArchive();
+<PopupTabsCard
+  recent={recentArchive.summary}
+  onRestoreRecent={() => {
+    void recentArchive.restoreAll().then((count) =>
+      toast.success(t("bookmark:tabCenter.archive.restored", { count })),
+    );
+  }}
+  // ...other props
+/>
+```
+
+---
+
+### useTabAITriage
+
+AI tidy-up in the tab center. `run()` calls `tabTriageService.suggest(snapshot)` in the extension page and selects everything except what local rules keep. `apply()` runs the selected suggestions through the background:
+
+- **keep:** renews the AI-kept tabs.
+- **bookmark:** bookmarks the tabs (with their category), then archives them.
+- **workspace:** adds the tabs to a workspace (an existing one when its name matches, ignoring case), then archives them.
+- **readLater:** reads later and closes.
+- **close:** archives.
+
+All archiving uses reason `"triage"`.
+
+```ts
+function useTabAITriage(snapshot: OpenTabsSnapshot | null): UseTabAITriageResult
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| status | `TabTriageStatus` | `"idle"`, `"loading"`, `"ready"`, `"notConfigured"` (AI not set up) or `"error"` |
+| error | `string \| null` | Error message when `status` is `"error"` |
+| result | `TabTriageResult \| null` | Last result. Cleared after a successful apply |
+| groups | `TriageGroup[]` | Suggestions grouped by destination |
+| selected | `ReadonlySet<number>` | Selected tab IDs |
+| toggle | `(tabIds: number[], selected: boolean) => void` | Selects or deselects tabs |
+| run | `() => Promise<void>` | Asks AI about the current snapshot |
+| applying | `boolean` | Apply is in progress |
+| apply | `() => Promise<boolean>` | Applies the selection. Resolves `true` on success and shows a toast with the kept, queued, bookmarked and archived counts |
+
+**Usage:**
+
+```tsx
+// components/tabCenter/TabAITriageDialog.tsx
+const triage = useTabAITriage(snapshot);
+const { status, result, run } = triage;
+const wasOpen = useRef(false);
+// Analyze when the dialog opens; a finished result stays until it is applied
+useEffect(() => {
+  if (open && !wasOpen.current && status === "idle") void run();
+  wasOpen.current = open;
+}, [open, run, status]);
+// ...
+<Button
+  disabled={status !== "ready" || triage.applying || triage.selected.size === 0}
+  onClick={async () => {
+    if (await triage.apply()) onOpenChange(false);
+  }}
+/>
+```
+
+---
+
+### useTabArchive
+
+Tab archive view of the tab center. The hook loads all entries and batches from `tabArchiveStorage` and reloads on `watchVersion`. Entries are indexed once, so search and filters run in memory even for 10,000 entries. Actions run in the background and show toasts.
+
+```ts
+function useTabArchive(): UseTabArchiveResult
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| entries | `TabArchiveEntry[]` | All archived tabs |
+| batches | `Map<string, TabArchiveBatch>` | Batches by ID |
+| loading | `boolean` | `true` until the first load has finished |
+| filter | `ArchiveFilterState` | `{ query, reason, domain, dateGroup }`. Each defaults to `""` or `"all"` |
+| setFilter | `(patch: Partial<ArchiveFilterState>) => void` | Merges a filter patch |
+| filtered | `IndexedArchiveEntry[]` | Matching entries, newest first |
+| domains | `string[]` | Domains sorted by frequency |
+| latestBatch | `{ batch: TabArchiveBatch; count: number } \| null` | Most recent batch that still has entries |
+| restore | `(entryIds: string[], activate?: boolean) => Promise<void>` | Reopens entries. `activate` focuses the last restored tab |
+| restoreBatch | `(batchId: string) => Promise<void>` | Reopens one batch |
+| readLater | `(entryIds: string[]) => Promise<void>` | Moves entries into Read later (they leave the archive) |
+| bookmark | `(entryIds: string[]) => Promise<void>` | Bookmarks entries (title and URL only) |
+| remove | `(entryIds: string[]) => Promise<void>` | Deletes entries |
+| clearAll | `() => Promise<void>` | Clears the archive |
+
+**Usage:**
+
+```tsx
+// components/tabCenter/TabArchiveView.tsx
+const archive = useTabArchive();
+const rows = useMemo(() => buildArchiveRows(archive.filtered, archive.batches), [archive.batches, archive.filtered]);
+<ArchiveToolbar filter={archive.filter} domains={archive.domains} onChange={archive.setFilter} />
+```
+
+---
+
+### useTabArchiveCount
+
+Number of archived tabs from `tabArchiveStorage.count()`. No entries are loaded, so the hook is cheap. It is refreshed on `watchVersion` and also exported from `hooks/useTabArchive.ts`.
+
+```ts
+function useTabArchiveCount(): { count: number; clear: () => Promise<void> }
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| count | `number` | Number of archive entries |
+| clear | `() => Promise<void>` | Calls `clearTabArchive()` and shows a success or failure toast |
+
+**Usage:**
+
+```tsx
+// components/TabCenterPage.tsx
+const archiveCount = useTabArchiveCount().count;
+// components/tabCenter/TabRulesView.tsx
+const archive = useTabArchiveCount();
+// ... entryCount={archive.count} onClear={archive.clear}
+```
+
+---
+
+### useTabBusySignal
+
+Tells the background that a HamHome save flow is open in this tab. Content script only. While `busy` is true, the hook sends `contentTabSignalService.setBusy(true)` and renews it every `TAB_BUSY_TTL_MS / 2` (7.5 min). It sends `setBusy(false)` on cleanup. Busy tabs get the `saving` protection, so auto archive and auto make room never close them during a save.
+
+```ts
+function useTabBusySignal(busy: boolean): void
+```
+
+Returns `void`.
+
+**Usage:**
+
+```tsx
+// components/SavePanel/InPageSaveFlow.tsx
+const isOpen = phase !== "idle";
+// While the overlay is open the tab is protected from auto archive and making room
+useTabBusySignal(isOpen);
+```
+
+---
+
+### useTabFeedback
+
+State of the in-page lifecycle feedback. Content script only. The hook receives messages from `tabFeedbackBus`: Read later toasts, "archived" toasts and budget nudges. A message closes after `TAB_FEEDBACK_DURATION_MS` (8000 ms) unless it is held or an action is running. Esc closes it without swallowing the key. Actions run through the background, and the hook never moves focus into the page.
+
+```ts
+function useTabFeedback(): UseTabFeedbackResult
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| feedback | `TabFeedbackMessage \| null` | Current message (`readLater`, `archived` or `budgetNudge`) |
+| feedbackId | `number` | Increases for every new message. Use it as the React key |
+| status | `TabFeedbackStatus` | `"idle"`, `"working"`, `"undone"`, `"done"` or `"failed"` |
+| handledTabIds | `ReadonlySet<number>` | Nudge candidates that were already handled |
+| dismiss | `() => void` | Closes the message and resets the state |
+| hold | `(held: boolean) => void` | Pauses or restarts the auto-close timer (hover, focus, typing a note) |
+| undo | `() => Promise<void>` | Calls `undoTabAction(undoToken)`. Sets `failed` when the undo has expired |
+| renew | `() => Promise<void>` | Read later message only: calls `readLaterRequeue([bookmarkId])` |
+| saveNote | `(note: string) => Promise<void>` | Read later message only: calls `readLaterUpdateNote` |
+| readLaterTab | `(tabId: number) => Promise<void>` | Nudge: reads a candidate later and closes it (source `"triage"`) |
+| archiveTab | `(tabId: number) => Promise<void>` | Nudge: archives a candidate (reason `"budget"`) |
+| openTabCenter | `() => void` | Opens the tab center (`openOptionsPage("tabs")`) and dismisses the message |
+| dismissToday | `() => Promise<void>` | Calls `dismissBudgetNudge("today")` and dismisses |
+| snoozeHour | `() => Promise<void>` | Calls `dismissBudgetNudge("hour")` and dismisses |
+
+**Usage:**
+
+```tsx
+// components/contentUi/feedback/TabFeedbackLayer.tsx
+const state = useTabFeedback();
+const { feedback } = state;
+if (!feedback) return null;
+// budget nudge branch
+<FeedbackCard key={state.feedbackId} onClose={state.dismiss} onHoldChange={state.hold} /* ... */>
+  <BudgetNudge
+    handledTabIds={state.handledTabIds}
+    status={state.status}
+    onReadLater={(tabId) => void state.readLaterTab(tabId)}
+    onArchive={(tabId) => void state.archiveTab(tabId)}
+    onReviewAll={state.openTabCenter}
+    onNotToday={() => void state.dismissToday()}
+    onSnooze={() => void state.snoozeHour()}
+    /* ... */
+  />
+</FeedbackCard>
+```
+
+---
+
+### useTabLifecycleOnboarding
+
+State of the first-run guidance in three steps: plan, existing tabs ("count from today" or "tidy up now") and recommended protected domains. Every time `open` becomes true, the state resets to step 0. All recommendations stay checked until the user toggles one, also when the open tabs load after the dialog opened. `finish()` turns auto archive on through `lifecycle.setAutoArchiveEnabled(true, …)` with the merged protected domains. This is never retroactive.
+
+```ts
+function useTabLifecycleOnboarding(
+  snapshot: OpenTabsSnapshot | null,
+  lifecycle: UseTabLifecycleSettingsResult,
+  open: boolean,
+): UseTabLifecycleOnboardingResult
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| step, setStep | `OnboardingStep` (`0 \| 1 \| 2`), setter | Current step |
+| plan, setPlan | `OnboardingPlan`, setter | `"recommended"` (default) or `"custom"` |
+| existingTabs, setExistingTabs | `OnboardingExistingTabs`, setter | `"fromToday"` (default) or `"tidyNow"` |
+| recommendedDomains | `string[]` | Domains of pinned tabs and known web apps, without domains that are already protected |
+| selectedDomains | `ReadonlySet<string>` | Checked recommendations |
+| toggleDomain | `(domain: string) => void` | Checks or unchecks one domain |
+| summary | `{ tabs; windows; stale; duplicateGroups; estimated: boolean }` | Current tab state. `estimated` is true when more than half of the idle times are estimates |
+| saving | `boolean` | `finish()` is in progress |
+| finish | `() => Promise<OnboardingOutcome>` | Applies the plan, then completes onboarding (see below) |
+| skip | `() => Promise<void>` | Completes onboarding without turning anything on |
+
+What `finish()` does:
+
+- With the recommended plan, it also sets a 7-day idle threshold, `usage-days` counting and mode `auto`, and turns on the budget (15 tabs, action `nudge`). Only a first set-up gets these values (`buildOnboardingPatch`): auto archive or a budget that is already on, e.g. synced from another device, keeps its own settings.
+- It returns `{ tidyTabIds, openRules }`. `tidyTabIds` holds the tabs to preselect for "tidy up now". `openRules` is true for the custom plan.
+
+**Usage:**
+
+```tsx
+// components/TabCenterPage.tsx
+const lifecycle = useTabLifecycleSettings();
+const onboarding = useTabLifecycleOnboarding(snapshot, lifecycle, onboardingOpen);
+// components/tabCenter/TabLifecycleOnboarding.tsx
+const finish = async () => {
+  setOutcome(await onboarding.finish());
+  onboarding.setStep(2);
+};
+```
+
+---
+
+### useTabLifecycleSettings
+
+Lifecycle settings (`sync:tabLifecycleSettings`) and this device's lifecycle state (`local:tabLifecycleState`), both watched. Plain options are written directly. The switches that let HamHome close tabs on its own (auto archive, auto make room) go through the background, as do activity tracking, consent and onboarding. The background records this device's consent.
+
+```ts
+function useTabLifecycleSettings(): UseTabLifecycleSettingsResult
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| settings | `TabLifecycleSettings` | Current settings (defaults until loaded) |
+| state | `TabLifecycleLocalState` | Device state: consents, usage days, last sweep, nudge state and so on |
+| loading | `boolean` | `true` until both settings and state are loaded |
+| autoArchiveActive | `boolean` | `isAutoArchiveEffective(settings, state)` |
+| autoMakeRoomActive | `boolean` | `isAutoMakeRoomEffective(settings, state)` |
+| pendingConsents | `{ autoArchive: boolean; autoMakeRoom: boolean }` | Switches that are on in the settings (for example from sync) but not consented to on this device |
+| update | `(patch: TabLifecycleSettingsPatch) => Promise<void>` | Writes plain options with `tabLifecycleConfigStorage.updateSettings` |
+| setAutoArchiveEnabled | `(enabled: boolean, patch?: Partial<TabAutoArchiveSettings>) => Promise<void>` | Background call. Turning it on records consent, and idle time counts from that moment |
+| setOverBudgetAction | `(action: TabBudgetOverAction) => Promise<void>` | Background call. `"auto-archive"` records make-room consent |
+| setActivityTracking | `(enabled: boolean) => Promise<void>` | Background call. Turning it off wipes the recorded activity |
+| acceptConsent | `(kind: "autoArchive" \| "autoMakeRoom") => Promise<void>` | Accepts on this device a switch that was turned on elsewhere |
+| completeOnboarding | `() => Promise<void>` | Records that onboarding is complete |
+| addProtectedDomain | `(input: string) => Promise<boolean>` | Normalizes the input and adds it. Resolves `false` for an invalid domain |
+| removeProtectedDomain | `(domain: string) => Promise<void>` | Removes a protected domain |
+
+**Usage:**
+
+```tsx
+// components/TabCenterPage.tsx
+const lifecycle = useTabLifecycleSettings();
+// components/tabCenter/TabRulesView.tsx (receives `lifecycle` as a prop)
+<AutoArchiveCard
+  rule={settings.autoArchive}
+  active={lifecycle.autoArchiveActive}
+  onToggle={(enabled) => (enabled ? onEnableAutoArchive() : void lifecycle.setAutoArchiveEnabled(false))}
+  onChange={(patch) => void lifecycle.update({ autoArchive: patch })}
+  onAddDomain={lifecycle.addProtectedDomain}
+  onRemoveDomain={(domain) => void lifecycle.removeProtectedDomain(domain)}
+  // ...other props
+/>
+```
+
+---
+
+### useTabTidy
+
+Rule-based tidy-up without AI. Suggestions come from `buildTidySuggestions` and all of them are selected by default. `apply()` runs the selected suggestions:
+
+- **Workspace groups:** saved as new workspaces named after the group, then archived.
+- **Read later group:** read later and closed.
+- **Duplicates, low-value and idle tabs:** archived.
+
+All archiving uses reason `"triage"`.
+
+```ts
+function useTabTidy(snapshot: OpenTabsSnapshot | null): UseTabTidyResult
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| suggestions | `TidySuggestions` | `{ duplicates, lowValue, readLater, archive, workspaces }`. Empty without a snapshot |
+| selected | `ReadonlySet<number>` | Suggested tab IDs, minus the deselected ones |
+| toggle | `(tabIds: number[], selected: boolean) => void` | Selects or deselects tabs |
+| reset | `() => void` | Selects everything again |
+| applying | `boolean` | Apply is in progress |
+| apply | `() => Promise<boolean>` | Applies the selection. Resolves `true` on success and shows a toast with the archived and queued counts |
+
+**Usage:**
+
+```tsx
+// components/tabCenter/OpenTabsView.tsx
+const tidy = useTabTidy(snapshot);
+// onTidyUp:
+tidy.reset();
+setTidyOpen(true);
+// components/tabCenter/TabTidyDialog.tsx
+<Button disabled={tidy.applying || tidy.selected.size === 0} onClick={async () => {
+  if (await tidy.apply()) onOpenChange(false);
+}} />
+```
+
+---
+
+### useTabWeeklyOverview
+
+Local tab stats for the last 7 days, loaded from the background (`getTabWeeklyOverview`) every time `active` becomes true.
+
+```ts
+function useTabWeeklyOverview(active: boolean): UseTabWeeklyOverviewResult
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| overview | `TabWeeklyOverview \| null` | Last loaded overview |
+| loading | `boolean` | Loading is in progress |
+
+**Usage:**
+
+```tsx
+// components/tabCenter/TabWeeklyOverviewDialog.tsx
+const { overview, loading } = useTabWeeklyOverview(open);
+```
+
+---
+
+### useWorkspaceBudgetSwitch
+
+Runs before a workspace is restored. When restoring would push the open tabs over the tab budget, the hook asks the user to choose:
+
+- **switch:** saves the current window as a workspace and closes its saved tabs, then restores.
+- **open:** restores anyway.
+- **cancel:** does not restore.
+
+There is no prompt when the budget is off or its status cannot be read (`tabBadgeService.getBudgetStatus()`).
+
+```ts
+function useWorkspaceBudgetSwitch(): UseWorkspaceBudgetSwitchResult
+```
+
+| Field | Type | Description |
+| --- | --- | --- |
+| prompt | `BudgetSwitchPrompt \| null` | Open prompt: `{ name, pageCount, over }` |
+| answer | `(choice: BudgetSwitchChoice) => void` | Resolves the open prompt with `"switch"`, `"open"` or `"cancel"` |
+| beforeRestore | `(workspace: Workspace, pageCount: number) => Promise<boolean>` | Resolves `false` when the restore must not happen (cancel) |
+
+**Usage:**
+
+```tsx
+// components/WorkspacesPage.tsx
+const budgetSwitch = useWorkspaceBudgetSwitch();
+const state = useWorkspacesPage({ beforeRestore: budgetSwitch.beforeRestore });
+// ...
+<WorkspaceBudgetSwitchDialog prompt={budgetSwitch.prompt} onChoose={budgetSwitch.answer} />
+```
+
+---
+
+## Services (tab lifecycle & read later)
+
+Unless noted otherwise, these modules export a singleton instance (for example `readLaterService`). Extension pages and content scripts reach the background modules through `getBackgroundService()`, for example `readLaterTabs` → `readLaterService.addTabs`.
+
+### content-tab-signal-service
+
+Fire-and-forget messages that a content script sends about its own tab. Content script only. The background resolves the tab from `sender.tab` (see `tab-lifecycle-background`), so the page never needs its tab ID. Export: `contentTabSignalService`.
+
+| Method | Description |
+| --- | --- |
+| `setBusy(busy: boolean): void` | Sends `TAB_MESSAGES.busy`: a HamHome save flow is open (`true`) or closed (`false`) in this tab |
+| `readLaterThisTab(): void` | Sends `TAB_MESSAGES.readLaterThisTab`: put this tab in Read later. The tab closes as configured and the usual toast appears |
+
+### page-snapshot-service
+
+Captures a tab's HTML and stores it as the bookmark's offline snapshot. Background only. It uses SingleFile when available and plain `outerHTML` otherwise. Without `tabId`, it uses the active tab from `tabs.query({ active: true, currentWindow: true })`. Export: `pageSnapshotService`.
+
+| Method | Description |
+| --- | --- |
+| `getPageHtml(tabId?): Promise<string \| null>` | Sends `EXTRACT_HTML` to the content script. Falls back to `scripting.executeScript` (`document.documentElement.outerHTML`) |
+| `getPageSingleFileHtml(tabId?): Promise<string \| null>` | Starts `EXTRACT_SINGLEFILE_HTML` with a capture ID and joins the `singlefile.chunk` messages. Falls back to `getPageHtml` |
+| `saveSnapshot(bookmarkId, options?): Promise<SnapshotSaveResult>` | Mode `"none"` skips. Modes `"auto"` and `"markdown"` with `markdown` set store Markdown. Otherwise stores the SingleFile HTML. Then sets `hasSnapshot: true` on the bookmark. Options: `SaveSnapshotBackgroundOptions & { tabId? }` |
+
+### read-later-import-service
+
+JSON import of Read later state, lifecycle settings and, when the file has one, the tab archive. Called directly by `ImportExportPage` (extension page). Exports: `importLifecycleData`, `LifecycleImportResult`.
+
+| Method | Description |
+| --- | --- |
+| `importLifecycleData(data, createdBookmarkIds): Promise<LifecycleImportResult>` | Imports entries, archive and settings, and returns `{ readLater, archived, settings }`. Details below |
+
+How the import works:
+
+- Bookmark IDs change on import, so entries are matched to local bookmarks by normalized URL.
+- Entries whose local copy is newer or equally new are skipped.
+- The file's `queueOnly` flag is kept only for bookmarks created by this import.
+- Archive entries go into one new manual batch.
+- Settings are applied through `importRawSettings` with `updatedAt` set to now. Automatic closing still needs this device's consent.
+
+### read-later-service
+
+Read later as a state of a bookmark. Background only.
+
+- Adding a URL that is not bookmarked creates a queue-only bookmark, hidden from library views until kept. Adding a library bookmark only queues it.
+- "Read later & close" first extracts the content and writes the bookmark and queue state. Only then does it close the tab.
+- Every add stores an undo record.
+
+Export: `readLaterService`.
+
+| Method | Description |
+| --- | --- |
+| `addTab(tabId, { source?, note?, closeTab?, showFeedback? }): Promise<ReadLaterAddResult>` | One tab (popup, shortcut, context menu, save overlay). Details below |
+| `addTabs(tabIds, source, { closeTabs? }): Promise<ReadLaterBatchResult>` | Several tabs (tab center, triage, nudge, agent). Extracts 3 tabs at a time. `closeTabs` overrides the setting. Writes an AI summary only when `autoSummary` is `"all"` |
+| `addLink({ url, text?, sourceTabId?, sourceUrl? }): Promise<ReadLaterAddResult>` | "Read link later" without opening the link. Details below |
+| `addArchiveEntries(entryIds): Promise<ReadLaterBatchResult>` | Moves archived tabs into the queue (title and URL only). Queued entries leave the archive |
+| `addBookmarks(bookmarkIds, source): Promise<ReadLaterBatchResult>` | Queues library bookmarks. No bookmarks are created |
+| `getQuickList(limit): Promise<ReadLaterQuickList>` | Newest unread items for the in-page edge panel |
+| `open(bookmarkId): Promise<boolean>` | Opens the item in a new active tab and marks it as reading. Remembers the tab for enrichment and for the reading bar |
+| `getReadingSession(tabId, pageUrl): Promise<ReadingSession \| null>` | Session of a tab opened from the queue. `null` once the item is read or removed, or after the tab navigated elsewhere |
+| `endReadingSession(tabId): Promise<void>` | Forgets the reading tab |
+| `handleTabComplete(tabId): Promise<void>` | Runs when a tab finishes loading: fills in links that were added without opening them, then sends `TAB_MESSAGES.readingSession` to the page |
+| `markRead(bookmarkIds): Promise<void>` | Sets status `read` and counts `readLaterRead` |
+| `requeue(bookmarkIds): Promise<void>` | Moves items back to unread and renews their expiry. Counts `readLaterAdded` for items that were not pending |
+| `updateNote(bookmarkId, note): Promise<void>` | Sets the note. An empty note clears it |
+| `keep(bookmarkIds, { classify? }): Promise<void>` | Sets `queueOnly: false`. With `classify`, AI fills in an empty category, tags and description |
+| `remove(bookmarkIds): Promise<{ trashed; dequeued }>` | Queue-only bookmarks go to the trash. Library bookmarks get `removedAt` |
+| `runExpiry(now?): Promise<number>` | Daily task: pending items past `expireAfterDays` become `expired`. Nothing is deleted |
+| `revert(record: ReadLaterUndoRecord): Promise<void>` | Undo: reopens closed tabs, purges created bookmarks and restores the previous queue state |
+
+`addTab()` details:
+
+- Defaults: `source` is `"manual"`, and `closeTab` follows `readLater.closeTabOnAdd`.
+- When `saveSnapshotOnAdd` is on and the item is new to the queue and not private, it waits for the offline snapshot (at most 10 s). If the snapshot fails, the entry is marked `snapshotMissing`.
+- It never closes a pinned tab.
+- The toast appears in the tab, or in the tab that becomes active after closing. `showFeedback: false` turns it off.
+- It writes an AI summary for new, non-private bookmarks unless `autoSummary` is `"off"`.
+
+`addLink()` details:
+
+- The title comes from the link text. When that is missing, it is asked from the source tab or derived from the URL.
+- The entry is marked `needsEnrichment`.
+- The toast appears in the source tab, or else in the active tab.
+
+### tab-activity-service
+
+Records when each tab in a normal, non-incognito window was first seen and last used. Background only.
+
+- Activating a tab, focusing its window and switching away from it count as use. So does navigating the active tab.
+- Each day with such an interaction is recorded as a usage day.
+- Every event persists its change, so the MV3 service worker can stop at any time.
+- Records never leave the device.
+
+Export: `tabActivityService`.
+
+| Method | Description |
+| --- | --- |
+| `isTracking(): Promise<boolean>` | Whether `activityTracking` is on |
+| `initialize(): Promise<void>` | Idempotent start-up; every handler waits for it. Details below |
+| `syncRecords(current, previous?, now?): Promise<TabActivityRecord[]>` | Same browser session: creates estimated records for unknown tabs, refreshes positions and drops records of tabs that are gone. Also used by the sweep |
+| `forgetWindow(windowId): void` | Drops the cached window type and the stored active tab |
+| `handleCreated(tab)` | Creates a record, or takes one from the restart pool |
+| `handleActivated({ tabId, windowId })` | The previous tab was in use until now. The new tab is in use now. Records the usage day |
+| `handleUpdated(tabId, changeInfo, tab)` | URL change: counts as use only for the active tab. Audible change: sets `lastAudibleAt` |
+| `handleRemoved(tabId, removeInfo)` | Deletes the record. Keeps it when the window is closing, for the next start-up |
+| `handleReplaced(addedTabId, removedTabId)` | Moves the record to the new tab ID |
+| `handleAttached(tabId, attachInfo)` | Updates window and index. Deletes the record when the tab moved to a non-normal window |
+| `handleWindowFocusChanged(windowId)` | The previous window's tab was in use until now. The newly focused window's active tab is in use now |
+| `setLocked(tabIds, locked): Promise<void>` | Locks or unlocks tabs (creates records when needed) and refreshes the persisted `lockedUrls` |
+| `renew(tabIds): Promise<void>` | Resets the idle timer |
+| `clearAll(): Promise<void>` | Runs when tracking is turned off: wipes records, usage days, locked URLs and pending confirmations |
+
+`initialize()` details:
+
+- On a new browser session, it reconciles the previous records with the current tabs (`reconcileActivityRecordsDetailed`).
+- Unclaimed records stay in a pool for 2 minutes, so tabs restored late can still claim them.
+- It updates `lastStartupAt`, `trackingStartedAt` and `lockedUrls`.
+- In the same session, it only runs `syncRecords`.
+
+### tab-archive-service
+
+The safety net behind every tab HamHome closes. Its header does not name a context, but all callers run in the background: the background service, the sweep, the budget service, undo and agent tools. Archiving comes first and closing second. Entries are committed in one transaction before any tab closes, and nothing closes when that write fails. Exports: `tabArchiveService`, `ArchiveTabsOptions { automatic?; skipProtected? }`.
+
+| Method | Description |
+| --- | --- |
+| `archiveTabs(tabIds, reason, options?): Promise<TabArchiveResult>` | Archives, then closes. Details below |
+| `restoreEntries(entryIds, { activate? }): Promise<TabRestoreResult>` | Reopens entries and removes them from the archive. Details below |
+| `restoreBatches(batchIds): Promise<TabRestoreResult>` | Restores every entry of the given batches |
+| `deleteEntries(entryIds): Promise<void>` | Deletes entries |
+| `clear(): Promise<void>` | Clears the archive |
+| `runRetention(now?): Promise<number>` | Daily task: purges entries past `archive.retentionDays` and beyond 10,000 entries, and prunes empty batches older than one day |
+
+`archiveTabs()` details:
+
+- It never closes pinned or incognito tabs.
+- `skipProtected` also skips active, audible, busy and locked tabs. `automatic` marks the batch as automatic.
+- Each entry stores its origin: window, index and tab group.
+- Closing is retried once after 500 ms. Entries of tabs that stayed open are removed from the archive again.
+- It counts `autoArchived` or `manualArchived`.
+
+`restoreEntries()` details:
+
+- Tabs reopen in their original window and position. When that window is gone, they open in the last focused normal window.
+- Auto tab grouping is suppressed for the restored tabs.
+- Budget actions are suppressed for 2 minutes.
+- On Chromium, tabs go back into their tab group, or into a recreated group with the same title and color.
+- `activate` focuses the last restored tab.
+
+### tab-badge-service
+
+Updates the toolbar badge and title:
+
+- **Tab count:** shown when the budget is on or "show count" is set. Colored by budget level when the budget is on.
+- **Pending dot:** a `•` while archive confirmations wait.
+- **Flash:** a short badge where no in-page toast can be shown.
+
+Updates are debounced by 300 ms. The badge runs in the background. `getBudgetStatus()` is also called from extension pages (`useWorkspaceBudgetSwitch`). Exports: `tabBadgeService`, `countBudgetTabs`.
+
+| Method | Description |
+| --- | --- |
+| `countBudgetTabs()` (exported function) | Counts non-pinned tabs per normal, non-incognito window with one `tabs.query`. Marks the focused (or last focused) window |
+| `scheduleRefresh(): void` | Runs `refresh()` after 300 ms (debounced) |
+| `getBudgetStatus(): Promise<TabBudgetStatus>` | Budget status from the settings and the current counts |
+| `refresh(): Promise<void>` | Sets the badge text, color, text color and title. The title is in Chinese or English, from the app language. Skipped while a flash is showing |
+| `flash(text = "✓", color = "#16A34A"): Promise<void>` | Shows a badge for 2.5 s, then refreshes |
+
+### tab-bookmark-service
+
+Quick bookmarking of several open or archived tabs at once (tab center, triage), without AI. Runs in the background and is called through the background service. Existing URLs are skipped, never duplicated. If such a URL was a queue-only Read later bookmark, it moves into the library. Export: `tabBookmarkService`.
+
+| Method | Description |
+| --- | --- |
+| `bookmarkTabs(tabIds, { categoryByTabId? }): Promise<QuickBookmarkResult>` | Extracts content from 3 tabs at a time. Private pages get no description or content. `categoryByTabId` files tabs into existing categories (from AI tidy-up). Queues embeddings |
+| `bookmarkArchiveEntries(entryIds): Promise<QuickBookmarkResult>` | Uses only the title and URL of archived entries |
+
+### tab-budget-service
+
+Handles an open tab count over the budget. Background only. The budget never blocks opening a tab. Depending on `overBudgetAction`, it does one of three things:
+
+- Only colors the badge.
+- Shows one gentle in-page nudge per overage. A 15-minute cooldown, "not today" and snooze are respected.
+- When explicitly turned on on this device, archives the least recently used idle tabs to make room, with an undo toast.
+
+Export: `tabBudgetService`.
+
+| Method | Description |
+| --- | --- |
+| `evaluate(grew: boolean): Promise<void>` | Runs after tabs open, close or move (the caller debounces). Details below |
+| `scheduleNudge(): void` | Tries the nudge after `NUDGE_DWELL_MS` (3 s) |
+| `onPageReady(): Promise<void>` | Retries a pending nudge that was not shown yet, when the user lands on another page |
+
+`evaluate()` details:
+
+- It tracks the overage episode in session storage.
+- It acts only when the count grew and the action is not `badge-only`.
+- It does nothing within 15 minutes after start-up or while HamHome is opening tabs in bulk.
+- Otherwise it makes room when that is effective on this device, and falls back to the nudge.
+- The nudge appears on the active, fully loaded tab. It lists up to 3 least recently used, unprotected candidates. On private pages their titles are hidden.
+
+### tab-content-service
+
+Talks to content scripts on behalf of the background:
+
+- Makes sure a content script runs. Tabs opened before the extension was installed or updated get the manifest scripts injected on demand.
+- Extracts reading content.
+- Asks about page signals (unsubmitted input, context-menu link).
+
+Pages that cannot be scripted fall back to the tab title. Exports: `tabContentService`, `ExtractedTabContent` (`ReadingPageContent` plus `isPrivate` and `partial`).
+
+| Method | Description |
+| --- | --- |
+| `ping(tabId): Promise<boolean>` | Sends `TAB_MESSAGES.ping` with an 800 ms timeout |
+| `ensureContentScript(tabId): Promise<boolean>` | Pings the tab. If needed, waits up to 3 s for a loading page, then injects via `scripting.executeScript` and pings again. Resolves `false` for pages that cannot host a content script |
+| `extract(tabId): Promise<ExtractedTabContent \| null>` | Title, description, Markdown and reading time. Never throws. Details below |
+| `hasDirtyForm(tabId): Promise<boolean>` | Sends `TAB_MESSAGES.queryDirtyForm` (600 ms timeout). An unreachable page counts as clean |
+| `getContextLinkText(tabId, linkUrl): Promise<string>` | Text of the link the user right-clicked (`TAB_MESSAGES.contextLink`) |
+
+`extract()` details:
+
+- It sends `TAB_MESSAGES.extractReading` with a 6 s timeout.
+- Private pages return only the title and URL, with `isPrivate` set.
+- Discarded or unreachable tabs fall back to a one-off metadata script, or to the tab metadata (`partial: true`).
+
+### tab-feedback-service
+
+Shows in-page feedback: undo toasts after "read later & close" or archiving, and budget nudges. The content UI renders them. Pages that cannot host the UI get a badge flash. Runs in the background and is called by read-later-service and tab-budget-service. Export: `tabFeedbackService`.
+
+| Method | Description |
+| --- | --- |
+| `show(tabId, feedback): Promise<boolean>` | Ensures a content script and sends `TAB_MESSAGES.feedback`. Resolves `false` when the feedback could not be shown |
+| `findActiveTab(windowId?): Promise<Tab \| null>` | Active tab of the window, or of the last focused normal window |
+| `showInActiveTab(windowId, feedback, fallbackBadge = "✓"): Promise<boolean>` | Shows the feedback on the tab the user is looking at. Falls back to a badge flash |
+
+### tab-lifecycle-background
+
+`registerTabLifecycleBackground()` wires up the lifecycle features in the background. `entrypoints/background.ts` must call it synchronously at start-up, so that MV3 delivers the events that woke the service worker.
+
+On registration it:
+
+- Runs `tabActivityService.initialize()` and `tabLifecycleService.syncAutoArchiveActivation()`.
+- Runs the daily tasks (archive retention and Read later expiry) once per browser session. The session key `tl.dailyTasksRan` records the run, because alarms do not catch up while the device is off.
+- Schedules a badge refresh and a stats sample.
+
+Alarms (the names are exported as constants):
+
+| Alarm | Period | Runs |
+| --- | --- | --- |
+| `TAB_LIFECYCLE_SWEEP_ALARM` (`"tab-lifecycle-sweep"`) | 30 min | `tabLifecycleService.runSweep()` and a stats sample |
+| `TAB_ARCHIVE_RETENTION_ALARM` (`"tab-archive-retention"`) | 24 h | `tabArchiveService.runRetention()` |
+| `READ_LATER_EXPIRY_ALARM` (`"read-later-expiry"`) | 24 h | `readLaterService.runExpiry()` |
+
+Listeners:
+
+| Event | Effect |
+| --- | --- |
+| `runtime.onStartup` | `tabActivityService.initialize()` |
+| `tabs.onCreated` | `handleCreated`, then a budget check (count grew) |
+| `tabs.onActivated` | `handleActivated`, then a nudge retry (`tabBudgetService.onPageReady`) |
+| `tabs.onUpdated` | `handleUpdated`. A pin change triggers a budget check (count grew when the tab was unpinned). `status: "complete"` triggers `readLaterService.handleTabComplete` and, for the active tab, a nudge retry |
+| `tabs.onRemoved` | `handleRemoved`, clears the busy flag, ends the reading session, then a budget check |
+| `tabs.onReplaced` | `handleReplaced` |
+| `tabs.onAttached` | `handleAttached`, then a budget check (count grew) |
+| `tabs.onDetached` | Badge refresh |
+| `windows.onFocusChanged` | `handleWindowFocusChanged`, a badge refresh and a stats sample |
+| `windows.onRemoved` | `tabActivityService.forgetWindow` |
+| `runtime.onMessage` (sender is a tab) | `TAB_MESSAGES.busy` calls `tabSessionStorage.setBusy(tabId, busy, TAB_BUSY_TTL_MS)`. `TAB_MESSAGES.readLaterThisTab` calls `readLaterService.addTab(tabId, { source: "manual" })` |
+| `tabLifecycleConfigStorage.watchSettings` | Syncs auto archive activation, then a badge refresh and a stats sample |
+
+A budget check is debounced by 400 ms, so bursts become one `tabBudgetService.evaluate(grew)` call. Each check also schedules a badge refresh and a stats sample. Stats samples are debounced by 2 s.
+
+### tab-lifecycle-service
+
+Orchestrates the tab lifecycle.
+
+- `getSnapshot()` is read-only. It works in the background and in extension pages, which share the IndexedDB origin.
+- `runSweep()` runs in the background only.
+- Automatic closing starts only after the user turned it on on this device. Turning it on is never retroactive.
+
+Exports: `tabLifecycleService`, `STARTUP_GRACE_MS` (15 min), `SnapshotOptions { dirtyTabIds? }`.
+
+| Method | Description |
+| --- | --- |
+| `loadNormalTabs(): Promise<{ tabs; focusedWindowId? }>` | Tabs of all normal, non-incognito windows, with one `windows.getAll` call |
+| `getSnapshot(options?): Promise<OpenTabsSnapshot>` | Builds the snapshot. Details below |
+| `runSweep(now?): Promise<TabLifecycleSweepSummary>` | Auto archive check. Details below |
+| `syncAutoArchiveActivation(settings?, now?): Promise<void>` | Tracks when auto archive becomes effective: sets `autoArchiveActive` and the idle-time baseline |
+| `setAutoArchiveEnabled(enabled, patch?): Promise<TabLifecycleSettings>` | Called from this device's UI. Turning it on records consent, and idle time counts from now. Turning it off clears pending confirmations |
+| `setOverBudgetAction(action): Promise<TabLifecycleSettings>` | `"auto-archive"` records make-room consent |
+| `acceptSyncedConsent(kind): Promise<void>` | Accepts on this device a switch that another device turned on |
+| `setActivityTracking(enabled): Promise<void>` | Turning it off wipes activity data (`tabActivityService.clearAll`). Turning it on initializes tracking again |
+| `completeOnboarding(): Promise<void>` | Sets `onboardingCompletedAt` (only the first time) |
+| `confirmPendingArchive(tabIds?): Promise<number>` | Confirm mode: archives the pending tabs (reason `"expired"`, protected tabs skipped) |
+| `keepPendingArchive(tabIds?): Promise<void>` | Confirm mode: renews the pending tabs and drops them from the list |
+| `dismissBudgetNudge(mode: "today" \| "hour"): Promise<void>` | `"today"`: no nudge for the rest of the day. `"hour"`: snooze for one hour |
+| `resumeBudgetNudge(): Promise<void>` | Clears the dismissal and the snooze |
+| `focusTab(tabId): Promise<void>` | Activates the tab and focuses its window |
+
+`getSnapshot()` details:
+
+- It reads tabs, groups, settings, state, busy and bulk-opened tabs, pending confirmations and the tab-group rules that protect their tabs.
+- It reads activity records only while tracking is on.
+- It passes everything to `buildOpenTabsSnapshot`.
+- `options.dirtyTabIds` adds the dirty-form protection to those tabs.
+
+`runSweep()` details:
+
+- It stores the summary as `state.lastSweep` and refreshes the badge.
+- It skips with a reason: `tracking-off`, `inactive`, `startup-grace` (15 min) or `min-open-tabs`.
+- It handles at most 30 expired, unprotected tabs per run. With `protectDirtyForms`, those tabs are re-checked for unsubmitted input.
+- In mode `mark-only` it only marks tabs. In `confirm` it stores them as pending confirmations. In `auto` it archives them with reason `"expired"`.
+
+### tab-stats-service
+
+Local tab stats. It samples the open tab count while activity tracking is on, and counts archive, restore and Read later events. Recording never throws into the action it counts. Runs in the background. Export: `tabStatsService`.
+
+| Method | Description |
+| --- | --- |
+| `sample(now?): Promise<void>` | Records the open tab count (pinned tabs excluded) and whether it is over budget. Writes when something changed, on a new day, or at least every 10 minutes. When tracking is off, it clears `lastSample` |
+| `count(counter: TabStatsCounter, delta = 1): void` | Fire and forget: increments today's counter |
+| `getWeeklyOverview(now?): Promise<TabWeeklyOverview>` | Overview of the last 7 days (`buildWeeklyOverview`) |
+
+### tab-triage-service
+
+AI tidy-up of open tabs. Runs in extension pages; applying the result goes through the background. It decides which tabs AI may see and which local rules decide, reuses cached answers, asks AI in batches of 40 (2 at a time) and checks the answers. Exports: `tabTriageService`, `TabTriageError` (`code: "not-configured" | "failed"`).
+
+| Method | Description |
+| --- | --- |
+| `isAvailable(): Promise<boolean>` | Whether an AI agent is configured |
+| `suggest(snapshot): Promise<TabTriageResult>` | Builds suggestions for the snapshot. Details below |
+
+`suggest()` details:
+
+- It throws `TabTriageError("not-configured")` when no AI is set up.
+- It checks every tab for private content.
+- Pinned, protected, private and non-web tabs get local suggestions from the rule-based tidy-up.
+- It reuses cached answers for 24 hours, matched by cleaned URL and language.
+- The prompt also gets up to 30 workspace names and the bookmark category paths.
+- It throws `"failed"` only when every batch failed.
+- Fresh answers are merged into the cache.
+
+### tab-undo-records
+
+Undo records behind the in-page Undo buttons. They are kept in `storage.session` (`tl.undo.<token>`), so they survive a service worker restart, and are honoured for 10 minutes. Exports: `UNDO_TTL_MS`, and the types `ArchiveUndoRecord`, `ClosedTabSnapshot`, `ReadLaterUndoRecord` and `TabUndoRecord`.
+
+| Method | Description |
+| --- | --- |
+| `saveUndoRecord(record): Promise<string>` | Stores the record and returns its token (`nanoid`) |
+| `takeUndoRecord(token): Promise<TabUndoRecord \| null>` | Reads and deletes the record. Returns `null` when it is unknown or older than 10 minutes |
+
+### tab-undo-service
+
+Undo for the in-page toasts. Runs in the background (`undoTabAction`). Export: `tabUndoService`.
+
+| Method | Description |
+| --- | --- |
+| `undo(token): Promise<boolean>` | An archive record restores its batch. A Read later record is reverted with `readLaterService.revert`. Resolves `false` when the token is unknown or expired |
+
+### tab-triage-agent-service (`lib/agent/services`)
+
+One structured agent call per batch of the AI tidy-up. The command is `suggestTabTriage`, with at most 1 iteration, temperature 0.2 and a Chinese or English system prompt, chosen by the configured language. The prompt carries only ids, idle times, tab groups, titles and cleaned URLs, plus the existing workspace names and category paths. It never carries page content. Called by tab-triage-service. Export: `tabTriageAgentService`.
+
+| Method | Description |
+| --- | --- |
+| `suggest({ items, workspaces, categories }): Promise<{ items: RawTriageItem[]; language }>` | Runs the command with a JSON output schema (destination `keep`, `readLater`, `bookmark`, `workspace` or `close`) and parses the answer with zod. Errors are rethrown with `getAgentErrorMessage(error, "AI 整理失败")` |
+
+### tab-lifecycle-tools (`lib/agent/tools`)
+
+Agent tools for open tabs, the tab archive and Read later. `createGlobalAgentTools` adds them for the global agent, which runs in the background. Services load on first use. The agent can never turn on auto archive or auto make room; those switches only exist in the UI. Exports: `createTabLifecycleTools(): AgentTool[]`, and `isAutoApprovedCall` (re-exported). Approval follows `requiresUserApproval`, which gates every tool with `riskLevel: "high"`.
+
+| Tool | Risk level | Read only | Needs approval | Description |
+| --- | --- | --- | --- | --- |
+| `list_open_tabs` | low | yes | no | Open tabs with idle days (and whether that is an estimate), protection, idle state, duplicates and tab group. Filters: `minIdleDays`, `duplicatesOnly`, `query`, `limit` (default 50, max 200) |
+| `get_tab_lifecycle_status` | low | yes | no | Budget, stats, auto archive status, pending confirmations, tabs auto-archived in the last 24 h, archive size and Read later counts |
+| `search_tab_archive` | low | yes | no | Searches the archive by `query`, `domain`, `reason`, `withinDays` and `limit` (default 30) |
+| `restore_archived_tabs` | medium | no | no | Reopens archive entries (`entryIds`) |
+| `move_tabs_to_read_later` | high | no | yes | `readLaterService.addTabs(tabIds, "agent", { closeTabs: true })` |
+| `archive_tabs` | high | no | yes | Archives and closes tabs (reason `"manual"`). Pinned tabs are never closed |
+| `list_read_later` | low | yes | no | Items by `status` (default `unread`), newest first. `limit` defaults to 30 |
+| `update_read_later_status` | high | no | only for batches | Actions `markRead`, `requeue` or `keep`. `keep` lets AI classify only when there is one item. A call with at most one `bookmarkIds` entry is auto-approved |
+
+### tool-approval-rules (`lib/agent/tools`)
+
+Per-call exceptions to the approval policy. The module imports no storage, so the policy stays light. `createToolApprovalPolicy` uses it in `onAsk`.
+
+| Method | Description |
+| --- | --- |
+| `isAutoApprovedCall(toolName, input): boolean` | `true` for `update_read_later_status` with at most one `bookmarkIds` entry, so single items run without asking |
+
+### queue-bookmark-embeddings (`lib/embedding`)
+
+Queues embedding generation for bookmarks. Background only. It does nothing when semantic search is off or not configured. Used by read-later-service, tab-bookmark-service and the background service.
+
+| Method | Description |
+| --- | --- |
+| `queueBookmarkEmbeddings(bookmarkIds, { waitForCompletion? }): Promise<void>` | Adds the existing bookmarks to `embeddingQueue` and starts the queue unless it is already processing. `waitForCompletion` waits for the run to finish |
+
+---
+
+## Storage (tab lifecycle & read later)
+
+Storage modules for Read later and the tab lifecycle. WXT `storage` items and IndexedDB are local to the device unless the table says otherwise.
+
+| Module | Backing store / key | Synced | Exported | Lifetime | Notes |
+| --- | --- | --- | --- | --- | --- |
+| read-later-storage | `local:readLaterEntries` (`ReadLaterEntryMap` keyed by bookmark ID) | WebDAV file `bookmarks/read-later.json` (last write wins per entry) | Yes, `readLaterEntries` in the JSON export | Until removed. Expiry only changes the status. Leaving the queue is soft (`removedAt`) | Holds queue state only; the bookmark stays in bookmark storage. Writes run one after another |
+| tab-lifecycle-db | IndexedDB `HamHomeTabLifecycle` v1: `tabActivity` (key `tabId`), `tabArchive` (key `id`; indexes `closedAt`, `batchId`, `normalizedUrl`), `archiveBatches` (key `id`; index `createdAt`) | No | — | — | Native IndexedDB helpers. Extension pages share the origin with the background. Content scripts must not touch the database |
+| tab-activity-storage | IndexedDB `HamHomeTabLifecycle.tabActivity` | No | No | One record per open tab. Deleted when the tab closes, but kept when its window closes (for the next start-up). Wiped when tracking is turned off | One readwrite transaction per write |
+| tab-archive-storage | IndexedDB `HamHomeTabLifecycle.tabArchive` and `archiveBatches`, plus the change counter `local:tabArchiveVersion` | No | Only when the user opts in ("include tab archive", `tabArchive` in the JSON) | Retention of 30, 90 or 180 days, or forever (default 90). At most 10,000 entries (daily retention) | Re-archiving a URL merges into its existing entry (`closeCount` + 1). Every write bumps `local:tabArchiveVersion` |
+| tab-lifecycle-config-storage | `sync:tabLifecycleSettings` | Browser sync storage, plus WebDAV file `tab-lifecycle-config.json` | Yes, `tabLifecycleSettings` in the JSON export | Persistent | Kept out of `LocalSettings`. Fields from newer clients are preserved. Synced switches still need this device's consent |
+| tab-lifecycle-state-storage | `local:tabLifecycleState` | No | No | Persistent on the device. Usage days cover the last 120 days | Usage days, locked URLs, start-up time, consents, onboarding, nudge throttling and the last sweep. The header names the background as the only writer. Updates run one after another |
+| tab-session-storage | `storage.session`, keys `tl.*`. Falls back to an in-memory map where `storage.session` is missing | No | No | Browser session: cleared when the browser or extension restarts, kept across service worker restarts | Active tab per window, focused windows, budget episode, bulk-opened and busy tabs, pending confirmations, enrichment and reading tabs, undo records |
+| tab-stats-storage | `local:tabLifecycleStats` | No | No | 90 days (pruned when sampling) | Counts only, no titles or URLs. Updates run one after another |
+| tab-triage-cache-storage | `local:tabTriageCache` (keyed by cleaned URL) | No | No | 24 hours, at most 500 entries | AI tidy-up answers per URL and language |
+
+### read-later-storage
+
+Export: `readLaterStorage`.
+
+- `getAll()`: copy of all entries (`ReadLaterEntryMap`).
+- `get(bookmarkId)`: one entry, or `undefined`.
+- `update(bookmarkId, updater)`: read-modify-write of one entry. The updater returns the new entry, `null` to delete or `undefined` to leave it unchanged.
+- `updateMany(bookmarkIds, updater)`: same contract for several entries; returns the updated entries.
+- `set(entry)` and `setMany(entries)`: write entries.
+- `remove(bookmarkIds)`: hard delete, used when the bookmark itself is gone for good.
+- `replaceAll(entries)`: replaces the whole map (sync merge).
+- `clear()`: deletes all entries.
+- `watch(callback)`: subscribes to changes and returns an unwatch function.
+
+### tab-lifecycle-db
+
+- `TAB_LIFECYCLE_DB_NAME` (`"HamHomeTabLifecycle"`), plus the store names `TAB_ACTIVITY_STORE`, `TAB_ARCHIVE_STORE` and `ARCHIVE_BATCH_STORE`.
+- `openTabLifecycleDB()`: returns the cached `IDBDatabase`, reset on version change or close.
+- `requestToPromise(request)`: wraps an `IDBRequest` in a promise.
+- `runTabLifecycleTransaction(storeNames, mode, work)`: runs `work` in one transaction and resolves with its result once the transaction committed. Aborts on error.
+
+### tab-activity-storage
+
+Export: `tabActivityStorage`.
+
+- `getAll()`, `getMap()` (keyed by tab ID) and `get(tabId)`.
+- `update(tabId, updater)`: atomic read-modify-write. `null` deletes the record, `undefined` leaves it unchanged.
+- `updateMany(tabIds, updater)`: same, in one transaction.
+- `put(record)` and `putMany(records)`.
+- `delete(tabId)` and `deleteMany(tabIds)`.
+- `replaceAll(records)`: replaces every record (reconciliation after a restart).
+- `clear()`.
+
+### tab-archive-storage
+
+Export: `tabArchiveStorage`.
+
+- `getAllEntries()`, `getEntries(ids)` and `getEntriesByBatch(batchId)`.
+- `getAllBatches()` and `getBatch(id)`.
+- `count()`: number of entries.
+- `addBatch(batch, entries)`: writes a batch with its entries in one transaction (all or nothing) and returns `{ batch, entries }`. URLs that are already archived are merged (`mergeArchiveEntry`) and leave their old batch.
+- `deleteEntries(ids)`: deletes entries. Batches left empty are deleted too.
+- `pruneEmptyBatches(olderThan)`: deletes empty batches older than the given time and returns how many.
+- `clear()`.
+- `bumpVersion()` and `watchVersion(callback)`: change signal for extension pages, which returns an unwatch function. IndexedDB has no change events.
+
+### tab-lifecycle-config-storage
+
+Export: `tabLifecycleConfigStorage`.
+
+- `getSettings()`: normalized settings.
+- `getRawSettings()`: the stored value including fields that only newer clients know (for sync).
+- `updateSettings(patch)`: applies the patch (writes run one after another), sets `updatedAt` and returns the new settings.
+- `importRawSettings(raw)`: applies settings from sync or import as they are, keeping their timestamp.
+- `resetSettings()`: restores the defaults with `updatedAt` set to now.
+- `watchSettings(callback)`: subscribes to normalized settings and returns an unwatch function.
+
+### tab-lifecycle-state-storage
+
+Export: `tabLifecycleStateStorage`.
+
+- `get()`: normalized state.
+- `update(updater)`: read-modify-write; writes run one after another. Returning the same object skips the write.
+- `patch(partial)`: merges a partial state.
+- `reset()`: restores the default state.
+- `watch(callback)`: subscribes to changes and returns an unwatch function.
+
+### tab-session-storage
+
+Exports: `tabSessionStorage`, `BudgetEpisode`.
+
+- `get(key, fallback)`, `set(key, value)` and `remove(key)`: generic access. Other modules also store `tl.reconcilePool` and `tl.dailyTasksRan` this way.
+- `claimNewSession()`: `true` the first time it is called in a browser session.
+- `getActiveTab(windowId)`, `setActiveTab(windowId, tabId)` and `clearActiveTab(windowId)`.
+- `getFocusedWindow()`, `setFocusedWindow(windowId)` (also updates the last focused window) and `getLastFocusedWindow()`.
+- `getBudgetEpisode()` and `setBudgetEpisode(episode | null)`.
+- `markBulkOpened(tabIds, until)` and `getBulkOpened(now?)`, which returns `{ tabIds, activeUntil }`. A `*` entry suppresses budget actions as a whole.
+- `setBusy(tabId, busy, ttlMs)` and `getBusyTabIds(now?)`.
+- `getPendingConfirm()` and `setPendingConfirm(items)`.
+- `getUndo(token)`, `setUndo(token, value)` and `removeUndo(token)`.
+- `setEnrichment(tabId, bookmarkId | null)` and `getEnrichment(tabId)`: links added with "read link later", filled in once their tab finished loading.
+- `setReadingTab(tabId, bookmarkId | null)` and `getReadingTab(tabId)`: tabs opened from Read later.
+
+### tab-stats-storage
+
+Export: `tabStatsStorage`.
+
+- `get()`: normalized stats.
+- `update(updater)`: read-modify-write; writes run one after another. Returning the same object skips the write.
+- `clear()`.
+
+### tab-triage-cache-storage
+
+Export: `tabTriageCacheStorage`.
+
+- `get(now?)`: the cache without expired entries.
+- `merge(entries, now?)`: merges new entries, then prunes.
+- `clear()`.
+
+---
+
+## Utils (tab lifecycle & read later)
+
+Pure helpers, except where noted: `page-signals` and the two buses keep module-level state in the content script.
+
+### tab-archive.utils
+
+Tab archive helpers: retention, merging re-archived URLs, grouping and search.
+
+- `ARCHIVE_MAX_ENTRIES` (10,000), `ARCHIVE_RETENTION_OPTIONS` (`[30, 90, 180, null]`), `RECENT_AUTO_BATCH_MS` (24 h), `SWEEP_MAX_ARCHIVE` (30), `ARCHIVE_REASONS` (`expired`, `budget`, `manual`, `duplicate`, `triage`).
+- `selectArchiveEntriesToPurge(entries, retentionDays, now, maxEntries?)`: IDs past the retention period, then the oldest ones beyond the cap.
+- `mergeArchiveEntry(existing, incoming)`: re-archiving a URL updates the existing entry, which moves to the new batch with `closeCount` + 1.
+- `ArchiveDateGroup`, `ARCHIVE_DATE_GROUPS` and `getArchiveDateGroup(closedAt, now)`: today, yesterday, week or earlier.
+- `buildArchiveSearchText(entry)`: lowercase title and URL.
+- `indexArchiveEntries(entries, now)`: sorts newest first and precomputes the search text and date group (`IndexedArchiveEntry`).
+- `filterArchiveEntries(indexed, filter)`: filters by reason, domain and date group; every query term must match.
+- `listArchiveDomains(entries)`: domains sorted by frequency.
+- `summarizeRecentAutoBatches(batches, entries, now)`: automatic batches of the last 24 hours that were not undone and still hold entries.
+- `getDomainFromUrl(url)`: hostname, or the protocol for URLs without a host.
+- `buildArchiveRows(items, batches)`: `ArchiveListRow[]` with date headers, then batch blocks, then entries.
+
+### tab-budget.utils
+
+Tab budget: counting, badge appearance, nudge throttling and auto make room. Pinned tabs never count.
+
+- `BUDGET_LIMIT_MIN` (5), `BUDGET_LIMIT_MAX` (100), `DEFAULT_BUDGET_LIMIT` (15).
+- `NUDGE_COOLDOWN_MS` (15 min), `NUDGE_DWELL_MS` (3 s), `BULK_OPEN_SUPPRESSION_MS` (2 min), `MAKE_ROOM_MIN_IDLE_MS` (1 h), `MAKE_ROOM_MIN_AGE_MS` (10 min).
+- `BADGE_COLORS`: colors for `normal`, `warning` and `over`.
+- `clampBudgetLimit(limit)`: rounds and clamps to 5–100; returns 15 for a non-finite value.
+- `getBudgetLevel(count, limit)`: `normal` below 80%, `warning` from 80%, `over` above the limit.
+- `formatBadgeCount(count)`: badge text, capped at `"99+"`.
+- `computeBudgetStatus({ enabled, limit, scope, windows, lastFocusedWindowId? })`: `TabBudgetStatus`. In `per-window` scope it counts the focused window, else the last focused one, else the first.
+- `getNudgeBlockReason(state, episodeNudged, now)`: `alreadyShown`, `dismissedToday`, `snoozed`, `cooldown` or `null`.
+- `selectMakeRoomCandidates(tabs, over, now)`: up to `over` tab IDs, least recently used first. Only unprotected tabs that were not bulk-opened, idle for at least 1 h and first seen at least 10 min ago.
+
+### tab-duplicates.utils
+
+Duplicate tab detection. It uses the bookmark URL normalization (tracking parameters and trailing slash removed, hash kept).
+
+- `normalizeTabUrl(url)`: comparison URL. Blank and new-tab pages are reduced to their lowercase base; returns `null` for an empty URL.
+- `buildTabDuplicateGroups(tabs)`: `TabDuplicateGroup[]`. The tab to keep is the current tab, then a pinned tab, then the most recently used one. `redundantTabIds` never contains pinned tabs.
+
+### tab-idle.utils
+
+Idle evaluation. In usage-day mode, a day threshold expires only when both the wall-clock time and the number of usage days reach it. Hour thresholds only use wall-clock time.
+
+- `HOUR_MS`, `DAY_MS`, `IDLE_DISPLAY_MS` (24 h, the "idle" label in the UI), `IDLE_THRESHOLD_OPTIONS` (12 h and 1, 3, 7, 14 or 30 days).
+- `thresholdToMs(threshold)` and `isSameThreshold(a, b)`.
+- `evaluateIdle({ lastActiveAt, now, threshold, countBy, usageDays })`: `IdleEvaluation` with idle time, usage days since, expired, expiring and remaining time. A timestamp in the future counts as just used.
+- `getIdleState(evaluation)`: `expired`, `expiring`, `idle` or `fresh`.
+- `estimateExpiryAt(evaluation, now)`: estimated expiry time, assuming daily use.
+
+### tab-lifecycle-settings.utils
+
+Lifecycle settings defaults, normalization and consent checks. Unknown values fall back to the defaults, so a malformed file never turns on anything that closes tabs.
+
+- `DEFAULT_IDLE_THRESHOLD` (7 days), `READ_LATER_EXPIRY_OPTIONS` (`[14, 30, 60, null]`), `MIN_OPEN_TABS_MAX` (50).
+- `DEFAULT_TAB_LIFECYCLE_SETTINGS`: activity tracking on; auto archive and budget off; Read later closes the tab on add, expires after 30 days and summarizes `manual-only`.
+- `DEFAULT_TAB_LIFECYCLE_STATE`: empty device state, without any consent.
+- `normalizeTabLifecycleSettings(raw)` and `normalizeTabLifecycleState(raw)`: tolerant parsing.
+- `applyTabLifecycleSettingsPatch(current, patch, now)`: merges the nested sections, normalizes and sets `updatedAt`.
+- `isAutoArchiveEffective(settings, state)`: tracking on, auto archive on and this device consented.
+- `isAutoMakeRoomEffective(settings, state)`: tracking on, budget on, action `auto-archive` and this device consented.
+- `getPendingConsents(settings, state)`: switches that are on in the settings but not consented on this device.
+- `shouldShowBadgeCount(settings)`: `budget.enabled || budget.showBadge`.
+- `preserveUnknownSettingFields(raw, normalized)`: keeps fields from newer clients next to the normalized ones.
+
+### tab-messages
+
+Message types between the background and content scripts for the lifecycle features, kept in one place so both sides agree on the names.
+
+- `TAB_MESSAGES`, background to content:
+  - `ping` (`HAMHOME_PING`)
+  - `extractReading` (`EXTRACT_READING_CONTENT`)
+  - `feedback` (`HAMHOME_TAB_FEEDBACK`)
+  - `queryDirtyForm` (`HAMHOME_QUERY_DIRTY_FORM`)
+  - `contextLink` (`HAMHOME_GET_CONTEXT_LINK`)
+  - `readingSession` (`HAMHOME_READING_SESSION`)
+- `TAB_MESSAGES`, content to background:
+  - `busy` (`HAMHOME_TAB_BUSY`)
+  - `readLaterThisTab` (`HAMHOME_READ_LATER_THIS_TAB`)
+- `TAB_BUSY_TTL_MS` (15 min): how long a save overlay left open keeps its tab protected; renewed while it stays open.
+
+### tab-onboarding.utils
+
+First-run guidance helpers: protected domain recommendations and the tabs preselected by "tidy up now".
+
+- `WEB_APP_DOMAINS`: mail, chat and other web apps people keep open on purpose.
+- `recommendProtectedDomains(tabs, alreadyProtected?)`: domains of pinned tabs and known web apps among the open tabs, minus the protected ones, sorted.
+- `selectTidyNowTabIds(snapshot)`: unprotected redundant duplicates and stale tabs.
+- `estimatedShare(snapshot)`: share of tabs whose idle time is only an estimate.
+
+### tab-protection.utils
+
+Protection rules. A protected tab is never closed automatically.
+
+- `AUDIBLE_PROTECTION_MS` (10 min).
+- `ALWAYS_ON_PROTECTIONS`: `pinned`, `active`, `locked` and `saving`, which cannot be turned off.
+- `getProtectionReasons(input, options)`: `TabProtectionReason[]` (adds `audible`, `protectedDomain`, `grouped` and `dirtyForm` depending on the options).
+- `normalizeProtectedDomain(input)`: accepts `example.com`, `*.example.com`, a URL or a host with a path. Strips `www.` and returns `null` for an invalid domain.
+- `matchesProtectedDomain(hostname, domains)`: matches the domain or any of its subdomains, ignoring `www.`.
+
+### tab-reconcile.utils
+
+Reconciles activity records after a browser restart, when tab IDs change. Records are matched by normalized URL and window position, in this order:
+
+1. Same tab ID.
+2. Same window position.
+3. Same window, closest index.
+4. Anywhere.
+
+- `ReconcileTab`: `{ tabId, windowId, index, url }`.
+- `createActivityRecord(tab, now, { estimated?, locked? })`: a new record.
+- `reconcileActivityRecords(previous, current, now, lockedUrls?)`: one record per current tab. Unmatched tabs start from now, marked estimated.
+- `reconcileActivityRecordsDetailed(...)`: same, and also returns the `unclaimed` records.
+- `collectLockedUrls(records)`: sorted URLs of locked records.
+
+### tab-snapshot.utils
+
+Builds the open tabs snapshot shared by the tab center, the popup card, the budget and the sweep. Every input is passed in, so the module stays pure and unit-testable.
+
+- `RawTab`, `RawTabGroup` and `SnapshotInput` types.
+- `normalizeGroupTitle(title)`: trimmed, lowercase group title.
+- `getTabUrl(tab)`: `url`, or `pendingUrl`.
+- `getTabGroupId(tab)`: group ID, or `undefined` for ungrouped tabs.
+- `buildOpenTabsSnapshot(input)`: `OpenTabsSnapshot` with per-tab protection, idle state, archive time and duplicates, plus windows, budget, stats, auto archive status and pending confirmations. `tab.lastAccessed` only affects the displayed idle time; it is never used to decide on automatic archiving.
+- `selectSweepCandidates(snapshot, settings, max)`: expired, unprotected tabs, least recently used first. At most `max`, and never below `minOpenTabs`.
+- `sortTabsByLeastRecentlyUsed(tabs)`: least recently used first, with the current tab of each window last.
+
+### tab-stats.utils
+
+Local tab stats: daily peak and time-weighted average of open tabs, time over budget and event counters. Counts only; kept for 90 days.
+
+- `STATS_MAX_STEP_MS` (35 min, the longest gap that is counted), `STATS_RETENTION_DAYS` (90), `EMPTY_TAB_STATS`.
+- `createEmptyDay(date)`: empty `TabDailyStats`.
+- `shiftLocalDateKey(timestamp, offset)`: local date key `offset` days away (DST safe).
+- `recordOpenSample(stats, sample)`: credits the previous count up to now, split at midnight, and updates the day's peak.
+- `isSampleWorthWriting(stats, sample, minIntervalMs)`: `true` when the count or over-budget flag changed, on a new day, or after the interval.
+- `incrementStatsCounter(stats, counter, delta, now)`: increments today's counter.
+- `pruneStats(stats, now, keepDays?)`: drops days older than the retention period.
+- `normalizeTabStats(raw)`: tolerant parsing.
+- `buildWeeklyOverview(stats, now, samplingEnabled)`: `TabWeeklyOverview` for the last 7 days against the 7 days before.
+- `getAverageChangePercent(overview)`: week-over-week change of the average, rounded, or `null`.
+
+### tab-tidy.utils
+
+Rule-based tidy-up suggestions without AI. Every unprotected tab gets at most one suggestion, in this order:
+
+1. Duplicates.
+2. Low-value pages.
+3. Read later.
+4. Archive.
+5. Fold into a workspace.
+
+- `TidySuggestionKind`, `TidyWorkspaceGroup` and `TidySuggestions` types.
+- `WORKSPACE_SUGGESTION_MIN_TABS` (5).
+- `isLowValueTab(tab)`: blank tabs, search result pages and sign-in or verification paths.
+- `isArticleLikeTab(tab)`: blog, article, news or post signals in the title or URL.
+- `buildTidySuggestions(snapshot, now)`:
+  - `readLater`: article-like tabs idle for a day or more.
+  - `archive`: stale tabs, or tabs that are expired or expiring.
+  - `workspaces`: 5 or more idle tabs from one tab group or one domain.
+- `countTidySuggestions(suggestions)`: total number of suggested tabs.
+
+### tab-triage.utils
+
+The parts of AI tidy-up that need no AI: which tabs go to AI, what is sent, checking the answer and the 24-hour cache.
+
+- `TRIAGE_DESTINATIONS`, `TRIAGE_MAX_TABS` (120), `TRIAGE_BATCH_SIZE` (40), `TRIAGE_CACHE_TTL_MS` (24 h), `TRIAGE_CACHE_MAX_ENTRIES` (500).
+- `sanitizeTriageUrl(url)`: normalized URL without hash, credentials or sensitive parameters, truncated to 200 characters. Also used as the cache key.
+- `formatIdleForPrompt(ms)`: `"3d"`, `"5h"` or `"20m"`.
+- `partitionTriageTabs(tabs, privateTabIds, maxTabs?)`: returns `aiTabs` (most idle first, capped), `localTabs` (pinned, protected, private or non-web) and `skippedCount`.
+- `buildLocalTriageSuggestions(localTabs, tidy)`: pinned and protected tabs are kept. Other local tabs follow the rule-based tidy-up, otherwise they are kept.
+- `buildTriagePromptItems(batch, now)`: prompt rows with a 1-based `id`, cleaned title and URL, domain, idle time and group.
+- `buildCategoryOptions(categories, limit?)`: category paths such as `"Parent / Child"`, at most 80.
+- `matchCategoryOption(name, options)`: matches the full path, or the last name when that is unambiguous.
+- `normalizeTriageItems(raw, batch, categories)`: drops unknown tabs and destinations, keeps at most one suggestion per tab, resolves categories and fills in a workspace name.
+- `pickCachedSuggestions(tabs, cache, now, language, categories)`: returns `{ cached, misses }`.
+- `toCacheEntries(suggestions, tabs, now, language)`: cache entries from the AI suggestions (local suggestions are not cached).
+- `pruneTriageCache(cache, now, maxEntries?)`: drops expired entries and keeps the newest.
+- `groupTriageSuggestions(suggestions)`: `TriageGroup[]` per destination, in a fixed order. Workspace items are sorted by name.
+- `getDefaultTriageSelection(suggestions)`: everything except what local rules keep.
+- `chunk(items, size)`: splits an array into batches.
+
+### tab-view.utils
+
+Open tabs list of the tab center: grouping, sorting, filters and search, flattened into rows for the virtual list.
+
+- `OpenTabsGroupBy` (`window`, `group`, `domain`), `OpenTabsSort` (`position`, `recent`, `idle`), `OpenTabsFilter` (`idle`, `expiring`, `duplicates`, `protected`), plus `OpenTabsViewOptions`, `OpenTabsGroupLabel` and `OpenTabsRow`.
+- `matchesOpenTabFilter(tab, filter, now)`: whether a tab matches one filter.
+- `filterOpenTabs(tabs, { filters, query, now })`: every search term must match, and the tab must match any selected filter.
+- `buildOpenTabsRows(snapshot, options)`: a header row per group, followed by its tab rows. Domain groups are sorted by size.
+
+### usage-days.utils
+
+Usage days: local dates on which the user actually used the browser. Day-based idle thresholds count these instead of calendar days.
+
+- `USAGE_DAY_RETENTION_DAYS` (120).
+- `toLocalDateKey(timestamp)`: local date as `YYYY-MM-DD`, which sorts chronologically.
+- `getUsageDayCutoffKey(now, retentionDays?)`: oldest date key still kept.
+- `pruneUsageDays(days, now, retentionDays?)`: sorted, de-duplicated days within the retention period.
+- `addUsageDay(days, now, retentionDays?)`: records today. Returns the same array when today is already recorded, so callers can skip the write.
+- `countUsageDaysAfter(days, afterKey, upToKey)`: usage days after `afterKey`, up to and including `upToKey`.
+
+### read-later.utils (`lib/read-later`)
+
+Read later state machine and queue helpers. Any entry can be kept in the library or deleted. The states change as follows:
+
+- `unread` becomes `reading` when opened, and `reading` becomes `read` when marked read.
+- `unread` and `reading` become `expired` after the expiry period.
+- `read` and `expired` become `unread` again when added again.
+
+- `EXPIRING_SOON_DAYS` (3), `COMPLETION_WINDOW_DAYS` (30).
+- `estimateReadingMinutes(text)`: local estimate (400 CJK characters or 230 words per minute), at least 1. `undefined` when there is nothing to read.
+- `isEntryActive(entry)`: the entry exists and has no `removedAt`.
+- `isEntryPending(entry)`: active and `unread` or `reading`.
+- `getEntryView(entry)`: `unread`, `read`, `expired` or `null`.
+- `getEntryExpiresAt(entry, expireAfterDays)` and `getEntryDaysLeft(entry, expireAfterDays, now)`: expiry time, and whole days left (0 means today).
+- `createReadLaterEntry(input)`: a new `unread` entry.
+- `requeueEntry(entry, now, patch?)`: back to `unread` with a new `addedAt`; read, expired, opened and removed times are cleared.
+- `markEntryReading(entry, now)`: status `reading` (stays `expired` or `read`) and sets `openedAt`.
+- `markEntryRead(entry, now)`: status `read`.
+- `keepEntryInLibrary(entry, now)`: `queueOnly: false`.
+- `removeEntryFromQueue(entry, now)`: sets `removedAt` (soft removal).
+- `collectExpiredEntries(entries, expireAfterDays, now)`: pending entries past the expiry period, returned with status `expired`.
+- `countExpiringSoon(entries, expireAfterDays, now, withinDays?)`: pending entries that expire within the window.
+- `computeCompletionRate(entries, now, windowDays?)`: `{ read, expired, rate }`. `rate` is `null` when there is nothing yet.
+- `getQueueOnlyIds(entries)` and `filterLibraryBookmarks(bookmarks, entries)`: library views never show queue-only items.
+- `ReadLaterItem`, `getItemDomain(url)` (hostname without `www.`) and `buildReadLaterItems(entries, bookmarks)`: joins active entries with their live bookmarks.
+- `sortReadLaterItems(items, sort)`: `newest`, `oldest`, `shortest` (by `estimatedMinutes`) or `expiring` (oldest `addedAt` first).
+- `buildQuickList(entries, bookmarks, limit)`: newest unread items and the total unread count.
+- `matchesReadLaterQuery(item, query)`: every term must match the title, URL, description or note.
+- `mergeReadLaterEntries(local, remote)`: last-write-wins merge by bookmark ID; also returns `localChanged` and `remoteChanged`.
+- `reconcileEntriesWithBookmarks(entries, bookmarks, tombstones, now)`: drops entries of purged bookmarks. When sync merged duplicate bookmarks, the entry moves to the surviving one.
+- `normalizeReadLaterEntry(raw)`: validates an imported entry; `null` when it cannot be used.
+
+### page-signals (`utils`)
+
+Page signals the content script collects for the tab lifecycle. Not pure: it installs document listeners and keeps module-level state. Only booleans and the clicked link's own text ever leave the page.
+
+- `installPageSignals()`: installs capture listeners once, for `input`, `change`, `submit` and `contextmenu`.
+- `hasDirtyForm()`: whether an edited text field, select or contenteditable element still holds its edits. Submitted forms and search fields do not count.
+- `getContextLinkText(href)`: text of the link the context menu was opened on, when it matches `href`.
+
+### reading-session-bus (`utils`)
+
+Passes the "opened from Read later" signal from the content script message listener to the React UI. It keeps one listener and one pending value while the UI is still mounting.
+
+- `readingSessionBus.emit(session)`: delivers to the listener, or keeps the value as pending.
+- `readingSessionBus.subscribe(listener)`: sets the listener, delivers a pending value in a microtask and returns an unsubscribe function.
+
+### tab-feedback-bus (`utils`)
+
+Passes in-page feedback (undo toasts, budget nudges) from the content script message listener to the React UI. It keeps one message while the UI is still mounting, so feedback sent right after injection is not lost.
+
+- `tabFeedbackBus.emit(feedback)`: delivers to the listener, or keeps the message as pending.
+- `tabFeedbackBus.subscribe(listener)`: sets the listener, delivers a pending message in a microtask and returns an unsubscribe function.
+
+### tab-time-format (`utils`)
+
+Locale-aware time labels for the tab center, built on `Intl`.
+
+- `formatIdleDuration(ms, locale)`: the largest whole unit, such as "8 days", "3 hours" or "12 minutes" (at least 1 minute).
+- `formatArchiveTime(timestamp, locale, now?)`: only the time for today; date and time otherwise.
+- `formatDurationMinutes(minutes, locale)`: such as "3 hours 20 minutes", or only minutes under an hour.
+- `formatWeekdayShort(dateKey, locale)`: short weekday of a `YYYY-MM-DD` key.
+
+---
+
 ## ImportExportPage
 
 导入导出页面组件，支持书签、分类、工作空间和 Tab 分组配置的导入导出功能。
@@ -2953,6 +6025,12 @@ AI 分析结果缓存，基于 **IndexedDB** 实现（适合大数据存储）�
 - 同名同父级的分类不会重复创建，直接复用已有分类
 - HTML 导入时会基于书签域名通过 Cravatar favicon API 补全站点图标
 - 导入进度实时显示，支持大量书签的批量导入
+
+**Tab lifecycle & read later:**
+
+- JSON exports include queue-only read later items, every bookmark's read later state and the lifecycle settings; HTML exports only contain library bookmarks.
+- The tab archive is left out by default. An "Include tab archive" checkbox adds it, with a warning that it may contain sign-in links or one-time tokens.
+- JSON imports restore read later state, lifecycle settings and, when present, archive entries (`importLifecycleData`). Imported settings never turn on auto archive or making room on this device without consent.
 
 ---
 

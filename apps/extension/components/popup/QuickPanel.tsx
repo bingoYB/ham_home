@@ -4,13 +4,13 @@
  * 保存书签已改为在页面内完成，Popup 不再承载 AI 分析与保存表单，
  * 只提供快捷开关与入口：保存当前页、保存所有窗口、最近保存、常用设置等。
  */
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { browser } from "wxt/browser";
 import { useTranslation } from "react-i18next";
 import {
   AppWindow,
   Bookmark,
-  BookmarkX,
+  BookOpen,
   ChevronRight,
   Keyboard,
   Loader2,
@@ -19,12 +19,24 @@ import {
   List,
   Zap,
 } from "lucide-react";
-import { Switch, cn, toast } from "@hamhome/ui";
+import { Button, Switch, cn, toast } from "@hamhome/ui";
 import { QuickActions } from "@/components/common/QuickActions";
+import { PopupRecentSection } from "@/components/popup/PopupRecentSection";
+import { PopupTabsCard } from "@/components/popup/PopupTabsCard";
+import { PopupTriagePanel } from "@/components/popup/PopupTriagePanel";
 import { useBookmarks } from "@/contexts";
 import { useShortcuts } from "@/hooks/useShortcuts";
-import { useRelativeTime } from "@/hooks/useRelativeTime";
+import { useOpenTabActions } from "@/hooks/useOpenTabActions";
+import { useOpenTabsSnapshot } from "@/hooks/useOpenTabsSnapshot";
+import { useRecentAutoArchive } from "@/hooks/useRecentAutoArchive";
+import { useTabLifecycleSettings } from "@/hooks/useTabLifecycleSettings";
 import { isNonBookmarkableUrl } from "@/lib/privacy";
+import {
+  buildReadLaterItems,
+  isEntryPending,
+  sortReadLaterItems,
+} from "@/lib/read-later/read-later.utils";
+import { sortTabsByLeastRecentlyUsed } from "@/lib/tabs/tab-snapshot.utils";
 import { getBackgroundService } from "@/lib/services";
 import {
   getBrowserSpecificURL,
@@ -32,7 +44,7 @@ import {
   safeSendMessageToTab,
 } from "@/utils/browser-api";
 import { APP_WEBSITE_URL } from "@/lib/constants/app-info";
-import type { LocalBookmark } from "@/types";
+import type { ReadLaterItem } from "@/lib/read-later/read-later.utils";
 
 /** 最近保存展示条数 */
 const RECENT_LIMIT = 5;
@@ -44,10 +56,35 @@ interface QuickPanelProps {
 
 export function QuickPanel({ onFallbackToSaveView }: QuickPanelProps) {
   const { t } = useTranslation(["common", "bookmark", "settings"]);
-  const { bookmarks, appSettings, updateAppSettings } = useBookmarks();
+  const { bookmarks, allBookmarks, readLaterEntries, appSettings, updateAppSettings } =
+    useBookmarks();
   const { shortcuts } = useShortcuts();
   const [saving, setSaving] = useState(false);
+  const [readingLater, setReadingLater] = useState(false);
   const [unsupportedPage, setUnsupportedPage] = useState(false);
+  const [triageOpen, setTriageOpen] = useState(false);
+  const { snapshot } = useOpenTabsSnapshot();
+  const recentArchive = useRecentAutoArchive();
+  const lifecycle = useTabLifecycleSettings();
+  const tabActions = useOpenTabActions();
+
+  const readLaterQueue = useMemo(
+    () =>
+      sortReadLaterItems(
+        buildReadLaterItems(readLaterEntries, allBookmarks).filter((item) =>
+          isEntryPending(item.entry),
+        ),
+        "newest",
+      ),
+    [allBookmarks, readLaterEntries],
+  );
+  const triageTabs = useMemo(
+    () =>
+      sortTabsByLeastRecentlyUsed(
+        (snapshot?.tabs ?? []).filter((tab) => tab.protection.length === 0),
+      ),
+    [snapshot],
+  );
 
   // 检测当前页面是否可以保存
   useEffect(() => {
@@ -103,6 +140,46 @@ export function QuickPanel({ onFallbackToSaveView }: QuickPanelProps) {
     }
   }, [appSettings.usePopupSavePanel, onFallbackToSaveView]);
 
+  /** Read later & close: the background extracts, saves and closes the tab; the page shows an undo toast */
+  const handleReadLater = useCallback(async () => {
+    setReadingLater(true);
+    try {
+      const [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+      if (!tab?.id || !tab.url || isNonBookmarkableUrl(tab.url)) {
+        setUnsupportedPage(true);
+        return;
+      }
+      const result = await getBackgroundService().readLaterTab(tab.id, { source: "manual" });
+      if (!result.ok) {
+        toast.error(t("bookmark:readLater.addFailed"));
+        return;
+      }
+      if (!result.closed) {
+        toast.success(
+          result.alreadyQueued
+            ? t("bookmark:tabFeedback.readLater.alreadyQueuedShort")
+            : t("bookmark:tabFeedback.readLater.added"),
+        );
+        return;
+      }
+      window.close();
+    } catch (error) {
+      console.error("[QuickPanel] Failed to read later:", error);
+      toast.error(t("bookmark:readLater.addFailed"));
+    } finally {
+      setReadingLater(false);
+    }
+  }, [t]);
+
+  const openReadLaterItem = useCallback((item: ReadLaterItem) => {
+    getBackgroundService()
+      .readLaterOpen(item.entry.bookmarkId)
+      .then(() => window.close())
+      .catch((error: unknown) => {
+        console.error("[QuickPanel] Failed to open read later item:", error);
+      });
+  }, []);
+
   const handleSaveWorkspace = useCallback(async () => {
     try {
       await getBackgroundService().saveCurrentWindowWorkspace();
@@ -136,6 +213,21 @@ export function QuickPanel({ onFallbackToSaveView }: QuickPanelProps) {
           scrollbar-slim 保证滚动条是细条而不是系统默认样式 */}
       <div className="scrollbar-slim min-h-0 flex-1 overflow-y-auto overscroll-contain">
         <div className="space-y-4 p-4">
+          {/* Top: brand and settings */}
+          <header className="flex items-center justify-between">
+            <span className="text-sm font-semibold text-foreground">HamHome</span>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={() => openTab(getExtensionURL("app.html#settings"))}
+              title={t("common:common.settings")}
+              aria-label={t("common:common.settings")}
+            >
+              <Settings className="h-4 w-4" />
+            </Button>
+          </header>
+
           {/* 快捷操作 */}
           <section className="space-y-2">
             <SectionTitle>{t("bookmark:popup.quickActions")}</SectionTitle>
@@ -155,6 +247,20 @@ export function QuickPanel({ onFallbackToSaveView }: QuickPanelProps) {
                 onClick={handleSaveCurrentPage}
               />
               <ActionTile
+                icon={
+                  readingLater ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    <BookOpen className="h-3.5 w-3.5" />
+                  )
+                }
+                iconClassName="bg-violet-500/15 text-violet-500"
+                label={t("bookmark:popup.readLaterAndClose")}
+                hint={formatShortcut("read-later-close")}
+                disabled={readingLater || unsupportedPage}
+                onClick={handleReadLater}
+              />
+              <ActionTile
                 icon={<AppWindow className="h-3.5 w-3.5" />}
                 iconClassName="bg-amber-500/15 text-amber-500"
                 label={t("bookmark:workspace.saveCurrentWindow")}
@@ -164,14 +270,8 @@ export function QuickPanel({ onFallbackToSaveView }: QuickPanelProps) {
               <ActionTile
                 icon={<List className="h-3.5 w-3.5" />}
                 iconClassName="bg-sky-500/15 text-sky-500"
-                label={t("common:common.manageBookmarks")}
+                label={t("bookmark:popup.openHamHome")}
                 onClick={() => openTab(getExtensionURL("app.html"))}
-              />
-              <ActionTile
-                icon={<Settings className="h-3.5 w-3.5" />}
-                iconClassName="bg-muted text-muted-foreground"
-                label={t("common:common.settings")}
-                onClick={() => openTab(getExtensionURL("app.html#settings"))}
               />
             </div>
 
@@ -183,42 +283,46 @@ export function QuickPanel({ onFallbackToSaveView }: QuickPanelProps) {
             )}
           </section>
 
-          {/* 最近保存 */}
-          <section className="space-y-2">
-            <div className="flex items-center justify-between">
-              <SectionTitle>{t("bookmark:popup.recentSaves")}</SectionTitle>
-              <button
-                type="button"
-                className="flex items-center text-xs text-primary transition-opacity hover:opacity-80"
-                onClick={() => openTab(getExtensionURL("app.html"))}
-              >
-                {t("common:common.viewAll")}
-                <ChevronRight className="h-3 w-3" />
-              </button>
-            </div>
+          {/* Tabs: budget, tabs to tidy up, auto archived today */}
+          <PopupTabsCard
+            snapshot={snapshot}
+            recent={recentArchive.summary}
+            needsConsent={
+              lifecycle.pendingConsents.autoArchive || lifecycle.pendingConsents.autoMakeRoom
+            }
+            onboardingDone={!!lifecycle.state.onboardingCompletedAt}
+            triageOpen={triageOpen}
+            onToggleTriage={() => setTriageOpen((open) => !open)}
+            onViewArchive={() => openTab(getExtensionURL("app.html#tabs?view=archive"))}
+            onRestoreRecent={() => {
+              void recentArchive.restoreAll().then((count) =>
+                toast.success(t("bookmark:tabCenter.archive.restored", { count })),
+              );
+            }}
+            onConfirmPending={() => void tabActions.confirmPending()}
+            onOpenTabCenter={() => openTab(getExtensionURL("app.html#tabs"))}
+          />
+          {triageOpen && (
+            <PopupTriagePanel
+              tabs={triageTabs}
+              onReadLater={(tabId) => void tabActions.readLater([tabId])}
+              onBookmark={(tabId) => void tabActions.bookmark([tabId])}
+              onArchive={(tabId) => void tabActions.archive([tabId])}
+              onViewAll={() => openTab(getExtensionURL("app.html#tabs"))}
+            />
+          )}
 
-            {recentBookmarks.length > 0 ? (
-              <ul className="space-y-0.5 rounded-xl border bg-card p-1">
-                {recentBookmarks.map((bookmark) => (
-                  <RecentBookmarkItem
-                    key={bookmark.id}
-                    bookmark={bookmark}
-                    onOpen={() => openTab(bookmark.url)}
-                  />
-                ))}
-              </ul>
-            ) : (
-              <div className="flex flex-col items-center gap-0.5 rounded-xl border border-dashed bg-card px-3 py-4 text-center">
-                <BookmarkX className="mb-1 h-5 w-5 text-muted-foreground/40" />
-                <p className="text-[13px] text-muted-foreground">
-                  {t("bookmark:popup.noRecentSaves")}
-                </p>
-                <p className="text-[11px] text-muted-foreground/70">
-                  {t("bookmark:popup.noRecentSavesHint")}
-                </p>
-              </div>
-            )}
-          </section>
+          {/* Recent saves / Read later */}
+          <PopupRecentSection
+            recentBookmarks={recentBookmarks}
+            readLaterItems={readLaterQueue.slice(0, RECENT_LIMIT)}
+            readLaterCount={readLaterQueue.length}
+            onOpenBookmark={(bookmark) => openTab(bookmark.url)}
+            onOpenReadLater={openReadLaterItem}
+            onViewAll={(tab) =>
+              openTab(getExtensionURL(tab === "readLater" ? "app.html#read-later" : "app.html"))
+            }
+          />
 
           {/* 常用设置 */}
           <section className="space-y-2">
@@ -398,43 +502,5 @@ function LinkRow({ icon, label, description, onClick }: LinkRowProps) {
         <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60 transition-all duration-150 group-hover:translate-x-0.5 group-hover:text-primary" />
       </RowLayout>
     </button>
-  );
-}
-
-interface RecentBookmarkItemProps {
-  bookmark: LocalBookmark;
-  onOpen: () => void;
-}
-
-function RecentBookmarkItem({ bookmark, onOpen }: RecentBookmarkItemProps) {
-  const relativeTime = useRelativeTime(bookmark.createdAt);
-
-  return (
-    <li>
-      <button
-        type="button"
-        onClick={onOpen}
-        className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-muted"
-      >
-        {bookmark.favicon ? (
-          <img
-            src={bookmark.favicon}
-            alt=""
-            className="h-4 w-4 shrink-0 rounded"
-            onError={(event) => {
-              event.currentTarget.style.visibility = "hidden";
-            }}
-          />
-        ) : (
-          <Bookmark className="h-4 w-4 shrink-0 text-muted-foreground" />
-        )}
-        <span className="min-w-0 flex-1 truncate text-sm">
-          {bookmark.title}
-        </span>
-        <span className="shrink-0 text-[11px] text-muted-foreground">
-          {relativeTime}
-        </span>
-      </button>
-    </li>
   );
 }

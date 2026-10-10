@@ -9,9 +9,14 @@ import { constrainEmbeddingDimensions, sanitizeSafeSettingsUpdate } from "./safe
 import { createListHamHomeFeaturesTool } from "../skills/hamhome-feature-skill";
 import { createRuleManagementTools } from "./rule-management-tools";
 import { createBookmarkManagementTools } from "./bookmark-management-tools";
+import { createTabLifecycleTools } from "./tab-lifecycle-tools";
 
 const OPENABLE_VIEWS = [
   "all",
+  "read-later",
+  "health",
+  "trash",
+  "tabs",
   "settings",
   "privacy",
   "categories",
@@ -22,6 +27,8 @@ const OPENABLE_VIEWS = [
   "about",
 ] as const;
 const SETTINGS_TABS = ["ai", "general", "storage"] as const;
+/** Sub views of the tab center (#tabs?view=...) */
+const TAB_CENTER_VIEWS = ["open", "archive", "rules"] as const;
 
 function isObject(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === "object" && !Array.isArray(value);
@@ -81,7 +88,12 @@ async function getSafeSettingsSnapshot() {
 }
 
 async function openExtensionView(view: string, tab?: string) {
-  const hash = view === "settings" && tab ? `${view}?tab=${tab}` : view;
+  const hash =
+    view === "settings" && tab
+      ? `${view}?tab=${tab}`
+      : view === "tabs" && tab && tab !== "open"
+        ? `tabs?view=${tab}`
+        : view;
   const url = getExtensionURL(`app.html#${hash}`);
   const appUrlPrefix = getExtensionURL("app.html");
 
@@ -114,12 +126,14 @@ export async function createGlobalAgentTools(
   const searchTools = await createChatSearchTools(session);
   const ruleTools = createRuleManagementTools();
   const bookmarkTools = createBookmarkManagementTools();
+  const tabLifecycleTools = createTabLifecycleTools();
 
   return [
     createListHamHomeFeaturesTool(),
     ...searchTools,
     ...ruleTools,
     ...bookmarkTools,
+    ...tabLifecycleTools,
     {
       name: "get_safe_plugin_settings",
       description:
@@ -267,15 +281,16 @@ export async function createGlobalAgentTools(
     {
       name: "open_extension_view",
       description:
-        "Open a HamHome extension page such as settings, privacy, bookmarks, categories, tags, workspaces, tab groups, import/export, or about.",
+        "Open a HamHome extension page such as settings, privacy, bookmarks, read later, the bookmark health center (health), the trash, the tab center (tabs: open / archive / rules), categories, tags, workspaces, tab groups, import/export, or about. Auto archive and the tab budget are configured by the user in the tab center rules.",
       parameters: {
         type: "object",
         properties: {
           view: { type: "string", enum: [...OPENABLE_VIEWS] },
           tab: {
             type: "string",
-            enum: [...SETTINGS_TABS],
-            description: "Only applies when view is settings.",
+            enum: [...SETTINGS_TABS, ...TAB_CENTER_VIEWS],
+            description:
+              "Settings tab (ai / general / storage) when view is settings; tab center view (open / archive / rules) when view is tabs.",
           },
         },
         required: ["view"],
@@ -287,10 +302,9 @@ export async function createGlobalAgentTools(
         const view = isString(raw.view) && (OPENABLE_VIEWS as readonly string[]).includes(raw.view)
           ? raw.view
           : "settings";
-        const tab =
-          isString(raw.tab) && (SETTINGS_TABS as readonly string[]).includes(raw.tab)
-            ? raw.tab
-            : undefined;
+        const allowedTabs: readonly string[] =
+          view === "tabs" ? TAB_CENTER_VIEWS : SETTINGS_TABS;
+        const tab = isString(raw.tab) && allowedTabs.includes(raw.tab) ? raw.tab : undefined;
 
         return openExtensionView(view, tab);
       },

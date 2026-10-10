@@ -8,9 +8,11 @@ import { cn, toast } from "@hamhome/ui";
 import { BookmarkHeader } from "./BookmarkHeader";
 import { BookmarkListView } from "./BookmarkListView";
 import { PinnedSection } from "./PinnedSection";
+import { ReadLaterQuickSection } from "./ReadLaterQuickSection";
 import { GlobalAgentLauncher } from "@/components/agent/GlobalAgentLauncher";
 import { useBookmarkSearch } from "@/hooks/useBookmarkSearch";
 import { useGlobalAgent } from "@/hooks/useGlobalAgent";
+import { useReadLaterQuickList } from "@/hooks/useReadLaterQuickList";
 import { nanoid } from "nanoid";
 import { configStorage } from "@/lib/storage/config-storage";
 import type {
@@ -52,6 +54,8 @@ export function BookmarkPanel({
 
   // 全局 AI Agent
   const { isOpen: isAIChatOpen, sources: aiSources } = useGlobalAgent();
+  // Read later quick list, loaded only while the panel is open
+  const readLater = useReadLaterQuickList(isOpen);
   // 加载自定义筛选器
   useEffect(() => {
     const loadCustomFilters = async () => {
@@ -253,6 +257,22 @@ export function BookmarkPanel({
           onSelectCategory={handleSelectPinnedCategory}
           t={t}
         />
+
+        {/* Read later quick list; gives way to the results while searching or filtering */}
+        {!hasFilters && (
+          <ReadLaterQuickSection
+            items={readLater.items}
+            unreadCount={readLater.unreadCount}
+            onOpen={(bookmarkId) => {
+              readLater.open(bookmarkId);
+              onClose();
+            }}
+            onViewAll={() => {
+              readLater.openAll();
+              onClose();
+            }}
+          />
+        )}
 
         {/* 列表 - 确保有明确高度限制以启用滚动 */}
         <BookmarkListView

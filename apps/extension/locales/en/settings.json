@@ -331,7 +331,9 @@
         "htmlFormat": "HTML Format",
         "htmlSubtitle": "Browsable webpage",
         "htmlDesc": "Generate a beautiful HTML page that can be viewed directly in the browser",
-        "currentStats": "Currently have {{bookmarkCount}} bookmarks, {{categoryCount}} categories"
+        "currentStats": "Currently have {{bookmarkCount}} bookmarks, {{categoryCount}} categories",
+        "includeTabArchive": "Also export the tab archive",
+        "includeTabArchiveDesc": "Off by default. The archive may contain sign-in links or one-time tokens, so be careful when sharing the file."
       },
       "import": {
         "title": "Import Data",
@@ -378,7 +380,9 @@
         "unsupportedFormat": "Unsupported file format, please select a JSON or HTML file",
         "unknown": "Unknown error",
         "bookmarksApiNotSupported": "The current browser does not support the Bookmarks API. Please use Chrome, Edge, or Firefox."
-      }
+      },
+      "importLifecycleDetails": "; read later state {{readLater}}, archived tabs {{archived}}",
+      "importLifecycleSettings": "; tab settings restored"
     },
     "privacy": {
       "title": "Privacy Settings",
@@ -414,6 +418,20 @@
         "autoSaveDesc": "Automatically save page snapshots when saving bookmarks for offline viewing",
         "tip": "Tip",
         "tipContent": "The snapshot feature saves page HTML locally, which may take up significant storage space. You can turn off this feature if you're concerned about storage."
+      },
+      "tabActivity": {
+        "title": "Tab activity",
+        "descriptionOn": "To show idle times, archive idle tabs and suggest tidy-ups, HamHome records tab usage locally.",
+        "descriptionOff": "Tab activity tracking is off; HamHome does not record how tabs are used.",
+        "what": "What is recorded",
+        "whatDesc": "For every open tab: its URL and when it was first seen and last used, plus the dates you used the browser (last 120 days). No page content, and nothing about tabs you close yourself.",
+        "where": "Where it is kept",
+        "whereDesc": "Only in this device's extension storage: never uploaded to a server, never synced with WebDAV and not included in exports. It is not sent to AI on its own: only when you use AI tidy-up or ask the assistant about your tabs do the titles, cleaned-up URLs and idle times of tabs that are not private pages go to AI.",
+        "archive": "Tab archive",
+        "archiveDesc": "Tabs HamHome closes (title, URL and why they were closed) are kept in a local archive for 90 days by default; it is not synced and JSON exports leave it out unless you choose otherwise.",
+        "manage": "Turn off or wipe under Tabs → Rules",
+        "stats": "Local stats",
+        "statsDesc": "The numbers behind “This week”: daily open tab counts (peak and average), time over budget, and how many tabs were archived, restored or moved through Read later. Numbers only, no titles or URLs; kept on this device for 90 days, never synced or exported. Open tabs are not counted while activity tracking is off."
       }
     },
     "categories": {

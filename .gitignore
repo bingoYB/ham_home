@@ -43,6 +43,11 @@ coverage/
 playwright-report/
 test-results/
 .last-run.json
+# Local verification screenshots
+/output/
+
+# CodeGraph runtime file (missing from the tool's own .codegraph/.gitignore)
+.codegraph/daemon.pid
 
 # Misc
 *.tgz

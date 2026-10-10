@@ -5,12 +5,18 @@ const nextConfig = {
   reactStrictMode: true,
   // 静态导出配置 (用于 GitHub Pages)
   output: 'export',
+  trailingSlash: true,
   // GitHub Pages 需要 basePath，值为仓库名称
   // 开发环境不设置 basePath，生产构建时通过 NEXT_PUBLIC_BASE_PATH 环境变量设置
   basePath: process.env.NEXT_PUBLIC_BASE_PATH || undefined,
   transpilePackages: ['@hamhome/ui', '@hamhome/types', '@hamhome/utils'],
   images: {
     unoptimized: true,
+  },
+  // Two root layouts (legacy and localized) leave no shared layout for unmatched URLs;
+  // app/global-not-found.tsx renders the exported 404.html instead.
+  experimental: {
+    globalNotFound: true,
   },
   // Turbopack 配置
   turbopack: {
@@ -28,4 +34,3 @@ const nextConfig = {
 };
 
 module.exports = nextConfig;
-

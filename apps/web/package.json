@@ -6,6 +6,8 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "verify:export": "node scripts/verify-static-export.mjs",
+    "test": "vitest run",
     "start": "next start",
     "lint": "next lint",
     "clean": "rm -rf .next out"
@@ -24,7 +26,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "@types/node": "^22.0.0",
-    "typescript": "^5.7.0"
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.0"
   }
 }
-

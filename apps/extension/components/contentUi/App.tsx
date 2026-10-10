@@ -7,6 +7,8 @@ import { browser } from 'wxt/browser';
 import { EdgeTrigger } from '@/components/trigger';
 import { BookmarkPanel } from '@/components/bookmarkPanel';
 import { InPageSaveFlow } from '@/components/SavePanel';
+import { TabFeedbackLayer } from '@/components/contentUi/feedback/TabFeedbackLayer';
+import { ReadingDoneBar } from '@/components/contentUi/feedback/ReadingDoneBar';
 import { useEdgeTrigger } from '@/hooks/useEdgeTrigger';
 import { useContentUI } from '@/utils/ContentUIContext';
 import { getBackgroundService } from '@/lib/services';
@@ -218,6 +220,11 @@ export function App() {
     <div className="hamhome-content-root relative h-full w-full antialiased">
       {/* 页内保存浮窗：不依赖面板数据初始化，触发后立即响应；选择在扩展弹窗中保存时不挂载 */}
       {!usePopupSavePanel && <InPageSaveFlow />}
+
+      {/* In-page feedback: undo toasts for read later / archive and the tab budget nudge */}
+      <TabFeedbackLayer panelPosition={panelPosition} />
+      {/* Pages opened from Read later: ask "finished reading?" near the end or on leaving */}
+      <ReadingDoneBar panelPosition={panelPosition} />
 
       {/* 侧边栏可在设置中关闭，关闭后完全不注入触发器与面板 */}
       {isInitialized && isSidePanelEnabled && (

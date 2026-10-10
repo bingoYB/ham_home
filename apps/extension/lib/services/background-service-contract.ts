@@ -25,8 +25,26 @@ import type {
   ScreenshotCaptureResult,
   SaveSnapshotBackgroundOptions,
   SnapshotSaveResult,
+  ReadLaterAddResult,
+  ReadLaterBatchResult,
+  ReadLaterQuickList,
+  ReadLaterSource,
+  TabArchiveReason,
+  TabArchiveResult,
+  TabAutoArchiveSettings,
+  TabBudgetOverAction,
+  TabLifecycleSettings,
+  TabLifecycleSweepSummary,
+  TabRestoreResult,
+  TabWeeklyOverview,
+  QuickBookmarkResult,
 } from "@/types";
 import type { ShortcutCommand } from "@/utils/browser-api";
+
+export interface ArchiveActionResult extends TabArchiveResult {
+  /** For the in-page "Undo" button */
+  undoToken?: string;
+}
 
 export interface IBackgroundService {
   getBookmarks(): Promise<LocalBookmark[]>;
@@ -129,6 +147,75 @@ export interface IBackgroundService {
    * content script 没有 tabs 权限，需要由 background 代为执行
    */
   openProtocolUrl(url: string): Promise<void>;
+
+  // ============ Read later ============
+  /** Read later & close (closing follows the setting unless `closeTab` is given) */
+  readLaterTab(
+    tabId: number,
+    options?: { source?: ReadLaterSource; note?: string; closeTab?: boolean },
+  ): Promise<ReadLaterAddResult>;
+  readLaterTabs(
+    tabIds: number[],
+    source: ReadLaterSource,
+    options?: { closeTabs?: boolean },
+  ): Promise<ReadLaterBatchResult>;
+  readLaterArchiveEntries(entryIds: string[]): Promise<ReadLaterBatchResult>;
+  readLaterBookmarks(bookmarkIds: string[]): Promise<ReadLaterBatchResult>;
+  /** Newest unread items for the in-page edge panel */
+  getReadLaterQuickList(limit?: number): Promise<ReadLaterQuickList>;
+  /** Open in a new tab and mark as reading */
+  readLaterOpen(bookmarkId: string): Promise<boolean>;
+  readLaterMarkRead(bookmarkIds: string[]): Promise<void>;
+  /** Add again: unread, expiry renewed */
+  readLaterRequeue(bookmarkIds: string[]): Promise<void>;
+  /** Keep in the library; `classify` lets AI fill in category and tags */
+  readLaterKeep(bookmarkIds: string[], classify: boolean): Promise<void>;
+  /** Queue-only items go to the trash, library bookmarks only leave the queue */
+  readLaterRemove(bookmarkIds: string[]): Promise<{ trashed: number; dequeued: number }>;
+  readLaterUpdateNote(bookmarkId: string, note: string): Promise<void>;
+
+  // ============ Tab archive & tab center ============
+  /** Archive first, then close; protected tabs are skipped for automatic reasons */
+  archiveTabs(tabIds: number[], reason: TabArchiveReason): Promise<ArchiveActionResult>;
+  /** Close duplicates (archived), keeping the most recently used tab of each group */
+  closeDuplicateTabs(tabIds?: number[]): Promise<ArchiveActionResult>;
+  /** "Close without keeping a record" */
+  closeTabsWithoutRecord(tabIds: number[]): Promise<number>;
+  restoreArchiveEntries(entryIds: string[], activate?: boolean): Promise<TabRestoreResult>;
+  restoreArchiveBatches(batchIds: string[]): Promise<TabRestoreResult>;
+  deleteArchiveEntries(entryIds: string[]): Promise<void>;
+  clearTabArchive(): Promise<void>;
+  /** `categoryByTabId` files tabs into existing categories */
+  bookmarkTabs(
+    tabIds: number[],
+    options?: { categoryByTabId?: Record<number, string> },
+  ): Promise<QuickBookmarkResult>;
+  bookmarkArchiveEntries(entryIds: string[]): Promise<QuickBookmarkResult>;
+  setTabsLocked(tabIds: number[], locked: boolean): Promise<void>;
+  /** Reset the idle timer */
+  renewTabs(tabIds: number[]): Promise<void>;
+  /** Local stats of the last 7 days against the week before (this device only) */
+  getTabWeeklyOverview(): Promise<TabWeeklyOverview>;
+  focusTab(tabId: number): Promise<void>;
+  /** Undo from an in-page toast; false when the token expired */
+  undoTabAction(token: string): Promise<boolean>;
+
+  // ============ Lifecycle settings & budget ============
+  dismissBudgetNudge(mode: "today" | "hour"): Promise<void>;
+  resumeBudgetNudge(): Promise<void>;
+  confirmPendingArchive(tabIds?: number[]): Promise<number>;
+  keepPendingArchive(tabIds?: number[]): Promise<void>;
+  /** Turning auto archive on records consent for this device; never retroactive */
+  setAutoArchiveEnabled(
+    enabled: boolean,
+    patch?: Partial<TabAutoArchiveSettings>,
+  ): Promise<TabLifecycleSettings>;
+  /** "auto-archive" (make room automatically) also needs this device's consent */
+  setOverBudgetAction(action: TabBudgetOverAction): Promise<TabLifecycleSettings>;
+  acceptSyncedTabConsent(kind: "autoArchive" | "autoMakeRoom"): Promise<void>;
+  setTabActivityTracking(enabled: boolean): Promise<void>;
+  completeTabCenterOnboarding(): Promise<void>;
+  runTabLifecycleSweep(): Promise<TabLifecycleSweepSummary>;
 }
 
 export const BACKGROUND_SERVICE_KEY =

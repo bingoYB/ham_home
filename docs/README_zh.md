@@ -8,30 +8,53 @@
 
 # HamHome（仓鼠家）
 
-### 用 AI 整理收藏、找回内容，随时接着上次的浏览继续工作
+### 开源、本地优先的网页收藏与标签页管理，按需使用 AI 辅助
 
 [![Release](https://img.shields.io/github/v/release/bingoYB/ham_home?style=flat-square)](https://github.com/bingoYB/ham_home/releases)
 [![Stars](https://img.shields.io/github/stars/bingoYB/ham_home?style=flat-square)](https://github.com/bingoYB/ham_home/stargazers)
 [![Issues](https://img.shields.io/github/issues/bingoYB/ham_home?style=flat-square)](https://github.com/bingoYB/ham_home/issues)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](../LICENSE)
 
-**让收藏找得到，让工作接得上。**
+**借助 AI，让收藏有序，让标签页井然。**
 
 <p>
-  <a href="https://bingoyb.github.io/ham_home/">产品介绍</a> · <a href="#下载">安装扩展</a> · <a href="./USAGE_zh.md">使用指南</a> · <a href="#功能特性">功能特性</a> · <a href="#开发">开发文档</a>
+  <a href="https://bingoyb.github.io/ham_home/zh/">产品介绍</a> · <a href="#下载">安装扩展</a> · <a href="./USAGE_zh.md">使用指南</a> · <a href="#功能特性">功能特性</a> · <a href="#开发">开发文档</a>
 </p>
 
 </div>
 
 ## 什么是 HamHome？
 
-HamHome 是一款 AI 浏览器工作台，将书签、网页快照和标签页工作空间放在一起，帮助你保存值得留住的内容，也保存下次继续工作的现场。
+HamHome 是一款开源、本地优先的网页收藏与标签页管理扩展，支持 Chrome、Edge 和 Firefox。网页、文本和图片放进同一个收藏库，用关键词或语义搜索找回内容，并保存和恢复标签页工作空间。内置 Agent 可按需辅助查找和总结内容、检查状态，以及执行支持的管理操作。
 
 - **收藏时，少做整理**：保存网页后，用 AI 生成摘要、分类和标签，保留快照与页面截图；也可以只剪藏需要的那段文字或那张图片。
 - **需要时，更容易找回**：用关键词或语义搜索查找收藏，在视觉画廊里按页面截图浏览，也可以让内置 Agent 帮你搜索、总结已保存的内容。
-- **回来时，接着上次继续**：把一组标签页保存为工作空间，按需恢复；用分组规则整理正在浏览的页面。
+- **标签页，整理得井然**：把一组标签页保存为工作空间，按需恢复；Chrome/Edge 还可使用原生 Tab 分组规则与 AI 分组。
+- **需要操作时，向 Agent 提问**：查找和总结收藏、打开插件页面、检查同步状态，以及执行支持的工具。执行过程可见，凭据与敏感设置仍由你控制。
 
 **本地优先，AI 自选。** 数据默认保存在浏览器本地，无需注册 HamHome 账号。AI 功能需连接你选择的服务，相关内容会发送给该服务处理；你也可以按需启用 WebDAV 同步或文件导入导出。
+
+## 产品事实
+
+| 问题 | 说明 |
+| --- | --- |
+| 可以收藏什么？ | 网页书签、文本剪藏、图片收藏；可选本地快照和页面截图。 |
+| 数据存在哪里？ | 默认保存在浏览器存储和 IndexedDB，无需注册 HamHome 账号。 |
+| 所有功能都离线吗？ | 手动收藏管理在本地完成；AI、链接检查与 WebDAV 会访问相应的网络服务。 |
+| AI 如何配置？ | 自选服务商或本地端点；语义搜索的 Embedding 独立配置，图片分析需要图像模型。 |
+| Agent 能做什么？ | 查找和总结收藏、解释功能、打开页面、检查状态，以及执行支持的管理工具；敏感凭据由用户填写。 |
+| WebDAV 同步什么？ | 结构化数据与书签正文；本地 HTML/Markdown 快照文件和页面截图不通过 WebDAV 同步。 |
+| 浏览器功能一致吗？ | Chrome/Edge 运行原生 Tab Group 自动分组；当前 Firefox 构建可保存和恢复工作空间，但不运行原生自动分组。 |
+| 如何迁移和备份？ | 导入浏览器书签、导出 JSON/HTML，按需启用自选 WebDAV 服务；JSON 备份不包含页面截图。 |
+
+## 从一个任务开始
+
+- [整理网页、文本和图片收藏](https://bingoyb.github.io/ham_home/zh/guides/ai-collections/)
+- [忘记标题时找回收藏](https://bingoyb.github.io/ham_home/zh/guides/semantic-search/)
+- [保存标签页并恢复工作空间](https://bingoyb.github.io/ham_home/zh/guides/tab-workspaces/)
+- [了解 AI、本地存储与 WebDAV 的范围](https://bingoyb.github.io/ham_home/zh/guides/privacy-sync/)
+
+从[对应浏览器的商店](#下载)安装后，先保存网页或剪藏片段，再进入收藏库。按需配置 AI 或 WebDAV，详细操作见[使用指南](./USAGE_zh.md)。
 
 ## 产品截图
 

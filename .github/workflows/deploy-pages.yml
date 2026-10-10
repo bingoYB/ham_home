@@ -58,6 +58,7 @@ jobs:
       - name: Build with Next.js
         env:
           NEXT_PUBLIC_BASE_PATH: /ham_home
+          NEXT_PUBLIC_SITE_URL: https://bingoyb.github.io/ham_home
         run: pnpm build:web
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v4

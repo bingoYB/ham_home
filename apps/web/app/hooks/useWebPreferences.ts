@@ -1,37 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { usePathname } from 'next/navigation';
+import { switchLanguagePath } from '@/app/lib/site';
+import { useSystemTheme } from '@/app/hooks/useSystemTheme';
 import {
   persistLanguagePreference,
-  resolveInitialLanguage,
   type SupportedLanguage,
 } from '@/app/lib/language';
 
-export function useWebPreferences() {
-  const [isDark, setIsDark] = useState(false);
-  const [language, setLanguage] = useState<SupportedLanguage>('zh');
-  const [isLanguageReady, setIsLanguageReady] = useState(false);
-
-  useEffect(() => {
-    const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-    setIsDark(prefersDark);
-    document.documentElement.classList.toggle('dark', prefersDark);
-  }, []);
-
-  useEffect(() => {
-    const initialLanguage = resolveInitialLanguage();
-    setLanguage(initialLanguage);
-    setIsLanguageReady(true);
-  }, []);
-
-  useEffect(() => {
-    if (!isLanguageReady) {
-      return;
-    }
-
-    persistLanguagePreference(language);
-    document.documentElement.lang = language === 'en' ? 'en' : 'zh-CN';
-  }, [language, isLanguageReady]);
+export function useWebPreferences(language: SupportedLanguage = 'zh') {
+  const pathname = usePathname();
+  const { isDark, setIsDark } = useSystemTheme();
+  const alternateLanguage: SupportedLanguage = language === 'en' ? 'zh' : 'en';
 
   const toggleTheme = (e?: React.MouseEvent) => {
     const newIsDark = !isDark;
@@ -66,15 +46,14 @@ export function useWebPreferences() {
     });
   };
 
-  const toggleLanguage = () => {
-    setLanguage((prev) => (prev === 'en' ? 'zh' : 'en'));
-  };
-
   return {
     isDark,
     isEn: language === 'en',
     language,
     toggleTheme,
-    toggleLanguage,
+    // Rendered as a real link, so the other language version is discoverable without JavaScript.
+    languageSwitchHref: switchLanguagePath(pathname, alternateLanguage),
+    // Only an explicit switch is stored, so legacy routes can still suggest the visitor's language.
+    rememberLanguageSwitch: () => persistLanguagePreference(alternateLanguage),
   };
 }

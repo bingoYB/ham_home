@@ -1,10 +1,10 @@
 {
   "extName": {
-    "message": "HamHome",
+    "message": "HamHome — AI 网页收藏与标签页管理",
     "description": "扩展名称"
   },
   "extDescription": {
-    "message": "智能浏览器工作空间 —— 保存 Tab、自动分组，并用 AI 管理书签与收藏内容",
+    "message": "收藏网页、文本和图片，用 AI 查找和整理内容，保存并恢复标签页工作空间。本地优先，按需启用 Agent 辅助操作。",
     "description": "扩展描述"
   },
   "commandSaveBookmark": {
@@ -18,5 +18,9 @@
   "commandTogglePanel": {
     "message": "切换书签面板",
     "description": "切换面板命令描述"
+  },
+  "commandReadLater": {
+    "message": "稍后读并关闭当前标签页",
+    "description": "稍后读命令描述"
   }
 }

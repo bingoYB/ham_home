@@ -607,6 +607,12 @@ export function useSavePanel({
           existingBookmark.id,
           data,
         );
+        // Saving a page that is only in the read later queue moves it into the library
+        try {
+          await getBackgroundService().readLaterKeep([bookmark.id], false);
+        } catch (e) {
+          console.warn("[useSavePanel] Failed to move the read later item into the library:", e);
+        }
       } else {
         // 创建新书签
         bookmark = await bookmarkStorage.createBookmark(data);

@@ -26,6 +26,8 @@ import {
   Layers,
   HeartPulse,
   Trash2,
+  BookOpen,
+  PanelsTopLeft,
 } from "lucide-react";
 import {
   Toaster,
@@ -70,10 +72,14 @@ import { AboutPage } from "@/components/AboutPage";
 import { GlobalAgentLauncher } from "@/components/agent/GlobalAgentLauncher";
 import { APP_GITHUB_REPO_URL } from "@/lib/constants/app-info";
 import { safeCreateTab } from "@/utils/browser-api";
+import { useOpenTabCount } from "@/hooks/useOpenTabCount";
+import { isEntryPending } from "@/lib/read-later/read-later.utils";
 import logoImage from "@/assets/logo.png";
 
 const BookmarkHealthPage = lazy(() => import("@/components/BookmarkHealthPage"));
 const TrashPage = lazy(() => import("@/components/TrashPage"));
+const ReadLaterPage = lazy(() => import("@/components/ReadLaterPage"));
+const TabCenterPage = lazy(() => import("@/components/TabCenterPage"));
 
 // 页面标题映射
 const PAGE_TITLES: Record<string, { title: string; description?: string }> = {
@@ -88,6 +94,14 @@ const PAGE_TITLES: Record<string, { title: string; description?: string }> = {
   health: {
     title: "bookmark:healthCenter.title",
     description: "bookmark:healthCenter.description",
+  },
+  "read-later": {
+    title: "bookmark:readLater.title",
+    description: "bookmark:readLater.description",
+  },
+  tabs: {
+    title: "bookmark:tabCenter.title",
+    description: "bookmark:tabCenter.description",
   },
   trash: {
     title: "bookmark:trash.title",
@@ -138,12 +152,22 @@ function AppContent() {
     appSettings,
     updateAppSettings,
     bookmarks,
+    allBookmarks,
+    readLaterEntries,
     categories,
     allTags,
     storageInfo,
     syncConfig,
     syncStatus,
   } = useBookmarks();
+  const openTabCount = useOpenTabCount();
+  // The Read later badge counts unread items still queued; trashed bookmarks do not count
+  const readLaterUnread = useMemo(() => {
+    const live = new Set(allBookmarks.map((bookmark) => bookmark.id));
+    return Object.values(readLaterEntries).filter(
+      (entry) => isEntryPending(entry) && live.has(entry.bookmarkId),
+    ).length;
+  }, [allBookmarks, readLaterEntries]);
   const [theme, setTheme] = useState<"light" | "dark">("light");
   const relativeSyncTime = useRelativeTime(
     syncStatus?.lastSyncTime || undefined,
@@ -293,10 +317,24 @@ function AppContent() {
         badge: bookmarks.length,
       },
       {
+        title: t("bookmark:readLater.navTitle"),
+        url: "#read-later",
+        icon: BookOpen,
+        isActive: currentViewBase === "read-later",
+        badge: readLaterUnread,
+      },
+      {
         title: t("bookmark:healthCenter.navTitle"),
         url: "#health",
         icon: HeartPulse,
         isActive: currentViewBase === "health",
+      },
+      {
+        title: t("bookmark:tabCenter.navTitle"),
+        url: "#tabs",
+        icon: PanelsTopLeft,
+        isActive: currentViewBase === "tabs",
+        badge: openTabCount,
       },
       {
         title: t("bookmark:workspace.title"),
@@ -355,7 +393,15 @@ function AppContent() {
         isActive: currentViewBase === "about",
       },
     ],
-    [t, currentViewBase, bookmarks.length, categories.length, allTags.length],
+    [
+      t,
+      currentViewBase,
+      bookmarks.length,
+      categories.length,
+      allTags.length,
+      readLaterUnread,
+      openTabCount,
+    ],
   );
 
   // 品牌信息
@@ -520,6 +566,30 @@ function AppContent() {
             }
           >
             <TrashPage />
+          </Suspense>
+        );
+      case "read-later":
+        return (
+          <Suspense
+            fallback={
+              <div className="flex h-full items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            }
+          >
+            <ReadLaterPage currentView={currentView} />
+          </Suspense>
+        );
+      case "tabs":
+        return (
+          <Suspense
+            fallback={
+              <div className="flex h-full items-center justify-center">
+                <Loader2 className="h-6 w-6 animate-spin text-primary" />
+              </div>
+            }
+          >
+            <TabCenterPage currentView={currentView} onViewChange={handleViewChange} />
           </Suspense>
         );
       case "categories":

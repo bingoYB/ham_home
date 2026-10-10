@@ -8,7 +8,7 @@ interface LandingCtaProps {
 
 export function LandingCta({ isEn }: LandingCtaProps) {
   const texts = {
-    title: isEn ? 'Make your browser remember the work, not just the links' : '让浏览器记住你的工作，而不只是链接',
+    title: isEn ? 'Start organizing your collections and tabs' : '开始整理你的收藏与标签页',
     desc: isEn
       ? 'Available for Chrome, Edge, and Firefox. Start with local data, then add AI, semantic search, WebDAV, or Obsidian only when you need them.'
       : '支持 Chrome、Edge、Firefox。从本地数据开始，再按需开启 AI、语义搜索、WebDAV 或 Obsidian 工作流。',

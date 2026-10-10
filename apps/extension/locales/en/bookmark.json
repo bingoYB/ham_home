@@ -295,6 +295,13 @@
       "recommended": "{{count}} recommended",
       "success": "Workspace analysis complete",
       "failed": "Workspace analysis failed"
+    },
+    "budgetSwitch": {
+      "title": "This goes over your tab budget",
+      "description": "Restoring \"{{name}}\" opens {{count}} tabs, {{over}} over budget.",
+      "switch": "Save current window as a workspace and switch",
+      "openAnyway": "Open anyway",
+      "cancel": "Cancel"
     }
   },
   "popup": {
@@ -316,8 +323,33 @@
     "quickActions": "Quick actions",
     "noRecentSavesHint": "Saved bookmarks will show up here",
     "autoSaveSnapshotDesc": "Capture a snapshot when saving a page",
-    "omniboxSearchDesc": "Show bookmark suggestions in the address bar",
-    "viewShortcutsDesc": "See all shortcuts and how to use them"
+    "omniboxSearchDesc": "Type ham + Space in the address bar to search bookmark content",
+    "viewShortcutsDesc": "See all shortcuts and how to use them",
+    "readLaterAndClose": "Read later & close",
+    "openHamHome": "Open HamHome",
+    "readLaterTab": "Read later ({{count}})",
+    "noReadLater": "Read later is empty",
+    "noReadLaterHint": "Use \"Read later & close\" or right-click a link",
+    "tabs": {
+      "title": "Tabs",
+      "budgetLabel": "Tab budget used",
+      "over": "{{count}} over",
+      "summary": "{{stale}} not opened for over {{threshold}} · {{duplicates}} duplicate groups",
+      "tidyUp": "Tidy up",
+      "autoArchived": "{{count}} tabs archived today",
+      "view": "View",
+      "restoreAll": "Restore all",
+      "pending": "{{count}} tabs waiting to be archived",
+      "archiveAll": "Archive all",
+      "consent": "Auto tidy-up was turned on on another device and waits for this one",
+      "review": "Review",
+      "setup": "Let idle tabs leave the tab bar automatically",
+      "setupLink": "Set up"
+    },
+    "triage": {
+      "empty": "No tabs to tidy up",
+      "viewAll": "View all ({{count}})"
+    }
   },
   "inPageSave": {
     "title": "Save to HamHome",
@@ -329,7 +361,9 @@
     "errors": {
       "cannotBookmarkPage": "Browser internal pages cannot be bookmarked",
       "extractFailed": "Failed to read page content, please refresh and retry"
-    }
+    },
+    "readLater": "Read later",
+    "readLaterHint": "Not ready to keep it? Put it in Read later (closes the tab as configured)"
   },
   "savePanel": {
     "alreadyBookmarked": "This page is already bookmarked, you can update the information",
@@ -517,7 +551,8 @@
     },
     "list": {
       "loading": "Loading rules...",
-      "empty": "No grouping rules yet. Create your first rule to start grouping newly opened tabs automatically."
+      "empty": "No grouping rules yet. Create your first rule to start grouping newly opened tabs automatically.",
+      "protected": "Protected"
     },
     "form": {
       "createTitle": "New Rule",
@@ -534,7 +569,9 @@
       "removeMatcher": "Remove match rule",
       "matchRulesHint": "You can add multiple match rules. If any condition matches, the tab will be added to this group.",
       "collapsed": "Collapse group after creation",
-      "enabled": "Enable rule"
+      "enabled": "Enable rule",
+      "protectTabs": "Protect tabs in this group",
+      "protectTabsHint": "Auto archive and making room never close tabs in this group"
     },
     "matchTypes": {
       "domain": "Domain part",
@@ -643,6 +680,569 @@
       "endsWith": "Ends With",
       "greaterThan": "Greater Than",
       "lessThan": "Less Than"
+    },
+    "readLater": {
+      "title_one": "Read later · {{count}} unread",
+      "title_other": "Read later · {{count}} unread",
+      "viewAll": "View all",
+      "expand": "Show more",
+      "collapse": "Show less"
     }
+  },
+  "readLater": {
+    "title": "Read later",
+    "navTitle": "Read later",
+    "description": "A reading queue for the near future: unread items expire after 30 days, the good ones go to your library in one click",
+    "pageDescription": "Move \"I'll look at this later\" out of the tab bar. Unread items past their deadline move to \"Expired\" and are never deleted; items only in the queue stay out of your library.",
+    "searchPlaceholder": "Search title, URL, summary or note",
+    "addFailed": "Could not add to Read later, please try again",
+    "actionFailed": "Something went wrong, please try again",
+    "addedAt": "added {{time}}",
+    "minutes_one": "~{{count}} min",
+    "minutes_other": "~{{count}} min",
+    "daysLeft_one": "expires in {{count}} day",
+    "daysLeft_other": "expires in {{count}} days",
+    "expiresToday": "expires today",
+    "inLibrary": "In library",
+    "snapshotMissing": "Snapshot not saved",
+    "notePlaceholder": "Why do you want to read this? (optional)",
+    "emptySearch": "Nothing matches your search",
+    "emptyHint": "Found something good? Press {{shortcut}} to put it here.",
+    "empty": {
+      "unread": "Read later is empty. Put good finds here with one shortcut.",
+      "read": "Nothing read yet",
+      "expired": "Nothing has expired"
+    },
+    "views": {
+      "unread": "Unread",
+      "read": "Read",
+      "expired": "Expired"
+    },
+    "status": {
+      "reading": "Reading"
+    },
+    "sort": {
+      "label": "Sort",
+      "newest": "Newest first",
+      "oldest": "Oldest first",
+      "shortest": "Shortest read first",
+      "expiring": "Expiring soon"
+    },
+    "filters": {
+      "domain": "Domain",
+      "allDomains": "All domains",
+      "source": "Source",
+      "allSources": "All sources",
+      "kept": "In library",
+      "keptAll": "All",
+      "keptOnly": "In library",
+      "queueOnly": "Queue only"
+    },
+    "sources": {
+      "manual": "Manual",
+      "link": "Link",
+      "tab-center": "Tab center",
+      "archive": "Archive",
+      "triage": "Tidy-up",
+      "agent": "AI assistant",
+      "import": "Import"
+    },
+    "actions": {
+      "open": "Read",
+      "markRead": "Mark as read",
+      "keep": "Keep in library",
+      "requeue": "Add again",
+      "delete": "Delete",
+      "dequeue": "Remove from Read later",
+      "note": "Add a note"
+    },
+    "stats": {
+      "unread": "{{count}} unread",
+      "expiringSoon_one": "{{count}} item expires within 3 days",
+      "expiringSoon_other": "{{count}} items expire within 3 days",
+      "completion": "Completion in the last 30 days: {{rate}}% ({{read}} read / {{expired}} expired)",
+      "noCompletion": "Nothing read or expired in the last 30 days"
+    },
+    "confirmDelete": {
+      "title": "Delete selected items",
+      "description": "Delete the {{count}} selected items? Items only in Read later move to the trash (kept for 30 days); bookmarks in your library only leave the queue."
+    },
+    "toast": {
+      "markedRead": "Marked {{count}} as read",
+      "requeued": "Added {{count}} again",
+      "kept": "Kept {{count}} in your library",
+      "removed": "Deleted {{count}}"
+    },
+    "settings": {
+      "title": "Read later settings",
+      "closeTabOnAdd": "Close the tab after adding",
+      "saveSnapshotOnAdd": "Save an offline snapshot when adding",
+      "expireAfter": "Expire unread items after",
+      "days_one": "{{count}} day",
+      "days_other": "{{count}} days",
+      "never": "Never",
+      "autoSummary": "AI summary (TL;DR)",
+      "summary": {
+        "manual-only": "Only for single manual adds",
+        "all": "For every add",
+        "off": "Off"
+      }
+    },
+    "triage": {
+      "open": "Triage",
+      "title": "Triage Read later",
+      "description": "One card at a time, cleared with the keyboard",
+      "read": "Read",
+      "keep": "Keep",
+      "markRead": "Read",
+      "remove": "Delete",
+      "keys": "R read · S keep · D mark read · X delete · J/K move",
+      "done": "All done"
+    }
+  },
+  "tabCenter": {
+    "title": "Tabs",
+    "navTitle": "Tabs",
+    "description": "Open tabs, archive and tidy-up rules",
+    "pageDescription": "See how long every tab has been idle, which ones are duplicates and which are protected, and send them to Read later, your library, a workspace or the archive. Every tab HamHome closes can be found in Archive.",
+    "views": {
+      "open": "Open",
+      "archive": "Archive",
+      "rules": "Rules"
+    },
+    "searchPlaceholder": "Search title or URL",
+    "current": "Current",
+    "approxIdle": "≈ {{time}}",
+    "estimatedHint": "HamHome has not seen this tab being used yet; the time comes from the browser and is only an estimate",
+    "emptyFilter": "No tabs match",
+    "actionFailed": "Something went wrong, please try again",
+    "readLaterAdded": "Added {{count}} to Read later",
+    "bookmarked": "Bookmarked {{count}} ({{existing}} already in your library)",
+    "archived": "Moved {{count}} to the archive",
+    "duplicatesClosed": "Closed {{count}} duplicate tabs",
+    "closed": "Closed {{count}} tabs",
+    "locked": "Locked {{count}} tabs",
+    "unlocked": "Unlocked {{count}} tabs",
+    "renewed": "Restarted the idle timer of {{count}} tabs",
+    "closeDuplicates": "Close duplicates ({{count}})",
+    "stats": {
+      "budget": "Budget {{count}}/{{limit}}",
+      "open": "{{count}} open",
+      "expiring": "{{count}} archiving soon",
+      "stale": "{{count}} idle past the threshold",
+      "duplicates": "{{count}} duplicate groups",
+      "protected": "{{count}} protected"
+    },
+    "groupBy": {
+      "label": "Group",
+      "window": "By window",
+      "group": "By tab group",
+      "domain": "By domain"
+    },
+    "sort": {
+      "label": "Sort",
+      "position": "By position",
+      "recent": "Recently used",
+      "idle": "Least recently used"
+    },
+    "filters": {
+      "label": "Filters",
+      "idle": "Idle > 1 day",
+      "expiring": "Archiving soon",
+      "duplicates": "Duplicates",
+      "protected": "Protected"
+    },
+    "groupHeader": {
+      "window": "Window {{index}}",
+      "currentWindow": "Current window",
+      "untitledGroup": "Untitled group",
+      "ungrouped": "Not grouped",
+      "noDomain": "Other"
+    },
+    "status": {
+      "pinned": "Pinned",
+      "locked": "Locked",
+      "audible": "Playing",
+      "saving": "Saving",
+      "protectedDomain": "Protected domain",
+      "dirtyForm": "Unsaved input",
+      "archivesTomorrow": "Archives tomorrow",
+      "archivesIn": "Archives {{time}}",
+      "archivingSoon": "Archiving soon",
+      "expired": "Expired",
+      "pendingConfirm": "Waiting for confirmation",
+      "duplicate": "Duplicate ×{{count}}",
+      "discarded": "Sleeping"
+    },
+    "actions": {
+      "readLater": "Read later",
+      "bookmark": "Bookmark",
+      "workspace": "Add to workspace",
+      "archive": "Archive & close",
+      "lock": "Lock",
+      "unlock": "Unlock",
+      "renew": "Renew (restart idle timer)",
+      "closeWithoutRecord": "Close without keeping a record",
+      "more": "More actions"
+    },
+    "closeWithoutRecord": {
+      "title": "Close without a record",
+      "description": "Close the {{count}} selected tabs right away without archiving them. Afterwards they can only be found in the browser history.",
+      "confirm": "Close"
+    },
+    "tidyUp": {
+      "button": "Tidy up",
+      "title": "Tidy-up suggestions",
+      "description": "Built from local rules for {{count}} tabs, no AI involved. Every closed tab goes to the archive.",
+      "nothing": "Nothing to tidy up right now",
+      "apply": "Apply selected ({{count}})",
+      "cancel": "Cancel",
+      "applied": "Archived {{archived}}, added {{queued}} to Read later",
+      "groups": {
+        "duplicates": "Close duplicates ({{count}})",
+        "lowValue": "Archive low-value pages ({{count}})",
+        "readLater": "Move to Read later ({{count}})",
+        "archive": "Archive idle tabs ({{count}})",
+        "workspace": "Fold into workspace \"{{name}}\" ({{count}})"
+      },
+      "hints": {
+        "duplicates": "Keeps the most recently used one",
+        "lowValue": "Search results, sign-in and verification pages, blank tabs",
+        "readLater": "Article-like pages idle for more than a day",
+        "archive": "Past the idle threshold or about to be archived",
+        "workspace": "5+ idle tabs of the same tab group or domain"
+      }
+    },
+    "workspace": {
+      "title": "Add to workspace",
+      "description": "Add {{count}} pages to a workspace; URLs already in it are skipped",
+      "target": "Workspace",
+      "new": "New workspace",
+      "name": "Name",
+      "defaultName": "Tidied tabs",
+      "confirm": "Add",
+      "cancel": "Cancel",
+      "added": "Added {{count}} pages"
+    },
+    "reasons": {
+      "expired": "Idle too long",
+      "budget": "Over budget",
+      "manual": "Archived manually",
+      "duplicate": "Duplicate",
+      "triage": "Tidy-up"
+    },
+    "archive": {
+      "searchPlaceholder": "Search archived titles or URLs",
+      "empty": "The archive is empty. Tabs HamHome closes show up here and can be restored at any time.",
+      "latest": "Latest: {{time}} · {{reason}} · {{count}} tabs",
+      "restore": "Restore",
+      "restoreBatch": "Restore this batch",
+      "restored": "Restored {{count}} tabs",
+      "delete": "Delete",
+      "deleted": "Deleted {{count}} from the archive",
+      "deleteTitle": "Delete from archive",
+      "deleteConfirm": "Delete the {{count}} selected entries from the archive? They do not go to the trash and cannot be restored.",
+      "cleared": "Archive cleared",
+      "idleWhenClosed": "idle {{time}}",
+      "closeCount": "archived {{count}} times",
+      "bookmarked": "Bookmarked",
+      "automatic": "automatic",
+      "tabCount": "{{count}} tabs",
+      "selectBatch": "Select this batch",
+      "dateGroups": {
+        "today": "Today",
+        "yesterday": "Yesterday",
+        "week": "This week",
+        "earlier": "Earlier"
+      },
+      "filters": {
+        "reason": "Reason",
+        "allReasons": "All reasons",
+        "domain": "Domain",
+        "allDomains": "All domains",
+        "time": "Time",
+        "allTime": "Any time"
+      }
+    },
+    "consent": {
+      "autoArchive": "Auto archive was turned on on another device. So that synced settings never close tabs here by themselves, confirm it once on this device.",
+      "autoMakeRoom": "Making room automatically was turned on on another device; confirm it once on this device to use it here.",
+      "enableHere": "Turn on here"
+    },
+    "pending": {
+      "message": "{{count}} tabs are past the idle threshold and wait for your confirmation",
+      "keep": "Keep and restart the timer",
+      "archive": "Archive all"
+    },
+    "onboarding": {
+      "title": "Closing tabs without the risk",
+      "steps": {
+        "0": "Look at your tabs first, then decide how to tidy up",
+        "1": "What happens to existing tabs, and what is never touched",
+        "2": "All set"
+      },
+      "summary": "{{tabs}} tabs are open across {{windows}} window(s). About {{stale}} have not been opened for longer than the threshold, and there are {{duplicates}} groups of duplicates.",
+      "estimated": "HamHome just started recording, so idle times come from the browser and are only an estimate.",
+      "plan": {
+        "recommended": "Recommended",
+        "recommendedDesc": "Auto archive after 7 days (only days you use the browser count) + tab budget of 15 (hints only) + Read later",
+        "custom": "Custom",
+        "customDesc": "Only turn on auto archive; tune thresholds and the budget yourself under Rules"
+      },
+      "existing": {
+        "label": "Existing tabs",
+        "fromToday": "Start counting from today (recommended)",
+        "fromTodayDesc": "Idle time of existing tabs starts now, so nothing is closed because of past idleness",
+        "tidyNow": "Tidy up now",
+        "tidyNowDesc": "Opens the list with duplicates and tabs past the threshold selected, for you to confirm"
+      },
+      "protection": {
+        "title": "These tabs are never closed automatically",
+        "recommended": "Also protect these domains:"
+      },
+      "done": "Every tab HamHome closes can be found in Archive.",
+      "skip": "Not now",
+      "back": "Back",
+      "next": "Next",
+      "enable": "Turn on",
+      "start": "Get started"
+    },
+    "rules": {
+      "tracking": {
+        "title": "Activity tracking",
+        "description": "Records when each tab was last used and on which days you used the browser, to show idle times, auto archive and suggest tidy-ups.",
+        "label": "Track tab activity",
+        "privacy": "Stays on this device: never synced or exported. AI tidy-up and the assistant only see titles, cleaned-up URLs and idle times of non-private tabs when you ask them. Turning it off stops tracking and wipes what was recorded.",
+        "offTitle": "Turn off activity tracking",
+        "offDescription": "Tracking stops and the recorded activity is wiped. Auto archive and making room automatically become unavailable; archived tabs are not affected.",
+        "offConfirm": "Turn off and wipe"
+      },
+      "autoArchive": {
+        "title": "Auto archive",
+        "description": "Tabs idle past the threshold are closed automatically after being written to the archive, where they can be searched and restored. Turning it on is not retroactive: idle time counts from that moment.",
+        "enable": "Turn on auto archive",
+        "needsTracking": "Turn on activity tracking first",
+        "threshold": "Idle threshold",
+        "thresholdHint": "Never within 15 minutes after the browser starts; at most 30 tabs per run",
+        "thresholdOption": {
+          "hour_one": "{{count}} hour",
+          "hour_other": "{{count}} hours",
+          "day_one": "{{count}} day",
+          "day_other": "{{count}} days"
+        },
+        "countBy": "Count",
+        "countByHint": {
+          "usage-days": "Not opened for 7 days (only days you use the browser count): coming back from a vacation never empties your tabs",
+          "calendar": "Wall clock time, whether or not you used the browser"
+        },
+        "countByOption": {
+          "usage-days": "Usage days",
+          "calendar": "Calendar days"
+        },
+        "mode": "Mode",
+        "modeHint": {
+          "auto": "Archive when due; undo whole batches from the popup or the archive",
+          "confirm": "Wait for your confirmation when due; the icon shows a reminder",
+          "mark-only": "Only mark tabs as expired in the tab center, never close them"
+        },
+        "modeOption": {
+          "auto": "Archive",
+          "confirm": "Ask first",
+          "mark-only": "Mark only"
+        }
+      },
+      "protection": {
+        "title": "Protection",
+        "alwaysOn": "Pinned tabs, the current tab of each window, tabs you locked and tabs being saved with HamHome are never closed automatically.",
+        "audible": "Protect tabs playing sound (or within 10 minutes after)",
+        "grouped": "Protect tabs in tab groups",
+        "groupedHint": "Off by default: with automatic grouping most tabs would never expire. You can also protect a single group in its Tab grouping rule",
+        "dirtyForms": "Protect pages with unsaved input",
+        "dirtyFormsHint": "Pages holding input you edited but did not submit stay open",
+        "minOpenTabs": "Keep at least this many tabs",
+        "minOpenTabsHint": "Nothing is archived while no more tabs are open; 0 means no limit"
+      },
+      "domains": {
+        "title": "Protected domains",
+        "placeholder": "e.g. mail.google.com or *.slack.com",
+        "add": "Add",
+        "invalid": "Enter a valid domain",
+        "empty": "No protected domains yet",
+        "remove": "Remove {{domain}}"
+      },
+      "locked": {
+        "title": "Locked tabs ({{count}})",
+        "empty": "Lock a tab with the lock icon in the list; locks survive browser restarts"
+      },
+      "sweep": {
+        "done": "Last check {{time}}: archived {{count}}",
+        "error": "Last check {{time}}: writing the archive failed, no tab was closed",
+        "skipped": {
+          "tracking-off": "Last check {{time}}: activity tracking is off",
+          "inactive": "Last check {{time}}: auto archive is off",
+          "startup-grace": "Last check {{time}}: the browser just started, nothing is archived for 15 minutes",
+          "min-open-tabs": "Last check {{time}}: not more tabs open than you keep"
+        }
+      },
+      "retention": {
+        "title": "Archive retention",
+        "description": "The archive stays on this device. Past the retention period or above {{max}} entries, the oldest go first.",
+        "keep": "Keep for",
+        "days_one": "{{count}} day",
+        "days_other": "{{count}} days",
+        "forever": "Forever",
+        "clear": "Clear archive",
+        "count": "{{count}} entries",
+        "clearTitle": "Clear archive",
+        "clearDescription": "Delete all {{count}} entries of the archive? This cannot be undone.",
+        "clearConfirm": "Clear"
+      },
+      "budget": {
+        "title": "Tab budget",
+        "description": "A limit for open tabs; pinned tabs do not count. Going over only gives a gentle hint by default and never blocks opening a tab.",
+        "enable": "Turn on the tab budget",
+        "limit": "Limit",
+        "limitHint": "5–100 tabs",
+        "scope": "Count",
+        "scopeOption": {
+          "all-windows": "All windows",
+          "per-window": "Each window"
+        },
+        "overAction": "When over budget",
+        "overActionHint": {
+          "badge-only": "Only turn the icon count red",
+          "nudge": "One gentle hint in the corner of the current page, 15 minute cooldown",
+          "auto-archive": "Archive the least recently used tabs idle for over an hour, with undo"
+        },
+        "overActionOption": {
+          "badge-only": "Icon only",
+          "nudge": "In-page hint",
+          "auto-archive": "Make room"
+        },
+        "makeRoomTitle": "Make room automatically",
+        "makeRoomDescription": "When over budget, the least recently used tabs are archived automatically (only unprotected tabs idle for 60+ minutes and not opened in the last 10 minutes), exactly as many as needed, always with undo.",
+        "makeRoomConfirm": "Turn on",
+        "showBadge": "Show the tab count on the icon",
+        "showBadgeHint": "Shows the number of open tabs even with the budget off",
+        "paused": "Budget hints are paused",
+        "resume": "Resume hints"
+      }
+    },
+    "overview": {
+      "button": "This week",
+      "title": "This week",
+      "description": "Your tabs over the last 7 days. Counted on this device only, never uploaded or synced, kept for 90 days.",
+      "openTabs": "Open tabs (pinned excluded)",
+      "averagePeak": "{{average}} on average · peak {{peak}}",
+      "lessThanLastWeek": "{{percent}}% fewer than last week",
+      "moreThanLastWeek": "{{percent}}% more than last week",
+      "sameAsLastWeek": "same as last week",
+      "noSamples": "Nothing recorded yet",
+      "samplingOff": "Activity tracking is off, so open tabs are not counted.",
+      "overBudgetTime": "Over budget for {{duration}} this week",
+      "neverOverBudget": "Never over budget this week",
+      "budgetLine": "Budget {{limit}}",
+      "noData": "Nothing recorded",
+      "dayTooltip": "{{average}} on average, peak {{peak}}",
+      "today": "Today",
+      "legendAverage": "Average",
+      "legendPeak": "Peak",
+      "archiveTitle": "Archive",
+      "autoArchived": "Auto archived",
+      "manualArchived": "Archived by you",
+      "restored": "Restored",
+      "readLaterTitle": "Read later",
+      "readLaterAdded": "Added",
+      "readLaterRead": "Finished",
+      "readLaterExpired": "Expired",
+      "fewData": "Stats just started. Check back in a few days for the trend."
+    },
+    "aiTriage": {
+      "button": "AI tidy-up",
+      "title": "AI tidy-up suggestions",
+      "description_one": "Based on the title and URL of {{count}} tab; no page content is sent. Everything that closes can be found in the archive.",
+      "description_other": "Based on the titles and URLs of {{count}} tabs; no page content is sent. Everything that closes can be found in the archive.",
+      "privacy": "Only titles, URLs (sensitive parameters removed), idle times and tab group names are sent. Private pages, pinned and protected tabs are judged by local rules only.",
+      "loading_one": "Analyzing {{count}} tab…",
+      "loading_other": "Analyzing {{count}} tabs…",
+      "notConfigured": "AI tidy-up needs an AI service",
+      "notConfiguredHint": "You can also use the rule-based Tidy up, which needs no AI.",
+      "openSettings": "Set up AI",
+      "failed": "AI tidy-up failed, please try again later",
+      "nothing": "Nothing to tidy up",
+      "cached": "{{count}} reused from the last 24 hours",
+      "skipped_one": "{{count}} more tab is over the limit of one run and waits for the next",
+      "skipped_other": "{{count}} more tabs are over the limit of one run and wait for the next",
+      "partialFailure_one": "{{count}} tab could not be analyzed",
+      "partialFailure_other": "{{count}} tabs could not be analyzed",
+      "rerun": "Analyze again",
+      "apply": "Apply selected ({{count}})",
+      "applied": "Tidied up: {{kept}} kept, {{queued}} to Read later, {{bookmarked}} bookmarked, {{archived}} archived",
+      "uncategorized": "Uncategorized",
+      "groups": {
+        "keep": "Keep ({{count}})",
+        "readLater": "Read later ({{count}})",
+        "bookmark": "Bookmark ({{count}})",
+        "workspace": "Fold into workspaces ({{count}})",
+        "close": "Can be closed ({{count}})"
+      },
+      "hints": {
+        "keep": "Checked tabs restart their idle time",
+        "readLater": "Added to Read later and closed",
+        "bookmark": "Closed after bookmarking; kept in the archive",
+        "close": "Archived before closing; restore any time"
+      },
+      "local": {
+        "pinned": "Pinned tab",
+        "protected": "Protected, never closed",
+        "private": "Private page, not sent to AI",
+        "notWeb": "Not a web page, not sent to AI",
+        "duplicate": "Duplicate tab (local rule)",
+        "lowValue": "Search, sign-in or blank page (local rule)",
+        "idle": "Idle for long (local rule)",
+        "article": "Something to read (local rule)"
+      }
+    }
+  },
+  "tabFeedback": {
+    "undo": "Undo",
+    "undone": "Undone",
+    "undoExpired": "Too late to undo",
+    "failed": "Something went wrong, please try again",
+    "saved": "Saved",
+    "readLater": {
+      "added": "Added to Read later",
+      "alreadyQueued": "Already in Read later (added {{time}})",
+      "alreadyQueuedShort": "Already in Read later",
+      "renew": "Renew",
+      "note": "Add a note",
+      "notePlaceholder": "Why do you want to read this? (optional)",
+      "saveNote": "Save"
+    },
+    "archived": {
+      "label": "Moved to archive",
+      "single": "Moved \"{{title}}\" to the archive",
+      "multiple": "Moved {{count}} tabs to the archive"
+    },
+    "nudge": {
+      "label": "Tab budget hint",
+      "title": "{{count}} tabs open, {{over}} over budget",
+      "oldest": "Least recently viewed:",
+      "hiddenTitle": "Tab {{index}}",
+      "readLater": "Read later",
+      "archive": "Archive & close",
+      "reviewAll": "Review all",
+      "notToday": "Not today",
+      "snoozeHour": "Pause for an hour",
+      "handled": "Done"
+    }
+  },
+  "readingBar": {
+    "question": "Finished reading?",
+    "markRead": "Mark as read",
+    "keep": "Keep in library",
+    "notYet": "Not yet",
+    "markedRead": "Marked as read",
+    "kept": "Kept in your library and marked as read"
   }
 }

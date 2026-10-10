@@ -41,6 +41,7 @@ import { workspaceStorage } from "@/lib/storage/workspace-storage";
 import { tabGroupRulesStorage } from "@/lib/storage/tab-group-rules-storage";
 import { importTaskStorage } from "@/lib/storage/import-task-storage";
 import { getBackgroundService } from "@/lib/services";
+import { importLifecycleData } from "@/lib/services/read-later-import-service";
 import { bookmarkAnalysisService } from "@/lib/agent";
 import {
   useChromeBookmarks,
@@ -82,6 +83,8 @@ export function ImportExportPage() {
   } = useChromeBookmarks();
 
   const [importing, setImporting] = useState(false);
+  // The tab archive is left out by default: it may hold sign-in links or one-time tokens
+  const [includeTabArchive, setIncludeTabArchive] = useState(false);
   const [preserveFolders, setPreserveFolders] = useState(true);
   const [enableAIAnalysis, setEnableAIAnalysis] = useState(false);
   const [fetchPageContent, setFetchPageContent] = useState(false);
@@ -188,7 +191,7 @@ export function ImportExportPage() {
 
   // 导出 JSON
   const handleExportJSON = async () => {
-    await exportData("json");
+    await exportData("json", { includeTabArchive });
   };
 
   // 导出 HTML
@@ -521,6 +524,9 @@ export function ImportExportPage() {
       }
     }
 
+    // Read later state, lifecycle settings and, optionally, the tab archive
+    const lifecycleImport = await importLifecycleData(data, new Set(importedBookmarkIds));
+
     let workspaceCategoriesCreated = 0;
     let workspacesImported = 0;
     let tabGroupRulesImported = 0;
@@ -640,6 +646,16 @@ export function ImportExportPage() {
       tabGroupRulesImported > 0
     ) {
       details += `；工作空间 ${workspacesImported} 个，工作空间分类 ${workspaceCategoriesCreated} 个，Tab 分组规则 ${tabGroupRulesImported} 条`;
+    }
+    if (lifecycleImport.readLater > 0 || lifecycleImport.archived > 0) {
+      details += t("settings.importExport.importLifecycleDetails", {
+        readLater: lifecycleImport.readLater,
+        archived: lifecycleImport.archived,
+        ns: "settings",
+      });
+    }
+    if (lifecycleImport.settings) {
+      details += t("settings.importExport.importLifecycleSettings", { ns: "settings" });
     }
 
     setImportResult({
@@ -1284,6 +1300,22 @@ export function ImportExportPage() {
               </p>
             </button>
           </div>
+
+          <label className="mt-4 flex cursor-pointer items-start gap-2.5 rounded-lg border p-3 text-sm">
+            <Checkbox
+              className="mt-0.5"
+              checked={includeTabArchive}
+              onCheckedChange={(checked) => setIncludeTabArchive(checked === true)}
+            />
+            <span>
+              <span className="block font-medium text-foreground">
+                {t("settings.importExport.export.includeTabArchive", { ns: "settings" })}
+              </span>
+              <span className="mt-0.5 block text-xs text-muted-foreground">
+                {t("settings.importExport.export.includeTabArchiveDesc", { ns: "settings" })}
+              </span>
+            </span>
+          </label>
 
           <div className="mt-4 p-3 rounded-lg bg-muted text-sm text-muted-foreground">
             {t("settings.importExport.export.currentStats", {

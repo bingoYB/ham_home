@@ -6,6 +6,13 @@ import { workspaceStorage } from '../storage/workspace-storage';
 import { tabGroupRulesStorage } from '../storage/tab-group-rules-storage';
 import { bookmarkClipStorage } from '../storage/bookmark-clip-storage';
 import { bookmarkTombstoneStorage } from '../storage/bookmark-tombstone-storage';
+import { readLaterStorage } from '../storage/read-later-storage';
+import { tabLifecycleConfigStorage } from '../storage/tab-lifecycle-config-storage';
+import {
+  mergeReadLaterEntries,
+  reconcileEntriesWithBookmarks,
+} from '../read-later/read-later.utils';
+import { normalizeTabLifecycleSettings } from '../tabs/tab-lifecycle-settings.utils';
 import { z } from 'zod';
 import { 
   SyncSysSchema, 
@@ -23,6 +30,8 @@ import {
   RemoteWorkspaceCategory,
   RemoteTabGroupConfigFileSchema,
   RemoteTabGroupRule,
+  RemoteReadLaterFileSchema,
+  RemoteTabLifecycleConfigFileSchema,
 } from './sync-schema';
 import type {
   BookmarkTombstone,
@@ -34,6 +43,8 @@ import type {
   TabGroupRule,
   TabGroupAutoGroupSettings,
   BookmarkClip,
+  ReadLaterEntry,
+  ReadLaterEntryMap,
 } from '@/types';
 import { buildDuplicateGroups } from '../bookmarks/bookmark-dedup';
 import {
@@ -52,6 +63,9 @@ const WORKSPACES_JSON = `${SYNC_ROOT}/workspaces.json`;
 const TAB_GROUP_CONFIG_JSON = `${SYNC_ROOT}/tab-group-config.json`;
 const META_JSON = `${SYNC_ROOT}/bookmarks/meta.json`;
 const CLIPS_JSON = `${SYNC_ROOT}/bookmarks/clips.json`;
+// Read later state and lifecycle settings use their own files: older clients do not know them, so they cannot strip new fields
+const READ_LATER_JSON = `${SYNC_ROOT}/bookmarks/read-later.json`;
+const TAB_LIFECYCLE_CONFIG_JSON = `${SYNC_ROOT}/tab-lifecycle-config.json`;
 const CHUNKS_DIR = `${SYNC_ROOT}/bookmarks/chunks`;
 
 const LOCK_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
@@ -213,8 +227,11 @@ export class SyncEngine {
         await this.syncCategories();
         await this.syncWorkspaces();
         await this.syncTabGroupConfig();
+        await this.syncTabLifecycleConfig();
         await this.syncBookmarks();
         await this.syncBookmarkClips();
+        // Must run after bookmarks: read later state is aligned with the synced bookmarks and tombstones
+        await this.syncReadLater();
         console.log('WebDAV Sync complete.');
       } finally {
         await this.releaseLock();
@@ -905,6 +922,86 @@ export class SyncEngine {
 
     if (changed || localMap.size !== remoteMap.size) {
       await webdavClientAdapter.putJSON(CLIPS_JSON, { clips: merged });
+    }
+  }
+
+  /**
+   * Tab lifecycle settings (auto archive, tab budget, read later), last write wins by updatedAt.
+   * Synced settings that turn on auto archive / making room still need this device's consent.
+   */
+  private async syncTabLifecycleConfig(): Promise<void> {
+    console.log('Syncing tab lifecycle config...');
+    const local = await tabLifecycleConfigStorage.getRawSettings();
+    const remoteRaw = await webdavClientAdapter.getJSON<any>(TAB_LIFECYCLE_CONFIG_JSON);
+    const parsed = remoteRaw ? RemoteTabLifecycleConfigFileSchema.safeParse(remoteRaw) : null;
+    if (remoteRaw && !parsed?.success) {
+      // Possibly written by a newer version: never overwrite it with local data
+      console.warn('Failed to parse remote tab-lifecycle-config.json', parsed?.error);
+      return;
+    }
+    const remote = parsed?.success ? parsed.data.settings : null;
+
+    if (!remote || local.updatedAt > remote.updatedAt) {
+      await webdavClientAdapter.putJSON(TAB_LIFECYCLE_CONFIG_JSON, { version: 1, settings: local });
+      return;
+    }
+    if (local.updatedAt < remote.updatedAt) {
+      await tabLifecycleConfigStorage.importRawSettings(remote);
+      return;
+    }
+    // Same version but different content (should not happen): this device wins
+    const sameContent =
+      JSON.stringify(normalizeTabLifecycleSettings(local)) ===
+      JSON.stringify(normalizeTabLifecycleSettings(remote));
+    if (!sameContent) {
+      await webdavClientAdapter.putJSON(TAB_LIFECYCLE_CONFIG_JSON, { version: 1, settings: local });
+    }
+  }
+
+  /**
+   * Read later state: aligned by bookmarkId, last write wins by updatedAt; dropped with
+   * purged bookmarks (tombstones), moved to the kept bookmark when duplicates merge by URL.
+   */
+  private async syncReadLater(): Promise<void> {
+    console.log('Syncing read later...');
+    const remoteRaw = await webdavClientAdapter.getJSON<any>(READ_LATER_JSON);
+    const parsed = remoteRaw ? RemoteReadLaterFileSchema.safeParse(remoteRaw) : null;
+    if (remoteRaw && !parsed?.success) {
+      console.warn('Failed to parse remote read-later.json', parsed?.error);
+      return;
+    }
+
+    const remote: ReadLaterEntryMap = Object.fromEntries(
+      (parsed?.success ? parsed.data.entries : []).map((entry) => [
+        entry.bookmarkId,
+        entry as unknown as ReadLaterEntry,
+      ]),
+    );
+    const [bookmarks, tombstones] = await Promise.all([
+      bookmarkStorage.getBookmarksForSync(),
+      bookmarkTombstoneStorage.getAll(),
+    ]);
+
+    // Merge into the entries as they are when writing: queue changes made while the
+    // remote file was loading (e.g. "Read later & close") are kept, not overwritten
+    let remoteChanged = !remoteRaw;
+    const merged = await readLaterStorage.replaceWith((local) => {
+      const merge = mergeReadLaterEntries(local, remote);
+      const reconciled = reconcileEntriesWithBookmarks(
+        merge.merged,
+        bookmarks,
+        tombstones,
+        Date.now(),
+      );
+      remoteChanged = remoteChanged || merge.remoteChanged || reconciled.changed;
+      return merge.localChanged || reconciled.changed ? reconciled.entries : null;
+    });
+
+    if (remoteChanged) {
+      await webdavClientAdapter.putJSON(READ_LATER_JSON, {
+        version: 1,
+        entries: Object.values(merged),
+      });
     }
   }
 

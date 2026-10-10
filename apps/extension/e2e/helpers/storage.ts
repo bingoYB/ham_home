@@ -68,7 +68,10 @@ export async function resetExtensionData(
       deleteDatabase("hamhome-snapshots"),
       deleteDatabase("hamhome-assets"),
       deleteDatabase("HamHomeVectors"),
+      deleteDatabase("HamHomeTabLifecycle"),
     ]);
+    // Session state of the tab lifecycle (undo tokens, pending confirmations, budget nudges...)
+    await (chrome.storage as any).session?.clear?.();
 
     function deleteDatabase(name: string): Promise<void> {
       return new Promise((resolve) => {
@@ -418,3 +421,101 @@ export const indexedDbNames = {
   vectors: VECTOR_DB,
   vectorStore: VECTOR_STORE,
 };
+
+export interface SeedTabActivity {
+  url: string;
+  lastActiveAt: number;
+  firstSeenAt?: number;
+  locked?: boolean;
+}
+
+/**
+ * Overwrite the activity records (HamHomeTabLifecycle.tabActivity) of tabs with the
+ * given URLs, to simulate tabs that have not been used for a long time
+ */
+export async function seedTabActivity(worker: Worker, items: SeedTabActivity[]): Promise<void> {
+  await worker.evaluate(async (records) => {
+    const tabs = await chrome.tabs.query({});
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open("HamHomeTabLifecycle");
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      await new Promise<void>((resolve, reject) => {
+        const tx = db.transaction("tabActivity", "readwrite");
+        const store = tx.objectStore("tabActivity");
+        for (const item of records) {
+          for (const tab of tabs.filter((candidate) => candidate.url?.startsWith(item.url))) {
+            store.put({
+              tabId: tab.id,
+              windowId: tab.windowId,
+              index: tab.index,
+              url: item.url.replace(/\/$/, ""),
+              firstSeenAt: item.firstSeenAt ?? item.lastActiveAt,
+              lastActiveAt: item.lastActiveAt,
+              locked: item.locked,
+            });
+          }
+        }
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    } finally {
+      db.close();
+    }
+  }, items);
+}
+
+export async function seedTabLifecycle(
+  worker: Worker,
+  input: { settings?: Record<string, unknown>; state?: Record<string, unknown> },
+): Promise<void> {
+  await worker.evaluate(async ({ settings, state }) => {
+    if (settings) {
+      await chrome.storage.sync.set({ tabLifecycleSettings: { ...settings, updatedAt: Date.now() } });
+    }
+    if (state) {
+      const current = (await chrome.storage.local.get("tabLifecycleState")).tabLifecycleState ?? {};
+      await chrome.storage.local.set({ tabLifecycleState: { ...current, ...state } });
+    }
+  }, input);
+}
+
+export async function getReadLaterEntries(worker: Worker): Promise<Record<string, any>> {
+  return worker.evaluate(async () => {
+    const { readLaterEntries = {} } = await chrome.storage.local.get("readLaterEntries");
+    return readLaterEntries;
+  });
+}
+
+export async function getTabArchiveEntries(worker: Worker): Promise<any[]> {
+  return worker.evaluate(async () => {
+    if (typeof indexedDB.databases === "function") {
+      const databases = await indexedDB.databases();
+      if (!databases.some((entry) => entry.name === "HamHomeTabLifecycle")) return [];
+    }
+    const db = await new Promise<IDBDatabase>((resolve, reject) => {
+      const request = indexedDB.open("HamHomeTabLifecycle");
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    try {
+      if (!db.objectStoreNames.contains("tabArchive")) return [];
+      return await new Promise<any[]>((resolve, reject) => {
+        const request = db.transaction("tabArchive", "readonly").objectStore("tabArchive").getAll();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
+    } finally {
+      db.close();
+    }
+  });
+}
+
+/** Fire a background alarm now (unpacked extensions are not held to the 30 second minimum) */
+export async function fireAlarm(worker: Worker, name: string): Promise<void> {
+  await worker.evaluate(async (alarmName) => {
+    await chrome.alarms.create(alarmName, { when: Date.now() + 50 });
+  }, name);
+}

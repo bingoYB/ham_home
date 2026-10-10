@@ -184,13 +184,22 @@ export const EXTENSION_SCREENSHOTS: Record<ExtensionScreenshotId, ExtensionScree
   },
 };
 
-export function getExtensionScreenshotSrc(
+/** Site-relative screenshot path without the deployment base path. */
+export function getExtensionScreenshotPath(
   id: ExtensionScreenshotId,
   options: { isEn: boolean; isDark: boolean },
 ): string {
   const locale = options.isEn ? "en" : "zh";
   const theme = options.isDark ? "dark" : "light";
+
+  return `/screenshots/extension/${locale}-${theme}/${EXTENSION_SCREENSHOTS[id].file}`;
+}
+
+export function getExtensionScreenshotSrc(
+  id: ExtensionScreenshotId,
+  options: { isEn: boolean; isDark: boolean },
+): string {
   const basePath = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
-  return `${basePath}/screenshots/extension/${locale}-${theme}/${EXTENSION_SCREENSHOTS[id].file}`;
+  return `${basePath}${getExtensionScreenshotPath(id, options)}`;
 }

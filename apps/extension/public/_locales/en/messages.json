@@ -1,10 +1,10 @@
 {
   "extName": {
-    "message": "HamHome",
+    "message": "HamHome — AI Web Clipper & Tab Manager",
     "description": "Extension name"
   },
   "extDescription": {
-    "message": "Smart Browser Workspace -— Save tabs, auto-group sessions, and organize bookmarks and collections with AI",
+    "message": "Save pages, text and images, find collections with AI, and organize tab workspaces. Local first, with optional AI Agent help.",
     "description": "Extension description"
   },
   "commandSaveBookmark": {
@@ -18,5 +18,9 @@
   "commandTogglePanel": {
     "message": "Toggle bookmark panel",
     "description": "Command description for toggle panel"
+  },
+  "commandReadLater": {
+    "message": "Read later and close the current tab",
+    "description": "Read later command description"
   }
 }

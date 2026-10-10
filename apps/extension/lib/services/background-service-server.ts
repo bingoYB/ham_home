@@ -6,17 +6,30 @@ import { registerService } from "@webext-core/proxy-service";
 import { browser } from "wxt/browser";
 import {
   BACKGROUND_SERVICE_KEY,
+  type ArchiveActionResult,
   type IBackgroundService,
   type QueueProgress,
 } from "./background-service-contract";
 import { aiCacheStorage } from "@/lib/storage/ai-cache-storage";
 import { bookmarkStorage } from "@/lib/storage/bookmark-storage";
+import { readLaterStorage } from "@/lib/storage/read-later-storage";
+import { filterLibraryBookmarks } from "@/lib/read-later/read-later.utils";
 import { configStorage } from "@/lib/storage/config-storage";
-import { snapshotStorage } from "@/lib/storage/snapshot-storage";
 import { bookmarkHealthService } from "@/lib/services/bookmark-health-service";
 import { bookmarkScreenshotService } from "@/lib/services/bookmark-screenshot-service";
 import { vectorStore } from "@/lib/storage/vector-store";
 import { workspaceService } from "@/lib/services/workspace-service";
+import { pageSnapshotService } from "@/lib/services/page-snapshot-service";
+import { readLaterService } from "@/lib/services/read-later-service";
+import { tabActivityService } from "@/lib/services/tab-activity-service";
+import { tabStatsService } from "@/lib/services/tab-stats-service";
+import { tabArchiveService } from "@/lib/services/tab-archive-service";
+import { tabBadgeService } from "@/lib/services/tab-badge-service";
+import { tabBookmarkService } from "@/lib/services/tab-bookmark-service";
+import { tabLifecycleService } from "@/lib/services/tab-lifecycle-service";
+import { saveUndoRecord } from "@/lib/services/tab-undo-records";
+import { tabUndoService } from "@/lib/services/tab-undo-service";
+import { queueBookmarkEmbeddings } from "@/lib/embedding/queue-bookmark-embeddings";
 import { embeddingClient, embeddingQueue } from "@/lib/embedding";
 import { semanticRetriever } from "@/lib/search/semantic-retriever";
 import {
@@ -43,6 +56,10 @@ import type {
   ScreenshotCaptureResult,
   SaveSnapshotBackgroundOptions,
   SnapshotSaveResult,
+  ReadLaterSource,
+  TabArchiveReason,
+  TabAutoArchiveSettings,
+  TabBudgetOverAction,
 } from "@/types";
 import type { VectorStoreStats } from "@/lib/storage/vector-store";
 import type {
@@ -51,8 +68,13 @@ import type {
 } from "@/lib/search/semantic-retriever";
 
 class BackgroundServiceImpl implements IBackgroundService {
+  /** Library bookmarks: queue-only read later items stay out of library views */
   async getBookmarks() {
-    return bookmarkStorage.getBookmarks();
+    const [bookmarks, entries] = await Promise.all([
+      bookmarkStorage.getBookmarks(),
+      readLaterStorage.getAll(),
+    ]);
+    return filterLibraryBookmarks(bookmarks, entries);
   }
 
   async getCategories() {
@@ -68,165 +90,18 @@ class BackgroundServiceImpl implements IBackgroundService {
   }
 
   async getPageHtml(): Promise<string | null> {
-    try {
-      const [tab] = await browser.tabs.query({
-        active: true,
-        currentWindow: true,
-      });
-
-      if (!tab?.id) return null;
-
-      try {
-        const response = (await browser.tabs.sendMessage(tab.id, {
-          type: "EXTRACT_HTML",
-        })) as { html?: string } | null;
-
-        if (response?.html) {
-          return response.html;
-        }
-      } catch {
-        console.warn(
-          "[BackgroundService] EXTRACT_CLEAN_HTML failed, falling back to executeScript",
-        );
-      }
-
-      const results = await browser.scripting.executeScript({
-        target: { tabId: tab.id },
-        func: () => document.documentElement.outerHTML,
-      });
-
-      return results[0]?.result || null;
-    } catch (error) {
-      console.error("[BackgroundService] getPageHtml error:", error);
-      return null;
-    }
+    return pageSnapshotService.getPageHtml();
   }
 
   async getPageSingleFileHtml(): Promise<string | null> {
-    try {
-      const [tab] = await browser.tabs.query({
-        active: true,
-        currentWindow: true,
-      });
-
-      if (!tab?.id) return null;
-
-      const targetTabId = tab.id;
-
-      return new Promise<string | null>(async (resolve) => {
-        const captureId = crypto.randomUUID();
-        let chunks: string[] = [];
-        let receivedCount = 0;
-        let totalChunks = 0;
-
-        const cleanup = () => {
-          browser.runtime.onMessage.removeListener(chunkListener);
-        };
-
-        const chunkListener = (message: any) => {
-          if (
-            message.method === "singlefile.chunk" &&
-            message.captureId === captureId
-          ) {
-            if (totalChunks === 0) {
-              totalChunks = message.total;
-              chunks = new Array(totalChunks);
-            }
-            if (!chunks[message.index]) {
-              chunks[message.index] = message.chunk;
-              receivedCount++;
-
-              if (receivedCount === totalChunks) {
-                cleanup();
-                resolve(chunks.join(""));
-              }
-            }
-            return false;
-          }
-        };
-
-        browser.runtime.onMessage.addListener(chunkListener);
-
-        try {
-          const response = (await browser.tabs.sendMessage(targetTabId, {
-            type: "EXTRACT_SINGLEFILE_HTML",
-            captureId,
-          })) as { success?: boolean; error?: string } | null;
-
-          if (!response?.success) {
-            cleanup();
-            console.error(
-              "[BackgroundService] SingleFile start failed:",
-              response?.error,
-            );
-            resolve(await this.getPageHtml());
-          }
-        } catch (error) {
-          cleanup();
-          console.warn(
-            "[BackgroundService] sendMessage failed, falling back",
-            error,
-          );
-          resolve(await this.getPageHtml());
-        }
-      });
-    } catch (error) {
-      console.error(
-        "[BackgroundService] getPageSingleFileHtml critical error:",
-        error,
-      );
-      return this.getPageHtml();
-    }
+    return pageSnapshotService.getPageSingleFileHtml();
   }
 
   async saveSnapshotBackground(
     bookmarkId: string,
     options: SaveSnapshotBackgroundOptions = {},
   ): Promise<SnapshotSaveResult> {
-    try {
-      const mode = options.mode ?? (options.markdown ? "markdown" : "html");
-
-      if (mode === "none") {
-        return { ok: true, skipped: true };
-      }
-
-      if ((mode === "auto" || mode === "markdown") && options.markdown) {
-        await snapshotStorage.saveSnapshot(
-          bookmarkId,
-          options.markdown,
-          "text/markdown;charset=utf-8",
-        );
-      } else {
-        const html = await this.getPageSingleFileHtml();
-        if (!html) {
-          return { ok: false, error: "无法获取页面内容" };
-        }
-        await snapshotStorage.saveSnapshot(bookmarkId, html);
-      }
-
-      await bookmarkStorage.updateBookmark(bookmarkId, {
-        hasSnapshot: true,
-      });
-      console.log(
-        `[BackgroundService] Snapshot saved successfully for ${bookmarkId}`,
-      );
-      return {
-        ok: true,
-        type:
-          (mode === "auto" || mode === "markdown") && options.markdown
-            ? "text/markdown;charset=utf-8"
-            : "text/html",
-      };
-    } catch (error) {
-      console.warn(
-        "[BackgroundService] Failed to save snapshot in background:",
-        error,
-      );
-      return {
-        ok: false,
-        error: error instanceof Error ? error.message : "快照保存失败",
-      };
-    }
+    return pageSnapshotService.saveSnapshot(bookmarkId, options);
   }
 
   async saveScreenshotBackground(
@@ -325,55 +200,11 @@ class BackgroundServiceImpl implements IBackgroundService {
   }
 
   async queueBookmarkEmbedding(bookmarkId: string): Promise<void> {
-    const config = await configStorage.getEmbeddingConfig();
-    if (!config.enabled) {
-      return;
-    }
-
-    await embeddingClient.loadConfig();
-    if (!embeddingClient.isEnabled()) {
-      return;
-    }
-
-    const bookmark = await bookmarkStorage.getBookmarkById(bookmarkId);
-    if (!bookmark) {
-      return;
-    }
-
-    await embeddingQueue.addBookmark(bookmark);
-
-    const status = embeddingQueue.getStatus();
-    if (!status.isProcessing) {
-      await embeddingQueue.start();
-    }
+    await queueBookmarkEmbeddings([bookmarkId], { waitForCompletion: true });
   }
 
   async queueBookmarksEmbedding(bookmarkIds: string[]): Promise<void> {
-    if (bookmarkIds.length === 0) {
-      return;
-    }
-
-    const config = await configStorage.getEmbeddingConfig();
-    if (!config.enabled) {
-      return;
-    }
-
-    await embeddingClient.loadConfig();
-    if (!embeddingClient.isEnabled()) {
-      return;
-    }
-
-    for (const id of bookmarkIds) {
-      const bookmark = await bookmarkStorage.getBookmarkById(id);
-      if (bookmark) {
-        await embeddingQueue.addBookmark(bookmark);
-      }
-    }
-
-    const status = embeddingQueue.getStatus();
-    if (!status.isProcessing) {
-      await embeddingQueue.start();
-    }
+    await queueBookmarkEmbeddings(bookmarkIds, { waitForCompletion: true });
   }
 
   async semanticSearch(
@@ -570,6 +401,200 @@ class BackgroundServiceImpl implements IBackgroundService {
 
   async translate(text: string, targetLang: "zh" | "en"): Promise<string> {
     return translationService.translate(text, targetLang);
+  }
+
+  // ============ Read later ============
+
+  async readLaterTab(
+    tabId: number,
+    options?: { source?: ReadLaterSource; note?: string; closeTab?: boolean },
+  ) {
+    return readLaterService.addTab(tabId, options);
+  }
+
+  async readLaterTabs(
+    tabIds: number[],
+    source: ReadLaterSource,
+    options?: { closeTabs?: boolean },
+  ) {
+    return readLaterService.addTabs(tabIds, source, options);
+  }
+
+  async readLaterArchiveEntries(entryIds: string[]) {
+    return readLaterService.addArchiveEntries(entryIds);
+  }
+
+  async readLaterBookmarks(bookmarkIds: string[]) {
+    return readLaterService.addBookmarks(bookmarkIds, "manual");
+  }
+
+  async getReadLaterQuickList(limit = 8) {
+    return readLaterService.getQuickList(Math.min(20, Math.max(1, limit)));
+  }
+
+  async readLaterOpen(bookmarkId: string) {
+    return readLaterService.open(bookmarkId);
+  }
+
+  async readLaterMarkRead(bookmarkIds: string[]) {
+    return readLaterService.markRead(bookmarkIds);
+  }
+
+  async readLaterRequeue(bookmarkIds: string[]) {
+    return readLaterService.requeue(bookmarkIds);
+  }
+
+  async readLaterKeep(bookmarkIds: string[], classify: boolean) {
+    return readLaterService.keep(bookmarkIds, { classify });
+  }
+
+  async readLaterRemove(bookmarkIds: string[]) {
+    return readLaterService.remove(bookmarkIds);
+  }
+
+  async readLaterUpdateNote(bookmarkId: string, note: string) {
+    return readLaterService.updateNote(bookmarkId, note);
+  }
+
+  // ============ Tab archive & tab center ============
+
+  private async withUndo(
+    result: Awaited<ReturnType<typeof tabArchiveService.archiveTabs>>,
+  ): Promise<ArchiveActionResult> {
+    if (!result.batchId) return result;
+    const undoToken = await saveUndoRecord({
+      kind: "archive",
+      batchId: result.batchId,
+      createdAt: Date.now(),
+    });
+    return { ...result, undoToken };
+  }
+
+  async archiveTabs(tabIds: number[], reason: TabArchiveReason) {
+    const automatic = reason === "expired" || reason === "budget";
+    // Tidy-up suggestions were made earlier: tabs protected since then stay open
+    const ids =
+      reason === "triage" ? await tabLifecycleService.filterStillArchivable(tabIds) : tabIds;
+    const result = await tabArchiveService.archiveTabs(ids, reason, {
+      skipProtected: automatic,
+    });
+    tabBadgeService.scheduleRefresh();
+    return this.withUndo({
+      ...result,
+      skipped: result.skipped + new Set(tabIds).size - ids.length,
+    });
+  }
+
+  async closeDuplicateTabs(tabIds?: number[]) {
+    const snapshot = await tabLifecycleService.getSnapshot();
+    const scope = tabIds ? new Set(tabIds) : null;
+    // Redundant duplicates are never protected; unsubmitted input is checked here
+    const redundant = await tabLifecycleService.filterStillArchivable(
+      snapshot.tabs
+        .filter((tab) => tab.redundantDuplicate && (!scope || scope.has(tab.tabId)))
+        .map((tab) => tab.tabId),
+      { snapshot },
+    );
+    const result = await tabArchiveService.archiveTabs(redundant, "duplicate");
+    tabBadgeService.scheduleRefresh();
+    return this.withUndo(result);
+  }
+
+  async closeTabsWithoutRecord(tabIds: number[]) {
+    const tabs = await Promise.all(tabIds.map((id) => browser.tabs.get(id).catch(() => null)));
+    const closable = tabs
+      .filter((tab) => tab?.id != null && !tab.pinned)
+      .map((tab) => tab!.id!);
+    if (closable.length > 0) await browser.tabs.remove(closable);
+    return closable.length;
+  }
+
+  async restoreArchiveEntries(entryIds: string[], activate = false) {
+    return tabArchiveService.restoreEntries(entryIds, { activate });
+  }
+
+  async restoreArchiveBatches(batchIds: string[]) {
+    return tabArchiveService.restoreBatches(batchIds);
+  }
+
+  async deleteArchiveEntries(entryIds: string[]) {
+    return tabArchiveService.deleteEntries(entryIds);
+  }
+
+  async clearTabArchive() {
+    return tabArchiveService.clear();
+  }
+
+  async bookmarkTabs(tabIds: number[], options?: { categoryByTabId?: Record<number, string> }) {
+    return tabBookmarkService.bookmarkTabs(tabIds, options);
+  }
+
+  async bookmarkArchiveEntries(entryIds: string[]) {
+    return tabBookmarkService.bookmarkArchiveEntries(entryIds);
+  }
+
+  async setTabsLocked(tabIds: number[], locked: boolean) {
+    return tabActivityService.setLocked(tabIds, locked);
+  }
+
+  async renewTabs(tabIds: number[]) {
+    return tabActivityService.renew(tabIds);
+  }
+
+  async getTabWeeklyOverview() {
+    return tabStatsService.getWeeklyOverview();
+  }
+
+  async focusTab(tabId: number) {
+    return tabLifecycleService.focusTab(tabId);
+  }
+
+  async undoTabAction(token: string) {
+    return tabUndoService.undo(token);
+  }
+
+  // ============ Lifecycle settings & budget ============
+
+  async dismissBudgetNudge(mode: "today" | "hour") {
+    return tabLifecycleService.dismissBudgetNudge(mode);
+  }
+
+  async resumeBudgetNudge() {
+    return tabLifecycleService.resumeBudgetNudge();
+  }
+
+  async confirmPendingArchive(tabIds?: number[]) {
+    return tabLifecycleService.confirmPendingArchive(tabIds);
+  }
+
+  async keepPendingArchive(tabIds?: number[]) {
+    return tabLifecycleService.keepPendingArchive(tabIds);
+  }
+
+  async setAutoArchiveEnabled(enabled: boolean, patch?: Partial<TabAutoArchiveSettings>) {
+    return tabLifecycleService.setAutoArchiveEnabled(enabled, patch);
+  }
+
+  async setOverBudgetAction(action: TabBudgetOverAction) {
+    const settings = await tabLifecycleService.setOverBudgetAction(action);
+    tabBadgeService.scheduleRefresh();
+    return settings;
+  }
+
+  async acceptSyncedTabConsent(kind: "autoArchive" | "autoMakeRoom") {
+    return tabLifecycleService.acceptSyncedConsent(kind);
+  }
+
+  async setTabActivityTracking(enabled: boolean) {
+    return tabLifecycleService.setActivityTracking(enabled);
+  }
+
+  async completeTabCenterOnboarding() {
+    return tabLifecycleService.completeOnboarding();
+  }
+
+  async runTabLifecycleSweep() {
+    return tabLifecycleService.runSweep();
   }
 
   private async broadcastEmbeddingProgress(

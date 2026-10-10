@@ -8,30 +8,53 @@
 
 # HamHome
 
-### Organize bookmarks with AI, rediscover saved content, and pick up where you left off
+### Open-source, local-first web clipper and tab manager, with optional AI assistance
 
 [![Release](https://img.shields.io/github/v/release/bingoYB/ham_home?style=flat-square)](https://github.com/bingoYB/ham_home/releases)
 [![Stars](https://img.shields.io/github/stars/bingoYB/ham_home?style=flat-square)](https://github.com/bingoYB/ham_home/stargazers)
 [![Issues](https://img.shields.io/github/issues/bingoYB/ham_home?style=flat-square)](https://github.com/bingoYB/ham_home/issues)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](./LICENSE)
 
-**Find what you saved. Resume what you started.**
+**Keep your collections organized and your tabs tidy, with help from AI.**
 
 <p>
-  <a href="https://bingoyb.github.io/ham_home/">Website</a> · <a href="#downloads">Install</a> · <a href="./docs/USAGE_en.md">Usage Guide</a> · <a href="#features">Features</a> · <a href="#development">Development</a>
+  <a href="https://bingoyb.github.io/ham_home/en/">Website</a> · <a href="#downloads">Install</a> · <a href="./docs/USAGE_en.md">Usage Guide</a> · <a href="#features">Features</a> · <a href="#development">Development</a>
 </p>
 
 </div>
 
 ## What is HamHome?
 
-HamHome is an AI browser workspace that brings bookmarks, page snapshots, and tab sessions together. Save content worth keeping, along with the browsing context you want to return to.
+HamHome is an open-source, local-first web clipper and tab manager for Chrome, Edge, and Firefox. Save pages, text and images in one collection library, search with keywords or semantic search, and save or restore tab workspaces. The optional AI Agent helps you find and summarize content, inspect status, and run supported management tasks.
 
 - **Save with less sorting.** Let AI generate summaries, categories, and tags, keep page snapshots and screenshots, or clip just the passage or image you need.
 - **Find it when you need it.** Search saved content with keywords or semantic search, browse page screenshots in the visual gallery, or ask the built-in Agent to find and summarize it.
-- **Pick up where you left off.** Save a set of tabs as a workspace, restore it when needed, and organize active tabs with grouping rules.
+- **Keep tabs organized.** Save a set of tabs as a workspace and restore it when needed. Chrome/Edge also support native Tab Group rules and optional AI grouping.
+- **Ask for help with a task.** Let the Agent search and summarize saved content, open extension views, check sync status, and run supported tools. Execution steps are visible; credentials and sensitive settings remain under your control.
 
 **Local first. Your choice of AI.** Data stays in your browser by default, with no HamHome account required. AI features send relevant content to the provider you connect. WebDAV sync and file import/export are optional.
+
+## Product facts
+
+| Question | Answer |
+| --- | --- |
+| What can I save? | Page bookmarks, text clips, and image clips; optional local snapshots and page screenshots. |
+| Where is my data? | Browser storage and IndexedDB by default. No HamHome account is required. |
+| Does everything work offline? | Manual collection management is local. AI, link checks, and WebDAV use the relevant network services. |
+| How is AI configured? | Bring your own provider or local endpoint. Embeddings are configured separately for semantic search; image analysis requires a vision-capable model. |
+| What does the Agent do? | Search and summarize saved content, explain features, open views, inspect status, and run supported management tools. Sensitive credentials remain manual. |
+| What does WebDAV sync? | Structured data and bookmark text. Local HTML/Markdown snapshot files and page screenshots are not synced through WebDAV. |
+| Are all browsers identical? | Chrome/Edge run native Tab Group automation. The current Firefox build saves/restores workspaces but does not run native Tab Group automation. |
+| Can I move my data? | Import browser bookmarks, export JSON/HTML, and optionally sync through your WebDAV server. JSON backups do not contain page screenshots. |
+
+## Start with a task
+
+- [Organize saved pages, text and images](https://bingoyb.github.io/ham_home/en/guides/ai-collections/)
+- [Find content when you forget its title](https://bingoyb.github.io/ham_home/en/guides/semantic-search/)
+- [Save tabs and resume a workspace](https://bingoyb.github.io/ham_home/en/guides/tab-workspaces/)
+- [Understand AI, local storage and WebDAV](https://bingoyb.github.io/ham_home/en/guides/privacy-sync/)
+
+Install from [your browser’s store](#downloads), save a page or clip, then explore the library. Add AI or WebDAV only when you need them. See the [usage guide](./docs/USAGE_en.md) for detailed instructions.
 
 ## Screenshots
 
