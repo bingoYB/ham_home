@@ -35,7 +35,7 @@
 
 - 本方案基于仓库现有能力与用户确认的文本、图片收藏能力；本地实现不能单独证明各商店当前版本已经包含该功能。
 - 每个商店应以其实际发布包核对文字、截图与权限。未发布的能力先删去对应段落，待同平台版本更新后再补回。
-- 本轮不宣传开发中的自动归档、稍后读与标签预算。
+- 初稿不宣传当时开发中的自动归档、稍后读与标签预算；2026-10-10 的 `1.4.3` 已包含这些能力，随新版审核提交的补充文案见第 9 节。尚未更新到该版本的渠道仍使用基础介绍。
 - 不使用“所有数据永不外发”“全部离线”“WebDAV 同步完整快照”“已实现加密同步”等承诺。
 - Chrome/Edge 支持原生 Tab Group 自动分组；当前 Firefox 构建不运行该自动化。不要根据浏览器提供新 API 就宣称插件已适配。
 - Agent 只承诺已支持的工具；敏感凭据由用户填写，不描述成任意网站、任意任务都能自动完成。
@@ -269,11 +269,11 @@ git diff --check
 | README | 本地完成中英文同步、产品事实表、Agent 管理与操作说明、指南入口 |
 | GitHub About | 已通过 `gh repo edit` 更新，`gh repo view` 回读与本文第四节一致；258 个字符 |
 | GitHub topics | 保留原有五个主题，新增六个准确类别；Homepage 保持现有 GitHub Pages 地址 |
-| 插件市场 | 未操作，产品负责人按第五节执行 |
-| 扩展名称与短描述 | 本地已更新 `extName` / `extDescription`（en、zh_CN），并补充 `short_name`；未打包或发布 |
+| 插件市场 | 2026-10-10 经产品负责人确认后执行发布与描述更新，分平台结果见第九节 |
+| 扩展名称与短描述 | 已随 `1.4.3` 打包；Chrome 草稿与 Firefox 商店的中英文名称、摘要已核验 |
 | 分享图与小宣传图 | 已按新定位重新生成 `apps/web/public/og-image.png`、`docs/og-image.png`、`docs/og-image-440x280.png` |
 | Review 修正（2026-10-10） | x-default 指向 canonical 中文页；隐私页专属描述与正文重写；兼容页面英文提示；首页 `h1` 含品牌与类别；JSON-LD 按语言区分并标注免费、指南增加文章与面包屑；Web 测试改用 vitest；全局 404 页（`global-not-found`）、完整站点图标、FAQ 首题与英文标点修正；页头语言切换改为可抓取链接 |
-| 代码提交与线上 Web 部署 | 本轮未提交或推送；本地页面与 README 尚未在线生效 |
+| 代码提交与线上 Web 部署 | 已提交并推送到 `feat/agent-runtime-upgrade`；Web 与 README 尚未合并到 `main`，新版 Web 未部署 |
 
 验证已通过：
 
@@ -287,4 +287,40 @@ git diff --check
 
 构建时的 `baseline-browser-mapping` 数据更新时间提示在修改前的基线中同样存在，不影响构建通过。最初沙箱构建因 Turbopack 需要本地端口而被系统限制，允许本地构建进程后验证通过。
 
-现有扩展功能开发改动保持原状；扩展侧只改了国际化文件中的名称与短描述，并在 manifest 补充 `short_name`，未打包或发布。
+前期 Web 文案实施仅修改扩展的国际化名称、摘要和 `short_name`。2026-10-10 发布阶段按用户要求纳入全部本地功能改动，并发布 `1.4.3`，见下节。
+
+## 9. v1.4.3 发布与商店更新（2026-10-10）
+
+### 9.1 已执行状态
+
+- 全部原有本地修改提交为 `ba32f55`（`feat: add tab lifecycle management and AEO marketing`）；版本号单独提交为 `c6b00d9`（`chore(extension): bump version to 1.4.3`）。分支与 `v1.4.3` 标签均已推送。
+- [GitHub Release v1.4.3](https://github.com/bingoYB/ham_home/releases/tag/v1.4.3) 已公开发布，附带 Chrome、Firefox、Edge 三个 zip；源码包用于 Firefox 审核。
+- Chrome 后台已核验草稿包为 `1.4.3`，中英文名称、摘要与长描述已保存并读回。新版与文案一起提交审核，状态为“待审核”，通过后自动发布；当前公开包仍为 `1.4.2`。
+- Firefox `1.4.3` 已成功提交（file status: `unreviewed`），验证为 0 errors / 31 warnings / 0 notices。通过官方 API 更新中英文名称、摘要与第五节基础长描述，包含 Firefox 的工作空间与 Tab Group 能力差异，并读回核验。新增稍后读、自动归档和标签预算段落待该版本审核上架后再加入。
+- Edge 上传在 TLS 建连阶段失败：`Client network socket disconnected before secure TLS connection was established`。仅重试 Edge 后仍失败；备用开发者后台也返回 `ERR_CONNECTION_CLOSED`。该平台包未上传成功，描述尚未更新。网络恢复后仅处理 Edge，不重复提交 Chrome 和 Firefox。
+- GitHub About、topics 与 Homepage 已再次读回核验。Web 与 README 已推送到功能分支，未合并部署，因此商店继续使用原有可访问官网、支持和隐私网址。
+
+### 9.2 随新版加入的长描述段落
+
+Chrome 已将以下段落放在“工作空间”段落后、“本地优先”段落前。Edge 待成功上传新版后使用同样段落；Firefox 待新版审核上架后再加入。
+
+```text
+给标签页减负，留住值得读的内容
+- 一键加入稍后读并关闭页面，按阅读状态管理队列；可添加备注、标记已读或转入收藏库。
+- 在标签页中心归档并恢复页面；闲置自动归档和标签预算按需开启，自动归档需本机确认。
+- 用 AI 查看并调整保留、稍后读和归档建议，配合本周概览回顾使用情况。
+```
+
+```text
+Reduce tab clutter and keep what is worth reading
+- Add a page to Read later and close the tab. Track reading status, add notes, mark items as read or keep them in the library.
+- Archive and restore pages from the tab center. Enable idle auto-archiving and tab budgets when needed; auto-archiving requires consent on each device.
+- Review and adjust AI suggestions to keep, read later or archive tabs, and revisit your activity with the weekly overview.
+```
+
+### 9.3 发布验证与工具限制
+
+- 扩展 336 个测试、Agent 233 个测试、Web 12 个测试及 11 个扩展端到端测试通过；Agent 6 个集成测试按配置跳过。扩展 TypeScript、三个浏览器生产构建、Web 静态构建与导出检查通过。
+- 三个插件 zip 的 manifest 均为 `1.4.3`；名称与摘要符合文案，Chrome/Edge 含 `tabGroups`，Firefox 不含；插件与源码 zip 中未包含私有环境配置或密钥文件。
+- 本机使用 Node 24 与 Corepack pnpm 9。当前发布工具混用第三方 `FormData` 与 Node 原生 fetch，上传被编码成 `text/plain`：Firefox 返回 415；Chrome 工具可能报告上传步骤完成而后台仍是旧包。已通过本地 Request 复现。Firefox 本次用临时表单兼容处理成功提交；Chrome 改用 Edge 浏览器中的官方后台直接上传，并核验版本与送审回执。兼容处理仅用于发布进程，未修改插件包或仓库代码。
+- Firefox 的 31 条验证警告和已有构建 warning 未作为审核通过证据；最终上架取决于各商店审核。
