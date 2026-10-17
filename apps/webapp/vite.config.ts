@@ -28,6 +28,8 @@ export default defineConfig({
   plugins: [react()],
   define: {
     __WEBAPP_VERSION__: JSON.stringify(readManifestVersion()),
+    // Read by lib/platform: turns extension-only features off at build time
+    __HAMHOME_TARGET__: JSON.stringify("web"),
   },
   resolve: {
     alias: [
@@ -36,6 +38,8 @@ export default defineConfig({
         find: "@webext-core/proxy-service",
         replacement: path.join(extension, "web/shims/proxy-service.ts"),
       },
+      { find: "defuddle/full", replacement: path.join(extension, "web/shims/defuddle-full.ts") },
+      { find: /^@\/utils\/page-extract$/, replacement: path.join(extension, "web/shims/page-extract.ts") },
       { find: /^@ui\//, replacement: `${path.resolve(here, "../../packages/ui/src")}/` },
       { find: /^@\//, replacement: `${extension}/` },
     ],

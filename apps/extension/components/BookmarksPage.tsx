@@ -23,6 +23,7 @@ import {
   Bookmark as BookmarkIcon,
   Highlighter,
   Image as ImageIcon,
+  Plus,
 } from "lucide-react";
 import {
   Button,
@@ -37,6 +38,7 @@ import {
 } from "@hamhome/ui";
 import { useBookmarks } from "@/contexts/BookmarkContext";
 import { bookmarkStorage } from "@/lib/storage/bookmark-storage";
+import { capabilities } from "@/lib/platform";
 import { CategoryFilterDropdown } from "@/components/common/CategoryTree";
 import { ContentTypeFilterDropdown } from "@/components/common/ContentTypeFilterDropdown";
 import {
@@ -293,6 +295,8 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
   const [editingBookmark, setEditingBookmark] = useState<LocalBookmark | null>(
     null,
   );
+  // 新建书签（仅无页面可采集的环境提供入口）
+  const [isCreatingBookmark, setIsCreatingBookmark] = useState(false);
   // 剪藏主体弹窗：展示图片 / 选中文字的完整内容
   const [subjectBookmark, setSubjectBookmark] = useState<LocalBookmark | null>(
     null,
@@ -382,6 +386,7 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
   const handleEditSaved = () => {
     refreshBookmarks();
     setEditingBookmark(null);
+    setIsCreatingBookmark(false);
   };
 
   // 查看快照
@@ -576,6 +581,13 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
 
           {/* 右侧：筛选和视图切换 */}
           <div className="flex items-center gap-2">
+            {capabilities.manualBookmarkEntry && (
+              <Button size="sm" onClick={() => setIsCreatingBookmark(true)}>
+                <Plus className="h-4 w-4 mr-1" />
+                {t("bookmark:bookmark.addBookmark")}
+              </Button>
+            )}
+
             {/* 内容类型筛选 */}
             <ContentTypeFilterDropdown
               value={contentType}
@@ -657,15 +669,17 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
               >
                 <List className="h-4 w-4" />
               </Button>
-              <Button
-                variant={viewMode === "visual" ? "secondary" : "ghost"}
-                size="icon"
-                className="h-8 w-8"
-                onClick={() => setViewMode("visual")}
-                title={t("bookmark:bookmark.view.visual")}
-              >
-                <Images className="h-4 w-4" />
-              </Button>
+              {capabilities.screenshots && (
+                <Button
+                  variant={viewMode === "visual" ? "secondary" : "ghost"}
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={() => setViewMode("visual")}
+                  title={t("bookmark:bookmark.view.visual")}
+                >
+                  <Images className="h-4 w-4" />
+                </Button>
+              )}
             </div>
           </div>
         </div>
@@ -801,28 +815,32 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
                     <FolderOpen className="h-4 w-4 mr-1" />
                     {t("bookmark:bookmark.batch.moveCategory")}
                   </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleBatchSyncToObsidian}
-                    disabled={!Array.from(selectedIds).some(id => bookmarks.find(b => b.id === id)?.hasSnapshot)}
-                  >
-                    <Download className="h-4 w-4 mr-1" />
-                    {t("bookmark:bookmark.snapshot.syncSelectedToObsidian")}
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => startBatchAITask(Array.from(selectedIds))}
-                    disabled={isBatchAIProcessing}
-                  >
-                    {isBatchAIProcessing ? (
-                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                    ) : (
-                      <Sparkles className="h-4 w-4 mr-1" />
-                    )}
-                    {t("ai:batchOrganize")}
-                  </Button>
+                  {capabilities.snapshots && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={handleBatchSyncToObsidian}
+                      disabled={!Array.from(selectedIds).some(id => bookmarks.find(b => b.id === id)?.hasSnapshot)}
+                    >
+                      <Download className="h-4 w-4 mr-1" />
+                      {t("bookmark:bookmark.snapshot.syncSelectedToObsidian")}
+                    </Button>
+                  )}
+                  {capabilities.ai && (
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => startBatchAITask(Array.from(selectedIds))}
+                      disabled={isBatchAIProcessing}
+                    >
+                      {isBatchAIProcessing ? (
+                        <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                      ) : (
+                        <Sparkles className="h-4 w-4 mr-1" />
+                      )}
+                      {t("ai:batchOrganize")}
+                    </Button>
+                  )}
                   <Button
                     variant="destructive"
                     size="sm"
@@ -989,7 +1007,9 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
                       onSyncToObsidian={() => handleSyncToObsidian(bm)}
                       onTogglePin={() => handleToggleBookmarkPin(bm)}
                       isPinned={pinnedBookmarkIds.has(bm.id)}
-                      onReanalyzeAI={() => startBatchAITask([bm.id])}
+                      onReanalyzeAI={
+                        capabilities.ai ? () => startBatchAITask([bm.id]) : undefined
+                      }
                       isProcessingAI={isBatchAIProcessing}
                       // 用瀑布流实际算出的列宽，避免卡片宽度和单元格宽度两套来源
                       columnSize={columnWidth}
@@ -1052,7 +1072,11 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
                       onSyncToObsidian={() => handleSyncToObsidian(bookmark)}
                       onTogglePin={() => handleToggleBookmarkPin(bookmark)}
                       isPinned={pinnedBookmarkIds.has(bookmark.id)}
-                      onReanalyzeAI={() => startBatchAITask([bookmark.id])}
+                      onReanalyzeAI={
+                        capabilities.ai
+                          ? () => startBatchAITask([bookmark.id])
+                          : undefined
+                      }
                       isProcessingAI={isBatchAIProcessing}
                       hasScreenshot={!!screenshotIndex[bookmark.id]}
                       subject={toSubjectContent(clipSubjectIndex[bookmark.id])}
@@ -1077,11 +1101,14 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
       </ScrollArea>
 
       {/* 编辑弹窗 */}
-      {editingBookmark && (
+      {(editingBookmark || isCreatingBookmark) && (
         <EditBookmarkDialog
           bookmark={editingBookmark}
           onSaved={handleEditSaved}
-          onClose={() => setEditingBookmark(null)}
+          onClose={() => {
+            setEditingBookmark(null);
+            setIsCreatingBookmark(false);
+          }}
         />
       )}
 
@@ -1123,16 +1150,18 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
       />
 
       {/* 快照查看器 */}
-      <SnapshotViewer
-        open={!!snapshotBookmark}
-        snapshotUrl={snapshotUrl}
-        title={snapshotBookmark?.title || ""}
-        loading={snapshotLoading}
-        error={snapshotError}
-        onClose={handleCloseSnapshot}
-        onDelete={handleDeleteSnapshot}
-        t={t}
-      />
+      {capabilities.snapshots && (
+        <SnapshotViewer
+          open={!!snapshotBookmark}
+          snapshotUrl={snapshotUrl}
+          title={snapshotBookmark?.title || ""}
+          loading={snapshotLoading}
+          error={snapshotError}
+          onClose={handleCloseSnapshot}
+          onDelete={handleDeleteSnapshot}
+          t={t}
+        />
+      )}
 
       {/* 批量打标签弹窗 */}
       <BatchTagDialog

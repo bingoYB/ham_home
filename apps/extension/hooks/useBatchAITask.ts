@@ -1,7 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { aiTaskStorage } from '@/lib/storage/ai-task-storage';
 import { bookmarkStorage } from '@/lib/storage/bookmark-storage';
-import { bookmarkAnalysisService } from '@/lib/agent';
 import type { BatchAITask, BatchAITaskProgress } from '@/lib/storage/ai-task-storage';
 import { useBookmarks } from '@/contexts/BookmarkContext';
 
@@ -24,6 +23,9 @@ export function useBatchAITask() {
 
       let currentCategories = await bookmarkStorage.getCategories();
       let currentTags = await bookmarkStorage.getAllTags();
+
+      // Loaded on demand so builds without AI never ship the agent runtime
+      const { bookmarkAnalysisService } = await import('@/lib/agent');
 
       const BATCH_SIZE = 3;
 

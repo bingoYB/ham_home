@@ -4,6 +4,7 @@
  */
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { parseISODate } from '@hamhome/ui';
+import { capabilities } from '@/lib/platform';
 import type { LocalBookmark, LocalCategory, CustomFilter, FilterCondition } from '@/types';
 
 const SEMANTIC_SEARCH_MIN_SCORE = 0.3;
@@ -332,6 +333,9 @@ async function searchSemanticBookmarkIds(
   query: string,
   bookmarkCount: number,
 ): Promise<string[]> {
+  // Builds without embeddings do keyword search only (and skip loading the retriever)
+  if (!capabilities.semanticSearch) return [];
+
   const { isContentScriptContext } = await import('@/utils/browser-api');
 
   if (isContentScriptContext()) {

@@ -15,6 +15,7 @@ import {
   TabsTrigger,
 } from "@hamhome/ui";
 import { useOptionsPage } from "@/hooks/useOptionsPage";
+import { capabilities } from "@/lib/platform";
 import { AITab } from "./options/AITab";
 import { GeneralTab } from "./options/GeneralTab";
 import { StorageTab } from "./options/StorageTab";
@@ -143,11 +144,15 @@ export function OptionsPage() {
         onValueChange={handleTabChange}
         className="w-full"
       >
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="ai" className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4" />
-            {t("settings:settings.tabs.ai")}
-          </TabsTrigger>
+        <TabsList
+          className={`grid w-full ${capabilities.ai ? "grid-cols-3" : "grid-cols-2"}`}
+        >
+          {capabilities.ai && (
+            <TabsTrigger value="ai" className="flex items-center gap-2">
+              <Sparkles className="h-4 w-4" />
+              {t("settings:settings.tabs.ai")}
+            </TabsTrigger>
+          )}
           <TabsTrigger value="general" className="flex items-center gap-2">
             <Globe className="h-4 w-4" />
             {t("settings:settings.tabs.general")}
@@ -158,59 +163,61 @@ export function OptionsPage() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="ai" className="space-y-6 mt-6">
-          <AITab
-            aiConfig={aiConfig}
-            embeddingConfig={embeddingConfig}
-            localApiKey={localApiKey}
-            localBaseUrl={localBaseUrl}
-            localModel={localModel}
-            modelSelectorOpen={modelSelectorOpen}
-            isFetchingModels={isFetchingModels}
-            remoteModels={remoteModels}
-            modelFetchResult={modelFetchResult}
-            isTesting={isTesting}
-            testResult={testResult}
-            isAdvancedOpen={isAdvancedOpen}
-            newTag={newTag}
-            recommendedModels={recommendedModels}
-            vectorStats={vectorStats}
-            isLoadingStats={isLoadingStats}
-            isRebuilding={isRebuilding}
-            rebuildProgress={rebuildProgress}
-            isClearing={isClearing}
-            localEmbeddingApiKey={localEmbeddingApiKey}
-            localEmbeddingBaseUrl={localEmbeddingBaseUrl}
-            localEmbeddingModel={localEmbeddingModel}
-            isEmbeddingTesting={isEmbeddingTesting}
-            embeddingTestResult={embeddingTestResult}
-            setLocalApiKey={setLocalApiKey}
-            setLocalBaseUrl={setLocalBaseUrl}
-            setLocalModel={setLocalModel}
-            setModelSelectorOpen={setModelSelectorOpen}
-            setIsAdvancedOpen={setIsAdvancedOpen}
-            setNewTag={setNewTag}
-            setLocalEmbeddingApiKey={setLocalEmbeddingApiKey}
-            setLocalEmbeddingBaseUrl={setLocalEmbeddingBaseUrl}
-            setLocalEmbeddingModel={setLocalEmbeddingModel}
-            updateAIConfig={updateAIConfig}
-            updateEmbeddingConfig={updateEmbeddingConfig}
-            onTestConnection={handleTestConnection}
-            onFetchModels={handleFetchModels}
-            onAddTag={handleAddTag}
-            onRemoveTag={handleRemoveTag}
-            onKeyDown={handleKeyDown}
-            onTestEmbeddingConnection={handleTestEmbeddingConnection}
-            onIncrementalRebuild={handleIncrementalRebuild}
-            onFullRebuild={() => setShowFullRebuildDialog(true)}
-            onClearVectors={() => setShowClearVectorsDialog(true)}
-            showFullRebuildDialog={showFullRebuildDialog}
-            showClearVectorsDialog={showClearVectorsDialog}
-            setShowFullRebuildDialog={setShowFullRebuildDialog}
-            setShowClearVectorsDialog={setShowClearVectorsDialog}
-            formatBytes={formatBytes}
-          />
-        </TabsContent>
+        {capabilities.ai && (
+          <TabsContent value="ai" className="space-y-6 mt-6">
+            <AITab
+              aiConfig={aiConfig}
+              embeddingConfig={embeddingConfig}
+              localApiKey={localApiKey}
+              localBaseUrl={localBaseUrl}
+              localModel={localModel}
+              modelSelectorOpen={modelSelectorOpen}
+              isFetchingModels={isFetchingModels}
+              remoteModels={remoteModels}
+              modelFetchResult={modelFetchResult}
+              isTesting={isTesting}
+              testResult={testResult}
+              isAdvancedOpen={isAdvancedOpen}
+              newTag={newTag}
+              recommendedModels={recommendedModels}
+              vectorStats={vectorStats}
+              isLoadingStats={isLoadingStats}
+              isRebuilding={isRebuilding}
+              rebuildProgress={rebuildProgress}
+              isClearing={isClearing}
+              localEmbeddingApiKey={localEmbeddingApiKey}
+              localEmbeddingBaseUrl={localEmbeddingBaseUrl}
+              localEmbeddingModel={localEmbeddingModel}
+              isEmbeddingTesting={isEmbeddingTesting}
+              embeddingTestResult={embeddingTestResult}
+              setLocalApiKey={setLocalApiKey}
+              setLocalBaseUrl={setLocalBaseUrl}
+              setLocalModel={setLocalModel}
+              setModelSelectorOpen={setModelSelectorOpen}
+              setIsAdvancedOpen={setIsAdvancedOpen}
+              setNewTag={setNewTag}
+              setLocalEmbeddingApiKey={setLocalEmbeddingApiKey}
+              setLocalEmbeddingBaseUrl={setLocalEmbeddingBaseUrl}
+              setLocalEmbeddingModel={setLocalEmbeddingModel}
+              updateAIConfig={updateAIConfig}
+              updateEmbeddingConfig={updateEmbeddingConfig}
+              onTestConnection={handleTestConnection}
+              onFetchModels={handleFetchModels}
+              onAddTag={handleAddTag}
+              onRemoveTag={handleRemoveTag}
+              onKeyDown={handleKeyDown}
+              onTestEmbeddingConnection={handleTestEmbeddingConnection}
+              onIncrementalRebuild={handleIncrementalRebuild}
+              onFullRebuild={() => setShowFullRebuildDialog(true)}
+              onClearVectors={() => setShowClearVectorsDialog(true)}
+              showFullRebuildDialog={showFullRebuildDialog}
+              showClearVectorsDialog={showClearVectorsDialog}
+              setShowFullRebuildDialog={setShowFullRebuildDialog}
+              setShowClearVectorsDialog={setShowClearVectorsDialog}
+              formatBytes={formatBytes}
+            />
+          </TabsContent>
+        )}
 
         <TabsContent value="general" className="space-y-6 mt-6">
           <GeneralTab
