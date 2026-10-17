@@ -9,12 +9,11 @@ import {
   bookmarkStorage,
   configStorage,
 } from "@/lib/storage";
-import {
-  matchCategoryByName,
-} from "@/lib/agent";
+import { matchCategoryByName } from "@/lib/agent/category-utils";
 // 直接引用错误码模块，避免把 background 专用的剪藏分析服务打进 content script
 import { resolveClipAnalysisErrorCode } from "@/lib/agent/clip-analysis-errors";
 import { getBackgroundService } from "@/lib/services";
+import { capabilities } from "@/lib/platform";
 import { obsidianSyncService } from "@/lib/services/obsidian-sync-service";
 import { createMarkdownContent } from "defuddle/full";
 import {
@@ -325,6 +324,11 @@ export function useSavePanel({
    */
   const performAIAnalysis = useCallback(
     async (skipCache: boolean = false) => {
+      if (!capabilities.ai) {
+        setAIStatus("disabled");
+        return;
+      }
+
       const config = await configStorage.getAIConfig();
       const settings = await configStorage.getSettings();
 
@@ -433,15 +437,16 @@ export function useSavePanel({
         setSaveSnapshotState(false);
         setSaveScreenshotState(false);
       } else {
-        if (initialSaveSnapshot !== undefined) {
-          setSaveSnapshotState(initialSaveSnapshot);
-        } else {
-          setSaveSnapshotState(settings.autoSaveSnapshot);
-        }
+        // Synced settings may ask for snapshots/screenshots that this build cannot take
+        setSaveSnapshotState(
+          capabilities.snapshots &&
+            (initialSaveSnapshot ?? settings.autoSaveSnapshot),
+        );
 
         const screenshotAllowed =
-          !pageContent.isPrivate ||
-          settings.screenshotPrivatePagePolicy === "ask";
+          capabilities.screenshots &&
+          (!pageContent.isPrivate ||
+            settings.screenshotPrivatePagePolicy === "ask");
         setSaveScreenshotState(
           screenshotAllowed
             ? (initialSaveScreenshot ?? settings.autoSaveScreenshot)
@@ -582,17 +587,21 @@ export function useSavePanel({
     setObsidianError(null);
 
     try {
+      // 主体型剪藏不重复保存来源页正文（同页多条剪藏会各存一份）：
+      // 图片书签的主体是图片本身，文字书签的主体是选中片段
+      const content = imageBookmarkUrl
+        ? ""
+        : isTextClip(initialClip)
+          ? (initialClip?.text?.trim() ?? "")
+          : markdown;
+
       const data = {
         url: url.trim(),
         title: title.trim(),
         description: description.trim(),
-        // 主体型剪藏不重复保存来源页正文（同页多条剪藏会各存一份）：
-        // 图片书签的主体是图片本身，文字书签的主体是选中片段
-        content: imageBookmarkUrl
-          ? ""
-          : isTextClip(initialClip)
-            ? (initialClip?.text?.trim() ?? "")
-            : markdown,
+        // 编辑已有书签时没有重新采集页面，content 为空；updateBookmark 会把空字符串
+        // 当作"删除正文"，所以此时传 undefined，保持已存正文不变
+        content: existingBookmark && !content ? undefined : content,
         categoryId,
         tags,
         favicon: pageContent.favicon,
@@ -614,11 +623,13 @@ export function useSavePanel({
       setSnapshotStatus("bookmarkSaved");
 
       // 添加 embedding 生成任务（在 background 中执行）
-      try {
-        const backgroundService = getBackgroundService();
-        await backgroundService.queueBookmarkEmbedding(bookmark.id);
-      } catch (e) {
-        console.warn("[useSavePanel] Failed to queue embedding:", e);
+      if (capabilities.semanticSearch) {
+        try {
+          const backgroundService = getBackgroundService();
+          await backgroundService.queueBookmarkEmbedding(bookmark.id);
+        } catch (e) {
+          console.warn("[useSavePanel] Failed to queue embedding:", e);
+        }
       }
 
       const independentAssets: Promise<void>[] = [];

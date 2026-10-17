@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from "@hamhome/ui";
 import { syncEngine } from "@/lib/sync/sync-engine";
+import { capabilities } from "@/lib/platform";
 import type { WebDAVConfig, SyncStatus, EmbeddingConfig } from "@/types";
 import type { VectorStoreStats } from "@/lib/storage/vector-store";
 
@@ -154,134 +155,150 @@ export function StorageTab({
                 </Button>
               </div>
 
-              {/* 工作空间 */}
-              <div className="flex flex-col p-4 rounded-lg border bg-muted/30 gap-3">
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-foreground">
-                    {t("settings:settings.storage.workspaceData.title")}
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {t("settings:settings.storage.workspaceData.count", {
-                      count: storageInfo.workspaceCount || 0,
-                    })}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {t("settings:settings.storage.workspaceData.size")}
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={onClearAllData}
-                  disabled={isClearingAll || !storageInfo.workspaceCount}
-                  className="w-full text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
-                >
-                  {isClearingAll ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5 shrink-0" />
-                  ) : (
-                    <Trash2 className="h-3.5 w-3.5 mr-1.5 shrink-0" />
-                  )}
-                  {t("settings:settings.storage.workspaceData.clear")}
-                </Button>
-              </div>
+              {capabilities.browserTabs && (
+                <>
+                  {/* 工作空间 */}
+                  <div className="flex flex-col p-4 rounded-lg border bg-muted/30 gap-3">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-foreground">
+                        {t("settings:settings.storage.workspaceData.title")}
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {t("settings:settings.storage.workspaceData.count", {
+                          count: storageInfo.workspaceCount || 0,
+                        })}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {t("settings:settings.storage.workspaceData.size")}
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={onClearAllData}
+                      disabled={isClearingAll || !storageInfo.workspaceCount}
+                      className="w-full text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
+                    >
+                      {isClearingAll ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5 shrink-0" />
+                      ) : (
+                        <Trash2 className="h-3.5 w-3.5 mr-1.5 shrink-0" />
+                      )}
+                      {t("settings:settings.storage.workspaceData.clear")}
+                    </Button>
+                  </div>
+                </>
+              )}
 
-              {/* 网页快照 */}
-              <div className="flex flex-col p-4 rounded-lg border bg-muted/30 gap-3">
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-foreground">
-                    {t("settings:settings.storage.snapshotData.title")}
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {t("settings:settings.storage.snapshotData.count", {
-                      count: snapshotStats?.count || 0,
-                    })}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {t("settings:settings.storage.snapshotData.size", {
-                      size: formatBytes(snapshotStats?.totalSize || 0),
-                    })}
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={onClearSnapshotData}
-                  disabled={isClearingSnapshots || isClearingAll || !snapshotStats?.count}
-                  className="w-full text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
-                >
-                  {isClearingSnapshots ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5 shrink-0" />
-                  ) : (
-                    <Trash2 className="h-3.5 w-3.5 mr-1.5 shrink-0" />
-                  )}
-                  {t("settings:settings.storage.snapshotData.clear")}
-                </Button>
-              </div>
+              {capabilities.snapshots && (
+                <>
+                  {/* 网页快照 */}
+                  <div className="flex flex-col p-4 rounded-lg border bg-muted/30 gap-3">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-foreground">
+                        {t("settings:settings.storage.snapshotData.title")}
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {t("settings:settings.storage.snapshotData.count", {
+                          count: snapshotStats?.count || 0,
+                        })}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {t("settings:settings.storage.snapshotData.size", {
+                          size: formatBytes(snapshotStats?.totalSize || 0),
+                        })}
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={onClearSnapshotData}
+                      disabled={isClearingSnapshots || isClearingAll || !snapshotStats?.count}
+                      className="w-full text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
+                    >
+                      {isClearingSnapshots ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5 shrink-0" />
+                      ) : (
+                        <Trash2 className="h-3.5 w-3.5 mr-1.5 shrink-0" />
+                      )}
+                      {t("settings:settings.storage.snapshotData.clear")}
+                    </Button>
+                  </div>
+                </>
+              )}
 
-              {/* 页面截图 */}
-              <div className="flex flex-col p-4 rounded-lg border bg-muted/30 gap-3">
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-foreground">
-                    {t("settings:settings.storage.screenshotData.title")}
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {t("settings:settings.storage.screenshotData.count", {
-                      count: screenshotStats?.count || 0,
-                    })}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {t("settings:settings.storage.screenshotData.size", {
-                      size: formatBytes(screenshotStats?.totalSize || 0),
-                    })}
-                  </p>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  {t("settings:settings.storage.screenshotData.localOnly")}
-                </p>
-              </div>
+              {capabilities.screenshots && (
+                <>
+                  {/* 页面截图 */}
+                  <div className="flex flex-col p-4 rounded-lg border bg-muted/30 gap-3">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-foreground">
+                        {t("settings:settings.storage.screenshotData.title")}
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {t("settings:settings.storage.screenshotData.count", {
+                          count: screenshotStats?.count || 0,
+                        })}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {t("settings:settings.storage.screenshotData.size", {
+                          size: formatBytes(screenshotStats?.totalSize || 0),
+                        })}
+                      </p>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {t("settings:settings.storage.screenshotData.localOnly")}
+                    </p>
+                  </div>
+                </>
+              )}
 
-              {/* 语义向量索引 */}
-              <div className="flex flex-col p-4 rounded-lg border bg-muted/30 gap-3">
-                <div className="flex-1">
-                  <p className="text-sm font-medium text-foreground">
-                    {t("settings:settings.storage.vectorData.title")}
-                  </p>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    {embeddingConfig.enabled
-                      ? t("settings:settings.storage.vectorData.count", {
-                          count: vectorStats?.count || 0,
-                        })
-                      : t("settings:settings.storage.notEnabled")}
-                  </p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {embeddingConfig.enabled
-                      ? t("settings:settings.storage.vectorData.size", {
-                          size: formatBytes(vectorStats?.estimatedSize || 0),
-                        })
-                      : "—"}
-                  </p>
-                </div>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={onClearVectors}
-                  disabled={
-                    isRebuilding ||
-                    isClearing ||
-                    isClearingAll ||
-                    !embeddingConfig.enabled ||
-                    (vectorStats?.count ?? 0) === 0
-                  }
-                  className="w-full text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
-                >
-                  {isClearing ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5 shrink-0" />
-                  ) : (
-                    <Trash2 className="h-3.5 w-3.5 mr-1.5 shrink-0" />
-                  )}
-                  {t("settings:settings.storage.vectorData.clear")}
-                </Button>
-              </div>
+              {capabilities.semanticSearch && (
+                <>
+                  {/* 语义向量索引 */}
+                  <div className="flex flex-col p-4 rounded-lg border bg-muted/30 gap-3">
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-foreground">
+                        {t("settings:settings.storage.vectorData.title")}
+                      </p>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {embeddingConfig.enabled
+                          ? t("settings:settings.storage.vectorData.count", {
+                              count: vectorStats?.count || 0,
+                            })
+                          : t("settings:settings.storage.notEnabled")}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {embeddingConfig.enabled
+                          ? t("settings:settings.storage.vectorData.size", {
+                              size: formatBytes(vectorStats?.estimatedSize || 0),
+                            })
+                          : "—"}
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={onClearVectors}
+                      disabled={
+                        isRebuilding ||
+                        isClearing ||
+                        isClearingAll ||
+                        !embeddingConfig.enabled ||
+                        (vectorStats?.count ?? 0) === 0
+                      }
+                      className="w-full text-destructive border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
+                    >
+                      {isClearing ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin mr-1.5 shrink-0" />
+                      ) : (
+                        <Trash2 className="h-3.5 w-3.5 mr-1.5 shrink-0" />
+                      )}
+                      {t("settings:settings.storage.vectorData.clear")}
+                    </Button>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -320,13 +337,13 @@ export function StorageTab({
             >
               {isClearingAll ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {t("settings:settings.storage.clearAllData")}...
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {t("settings:settings.storage.clearAllData")}...
                 </>
               ) : (
                 <>
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  {t("settings:settings.storage.clearAllData")}
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    {t("settings:settings.storage.clearAllData")}
                 </>
               )}
             </Button>

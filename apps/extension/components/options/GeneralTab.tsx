@@ -16,6 +16,7 @@ import {
   CardTitle,
 } from "@hamhome/ui";
 import { isFirefox, getBrowserSpecificURL, safeCreateTab } from "@/utils/browser-api";
+import { capabilities } from "@/lib/platform";
 import type { CustomFilter, LocalSettings } from "@/types";
 
 interface GeneralTabProps {
@@ -80,128 +81,144 @@ export function GeneralTab({
           </Select>
         </div>
 
-        {/* 自动保存快照 */}
-        <div className="flex items-center justify-between">
-          <div className="space-y-0.5">
-            <Label>{t("settings:settings.general.autoSaveSnapshot")}</Label>
-            <p className="text-sm text-muted-foreground">
-              {t("settings:settings.general.autoSaveSnapshotDesc")}
-            </p>
-          </div>
-          <Switch
-            checked={appSettings.autoSaveSnapshot}
-            onCheckedChange={handleAutoSaveSnapshotChange}
-          />
-        </div>
+        {capabilities.snapshots && (
+          <>
+            {/* 自动保存快照 */}
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>{t("settings:settings.general.autoSaveSnapshot")}</Label>
+                <p className="text-sm text-muted-foreground">
+                  {t("settings:settings.general.autoSaveSnapshotDesc")}
+                </p>
+              </div>
+              <Switch
+                checked={appSettings.autoSaveSnapshot}
+                onCheckedChange={handleAutoSaveSnapshotChange}
+              />
+            </div>
+          </>
+        )}
 
-        {/* 自动保存页面截图 */}
-        <div className="flex items-center justify-between">
-          <div className="space-y-0.5">
-            <Label>{t("settings:settings.general.autoSaveScreenshot")}</Label>
-            <p className="text-sm text-muted-foreground">
-              {t("settings:settings.general.autoSaveScreenshotDesc")}
-            </p>
-          </div>
-          <Switch
-            checked={appSettings.autoSaveScreenshot}
-            onCheckedChange={(checked) =>
-              updateAppSettings({ autoSaveScreenshot: checked })
-            }
-          />
-        </div>
+        {capabilities.screenshots && (
+          <>
+            {/* 自动保存页面截图 */}
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>{t("settings:settings.general.autoSaveScreenshot")}</Label>
+                <p className="text-sm text-muted-foreground">
+                  {t("settings:settings.general.autoSaveScreenshotDesc")}
+                </p>
+              </div>
+              <Switch
+                checked={appSettings.autoSaveScreenshot}
+                onCheckedChange={(checked) =>
+                  updateAppSettings({ autoSaveScreenshot: checked })
+                }
+              />
+            </div>
 
-        <div className="flex items-center justify-between">
-          <div className="space-y-0.5">
-            <Label htmlFor="screenshot-private-policy">
-              {t("settings:settings.general.screenshotPrivatePagePolicy")}
-            </Label>
-            <p className="text-sm text-muted-foreground">
-              {t("settings:settings.general.screenshotPrivatePagePolicyDesc")}
-            </p>
-          </div>
-          <Select
-            value={appSettings.screenshotPrivatePagePolicy}
-            onValueChange={(value: "skip" | "ask") =>
-              updateAppSettings({ screenshotPrivatePagePolicy: value })
-            }
-          >
-            <SelectTrigger id="screenshot-private-policy" className="w-32">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="skip">
-                {t("settings:settings.general.screenshotPrivatePagePolicyOptions.skip")}
-              </SelectItem>
-              <SelectItem value="ask">
-                {t("settings:settings.general.screenshotPrivatePagePolicyOptions.ask")}
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="screenshot-private-policy">
+                  {t("settings:settings.general.screenshotPrivatePagePolicy")}
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  {t("settings:settings.general.screenshotPrivatePagePolicyDesc")}
+                </p>
+              </div>
+              <Select
+                value={appSettings.screenshotPrivatePagePolicy}
+                onValueChange={(value: "skip" | "ask") =>
+                  updateAppSettings({ screenshotPrivatePagePolicy: value })
+                }
+              >
+                <SelectTrigger id="screenshot-private-policy" className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="skip">
+                    {t("settings:settings.general.screenshotPrivatePagePolicyOptions.skip")}
+                  </SelectItem>
+                  <SelectItem value="ask">
+                    {t("settings:settings.general.screenshotPrivatePagePolicyOptions.ask")}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </>
+        )}
 
-        <div className="flex items-center justify-between">
-          <div className="space-y-0.5">
-            <Label htmlFor="bookmark-health-schedule">
-              {t("settings:settings.general.bookmarkHealthSchedule")}
-            </Label>
-            <p className="text-sm text-muted-foreground">
-              {t("settings:settings.general.bookmarkHealthScheduleDesc")}
-            </p>
-          </div>
-          <Select
-            value={appSettings.bookmarkHealthSchedule}
-            onValueChange={(value: "off" | "weekly" | "monthly") =>
-              updateAppSettings({ bookmarkHealthSchedule: value })
-            }
-          >
-            <SelectTrigger id="bookmark-health-schedule" className="w-32">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="off">
-                {t("settings:settings.general.bookmarkHealthScheduleOptions.off")}
-              </SelectItem>
-              <SelectItem value="weekly">
-                {t("settings:settings.general.bookmarkHealthScheduleOptions.weekly")}
-              </SelectItem>
-              <SelectItem value="monthly">
-                {t("settings:settings.general.bookmarkHealthScheduleOptions.monthly")}
-              </SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        {capabilities.bookmarkHealth && (
+          <>
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="bookmark-health-schedule">
+                  {t("settings:settings.general.bookmarkHealthSchedule")}
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  {t("settings:settings.general.bookmarkHealthScheduleDesc")}
+                </p>
+              </div>
+              <Select
+                value={appSettings.bookmarkHealthSchedule}
+                onValueChange={(value: "off" | "weekly" | "monthly") =>
+                  updateAppSettings({ bookmarkHealthSchedule: value })
+                }
+              >
+                <SelectTrigger id="bookmark-health-schedule" className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="off">
+                    {t("settings:settings.general.bookmarkHealthScheduleOptions.off")}
+                  </SelectItem>
+                  <SelectItem value="weekly">
+                    {t("settings:settings.general.bookmarkHealthScheduleOptions.weekly")}
+                  </SelectItem>
+                  <SelectItem value="monthly">
+                    {t("settings:settings.general.bookmarkHealthScheduleOptions.monthly")}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </>
+        )}
 
-        {/* 保存方式：页内浮窗 / 扩展弹窗 */}
-        <div className="flex items-center justify-between">
-          <div className="space-y-0.5">
-            <Label>{t("settings:settings.general.usePopupSavePanel")}</Label>
-            <p className="text-sm text-muted-foreground">
-              {t("settings:settings.general.usePopupSavePanelDesc")}
-            </p>
-          </div>
-          <Switch
-            checked={appSettings.usePopupSavePanel}
-            onCheckedChange={(checked) =>
-              updateAppSettings({ usePopupSavePanel: checked })
-            }
-          />
-        </div>
+        {capabilities.browserIntegration && (
+          <>
+            {/* 保存方式：页内浮窗 / 扩展弹窗 */}
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>{t("settings:settings.general.usePopupSavePanel")}</Label>
+                <p className="text-sm text-muted-foreground">
+                  {t("settings:settings.general.usePopupSavePanelDesc")}
+                </p>
+              </div>
+              <Switch
+                checked={appSettings.usePopupSavePanel}
+                onCheckedChange={(checked) =>
+                  updateAppSettings({ usePopupSavePanel: checked })
+                }
+              />
+            </div>
 
-        {/* Omnibox 搜索 */}
-        <div className="flex items-center justify-between">
-          <div className="space-y-0.5">
-            <Label>{t("settings:settings.general.enableOmniboxSearch")}</Label>
-            <p className="text-sm text-muted-foreground">
-              {t("settings:settings.general.enableOmniboxSearchDesc")}
-            </p>
-          </div>
-          <Switch
-            checked={appSettings.enableOmniboxSearch}
-            onCheckedChange={(checked) =>
-              updateAppSettings({ enableOmniboxSearch: checked })
-            }
-          />
-        </div>
+            {/* Omnibox 搜索 */}
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>{t("settings:settings.general.enableOmniboxSearch")}</Label>
+                <p className="text-sm text-muted-foreground">
+                  {t("settings:settings.general.enableOmniboxSearchDesc")}
+                </p>
+              </div>
+              <Switch
+                checked={appSettings.enableOmniboxSearch}
+                onCheckedChange={(checked) =>
+                  updateAppSettings({ enableOmniboxSearch: checked })
+                }
+              />
+            </div>
+          </>
+        )}
 
         {/* 主题设置 */}
         <div className="flex items-center justify-between">
@@ -234,102 +251,106 @@ export function GeneralTab({
           </Select>
         </div>
 
-        {/* 快捷键设置 */}
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="space-y-0.5">
-              <Label>{t("settings:settings.general.shortcut")}</Label>
-              <p className="text-sm text-muted-foreground">
-                {isFirefox()
-                  ? t("settings:settings.general.shortcutDescFirefox")
-                  : t("settings:settings.general.shortcutDesc")}
-              </p>
-            </div>
-            <Button
-              variant="outline"
-              onClick={async () => {
-                const url = getBrowserSpecificURL("shortcuts");
-                await safeCreateTab(url);
-                setTimeout(refreshShortcuts, 500);
-              }}
-            >
-              <span>{t("settings:settings.general.shortcutButton")}</span>
-              <ExternalLink className="h-4 w-4 ml-2" />
-            </Button>
-          </div>
-
-          {shortcuts.length > 0 && (
-            <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
-              <p className="text-sm font-medium text-muted-foreground">
-                {t("settings:settings.general.currentShortcuts")}
-              </p>
-              <div className="space-y-3">
-                {shortcuts.map((shortcut) => (
-                  <div key={shortcut.name} className="flex items-center justify-between gap-4">
-                    <span className="text-sm text-foreground">{shortcut.description}</span>
-                    {shortcut.shortcut ? (
-                      <div className="flex items-center gap-1">
-                        {shortcut.formattedShortcut.split(" + ").map((key: string, idx: number) => (
-                          <kbd
-                            key={idx}
-                            className="inline-flex items-center justify-center min-w-[28px] h-7 px-2 text-xs font-medium font-mono bg-background border border-border rounded-md shadow-sm"
-                          >
-                            {key}
-                          </kbd>
-                        ))}
-                      </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground italic">
-                        {t("settings:settings.general.shortcutNotSet")}
-                      </span>
-                    )}
-                  </div>
-                ))}
+        {capabilities.browserIntegration && (
+          <>
+            {/* 快捷键设置 */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <Label>{t("settings:settings.general.shortcut")}</Label>
+                  <p className="text-sm text-muted-foreground">
+                    {isFirefox()
+                      ? t("settings:settings.general.shortcutDescFirefox")
+                      : t("settings:settings.general.shortcutDesc")}
+                  </p>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={async () => {
+                    const url = getBrowserSpecificURL("shortcuts");
+                    await safeCreateTab(url);
+                    setTimeout(refreshShortcuts, 500);
+                  }}
+                >
+                  <span>{t("settings:settings.general.shortcutButton")}</span>
+                  <ExternalLink className="h-4 w-4 ml-2" />
+                </Button>
               </div>
+
+              {shortcuts.length > 0 && (
+                <div className="rounded-lg border bg-muted/30 p-4 space-y-3">
+                  <p className="text-sm font-medium text-muted-foreground">
+                    {t("settings:settings.general.currentShortcuts")}
+                  </p>
+                  <div className="space-y-3">
+                    {shortcuts.map((shortcut) => (
+                      <div key={shortcut.name} className="flex items-center justify-between gap-4">
+                        <span className="text-sm text-foreground">{shortcut.description}</span>
+                        {shortcut.shortcut ? (
+                          <div className="flex items-center gap-1">
+                            {shortcut.formattedShortcut.split(" + ").map((key: string, idx: number) => (
+                              <kbd
+                                key={idx}
+                                className="inline-flex items-center justify-center min-w-[28px] h-7 px-2 text-xs font-medium font-mono bg-background border border-border rounded-md shadow-sm"
+                              >
+                                {key}
+                              </kbd>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-xs text-muted-foreground italic">
+                            {t("settings:settings.general.shortcutNotSet")}
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
-        {/* 侧边栏开关 */}
-        <div className="flex items-center justify-between">
-          <div className="space-y-0.5">
-            <Label>{t("settings:settings.general.enableSidePanel")}</Label>
-            <p className="text-sm text-muted-foreground">
-              {t("settings:settings.general.enableSidePanelDesc")}
-            </p>
-          </div>
-          <Switch
-            checked={appSettings.enableSidePanel}
-            onCheckedChange={(checked) =>
-              updateAppSettings({ enableSidePanel: checked })
-            }
-          />
-        </div>
+            {/* 侧边栏开关 */}
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label>{t("settings:settings.general.enableSidePanel")}</Label>
+                <p className="text-sm text-muted-foreground">
+                  {t("settings:settings.general.enableSidePanelDesc")}
+                </p>
+              </div>
+              <Switch
+                checked={appSettings.enableSidePanel}
+                onCheckedChange={(checked) =>
+                  updateAppSettings({ enableSidePanel: checked })
+                }
+              />
+            </div>
 
-        {/* 面板位置 */}
-        <div className="flex items-center justify-between">
-          <div className="space-y-0.5">
-            <Label htmlFor="panelPosition">{t("settings:settings.general.panelPosition")}</Label>
-            <p className="text-sm text-muted-foreground">
-              {t("settings:settings.general.panelPositionDesc")}
-            </p>
-          </div>
-          <Select
-            value={appSettings.panelPosition}
-            disabled={!appSettings.enableSidePanel}
-            onValueChange={(value: "left" | "right") =>
-              updateAppSettings({ panelPosition: value })
-            }
-          >
-            <SelectTrigger id="panelPosition" className="w-32">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="left">{t("settings:settings.general.panelPositionOptions.left")}</SelectItem>
-              <SelectItem value="right">{t("settings:settings.general.panelPositionOptions.right")}</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+            {/* 面板位置 */}
+            <div className="flex items-center justify-between">
+              <div className="space-y-0.5">
+                <Label htmlFor="panelPosition">{t("settings:settings.general.panelPosition")}</Label>
+                <p className="text-sm text-muted-foreground">
+                  {t("settings:settings.general.panelPositionDesc")}
+                </p>
+              </div>
+              <Select
+                value={appSettings.panelPosition}
+                disabled={!appSettings.enableSidePanel}
+                onValueChange={(value: "left" | "right") =>
+                  updateAppSettings({ panelPosition: value })
+                }
+              >
+                <SelectTrigger id="panelPosition" className="w-32">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="left">{t("settings:settings.general.panelPositionOptions.left")}</SelectItem>
+                  <SelectItem value="right">{t("settings:settings.general.panelPositionOptions.right")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </>
+        )}
 
         {/* 自定义筛选器管理 */}
         <div className="space-y-4 pt-4 border-t">

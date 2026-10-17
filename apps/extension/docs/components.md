@@ -1629,26 +1629,30 @@ interface Source {
 
 ### EditBookmarkDialog
 
-书签编辑弹窗组件，支持修改书签的 URL、标题、摘要、分类和标签。
+书签编辑弹窗组件，支持修改书签的 URL、标题、摘要、分类和标签。`bookmark` 为 `null` 时是新建模式，用于没有可采集页面的环境（Web 版，见 `lib/platform`）手动录入书签。
 
-| Prop     | Type            | Required | Default | Description      |
-| -------- | --------------- | -------- | ------- | ---------------- |
-| bookmark | `LocalBookmark` | ✓        | -       | 要编辑的书签数据 |
-| onSaved  | `() => void`    | ✓        | -       | 保存成功回调     |
-| onClose  | `() => void`    | ✓        | -       | 关闭弹窗回调     |
+| Prop     | Type                    | Required | Default | Description                      |
+| -------- | ----------------------- | -------- | ------- | -------------------------------- |
+| bookmark | `LocalBookmark \| null` | ✓        | -       | 要编辑的书签数据；`null` 表示新建 |
+| onSaved  | `() => void`            | ✓        | -       | 保存成功回调                     |
+| onClose  | `() => void`            | ✓        | -       | 关闭弹窗回调                     |
 
 **用法示例：**
 
 ```tsx
 {
-  editingBookmark && (
+  (editingBookmark || isCreatingBookmark) && (
     <EditBookmarkDialog
-      bookmark={editingBookmark}
+      bookmark={editingBookmark} // null: 新建
       onSaved={() => {
         refreshBookmarks();
         setEditingBookmark(null);
+        setIsCreatingBookmark(false);
       }}
-      onClose={() => setEditingBookmark(null)}
+      onClose={() => {
+        setEditingBookmark(null);
+        setIsCreatingBookmark(false);
+      }}
     />
   );
 }
@@ -1659,6 +1663,9 @@ interface Source {
 - 内部使用 `useSavePanel` hook 管理表单状态
 - 支持 AI 推荐分类功能
 - 自动加载已有标签列表作为建议
+- 新建模式：标题为"添加书签"，链接必须以 `http://` 或 `https://` 开头，否则显示提示并禁用保存
+- 保存失败（例如链接已收藏）时在表单下方显示错误信息
+- 编辑已有书签不会改动已保存的正文；没有 AI 能力的构建（Web 版）摘要占位符不再提示"等待 AI 生成"
 
 ---
 

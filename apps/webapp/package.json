@@ -1,0 +1,17 @@
+{
+  "name": "@hamhome/webapp",
+  "version": "0.0.0",
+  "private": true,
+  "description": "HamHome self-hosted web app: web build of the extension's management page (sources in apps/extension/web)",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-react": "^5.1.1",
+    "vite": "5.4.21"
+  }
+}

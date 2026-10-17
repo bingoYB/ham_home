@@ -41,7 +41,7 @@ import { workspaceStorage } from "@/lib/storage/workspace-storage";
 import { tabGroupRulesStorage } from "@/lib/storage/tab-group-rules-storage";
 import { importTaskStorage } from "@/lib/storage/import-task-storage";
 import { getBackgroundService } from "@/lib/services";
-import { bookmarkAnalysisService } from "@/lib/agent";
+import { capabilities } from "@/lib/platform";
 import {
   useChromeBookmarks,
   ChromeBookmarkError,
@@ -611,7 +611,7 @@ export function ImportExportPage() {
     }
 
     // 批量添加 embedding 任务（在 background 中执行）
-    if (importedBookmarkIds.length > 0) {
+    if (capabilities.semanticSearch && importedBookmarkIds.length > 0) {
       try {
         const bgService = getBackgroundService();
         await bgService.queueBookmarksEmbedding(importedBookmarkIds);
@@ -664,6 +664,7 @@ export function ImportExportPage() {
   }> => {
     const aiStart = performance.now();
     try {
+      const { bookmarkAnalysisService } = await import("@/lib/agent");
       const result = await bookmarkAnalysisService.analyzeBookmarkForLibrary({
         url,
         title,
@@ -1143,7 +1144,7 @@ export function ImportExportPage() {
     }
 
     // 批量添加 embedding 任务（在 background 中执行）
-    if (importedBookmarkIds.length > 0) {
+    if (capabilities.semanticSearch && importedBookmarkIds.length > 0) {
       try {
         const tEmbed = performance.now();
         const bgService = getBackgroundService();
@@ -1348,67 +1349,71 @@ export function ImportExportPage() {
               </div>
             </div>
 
-            {/* AI 分类打标选项 */}
-            <div className="p-4 rounded-lg border border-border bg-card">
-              <div className="flex items-start gap-3">
-                <Checkbox
-                  id="enable-ai-analysis"
-                  checked={enableAIAnalysis}
-                  onCheckedChange={(checked) =>
-                    handleEnableAIAnalysisChange(checked === true)
-                  }
-                />
-                <div className="flex-1">
-                  <Label
-                    htmlFor="enable-ai-analysis"
-                    className="text-sm font-medium cursor-pointer flex items-center gap-2"
-                  >
-                    <Sparkles className="h-4 w-4 text-amber-500" />
-                    {t("settings.importExport.import.enableAIAnalysis", {
-                      ns: "settings",
-                    })}
-                  </Label>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {t("settings.importExport.import.enableAIAnalysisDesc", {
-                      ns: "settings",
-                    })}
-                  </p>
+            {capabilities.ai && (
+              <>
+                {/* AI 分类打标选项 */}
+                <div className="p-4 rounded-lg border border-border bg-card">
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      id="enable-ai-analysis"
+                      checked={enableAIAnalysis}
+                      onCheckedChange={(checked) =>
+                        handleEnableAIAnalysisChange(checked === true)
+                      }
+                    />
+                    <div className="flex-1">
+                      <Label
+                        htmlFor="enable-ai-analysis"
+                        className="text-sm font-medium cursor-pointer flex items-center gap-2"
+                      >
+                        <Sparkles className="h-4 w-4 text-amber-500" />
+                        {t("settings.importExport.import.enableAIAnalysis", {
+                          ns: "settings",
+                        })}
+                      </Label>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {t("settings.importExport.import.enableAIAnalysisDesc", {
+                          ns: "settings",
+                        })}
+                      </p>
 
-                  {/* 子配置：获取页面内容 */}
-                  {enableAIAnalysis && (
-                    <div className="mt-3 pt-3 border-t border-border">
-                      <div className="flex items-start gap-3">
-                        <Checkbox
-                          id="fetch-page-content"
-                          checked={fetchPageContent}
-                          onCheckedChange={(checked) =>
-                            setFetchPageContent(checked === true)
-                          }
-                        />
-                        <div>
-                          <Label
-                            htmlFor="fetch-page-content"
-                            className="text-sm cursor-pointer flex items-center gap-2"
-                          >
-                            <Globe className="h-3.5 w-3.5 text-muted-foreground" />
-                            {t(
-                              "settings.importExport.import.fetchPageContent",
-                              { ns: "settings" },
-                            )}
-                          </Label>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {t(
-                              "settings.importExport.import.fetchPageContentDesc",
-                              { ns: "settings" },
-                            )}
-                          </p>
+                      {/* 子配置：获取页面内容 */}
+                      {enableAIAnalysis && (
+                        <div className="mt-3 pt-3 border-t border-border">
+                          <div className="flex items-start gap-3">
+                            <Checkbox
+                              id="fetch-page-content"
+                              checked={fetchPageContent}
+                              onCheckedChange={(checked) =>
+                                setFetchPageContent(checked === true)
+                              }
+                            />
+                            <div>
+                              <Label
+                                htmlFor="fetch-page-content"
+                                className="text-sm cursor-pointer flex items-center gap-2"
+                              >
+                                <Globe className="h-3.5 w-3.5 text-muted-foreground" />
+                                {t(
+                                  "settings.importExport.import.fetchPageContent",
+                                  { ns: "settings" },
+                                )}
+                              </Label>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                {t(
+                                  "settings.importExport.import.fetchPageContentDesc",
+                                  { ns: "settings" },
+                                )}
+                              </p>
+                            </div>
+                          </div>
                         </div>
-                      </div>
+                      )}
                     </div>
-                  )}
+                  </div>
                 </div>
-              </div>
-            </div>
+              </>
+            )}
           </div>
 
           {/* 导入来源选择 */}
@@ -1438,30 +1443,34 @@ export function ImportExportPage() {
               </div>
             </button>
 
-            {/* 从浏览器导入 */}
-            <button
-              onClick={handleBrowserImport}
-              disabled={importing || loadingBrowserBookmarks}
-              className="p-6 rounded-xl border-2 border-dashed border-border hover:border-primary hover:bg-primary/5 transition-colors text-left group disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
-                  <BookmarkIcon className="h-6 w-6 text-orange-600 dark:text-orange-400" />
-                </div>
-                <div>
-                  <h3 className="font-semibold text-foreground group-hover:text-primary">
-                    {t("settings.importExport.import.fromBrowser", {
-                      ns: "settings",
-                    })}
-                  </h3>
-                  <p className="text-sm text-muted-foreground">
-                    {t("settings.importExport.import.fromBrowserDesc", {
-                      ns: "settings",
-                    })}
-                  </p>
-                </div>
-              </div>
-            </button>
+            {capabilities.browserBookmarkImport && (
+              <>
+                {/* 从浏览器导入 */}
+                <button
+                  onClick={handleBrowserImport}
+                  disabled={importing || loadingBrowserBookmarks}
+                  className="p-6 rounded-xl border-2 border-dashed border-border hover:border-primary hover:bg-primary/5 transition-colors text-left group disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+                      <BookmarkIcon className="h-6 w-6 text-orange-600 dark:text-orange-400" />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-foreground group-hover:text-primary">
+                        {t("settings.importExport.import.fromBrowser", {
+                          ns: "settings",
+                        })}
+                      </h3>
+                      <p className="text-sm text-muted-foreground">
+                        {t("settings.importExport.import.fromBrowserDesc", {
+                          ns: "settings",
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                </button>
+              </>
+            )}
           </div>
 
           {/* 导入进度 */}
@@ -1594,268 +1603,272 @@ export function ImportExportPage() {
           </div>
         </CardContent>
       </Card>
-      {/* 同步到浏览器书签栏 */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center gap-2">
-            <RefreshCw className="h-5 w-5 text-primary" />
-            <CardTitle className="text-lg">
-              {t("settings.importExport.syncBrowser.title", { ns: "settings" })}
-            </CardTitle>
-          </div>
-          <CardDescription>
-            {t("settings.importExport.syncBrowser.description", {
-              ns: "settings",
-            })}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {/* 同步选项 */}
-          <div className="mb-4 space-y-3">
-            {/* 选项1：是否使用顶层 HamHome 目录 */}
-            <div className="p-4 rounded-lg border border-border bg-card">
-              <div className="flex items-start gap-3">
-                <Checkbox
-                  id="sync-use-root-folder"
-                  checked={syncUseRootFolder}
-                  onCheckedChange={(checked) =>
-                    setSyncUseRootFolder(checked === true)
-                  }
-                />
-                <div className="flex-1">
-                  <div className="flex items-center gap-2">
-                    <Label
-                      htmlFor="sync-use-root-folder"
-                      className="text-sm font-medium cursor-pointer flex items-center gap-2"
-                    >
-                      <FolderTree className="h-4 w-4 text-muted-foreground" />
-                      {t("settings.importExport.syncBrowser.useRootFolder", {
-                        ns: "settings",
-                      })}
-                    </Label>
-                    <HoverCard>
-                      <HoverCardTrigger asChild>
-                        <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
-                      </HoverCardTrigger>
-                      <HoverCardContent
-                        align="start"
-                        sideOffset={8}
-                        className="w-[300px] p-0"
-                      >
-                        {/* hover 示例说明 */}
-                        <div className="p-3 bg-muted/90 text-xs text-muted-foreground font-mono leading-relaxed max-w-none">
-                          {syncUseRootFolder ? (
-                            <span>
-                              📁{" "}
-                              {t(
-                                "settings.importExport.syncBrowser.exampleBarLabel",
-                                { ns: "settings" },
-                              )}
-                              <br />
-                              &nbsp;&nbsp;└📁 HamHome
-                              <br />
-                              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├📁{" "}
-                              {t(
-                                "settings.importExport.syncBrowser.exampleCat1",
-                                {
-                                  ns: "settings",
-                                },
-                              )}
-                              <br />
-                              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;└🔖 ...
-                              <br />
-                              &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└📁{" "}
-                              {t(
-                                "settings.importExport.syncBrowser.exampleCat2",
-                                {
-                                  ns: "settings",
-                                },
-                              )}
-                            </span>
-                          ) : (
-                            <span>
-                              📁{" "}
-                              {t(
-                                "settings.importExport.syncBrowser.exampleBarLabel",
-                                { ns: "settings" },
-                              )}
-                              <br />
-                              &nbsp;&nbsp;├📁{" "}
-                              {t(
-                                "settings.importExport.syncBrowser.exampleCat1",
-                                {
-                                  ns: "settings",
-                                },
-                              )}
-                              <br />
-                              &nbsp;&nbsp;│&nbsp;&nbsp;└🔖 ...
-                              <br />
-                              &nbsp;&nbsp;└📁{" "}
-                              {t(
-                                "settings.importExport.syncBrowser.exampleCat2",
-                                {
-                                  ns: "settings",
-                                },
-                              )}
-                            </span>
-                          )}
-                        </div>
-                      </HoverCardContent>
-                    </HoverCard>
-                  </div>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {t("settings.importExport.syncBrowser.useRootFolderDesc", {
-                      ns: "settings",
-                    })}
-                  </p>
-                </div>
+      {capabilities.browserBookmarkImport && (
+        <>
+          {/* 同步到浏览器书签栏 */}
+          <Card>
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <RefreshCw className="h-5 w-5 text-primary" />
+                <CardTitle className="text-lg">
+                  {t("settings.importExport.syncBrowser.title", { ns: "settings" })}
+                </CardTitle>
               </div>
-            </div>
-
-            {/* 选项2：是否清空原有书签覆盖 */}
-            <div className="p-4 rounded-lg border border-border bg-card">
-              <div className="flex items-start gap-3">
-                <Checkbox
-                  id="sync-clear-first"
-                  checked={syncClearFirst}
-                  onCheckedChange={(checked) =>
-                    setSyncClearFirst(checked === true)
-                  }
-                />
-                <div className="flex-1">
-                  <Label
-                    htmlFor="sync-clear-first"
-                    className="text-sm font-medium cursor-pointer flex items-center gap-2"
-                  >
-                    <AlertCircle className="h-4 w-4 text-amber-500" />
-                    {t("settings.importExport.syncBrowser.clearFirst", {
-                      ns: "settings",
-                    })}
-                  </Label>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {t("settings.importExport.syncBrowser.clearFirstDesc", {
-                      ns: "settings",
-                    })}
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* 选项3：全局去重（自动跳过重复书签） */}
-            <div className="p-4 rounded-lg border border-border bg-card">
-              <div className="flex items-start gap-3">
-                <Checkbox
-                  id="sync-skip-duplicates"
-                  checked={syncSkipGlobalDuplicates}
-                  onCheckedChange={(checked) =>
-                    setSyncSkipGlobalDuplicates(checked === true)
-                  }
-                />
-                <div className="flex-1">
-                  <Label
-                    htmlFor="sync-skip-duplicates"
-                    className="text-sm font-medium cursor-pointer flex items-center gap-2"
-                  >
-                    <Filter className="h-4 w-4 text-emerald-500" />
-                    {t("settings.importExport.syncBrowser.skipDuplicates", {
-                      ns: "settings",
-                    })}
-                  </Label>
-                  <p className="text-xs text-muted-foreground mt-1">
-                    {t("settings.importExport.syncBrowser.skipDuplicatesDesc", {
-                      ns: "settings",
-                    })}
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <button
-            onClick={handleSyncToBrowser}
-            disabled={syncingToBrowser || bookmarks.length === 0}
-            className="w-full p-6 rounded-xl border-2 border-dashed border-border hover:border-primary hover:bg-primary/5 transition-colors text-left group disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 rounded-xl bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
-                {syncingToBrowser ? (
-                  <Loader2 className="h-6 w-6 text-indigo-600 dark:text-indigo-400 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
-                )}
-              </div>
-              <div>
-                <h3 className="font-semibold text-foreground group-hover:text-primary">
-                  {syncingToBrowser
-                    ? t("settings.importExport.syncBrowser.syncing", {
-                        ns: "settings",
-                      })
-                    : t("settings.importExport.syncBrowser.action", {
-                        ns: "settings",
-                      })}
-                </h3>
-                <p className="text-sm text-muted-foreground">
-                  {t("settings.importExport.syncBrowser.subtitle", {
-                    bookmarkCount: bookmarks.length,
-                    categoryCount: categories.length,
-                    ns: "settings",
-                  })}
-                </p>
-              </div>
-            </div>
-          </button>
-
-          {/* 同步进度 */}
-          {syncingToBrowser && syncProgress && (
-            <div className="mt-4 p-4 rounded-lg bg-muted">
-              <div className="flex items-center gap-3 mb-3">
-                <Loader2 className="h-5 w-5 text-primary animate-spin" />
-                <span className="text-sm font-medium">
-                  {t("settings.importExport.syncBrowser.syncing", {
-                    ns: "settings",
-                  })}
-                </span>
-              </div>
-              <Progress
-                value={(syncProgress.current / syncProgress.total) * 100}
-                className="h-2"
-              />
-              <p className="text-xs text-center text-muted-foreground mt-2">
-                {t("settings.importExport.import.progress", {
-                  current: syncProgress.current,
-                  total: syncProgress.total,
+              <CardDescription>
+                {t("settings.importExport.syncBrowser.description", {
                   ns: "settings",
                 })}
-              </p>
-            </div>
-          )}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {/* 同步选项 */}
+              <div className="mb-4 space-y-3">
+                {/* 选项1：是否使用顶层 HamHome 目录 */}
+                <div className="p-4 rounded-lg border border-border bg-card">
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      id="sync-use-root-folder"
+                      checked={syncUseRootFolder}
+                      onCheckedChange={(checked) =>
+                        setSyncUseRootFolder(checked === true)
+                      }
+                    />
+                    <div className="flex-1">
+                      <div className="flex items-center gap-2">
+                        <Label
+                          htmlFor="sync-use-root-folder"
+                          className="text-sm font-medium cursor-pointer flex items-center gap-2"
+                        >
+                          <FolderTree className="h-4 w-4 text-muted-foreground" />
+                          {t("settings.importExport.syncBrowser.useRootFolder", {
+                            ns: "settings",
+                          })}
+                        </Label>
+                        <HoverCard>
+                          <HoverCardTrigger asChild>
+                            <HelpCircle className="h-4 w-4 text-muted-foreground cursor-help" />
+                          </HoverCardTrigger>
+                          <HoverCardContent
+                            align="start"
+                            sideOffset={8}
+                            className="w-[300px] p-0"
+                          >
+                            {/* hover 示例说明 */}
+                            <div className="p-3 bg-muted/90 text-xs text-muted-foreground font-mono leading-relaxed max-w-none">
+                              {syncUseRootFolder ? (
+                                <span>
+                                  📁{" "}
+                                  {t(
+                                    "settings.importExport.syncBrowser.exampleBarLabel",
+                                    { ns: "settings" },
+                                  )}
+                                  <br />
+                                  &nbsp;&nbsp;└📁 HamHome
+                                  <br />
+                                  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;├📁{" "}
+                                  {t(
+                                    "settings.importExport.syncBrowser.exampleCat1",
+                                    {
+                                      ns: "settings",
+                                    },
+                                  )}
+                                  <br />
+                                  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;│&nbsp;&nbsp;└🔖 ...
+                                  <br />
+                                  &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;└📁{" "}
+                                  {t(
+                                    "settings.importExport.syncBrowser.exampleCat2",
+                                    {
+                                      ns: "settings",
+                                    },
+                                  )}
+                                </span>
+                              ) : (
+                                <span>
+                                  📁{" "}
+                                  {t(
+                                    "settings.importExport.syncBrowser.exampleBarLabel",
+                                    { ns: "settings" },
+                                  )}
+                                  <br />
+                                  &nbsp;&nbsp;├📁{" "}
+                                  {t(
+                                    "settings.importExport.syncBrowser.exampleCat1",
+                                    {
+                                      ns: "settings",
+                                    },
+                                  )}
+                                  <br />
+                                  &nbsp;&nbsp;│&nbsp;&nbsp;└🔖 ...
+                                  <br />
+                                  &nbsp;&nbsp;└📁{" "}
+                                  {t(
+                                    "settings.importExport.syncBrowser.exampleCat2",
+                                    {
+                                      ns: "settings",
+                                    },
+                                  )}
+                                </span>
+                              )}
+                            </div>
+                          </HoverCardContent>
+                        </HoverCard>
+                      </div>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {t("settings.importExport.syncBrowser.useRootFolderDesc", {
+                          ns: "settings",
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                </div>
 
-          {/* 同步结果 */}
-          {syncResult && (
-            <div
-              className={`mt-4 p-4 rounded-lg flex items-start gap-3 ${
-                syncResult.success
-                  ? "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-200"
-                  : "bg-red-50 dark:bg-red-950/20 text-red-800 dark:text-red-200"
-              }`}
-            >
-              {syncResult.success ? (
-                <Check className="h-5 w-5 mt-0.5" />
-              ) : (
-                <AlertCircle className="h-5 w-5 mt-0.5" />
-              )}
-              <div>
-                <p className="font-medium">{syncResult.message}</p>
-                {syncResult.details && (
-                  <p className="text-sm opacity-80 mt-1">
-                    {syncResult.details}
-                  </p>
-                )}
+                {/* 选项2：是否清空原有书签覆盖 */}
+                <div className="p-4 rounded-lg border border-border bg-card">
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      id="sync-clear-first"
+                      checked={syncClearFirst}
+                      onCheckedChange={(checked) =>
+                        setSyncClearFirst(checked === true)
+                      }
+                    />
+                    <div className="flex-1">
+                      <Label
+                        htmlFor="sync-clear-first"
+                        className="text-sm font-medium cursor-pointer flex items-center gap-2"
+                      >
+                        <AlertCircle className="h-4 w-4 text-amber-500" />
+                        {t("settings.importExport.syncBrowser.clearFirst", {
+                          ns: "settings",
+                        })}
+                      </Label>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {t("settings.importExport.syncBrowser.clearFirstDesc", {
+                          ns: "settings",
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 选项3：全局去重（自动跳过重复书签） */}
+                <div className="p-4 rounded-lg border border-border bg-card">
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      id="sync-skip-duplicates"
+                      checked={syncSkipGlobalDuplicates}
+                      onCheckedChange={(checked) =>
+                        setSyncSkipGlobalDuplicates(checked === true)
+                      }
+                    />
+                    <div className="flex-1">
+                      <Label
+                        htmlFor="sync-skip-duplicates"
+                        className="text-sm font-medium cursor-pointer flex items-center gap-2"
+                      >
+                        <Filter className="h-4 w-4 text-emerald-500" />
+                        {t("settings.importExport.syncBrowser.skipDuplicates", {
+                          ns: "settings",
+                        })}
+                      </Label>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        {t("settings.importExport.syncBrowser.skipDuplicatesDesc", {
+                          ns: "settings",
+                        })}
+                      </p>
+                    </div>
+                  </div>
+                </div>
               </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
+
+              <button
+                onClick={handleSyncToBrowser}
+                disabled={syncingToBrowser || bookmarks.length === 0}
+                className="w-full p-6 rounded-xl border-2 border-dashed border-border hover:border-primary hover:bg-primary/5 transition-colors text-left group disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-xl bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
+                    {syncingToBrowser ? (
+                      <Loader2 className="h-6 w-6 text-indigo-600 dark:text-indigo-400 animate-spin" />
+                    ) : (
+                      <RefreshCw className="h-6 w-6 text-indigo-600 dark:text-indigo-400" />
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-foreground group-hover:text-primary">
+                      {syncingToBrowser
+                        ? t("settings.importExport.syncBrowser.syncing", {
+                            ns: "settings",
+                          })
+                        : t("settings.importExport.syncBrowser.action", {
+                            ns: "settings",
+                          })}
+                    </h3>
+                    <p className="text-sm text-muted-foreground">
+                      {t("settings.importExport.syncBrowser.subtitle", {
+                        bookmarkCount: bookmarks.length,
+                        categoryCount: categories.length,
+                        ns: "settings",
+                      })}
+                    </p>
+                  </div>
+                </div>
+              </button>
+
+              {/* 同步进度 */}
+              {syncingToBrowser && syncProgress && (
+                <div className="mt-4 p-4 rounded-lg bg-muted">
+                  <div className="flex items-center gap-3 mb-3">
+                    <Loader2 className="h-5 w-5 text-primary animate-spin" />
+                    <span className="text-sm font-medium">
+                      {t("settings.importExport.syncBrowser.syncing", {
+                        ns: "settings",
+                      })}
+                    </span>
+                  </div>
+                  <Progress
+                    value={(syncProgress.current / syncProgress.total) * 100}
+                    className="h-2"
+                  />
+                  <p className="text-xs text-center text-muted-foreground mt-2">
+                    {t("settings.importExport.import.progress", {
+                      current: syncProgress.current,
+                      total: syncProgress.total,
+                      ns: "settings",
+                    })}
+                  </p>
+                </div>
+              )}
+
+              {/* 同步结果 */}
+              {syncResult && (
+                <div
+                  className={`mt-4 p-4 rounded-lg flex items-start gap-3 ${
+                    syncResult.success
+                      ? "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-200"
+                      : "bg-red-50 dark:bg-red-950/20 text-red-800 dark:text-red-200"
+                  }`}
+                >
+                  {syncResult.success ? (
+                    <Check className="h-5 w-5 mt-0.5" />
+                  ) : (
+                    <AlertCircle className="h-5 w-5 mt-0.5" />
+                  )}
+                  <div>
+                    <p className="font-medium">{syncResult.message}</p>
+                    {syncResult.details && (
+                      <p className="text-sm opacity-80 mt-1">
+                        {syncResult.details}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </>
+      )}
     </div>
   );
 }

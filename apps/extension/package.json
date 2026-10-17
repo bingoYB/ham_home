@@ -67,6 +67,7 @@
     "@types/react-dom": "^19.0.0",
     "@types/react-syntax-highlighter": "^15.5.13",
     "@wxt-dev/module-react": "^1.1.5",
+    "fake-indexeddb": "^6.0.0",
     "postcss-rem-to-pixel": "^4.1.2",
     "rollup-plugin-visualizer": "^7.0.1",
     "sharp": "^0.34.5",

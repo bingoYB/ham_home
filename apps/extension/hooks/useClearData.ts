@@ -4,6 +4,7 @@ import { snapshotStorage } from "@/lib/storage/snapshot-storage";
 import { getBackgroundService } from "@/lib/services";
 import { syncEngine } from "@/lib/sync/sync-engine";
 import { workspaceStorage } from "@/lib/storage/workspace-storage";
+import { capabilities } from "@/lib/platform";
 import type { QueueProgress } from "@/lib/embedding/embedding-queue";
 import type { VectorStoreStats } from "@/lib/storage/vector-store";
 
@@ -73,8 +74,10 @@ export function useClearData(): UseClearDataReturn {
       await clearAllData();
       await snapshotStorage.clearAllSnapshots();
       await workspaceStorage.clearAllData();
-      const bgService = getBackgroundService();
-      await bgService.clearVectorStore();
+      if (capabilities.semanticSearch) {
+        const bgService = getBackgroundService();
+        await bgService.clearVectorStore();
+      }
     } catch (error) {
       console.error("[useClearData] Failed to clear all data:", error);
     } finally {

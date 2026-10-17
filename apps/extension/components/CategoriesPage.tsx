@@ -66,7 +66,7 @@ import {
 import { CategoryPreviewTree } from "@hamhome/ui-business/category";
 import { useBookmarks } from "@/contexts/BookmarkContext";
 import { pinStorage } from "@/lib/storage";
-import { categoryGenerationService } from "@/lib/agent";
+import { capabilities } from "@/lib/platform";
 import {
   getPresetCategoriesGeneral,
   getPresetCategoriesProfessional,
@@ -489,6 +489,7 @@ export function CategoriesPage() {
     setAiGeneratedCategories(null);
 
     try {
+      const { categoryGenerationService } = await import("@/lib/agent");
       const result = await categoryGenerationService.generateCategories(
         aiDescription,
       );
@@ -831,15 +832,22 @@ export function CategoriesPage() {
           </DialogHeader>
 
           <Tabs defaultValue="preset" className="w-full">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList
+              className={cn(
+                "grid w-full",
+                capabilities.ai ? "grid-cols-2" : "grid-cols-1",
+              )}
+            >
               <TabsTrigger value="preset">
                 <Download className="h-4 w-4 mr-2" />
                 {t("settings:settings.categories.preset.presetTab")}
               </TabsTrigger>
-              <TabsTrigger value="ai">
-                <Sparkles className="h-4 w-4 mr-2" />
-                {t("settings:settings.categories.preset.aiTab")}
-              </TabsTrigger>
+              {capabilities.ai && (
+                <TabsTrigger value="ai">
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  {t("settings:settings.categories.preset.aiTab")}
+                </TabsTrigger>
+              )}
             </TabsList>
 
             {/* 预设分类 Tab - 左右布局 */}
@@ -913,101 +921,105 @@ export function CategoriesPage() {
               </div>
             </TabsContent>
 
-            {/* AI 生成 Tab */}
-            <TabsContent value="ai" className="space-y-4 mt-4">
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>
-                    {t("settings:settings.categories.preset.aiInputLabel")}
-                  </Label>
-                  <Textarea
-                    value={aiDescription}
-                    onChange={(e) => setAiDescription(e.target.value)}
-                    placeholder={t(
-                      "settings:settings.categories.preset.aiInputPlaceholder",
+            {capabilities.ai && (
+              <>
+              {/* AI 生成 Tab */}
+              <TabsContent value="ai" className="space-y-4 mt-4">
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>
+                      {t("settings:settings.categories.preset.aiInputLabel")}
+                    </Label>
+                    <Textarea
+                      value={aiDescription}
+                      onChange={(e) => setAiDescription(e.target.value)}
+                      placeholder={t(
+                        "settings:settings.categories.preset.aiInputPlaceholder",
+                      )}
+                      rows={4}
+                      className="resize-none"
+                    />
+                  </div>
+
+                  <Button
+                    onClick={handleAIGenerate}
+                    disabled={!aiDescription.trim() || aiGenerating}
+                    className="w-full"
+                  >
+                    {aiGenerating ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        {t("settings:settings.categories.preset.aiGenerating")}
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="h-4 w-4 mr-2" />
+                        {t("settings:settings.categories.preset.aiGenerate")}
+                      </>
                     )}
-                    rows={4}
-                    className="resize-none"
-                  />
-                </div>
+                  </Button>
 
-                <Button
-                  onClick={handleAIGenerate}
-                  disabled={!aiDescription.trim() || aiGenerating}
-                  className="w-full"
-                >
-                  {aiGenerating ? (
-                    <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                      {t("settings:settings.categories.preset.aiGenerating")}
-                    </>
-                  ) : (
-                    <>
-                      <Sparkles className="h-4 w-4 mr-2" />
-                      {t("settings:settings.categories.preset.aiGenerate")}
-                    </>
+                  {aiError && (
+                    <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-sm text-destructive">
+                      {aiError}
+                    </div>
                   )}
-                </Button>
 
-                {aiError && (
-                  <div className="p-3 bg-destructive/10 border border-destructive/20 rounded-lg text-sm text-destructive">
-                    {aiError}
-                  </div>
-                )}
+                  {aiGeneratedCategories && (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label>
+                          {t("settings:settings.categories.preset.aiRecommended")}
+                        </Label>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={handleAIGenerate}
+                          disabled={aiGenerating}
+                        >
+                          <RefreshCw
+                            className={cn(
+                              "h-4 w-4 mr-1",
+                              aiGenerating && "animate-spin",
+                            )}
+                          />
+                          {t("settings:settings.categories.preset.retry")}
+                        </Button>
+                      </div>
 
-                {aiGeneratedCategories && (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between">
-                      <Label>
-                        {t("settings:settings.categories.preset.aiRecommended")}
-                      </Label>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={handleAIGenerate}
-                        disabled={aiGenerating}
-                      >
-                        <RefreshCw
-                          className={cn(
-                            "h-4 w-4 mr-1",
-                            aiGenerating && "animate-spin",
-                          )}
+                      <div className="p-4 bg-muted/50 rounded-lg space-y-2">
+                        <CategoryPreviewTree
+                          categories={aiGeneratedCategories}
+                          generated
                         />
-                        {t("settings:settings.categories.preset.retry")}
-                      </Button>
-                    </div>
+                      </div>
 
-                    <div className="p-4 bg-muted/50 rounded-lg space-y-2">
-                      <CategoryPreviewTree
-                        categories={aiGeneratedCategories}
-                        generated
-                      />
+                      <div className="flex gap-2 pt-2">
+                        <Button
+                          variant="outline"
+                          className="flex-1"
+                          onClick={() => {
+                            setAiGeneratedCategories(null);
+                            setAiDescription("");
+                          }}
+                        >
+                          <X className="h-4 w-4 mr-2" />
+                          {t("settings:settings.dialogs.cancel")}
+                        </Button>
+                        <Button
+                          className="flex-1"
+                          onClick={handleApplyAICategories}
+                        >
+                          <Check className="h-4 w-4 mr-2" />
+                          {t("settings:settings.categories.preset.apply")}
+                        </Button>
+                      </div>
                     </div>
-
-                    <div className="flex gap-2 pt-2">
-                      <Button
-                        variant="outline"
-                        className="flex-1"
-                        onClick={() => {
-                          setAiGeneratedCategories(null);
-                          setAiDescription("");
-                        }}
-                      >
-                        <X className="h-4 w-4 mr-2" />
-                        {t("settings:settings.dialogs.cancel")}
-                      </Button>
-                      <Button
-                        className="flex-1"
-                        onClick={handleApplyAICategories}
-                      >
-                        <Check className="h-4 w-4 mr-2" />
-                        {t("settings:settings.categories.preset.apply")}
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </TabsContent>
+                  )}
+                </div>
+              </TabsContent>
+              </>
+            )}
           </Tabs>
         </DialogContent>
       </Dialog>
