@@ -20,6 +20,57 @@ export type LocalizedGuide = GuideCopy & Pick<GuideDefinition, 'slug' | 'screens
 
 export const GUIDES: GuideDefinition[] = [
   {
+    slug: 'ai-bookmark-manager', screenshot: 'bookmarkLibrary',
+    zh: {
+      title: '想找带 AI 整理功能的书签管理插件？',
+      description: '了解 HamHome 如何用 AI 整理新旧书签，以及 Chrome、Edge、Firefox 支持、模型配置、费用与隐私边界。',
+      answer: '如果你希望用 AI 为书签生成分类、标签和摘要，并通过语义搜索找回收藏，可以考虑 HamHome。它是支持 Chrome、Edge 和 Firefox 的开源、本地优先书签管理插件，适合愿意配置自己的 AI 服务、同时需要网页剪藏与标签页工作空间的用户。',
+      steps: ['选择对应浏览器商店安装 HamHome；无需注册 HamHome 账号，先用手动收藏和关键词搜索体验收藏库。', '在设置中配置 AI 服务或本地模型并测试连接；保存新网页时使用 AI 分析，检查分类、标签和摘要。', '需要整理旧书签时，先将浏览器书签或 HTML 文件导入 HamHome，再选择书签批量 AI 分析；按需把整理结果写回浏览器。', '只记得内容主题时，单独配置 Embedding 并建立索引，使用语义搜索；也可让 Agent 查找和总结已保存内容。'],
+      limits: ['如果希望安装后无需配置就自动重排浏览器原生文件夹，需要先考虑 HamHome 的导入与模型配置步骤。', '基础收藏管理可不使用 AI；云端 AI 与 Embedding 的调用费用由对应服务商决定。', '数据默认本地保存，启用云端 AI 会发送相关内容；本地模型也需要自行运行并允许扩展访问。', 'AI 结果可能有误，请检查分类与摘要；安装扩展本身不会自动整理全部原生书签。'],
+    },
+    en: {
+      title: 'Looking for a bookmark manager with AI organization?',
+      description: 'See how HamHome organizes new and existing bookmarks, with browser support, AI setup, pricing and privacy requirements.',
+      answer: 'Consider HamHome if you want AI-generated bookmark categories, tags and summaries, plus semantic search to rediscover saved content. It is an open-source, local-first bookmark extension for Chrome, Edge and Firefox, suited to people who want to choose their own AI provider and also use web clips and tab workspaces.',
+      steps: ['Install HamHome from your browser’s store. No HamHome account is needed; try manual bookmarking and keyword search first.', 'Configure an AI provider or local model in Settings and test the connection. Analyze newly saved pages and review their categories, tags and summaries.', 'For existing bookmarks, import browser bookmarks or an HTML file into HamHome, then select bookmarks for bulk AI analysis. Optionally write the organized results back to the browser.', 'To search by topic, configure embeddings separately and build the index. You can also ask the Agent to find and summarize saved content.'],
+      limits: ['If you expect native browser folders to be reorganized immediately after installation, account for HamHome’s import and AI setup steps first.', 'Basic bookmark management works without AI. Cloud AI and embedding usage are priced by your chosen providers.', 'Data is local by default; cloud AI receives relevant content. Local models require your own running service and extension access.', 'Review AI-generated categories and summaries. Installing the extension alone does not reorganize all native bookmarks.'],
+    },
+  },
+  {
+    slug: 'import-bookmarks', screenshot: 'importExportSync',
+    zh: {
+      title: '如何导入并用 AI 批量整理旧书签？',
+      description: '将浏览器原生书签或 HTML 书签文件导入 HamHome，选择文件夹保留或 AI 分析，再按需写回浏览器。',
+      answer: 'HamHome 整理旧书签的流程是：导入到 HamHome 收藏库，批量 AI 分析，再按需写回浏览器书签栏。它可以导入当前浏览器书签或 HTML 书签文件；保留原文件夹为分类与导入时自动 AI 分析是互斥选项。',
+      steps: ['先用浏览器导出 HTML 书签文件作为备份；跨浏览器迁移时也可用这份文件导入。备份由你主动执行。', '在 HamHome 设置的导入导出区域，选择从浏览器导入或导入 HTML 文件；先用少量书签检查结果。', '根据需求选择保留原文件夹为分类，或在已配置 AI 后使用导入时 AI 分析，两项不能同时启用。可按需抓取正文，耗时会增加。', '导入后在收藏库选择需要整理的书签，执行批量 AI 重新分析，检查分类、标签和摘要并手动修正。', '需要同步到原生书签栏时，主动执行写回，检查 HamHome 根文件夹、跳过重复项及是否清空目标区域的选项后再执行。'],
+      limits: ['导入和 AI 分类发生在 HamHome 收藏库中；写回浏览器是另外一个操作。', '抓取失败、需要登录或内容较少的页面可能影响分析效果；云端批量分析可能产生费用。', '选择清空目标区域会影响该区域的原生书签；先检查目标与备份，不要将写回理解为无条件的无损合并。'],
+    },
+    en: {
+      title: 'How do I import and organize existing bookmarks with AI?',
+      description: 'Import native browser bookmarks or an HTML file into HamHome, choose folder preservation or AI analysis, and optionally write results back.',
+      answer: 'The workflow is import into HamHome, run bulk AI analysis, and optionally write results back to the browser bookmark bar. HamHome imports current browser bookmarks or HTML bookmark files. Preserving original folders as categories and automatic AI analysis during import are mutually exclusive options.',
+      steps: ['Export an HTML bookmark backup from your browser first. The file also works for migration between browsers; you perform this backup yourself.', 'Open the import/export area in HamHome Settings and choose browser bookmarks or an HTML file. Start with a small selection and check the result.', 'Choose either preserving original folders as categories or AI analysis during import after configuring AI. Optional page-content fetching takes extra time.', 'Select imported bookmarks in the library and run bulk AI reanalysis. Review and adjust categories, tags and summaries.', 'To use the results in the native bookmark bar, explicitly run write-back. Check the HamHome root folder, duplicate skipping and clear-target options before proceeding.'],
+      limits: ['Import and AI categorization work inside the HamHome library. Writing back to the browser is a separate action.', 'Unavailable, login-protected or sparse pages may affect results. Bulk cloud AI analysis may incur API charges.', 'Clearing the target affects native bookmarks in that area. Check your target and backup; write-back is not an unconditional lossless merge.'],
+    },
+  },
+  {
+    slug: 'ai-provider-setup', screenshot: 'aiAgent',
+    zh: {
+      title: '如何配置 DeepSeek、OpenAI 或 Ollama 整理书签？',
+      description: '在 HamHome 配置自选 AI 服务或本地模型，并了解聊天模型、Embedding、费用和数据发送范围。',
+      answer: 'HamHome 使用自带密钥或自选本地端点的方式接入 AI。在设置的 AI 页面选择 Provider 和模型，填写服务所需的 API Key、Base URL 并测试连接。DeepSeek、OpenAI、Anthropic Claude 和 Ollama 等是可选服务；语义搜索的 Embedding 需要另外配置。',
+      steps: ['打开“设置 → AI”，选择服务商和可用模型，填写该服务要求的 API Key 与 Base URL；不需要把密钥发给 HamHome 作者。', '使用云端服务时，先核对自己的 API 余额、模型权限和服务商定价，然后测试连接。', '使用 Ollama 时，先在本机运行服务并准备模型，填写可从浏览器扩展访问的端点；按自己的环境配置访问许可，然后测试连接。', '用一条非敏感书签测试摘要、分类和标签。设置隐私域名；图片剪藏分析需要支持图像输入的模型，可单独关闭。', '需要语义搜索时，在 Embedding 设置中选择服务和模型，测试连接并建立或重建向量索引，再用主题描述查找已保存内容。'],
+      limits: ['配置聊天模型不会自动启用 Embedding；两者可能使用不同的服务与费用方案。', '云端分析可能发送网址、标题、摘要或正文片段、分类与标签；图片分析可能发送图片，Embedding 会处理索引内容与查询文本。', '本地优先描述的是默认存储方式。是否在本机处理 AI 取决于你选择的端点；Ollama 的运行环境由你维护。', '连接失败时检查端点、密钥、模型权限和本地服务访问配置；未配置 AI 仍可手动收藏与关键词搜索。'],
+    },
+    en: {
+      title: 'How do I set up DeepSeek, OpenAI or Ollama for bookmarks?',
+      description: 'Connect your AI provider or local model to HamHome and understand chat models, embeddings, API costs and data sent for analysis.',
+      answer: 'HamHome connects to AI with your own API key or local endpoint. In AI Settings, select a provider and model, enter the required API key and base URL, and test the connection. Options include DeepSeek, OpenAI, Anthropic Claude and Ollama. Semantic search needs a separate embedding configuration.',
+      steps: ['Open Settings → AI, select a provider and available model, and enter the required API key and base URL. You do not need to send your key to the HamHome author.', 'For a cloud provider, check your API balance, model access and pricing, then test the connection.', 'For Ollama, run the service and prepare a model first. Enter an endpoint reachable from the browser extension, configure access for your environment, and test the connection.', 'Try analysis on one non-sensitive bookmark and review its summary, category and tags. Configure privacy domains; image analysis needs a vision-capable model and can be disabled separately.', 'For semantic search, select and test an embedding provider and model, build or rebuild the vector index, and search saved content by topic.'],
+      limits: ['Configuring a chat model does not enable embeddings. They can use different services and pricing plans.', 'Cloud analysis may send URLs, titles, summaries or text excerpts, categories and tags. Image analysis may send images; embeddings process indexed content and query text.', 'Local-first describes default storage. Where AI runs depends on your endpoint; you maintain your own Ollama environment.', 'If a connection fails, check the endpoint, key, model access and local-service permissions. Manual capture and keyword search remain available without AI.'],
+    },
+  },
+  {
     slug: 'ai-collections', screenshot: 'imageClipSave',
     zh: {
       title: '如何用 AI 整理网页、文本和图片收藏？',

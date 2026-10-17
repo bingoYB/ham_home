@@ -85,7 +85,7 @@ app/components/
 ### 行为说明
 
 - 下载菜单通过 `getDownloadChannels()` 和 `getRecommendedDownloadChannel()` 自动推荐当前浏览器渠道。
-- 副标题来自 `PRODUCT_COPY`：AI 网页收藏与标签页管理 / AI Web Clipper & Tab Manager。
+- 副标题来自 `PRODUCT_COPY`：AI 书签管理与网页收藏插件 / AI Bookmark Manager。
 - 语言切换是带 `hrefLang` 与 `lang` 的真实链接（`Link`，关闭预取），静态 HTML 中即可发现另一语言版本；目标保留指南或隐私页面路径，点击时记录显式语言偏好。下载菜单抽取为 `DownloadDropdown`。
 
 ---
@@ -110,11 +110,11 @@ app/components/
 ### 行为说明
 
 - 轮播展示真实插件截图：书签库、视觉画廊、AI Agent、书签健康中心、工作空间、Tab 分组、导入导出与同步。
-- 能力标签为 2×2 网格：文字与图片剪藏、Agent 辅助管理与操作、工作空间与 Tab 分组、隐私边界可控。
-- 唯一的 `h1` 由 Logo、品牌名 HamHome 和类别标签组成（如「HamHome — AI 网页收藏与标签页管理」，与页面 title 一致）；Logo 为装饰图（空 alt），类别前有仅供读屏的「—」分隔。
+- 能力标签为 2×2 网格：AI 分类/标签/摘要、导入旧书签批量分析、关键词与语义搜索、本地存储与自选 AI。
+- 唯一的 `h1` 由 Logo、品牌名 HamHome 和类别标签组成（如「HamHome — AI 书签管理与网页收藏插件」，与页面 title 的 AI 书签管理定位一致）；Logo 为装饰图（空 alt），类别前有仅供读屏的「—」分隔。
 - 最终口号「借助 AI，让收藏有序，让标签页井然。」与对应英文作为 `h1` 之后的大号段落，来自 `PRODUCT_COPY`；轮播交给 `HeroScreenshotCarousel`。
 - 截图路径由 `getExtensionScreenshotSrc()` 生成，自动带上 `NEXT_PUBLIC_BASE_PATH`。
-- 不再使用 Imgur 老截图。
+- 安装操作复用 `LandingActionButtons`；按钮下方展示三个真实商店链接及 AI/Embedding 配置、费用与数据传输条件。
 
 ---
 
@@ -227,8 +227,8 @@ app/components/
 
 ### 行为说明
 
-- 展示 AI 收藏、富剪藏、健康中心、Agent 代办、工作空间、Tab 分组、WebDAV、隐私保护八个摘要，桌面端 4 列。
-- 文案按保存内容、找回收藏、理顺标签页展开，AI 与 Agent 作为可选辅助能力。
+- 展示 AI 整理、富剪藏、旧书签整理、Agent 辅助、工作空间、语义搜索、WebDAV、隐私保护八个摘要，桌面端 4 列。
+- 文案按 AI 整理新旧书签、搜索找回展开，保留剪藏和工作空间能力。
 
 ---
 
@@ -418,7 +418,7 @@ app/components/
 
 ## LandingGuides
 
-四类任务指南的内部链接网格：AI 收藏、语义搜索、工作空间、隐私与同步。
+七类任务指南的内部链接网格：插件选型、旧书签整理、模型配置、AI 收藏、语义搜索、工作空间、隐私与同步。
 
 | Prop | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
@@ -443,7 +443,7 @@ app/components/
 <GuidePage language="en" guide={guide} />
 ```
 
-`generateStaticParams` 生成全部八篇指南；页面保留对应语言的导航、隐私链接与使用文档。路由同时输出 `TechArticle` 与面包屑 JSON-LD，`og:type` 为 `article`。
+`generateStaticParams` 生成全部十四篇双语指南；页面保留对应语言的导航、隐私链接与使用文档。路由同时输出 `TechArticle` 与面包屑 JSON-LD，`og:type` 为 `article`。
 
 ## AgentExamples
 
@@ -545,3 +545,31 @@ app/components/
 - `sitemap` 只列出正式语言路由；首页与指南的 `lastModified` 用 `CONTENT_UPDATED_AT`，隐私页用 `PRIVACY_POLICY_UPDATED_AT`。
 - 保留 `/` 与 `/privacy-policy/` 为兼容入口；目录静态导出用 `trailingSlash: true`。
 - 验证：先运行 `pnpm --filter web test`（vitest，覆盖语言路由、hreflang 与结构化数据），再运行 `NEXT_PUBLIC_BASE_PATH=/ham_home pnpm build:web`，然后 `pnpm --filter web verify:export`。该脚本检查 14 个 HTML 页面的语言、canonical 与 hreflang（含 x-default）、页头可抓取的语言切换链接、OG（含分享图文件与尺寸）、首页 `h1`、FAQ 首题与完整性、产品与指南结构化数据、隐私页描述、图标、内部链接和资源，以及 `404.html`、sitemap 与 robots。
+
+
+## LandingActionButtons
+
+首页首屏、底部 CTA 与指南页共用的安装入口，先展示安装/GitHub 按钮，再展示静态商店链接。安装按钮按浏览器推荐渠道；无 JavaScript 时仍可打开 releases 和各商店。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| isEn | boolean | 是 | — | 按钮与商店语言 |
+| className | string | 否 | — | 外层布局样式 |
+| downloadLabel | string | 否 | 下载安装 / Install & Download | 安装按钮文案 |
+| githubLabel | string | 否 | GitHub | 仓库按钮文案 |
+
+```tsx
+<LandingActionButtons isEn={false} className="mt-8" downloadLabel="安装扩展" />
+```
+
+## BrowserStoreLinks
+
+输出已发布的 Chrome、Edge、Firefox 商店链接，复用 `getDownloadChannels()` 的渠道数据，静态 HTML 可抓取。离线包保留在安装按钮和下载菜单中。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| isEn | boolean | 是 | — | 商店名称与导航标签语言 |
+
+```tsx
+<BrowserStoreLinks isEn={false} />
+```

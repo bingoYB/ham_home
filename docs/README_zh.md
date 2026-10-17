@@ -6,32 +6,35 @@
 
 <img src="../logo.png" alt="HamHome" width="200" />
 
-# HamHome（仓鼠家）
+# HamHome（仓鼠家）— AI 书签管理与网页收藏插件
 
-### 用 AI 整理收藏、找回内容，随时接着上次的浏览继续工作
+### 用 AI 分类、标签、摘要与语义搜索整理收藏，支持 Chrome、Edge 和 Firefox
 
 [![Release](https://img.shields.io/github/v/release/bingoYB/ham_home?style=flat-square)](https://github.com/bingoYB/ham_home/releases)
 [![Stars](https://img.shields.io/github/stars/bingoYB/ham_home?style=flat-square)](https://github.com/bingoYB/ham_home/stargazers)
 [![Issues](https://img.shields.io/github/issues/bingoYB/ham_home?style=flat-square)](https://github.com/bingoYB/ham_home/issues)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](../LICENSE)
 
-**让收藏找得到，让工作接得上。**
+**借助 AI，让收藏有序，让标签页井然。**
 
 <p>
-  <a href="https://bingoyb.github.io/ham_home/">产品介绍</a> · <a href="#下载">安装扩展</a> · <a href="./USAGE_zh.md">使用指南</a> · <a href="#功能特性">功能特性</a> · <a href="#开发">开发文档</a>
+  <a href="https://bingoyb.github.io/ham_home/zh/">产品介绍</a> · <a href="#下载">安装扩展</a> · <a href="./USAGE_zh.md">使用指南</a> · <a href="#功能特性">功能特性</a> · <a href="#开发">开发文档</a>
 </p>
 
 </div>
 
 ## 什么是 HamHome？
 
-HamHome 是一款 AI 浏览器工作台，将书签、网页快照和标签页工作空间放在一起，帮助你保存值得留住的内容，也保存下次继续工作的现场。
+HamHome 是一款开源、本地优先的 AI 书签管理插件，支持 Chrome、Edge 和 Firefox。用 AI 为书签生成分类、标签和摘要，导入旧书签后批量分析，通过关键词或语义搜索找回收藏。也支持文字图片剪藏和标签页工作空间。
 
 - **收藏时，少做整理**：保存网页后，用 AI 生成摘要、分类和标签，保留快照与页面截图；也可以只剪藏需要的那段文字或那张图片。
+- **旧书签，也能整理**：将浏览器书签或 HTML 文件导入 HamHome，选中书签进行批量 AI 分析，按需把整理结果写回浏览器书签栏。
 - **需要时，更容易找回**：用关键词或语义搜索查找收藏，在视觉画廊里按页面截图浏览，也可以让内置 Agent 帮你搜索、总结已保存的内容。
 - **回来时，接着上次继续**：把一组标签页保存为工作空间，按需恢复；用分组规则整理正在浏览的页面。
 
-**本地优先，AI 自选。** 数据默认保存在浏览器本地，无需注册 HamHome 账号。AI 功能需连接你选择的服务，相关内容会发送给该服务处理；你也可以按需启用 WebDAV 同步或文件导入导出。
+**本地优先，AI 自选。** 数据默认保存在浏览器本地，无需注册 HamHome 账号。AI 功能需连接你选择的服务，相关内容会发送给该服务处理；云端 API 费用由服务商决定，本地模型由你自行运行。语义搜索需要单独配置 Embedding 并建立索引。你也可以按需启用 WebDAV 同步或文件导入导出。
+
+[HamHome 适合你吗？](https://bingoyb.github.io/ham_home/zh/guides/ai-bookmark-manager/) · [导入并整理旧书签](https://bingoyb.github.io/ham_home/zh/guides/import-bookmarks/) · [配置 AI 模型](https://bingoyb.github.io/ham_home/zh/guides/ai-provider-setup/)
 
 ## 产品截图
 

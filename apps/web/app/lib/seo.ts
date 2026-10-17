@@ -20,8 +20,8 @@ interface PageMetadataOptions {
 
 export function createPageMetadata(language: SupportedLanguage, { path = '', title, description, type = 'website' }: PageMetadataOptions = {}): Metadata {
   const copy = PRODUCT_COPY[language];
-  const pageTitle = title ? `${title} | HamHome` : `HamHome — ${copy.category}`;
-  const pageDescription = description || copy.description;
+  const pageTitle = title ? `${title} | HamHome` : copy.seoTitle;
+  const pageDescription = description || copy.seoDescription;
   const url = siteUrl(localizedPath(language, path));
   const openGraph = {
     title: pageTitle, description: pageDescription, url, siteName: 'HamHome',

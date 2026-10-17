@@ -18,6 +18,18 @@ export const FAQS: Record<FAQCategory, { qEn: string; aEn: string; qZh: string; 
       aZh: PRODUCT_COPY.zh.description
     },
     {
+      qEn: 'Who is HamHome’s AI bookmark manager for?',
+      aEn: 'It suits people who want AI categories, tags and summaries, imported bookmark organization, and semantic retrieval while choosing their own AI provider. Plan for provider setup first; installing HamHome does not automatically rearrange native browser folders.',
+      qZh: 'HamHome 适合哪些需要 AI 书签整理的用户？',
+      aZh: '适合希望用 AI 生成分类、标签和摘要，整理导入的旧书签，通过语义搜索找回收藏，并愿意配置自选 AI 服务的用户。安装 HamHome 本身不会自动重排浏览器原生文件夹。',
+    },
+    {
+      qEn: 'Can AI organize my existing browser bookmarks?',
+      aEn: 'Yes. Import browser bookmarks or an HTML file into HamHome, configure AI, and select bookmarks for bulk analysis. During import, preserving folders as categories and automatic AI analysis are mutually exclusive. Writing results back to the browser bookmark bar is a separate, optional action.',
+      qZh: '可以用 AI 整理浏览器里已有的旧书签吗？',
+      aZh: '可以。先把浏览器书签或 HTML 文件导入 HamHome，配置 AI 后选中书签进行批量分析。导入时保留文件夹为分类与自动 AI 分析是互斥选项；把结果写回浏览器书签栏是单独、可选的操作。',
+    },
+    {
       qEn: 'Can I use HamHome without configuring AI?',
       aEn: 'Yes. Save pages, text and images, manually organize categories and tags, search by keywords, and save or restore workspaces. AI summaries, semantic search and the Agent require the corresponding provider or local endpoint configuration.',
       qZh: '不配置 AI 也能使用 HamHome 吗？',
@@ -57,9 +69,9 @@ export const FAQS: Record<FAQCategory, { qEn: string; aEn: string; qZh: string; 
     },
     {
       qEn: 'Are my private sites sent to AI?',
-      aEn: 'You can configure privacy domains and use automatic privacy detection so sensitive sites skip AI analysis and page screenshots. AI keys, Base URLs, privacy domains, WebDAV credentials, and browser shortcuts are manually configured by the user.',
+      aEn: 'Cloud AI receives relevant page content for analysis. You can configure privacy domains and use automatic privacy detection so sensitive sites skip AI analysis and page screenshots. Review the privacy settings before analyzing sensitive content; keys and endpoints are configured by you.',
       qZh: '我的私人网站内容会发送给 AI 吗？',
-      aZh: '你可以配置隐私域名并启用自动隐私检测，让敏感站点跳过 AI 分析和页面截图。API Key、Base URL、隐私域名、WebDAV 凭据和浏览器快捷键都由用户手动配置。'
+      aZh: '云端 AI 会接收用于分析的相关网页内容。你可以配置隐私域名并启用自动隐私检测，让敏感站点跳过 AI 分析和页面截图。分析敏感内容前请检查隐私设置；密钥与端点由你配置。'
     },
     {
       qEn: 'Where are page screenshots stored?',
@@ -76,6 +88,12 @@ export const FAQS: Record<FAQCategory, { qEn: string; aEn: string; qZh: string; 
   ],
   ai: [
     {
+      qEn: 'What does AI do when I save a new bookmark?',
+      aEn: 'After you configure a provider, AI can generate a category, tags and a summary from page content. Review and adjust the result when saving. You can also select existing HamHome bookmarks for bulk reanalysis.',
+      qZh: '收藏新网页时，AI 能做哪些整理？',
+      aZh: '配置服务后，AI 可以根据网页内容生成分类、标签和摘要，保存时可检查并调整结果。已有 HamHome 书签也可选中后批量重新分析。',
+    },
+    {
       qEn: 'Does semantic search need a separate configuration?',
       aEn: 'Yes. Configure an embedding provider and model separately from the chat model, then build the vector index. Keyword search remains available without embeddings.',
       qZh: '语义搜索需要单独配置吗？',
@@ -88,9 +106,9 @@ export const FAQS: Record<FAQCategory, { qEn: string; aEn: string; qZh: string; 
       aZh: 'HamHome 采用自带密钥模式。你接入自己的服务商账号或本地端点。云端 API 是否收费及费用由服务商决定；Ollama 等本地端点取决于你自己的运行环境。'
     },
     {
-      qEn: 'Which AI providers are supported?',
+      qEn: 'Can I use DeepSeek, OpenAI, Claude or Ollama?',
       aEn: 'Chat providers include OpenAI, Anthropic, Google Gemini, Azure OpenAI, DeepSeek, Groq, Mistral, Moonshot/Kimi, Zhipu/GLM, Tencent Hunyuan, NVIDIA NIM, SiliconFlow, Ollama, and custom OpenAI-compatible APIs. Embeddings are configured separately for semantic search.',
-      qZh: '支持哪些 AI Provider？',
+      qZh: '支持 DeepSeek、OpenAI、Claude 或 Ollama 吗？',
       aZh: '聊天模型支持 OpenAI、Anthropic、Google Gemini、Azure OpenAI、DeepSeek、Groq、Mistral、Moonshot/Kimi、智谱/GLM、腾讯混元、NVIDIA NIM、SiliconFlow、Ollama 和自定义 OpenAI 兼容 API。语义搜索的 Embedding 会单独配置。'
     },
     {
