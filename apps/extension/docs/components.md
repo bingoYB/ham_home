@@ -1659,6 +1659,8 @@ interface Source {
 **行为说明：**
 
 - 内部使用 `useSavePanel` hook 管理表单状态
+- 传给 `useSavePanel` 的 `pageContent` 用 `useMemo` 保持引用稳定；每次渲染新建对象会让 hook 的初始化 effect 反复重跑并死循环读取存储
+- 保存时不改动已保存的正文：列表里的书签不带 `content`，弹窗没有可提取的正文，此时不会向存储写入空内容（`resolveBookmarkContent` 返回 `undefined`）
 - 支持 AI 推荐分类功能
 - 自动加载已有标签列表作为建议
 
