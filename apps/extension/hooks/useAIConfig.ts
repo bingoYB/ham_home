@@ -4,10 +4,7 @@ import { useBookmarks } from "@/contexts/BookmarkContext";
 import { useLanguage } from "@/hooks/useLanguage";
 import { useShortcuts } from "@/hooks/useShortcuts";
 import { configStorage } from "@/lib/storage/config-storage";
-import {
-  agentConfigService,
-  getProviderModels,
-} from "@/lib/agent";
+import { getProviderModels } from "@/lib/agent/provider-config";
 import type { AIConfig, AIProvider } from "@/types";
 
 export interface UseAIConfigReturn {
@@ -82,6 +79,7 @@ export function useAIConfig(): UseAIConfigReturn {
 
     try {
       await updateAIConfig({});
+      const { agentConfigService } = await import("@/lib/agent");
       const result = await agentConfigService.testConnection();
 
       if (result.success) {
@@ -104,6 +102,7 @@ export function useAIConfig(): UseAIConfigReturn {
     setModelSelectorOpen(true);
 
     try {
+      const { agentConfigService } = await import("@/lib/agent");
       const result = await agentConfigService.listAvailableModels({
         provider: aiConfig.provider,
         apiKey: localApiKey.trim(),

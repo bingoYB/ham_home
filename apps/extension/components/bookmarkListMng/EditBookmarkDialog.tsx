@@ -1,9 +1,11 @@
 /**
  * 编辑书签弹窗组件
+ * bookmark 为 null 时是新建模式：用于没有可采集页面的环境（Web 版）手动录入书签
  */
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
+  AlertCircle,
   Link2,
   FileText,
   AlignLeft,
@@ -26,10 +28,12 @@ import {
 import { TagInput } from '@/components/common/TagInput';
 import { CategorySelect } from '@/components/common/CategorySelect';
 import { useSavePanel } from '@/components/SavePanel/useSavePanel';
+import { capabilities } from '@/lib/platform';
 import type { LocalBookmark, PageContent } from '@/types';
 
 interface EditBookmarkDialogProps {
-  bookmark: LocalBookmark;
+  /** 要编辑的书签；null 表示新建 */
+  bookmark: LocalBookmark | null;
   onSaved: () => void;
   onClose: () => void;
 }
@@ -37,18 +41,18 @@ interface EditBookmarkDialogProps {
 export function EditBookmarkDialog({ bookmark, onSaved, onClose }: EditBookmarkDialogProps) {
   const { t } = useTranslation(['common', 'bookmark']);
 
-  // 从 bookmark 构建 pageContent。
+  // 从 bookmark 构建 pageContent（新建时为空表单）。
   // 必须保持引用稳定：useSavePanel 的初始化 effect 依赖它，每次渲染都新建对象会让 effect
   // 反复重跑，而 effect 每次都会 setState 新数组再触发渲染，形成无限循环。
   const pageContent = useMemo<PageContent>(
     () => ({
-      url: bookmark.url,
-      title: bookmark.title,
-      content: bookmark.content || '',
+      url: bookmark?.url ?? '',
+      title: bookmark?.title ?? '',
+      content: bookmark?.content || '',
       htmlContent: '',
-      textContent: bookmark.description || '',
-      excerpt: bookmark.description || '',
-      favicon: bookmark.favicon || '',
+      textContent: bookmark?.description || '',
+      excerpt: bookmark?.description || '',
+      favicon: bookmark?.favicon || '',
     }),
     [bookmark],
   );
@@ -64,6 +68,7 @@ export function EditBookmarkDialog({ bookmark, onSaved, onClose }: EditBookmarkD
     allTags,
     aiRecommendedCategory,
     saving,
+    actionError,
     setUrl,
     setTitle,
     setDescription,
@@ -77,11 +82,17 @@ export function EditBookmarkDialog({ bookmark, onSaved, onClose }: EditBookmarkD
     onSaved,
   });
 
+  const isCreating = bookmark === null;
+  // Only checked when typing a URL by hand: a captured page always has a valid one
+  const urlInvalid = isCreating && url.trim() !== '' && !/^https?:\/\/\S+$/i.test(url.trim());
+
   return (
     <Dialog open={true} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{t('bookmark:bookmark.editBookmark')}</DialogTitle>
+          <DialogTitle>
+            {isCreating ? t('bookmark:bookmark.addBookmark') : t('bookmark:bookmark.editBookmark')}
+          </DialogTitle>
         </DialogHeader>
 
         <div className="space-y-3 py-4">
@@ -99,6 +110,9 @@ export function EditBookmarkDialog({ bookmark, onSaved, onClose }: EditBookmarkD
               placeholder={t('bookmark:savePanel.urlPlaceholder')}
               className="h-9 shadow-none font-mono text-xs"
             />
+            {urlInvalid && (
+              <p className="text-xs text-destructive">{t('bookmark:savePanel.urlInvalid')}</p>
+            )}
           </div>
 
           {/* 标题 */}
@@ -129,7 +143,11 @@ export function EditBookmarkDialog({ bookmark, onSaved, onClose }: EditBookmarkD
               id="edit-description"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder={t('bookmark:savePanel.descriptionPlaceholder')}
+              placeholder={
+                capabilities.ai
+                  ? t('bookmark:savePanel.descriptionPlaceholder')
+                  : t('bookmark:savePanel.descriptionPlaceholderManual')
+              }
               rows={3}
               className="text-sm resize-none shadow-none"
             />
@@ -168,11 +186,20 @@ export function EditBookmarkDialog({ bookmark, onSaved, onClose }: EditBookmarkD
           </div>
         </div>
 
+        {actionError && (
+          <div className="flex items-start gap-1.5 rounded-lg bg-destructive/10 px-2 py-1.5 text-xs text-destructive">
+            <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+            <span className="min-w-0 flex-1 break-words">
+              {actionError.message || t('bookmark:bookmark.saveFailed')}
+            </span>
+          </div>
+        )}
+
         <DialogFooter>
           <Button variant="outline" onClick={onClose} disabled={saving}>
             {t('bookmark:savePanel.cancel')}
           </Button>
-          <Button onClick={save} disabled={saving || !title.trim() || !url.trim()}>
+          <Button onClick={save} disabled={saving || !title.trim() || !url.trim() || urlInvalid}>
             {saving ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -181,7 +208,7 @@ export function EditBookmarkDialog({ bookmark, onSaved, onClose }: EditBookmarkD
             ) : (
               <>
                 <Bookmark className="h-4 w-4 mr-2" />
-                {t('bookmark:savePanel.updateBookmark')}
+                {isCreating ? t('bookmark:savePanel.saveBookmark') : t('bookmark:savePanel.updateBookmark')}
               </>
             )}
           </Button>

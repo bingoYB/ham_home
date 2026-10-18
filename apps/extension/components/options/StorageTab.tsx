@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from "@hamhome/ui";
 import { syncEngine } from "@/lib/sync/sync-engine";
+import { capabilities } from "@/lib/platform";
 import { StorageStatCard } from "./StorageStatCard";
 import type { WebDAVConfig, SyncStatus, EmbeddingConfig } from "@/types";
 import type { VectorStoreStats } from "@/lib/storage/vector-store";
@@ -136,69 +137,77 @@ export function StorageTab({
                 }
                 onClear={onClearBookmarkData}
               />
-              <StorageStatCard
-                title={t("settings:settings.storage.workspaceData.title")}
-                primary={t("settings:settings.storage.workspaceData.count", {
-                  count: storageInfo.workspaceCount || 0,
-                })}
-                secondary={t("settings:settings.storage.workspaceData.size")}
-                clearLabel={t("settings:settings.storage.workspaceData.clear")}
-                isClearing={isClearingAll}
-                clearDisabled={isClearingAll || !storageInfo.workspaceCount}
-                onClear={onClearAllData}
-              />
-              <StorageStatCard
-                title={t("settings:settings.storage.snapshotData.title")}
-                primary={t("settings:settings.storage.snapshotData.count", {
-                  count: snapshotStats?.count || 0,
-                })}
-                secondary={t("settings:settings.storage.snapshotData.size", {
-                  size: formatBytes(snapshotStats?.totalSize || 0),
-                })}
-                clearLabel={t("settings:settings.storage.snapshotData.clear")}
-                isClearing={isClearingSnapshots}
-                clearDisabled={
-                  isClearingSnapshots || isClearingAll || !snapshotStats?.count
-                }
-                onClear={onClearSnapshotData}
-              />
-              <StorageStatCard
-                title={t("settings:settings.storage.screenshotData.title")}
-                primary={t("settings:settings.storage.screenshotData.count", {
-                  count: screenshotStats?.count || 0,
-                })}
-                secondary={t("settings:settings.storage.screenshotData.size", {
-                  size: formatBytes(screenshotStats?.totalSize || 0),
-                })}
-                footnote={t("settings:settings.storage.screenshotData.localOnly")}
-              />
-              <StorageStatCard
-                title={t("settings:settings.storage.vectorData.title")}
-                primary={
-                  embeddingConfig.enabled
-                    ? t("settings:settings.storage.vectorData.count", {
-                        count: vectorStats?.count || 0,
-                      })
-                    : t("settings:settings.storage.notEnabled")
-                }
-                secondary={
-                  embeddingConfig.enabled
-                    ? t("settings:settings.storage.vectorData.size", {
-                        size: formatBytes(vectorStats?.estimatedSize || 0),
-                      })
-                    : "—"
-                }
-                clearLabel={t("settings:settings.storage.vectorData.clear")}
-                isClearing={isClearing}
-                clearDisabled={
-                  isRebuilding ||
-                  isClearing ||
-                  isClearingAll ||
-                  !embeddingConfig.enabled ||
-                  (vectorStats?.count ?? 0) === 0
-                }
-                onClear={onClearVectors}
-              />
+              {capabilities.browserTabs && (
+                <StorageStatCard
+                  title={t("settings:settings.storage.workspaceData.title")}
+                  primary={t("settings:settings.storage.workspaceData.count", {
+                    count: storageInfo.workspaceCount || 0,
+                  })}
+                  secondary={t("settings:settings.storage.workspaceData.size")}
+                  clearLabel={t("settings:settings.storage.workspaceData.clear")}
+                  isClearing={isClearingAll}
+                  clearDisabled={isClearingAll || !storageInfo.workspaceCount}
+                  onClear={onClearAllData}
+                />
+              )}
+              {capabilities.snapshots && (
+                <StorageStatCard
+                  title={t("settings:settings.storage.snapshotData.title")}
+                  primary={t("settings:settings.storage.snapshotData.count", {
+                    count: snapshotStats?.count || 0,
+                  })}
+                  secondary={t("settings:settings.storage.snapshotData.size", {
+                    size: formatBytes(snapshotStats?.totalSize || 0),
+                  })}
+                  clearLabel={t("settings:settings.storage.snapshotData.clear")}
+                  isClearing={isClearingSnapshots}
+                  clearDisabled={
+                    isClearingSnapshots || isClearingAll || !snapshotStats?.count
+                  }
+                  onClear={onClearSnapshotData}
+                />
+              )}
+              {capabilities.screenshots && (
+                <StorageStatCard
+                  title={t("settings:settings.storage.screenshotData.title")}
+                  primary={t("settings:settings.storage.screenshotData.count", {
+                    count: screenshotStats?.count || 0,
+                  })}
+                  secondary={t("settings:settings.storage.screenshotData.size", {
+                    size: formatBytes(screenshotStats?.totalSize || 0),
+                  })}
+                  footnote={t("settings:settings.storage.screenshotData.localOnly")}
+                />
+              )}
+              {capabilities.semanticSearch && (
+                <StorageStatCard
+                  title={t("settings:settings.storage.vectorData.title")}
+                  primary={
+                    embeddingConfig.enabled
+                      ? t("settings:settings.storage.vectorData.count", {
+                          count: vectorStats?.count || 0,
+                        })
+                      : t("settings:settings.storage.notEnabled")
+                  }
+                  secondary={
+                    embeddingConfig.enabled
+                      ? t("settings:settings.storage.vectorData.size", {
+                          size: formatBytes(vectorStats?.estimatedSize || 0),
+                        })
+                      : "—"
+                  }
+                  clearLabel={t("settings:settings.storage.vectorData.clear")}
+                  isClearing={isClearing}
+                  clearDisabled={
+                    isRebuilding ||
+                    isClearing ||
+                    isClearingAll ||
+                    !embeddingConfig.enabled ||
+                    (vectorStats?.count ?? 0) === 0
+                  }
+                  onClear={onClearVectors}
+                />
+              )}
             </div>
           </div>
 
@@ -237,13 +246,13 @@ export function StorageTab({
             >
               {isClearingAll ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {t("settings:settings.storage.clearAllData")}...
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    {t("settings:settings.storage.clearAllData")}...
                 </>
               ) : (
                 <>
-                  <Trash2 className="mr-2 h-4 w-4" />
-                  {t("settings:settings.storage.clearAllData")}
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    {t("settings:settings.storage.clearAllData")}
                 </>
               )}
             </Button>

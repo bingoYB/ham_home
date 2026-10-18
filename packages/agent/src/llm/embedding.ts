@@ -1,7 +1,7 @@
 import { embed, embedMany, type EmbeddingModel } from "ai";
+import { toEmbeddingCallOptions } from "./embedding-options";
 import { resolveEmbeddingModel } from "./providers";
 import type {
-  AiSdkProviderName,
   EmbeddingClient,
   EmbeddingClientConfig,
   EmbeddingTestConnectionResult,
@@ -10,6 +10,7 @@ import type {
 } from "../core/types";
 
 export type { EmbeddingClient, EmbeddingTestConnectionResult } from "../core/types";
+export { supportsEmbeddingDimensions } from "./embedding-options";
 
 /**
  * Vercel AI SDK backed embedding client for single and batch embedding calls.
@@ -88,20 +89,6 @@ export function createEmbeddingClient(config: EmbeddingClientConfig): EmbeddingC
 }
 
 /**
- * Whether `EmbeddingClientConfig.dimensions` is forwarded for the provider. The
- * model itself must also accept a custom size, which only the caller knows.
- *
- * Example:
- * ```ts
- * supportsEmbeddingDimensions("openai"); // true
- * supportsEmbeddingDimensions("mistral"); // false
- * ```
- */
-export function supportsEmbeddingDimensions(provider: AiSdkProviderName | undefined): boolean {
-  return toEmbeddingCallOptions({ provider, model: "", dimensions: 1 }) !== undefined;
-}
-
-/**
  * Calculates cosine similarity for two non-zero vectors with equal length.
  *
  * Example:
@@ -154,29 +141,4 @@ export function rankBySimilarity<T>(
     .sort((left, right) => right.score - left.score);
 
   return typeof options.topK === "number" ? ranked.slice(0, options.topK) : ranked;
-}
-
-/**
- * Maps `dimensions` onto the per-call option key each AI SDK embedding model reads.
- * Azure reuses the OpenAI embedding model, so it reads the `openai` key too.
- */
-function toEmbeddingCallOptions(
-  config: EmbeddingClientConfig,
-): Record<string, Record<string, number>> | undefined {
-  const { dimensions } = config;
-  if (!dimensions) {
-    return undefined;
-  }
-
-  switch (config.provider ?? "gateway") {
-    case "openai":
-    case "azure":
-      return { openai: { dimensions } };
-    case "openai-compatible":
-      return { openaiCompatible: { dimensions } };
-    case "google":
-      return { google: { outputDimensionality: dimensions } };
-    default:
-      return undefined;
-  }
 }

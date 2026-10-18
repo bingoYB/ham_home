@@ -65,6 +65,7 @@ import { AboutPage } from "@/components/AboutPage";
 import { GlobalAgentLauncher } from "@/components/agent/GlobalAgentLauncher";
 import { AppSidebarFooter } from "@/components/layout/AppSidebarFooter";
 import { APP_GITHUB_REPO_URL } from "@/lib/constants/app-info";
+import { capabilities, isViewAvailable } from "@/lib/platform";
 import { safeCreateTab } from "@/utils/browser-api";
 import logoImage from "@/assets/logo.png";
 
@@ -277,7 +278,11 @@ function AppContent() {
   };
 
   // 侧边栏菜单数据
-  const currentViewBase = currentView.split("?")[0];
+  // A route this build cannot serve (e.g. #workspaces on the web) falls back to the list
+  const requestedView = currentView.split("?")[0];
+  const currentViewBase = isViewAvailable(requestedView, capabilities)
+    ? requestedView
+    : "all";
 
   const navMain: AppSidebarNavItem[] = useMemo(
     () => [
@@ -350,7 +355,7 @@ function AppContent() {
         icon: Info,
         isActive: currentViewBase === "about",
       },
-    ],
+    ].filter((item) => isViewAvailable(item.url.replace(/^#/, ""), capabilities)),
     [t, currentViewBase, bookmarks.length, categories.length, allTags.length],
   );
 
@@ -421,6 +426,7 @@ function AppContent() {
       case "privacy":
         return <PrivacyPage />;
       case "health":
+        if (!capabilities.bookmarkHealth) return null;
         return (
           <Suspense
             fallback={
@@ -449,9 +455,9 @@ function AppContent() {
       case "tags":
         return <TagsPage />;
       case "workspaces":
-        return <WorkspacesPage />;
+        return capabilities.browserTabs ? <WorkspacesPage /> : null;
       case "tab-groups":
-        return <TabGroupsPage />;
+        return capabilities.browserTabs ? <TabGroupsPage /> : null;
       case "import-export":
         return <ImportExportPage />;
       case "about":
@@ -607,7 +613,7 @@ function AppContent() {
           </ScrollArea>
         </main>
       </SidebarInset>
-      <GlobalAgentLauncher />
+      {capabilities.ai && <GlobalAgentLauncher />}
       <Toaster theme={appSettings.theme} />
     </SidebarProvider>
   );

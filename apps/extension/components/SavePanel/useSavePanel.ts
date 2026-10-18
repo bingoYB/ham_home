@@ -9,12 +9,11 @@ import {
   bookmarkStorage,
   configStorage,
 } from "@/lib/storage";
-import {
-  matchCategoryByName,
-} from "@/lib/agent";
+import { matchCategoryByName } from "@/lib/agent/category-utils";
 // 直接引用错误码模块，避免把 background 专用的剪藏分析服务打进 content script
 import { resolveClipAnalysisErrorCode } from "@/lib/agent/clip-analysis-errors";
 import { getBackgroundService } from "@/lib/services";
+import { capabilities } from "@/lib/platform";
 import { obsidianSyncService } from "@/lib/services/obsidian-sync-service";
 import { createMarkdownContent } from "defuddle/full";
 import {
@@ -322,6 +321,11 @@ export function useSavePanel({
    */
   const performAIAnalysis = useCallback(
     async (skipCache: boolean = false) => {
+      if (!capabilities.ai) {
+        setAIStatus("disabled");
+        return;
+      }
+
       const config = await configStorage.getAIConfig();
       const settings = await configStorage.getSettings();
 
@@ -430,15 +434,16 @@ export function useSavePanel({
         setSaveSnapshotState(false);
         setSaveScreenshotState(false);
       } else {
-        if (initialSaveSnapshot !== undefined) {
-          setSaveSnapshotState(initialSaveSnapshot);
-        } else {
-          setSaveSnapshotState(settings.autoSaveSnapshot);
-        }
+        // Synced settings may ask for snapshots/screenshots that this build cannot take
+        setSaveSnapshotState(
+          capabilities.snapshots &&
+            (initialSaveSnapshot ?? settings.autoSaveSnapshot),
+        );
 
         const screenshotAllowed =
-          !pageContent.isPrivate ||
-          settings.screenshotPrivatePagePolicy === "ask";
+          capabilities.screenshots &&
+          (!pageContent.isPrivate ||
+            settings.screenshotPrivatePagePolicy === "ask");
         setSaveScreenshotState(
           screenshotAllowed
             ? (initialSaveScreenshot ?? settings.autoSaveScreenshot)
@@ -608,11 +613,13 @@ export function useSavePanel({
       setSnapshotStatus("bookmarkSaved");
 
       // 添加 embedding 生成任务（在 background 中执行）
-      try {
-        const backgroundService = getBackgroundService();
-        await backgroundService.queueBookmarkEmbedding(bookmark.id);
-      } catch (e) {
-        console.warn("[useSavePanel] Failed to queue embedding:", e);
+      if (capabilities.semanticSearch) {
+        try {
+          const backgroundService = getBackgroundService();
+          await backgroundService.queueBookmarkEmbedding(bookmark.id);
+        } catch (e) {
+          console.warn("[useSavePanel] Failed to queue embedding:", e);
+        }
       }
 
       const independentAssets: Promise<void>[] = [];
