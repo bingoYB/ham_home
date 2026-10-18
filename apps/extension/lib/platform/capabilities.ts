@@ -23,6 +23,8 @@ export interface PlatformCapabilities {
   snapshots: boolean;
   /** Page screenshots stored on this device. */
   screenshots: boolean;
+  /** Hand a snapshot to Obsidian: needs a stored snapshot and the tabs API to open `obsidian://`. */
+  obsidianSync: boolean;
   /** Link health scans, which need the extension's cross-origin host permissions. */
   bookmarkHealth: boolean;
   /** Add a bookmark by typing its URL: there is no open page to capture it from. */

@@ -24,6 +24,7 @@ describe("flags", () => {
       semanticSearch: true,
       snapshots: true,
       screenshots: true,
+      obsidianSync: true,
       bookmarkHealth: true,
       manualBookmarkEntry: false,
     });
@@ -38,6 +39,7 @@ describe("flags", () => {
       semanticSearch: false,
       snapshots: false,
       screenshots: false,
+      obsidianSync: false,
       bookmarkHealth: false,
       manualBookmarkEntry: true,
     });

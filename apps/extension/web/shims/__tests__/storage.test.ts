@@ -89,7 +89,7 @@ describe("web storage shim", () => {
     expect(watcher).toHaveBeenCalledWith("none", "value");
   });
 
-  it("propagates changes to other tabs and refreshes their cache", async () => {
+  it("propagates changes to other tabs and lets them read the new value", async () => {
     const { storage: tabA, names } = open();
     const { storage: tabB } = open(names);
     const itemA = tabA.defineItem<number>("local:n", { fallback: 0 });
@@ -102,6 +102,49 @@ describe("web storage shim", () => {
 
     await vi.waitFor(() => expect(watcher).toHaveBeenCalledWith(5, 0));
     expect(await itemB.getValue()).toBe(5);
+  });
+
+  it("never serves stale data when another tab's broadcast is missed", async () => {
+    const { storage: tabA, names } = open();
+    // Same database, different channel: tab A will never hear about tab B's writes
+    const { storage: tabB } = open({ dbName: names.dbName, channelName: "unreachable-channel" });
+    const itemA = tabA.defineItem<string[]>("local:list", { fallback: [] });
+    const itemB = tabB.defineItem<string[]>("local:list", { fallback: [] });
+    await itemA.setValue(["a"]);
+    expect(await itemA.getValue()).toEqual(["a"]);
+
+    await itemB.setValue(["a", "b"]);
+
+    // A read-modify-write in tab A must build on B's data instead of overwriting it
+    await itemA.setValue([...(await itemA.getValue()), "c"]);
+    expect(await itemB.getValue()).toEqual(["a", "b", "c"]);
+  });
+
+  it("writes a value that differs from the database even if this tab never read it", async () => {
+    const { storage: tabA, names } = open();
+    const { storage: tabB } = open({ dbName: names.dbName, channelName: "unreachable-channel" });
+    const itemA = tabA.defineItem<number>("local:n", { fallback: 0 });
+    const itemB = tabB.defineItem<number>("local:n", { fallback: 0 });
+    await itemA.setValue(1);
+    await itemB.setValue(2);
+
+    await itemA.setValue(1);
+
+    expect(await itemB.getValue()).toBe(1);
+  });
+
+  it("hands watchers the value the database held before the write", async () => {
+    const { storage: tabA, names } = open();
+    const { storage: tabB } = open({ dbName: names.dbName, channelName: "unreachable-channel" });
+    const itemA = tabA.defineItem<number>("local:n", { fallback: 0 });
+    const itemB = tabB.defineItem<number>("local:n", { fallback: 0 });
+    await itemA.setValue(1);
+    const watcher = vi.fn();
+    itemB.watch(watcher);
+
+    await itemB.setValue(2);
+
+    expect(watcher).toHaveBeenCalledWith(2, 1);
   });
 
   it("rejects options the app does not use instead of ignoring them", () => {

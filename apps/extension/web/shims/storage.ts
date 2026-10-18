@@ -10,6 +10,12 @@
  * - values are JSON round-tripped, so every read returns a fresh copy and `undefined` is stripped;
  * - operations are applied in call order (`set` followed by `get` sees the new value);
  * - `watch` fires in the writing tab as well as in other tabs, and only when the value changed.
+ *
+ * IndexedDB is the only copy of the data. There is deliberately no in-memory cache: a cache would
+ * go stale whenever another tab's broadcast is missed (frozen or discarded tab, no BroadcastChannel),
+ * and the next read-modify-write from that tab would overwrite the other tab's data. Reads always
+ * hit the database, and each write compares and replaces inside one transaction. BroadcastChannel
+ * is only used to wake the `watch` callbacks of other tabs.
  */
 
 type Watcher = (newJson: string | null, oldJson: string | null) => void;
@@ -66,8 +72,6 @@ export function createWebStorage(options: WebStorageOptions = {}) {
   const dbName = options.dbName ?? "hamhome-web-kv";
   const channelName = options.channelName ?? "hamhome-web-kv";
 
-  /** key -> JSON string; `null` means "known to be missing". */
-  const cache = new Map<string, string | null>();
   const watchers = new Map<string, Set<Watcher>>();
   let dbPromise: Promise<IDBDatabase> | null = null;
   // All operations run on one chain so they are applied in call order, like chrome.storage.
@@ -106,7 +110,6 @@ export function createWebStorage(options: WebStorageOptions = {}) {
   if (channel) {
     channel.onmessage = (event: MessageEvent<BroadcastMessage>) => {
       const { key, newJson, oldJson } = event.data;
-      if (cache.has(key)) cache.set(key, newJson);
       notify(key, newJson, oldJson);
     };
   }
@@ -118,37 +121,34 @@ export function createWebStorage(options: WebStorageOptions = {}) {
   }
 
   async function readJson(key: string): Promise<string | null> {
-    const cached = cache.get(key);
-    if (cached !== undefined) return cached;
     const db = await openDb();
     const stored = await requestToPromise(
       db.transaction(STORE_NAME, "readonly").objectStore(STORE_NAME).get(key),
     );
-    const json = typeof stored === "string" ? stored : null;
-    cache.set(key, json);
-    return json;
+    return typeof stored === "string" ? stored : null;
   }
 
   async function writeJson(key: string, json: string | null): Promise<void> {
-    const previous = await readJson(key);
-    if (previous === json) return;
-
     const db = await openDb();
     const tx = db.transaction(STORE_NAME, "readwrite");
     const store = tx.objectStore(STORE_NAME);
-    if (json === null) store.delete(key);
-    else store.put(json, key);
-    try {
-      await transactionDone(tx);
-    } catch (error) {
-      // The cache must not claim a value that never reached disk.
-      cache.delete(key);
-      throw error;
-    }
 
-    cache.set(key, json);
-    channel?.postMessage({ key, newJson: json, oldJson: previous } satisfies BroadcastMessage);
-    notify(key, json, previous);
+    // Read the old value and replace it inside the same readwrite transaction, so the value
+    // handed to watchers is what the database really held even if another tab wrote meanwhile.
+    const outcome = { changed: false, previous: null as string | null };
+    const read = store.get(key);
+    read.onsuccess = () => {
+      outcome.previous = typeof read.result === "string" ? read.result : null;
+      if (outcome.previous === json) return;
+      outcome.changed = true;
+      if (json === null) store.delete(key);
+      else store.put(json, key);
+    };
+    await transactionDone(tx);
+
+    if (!outcome.changed) return;
+    channel?.postMessage({ key, newJson: json, oldJson: outcome.previous } satisfies BroadcastMessage);
+    notify(key, json, outcome.previous);
   }
 
   function defineItem<T>(key: string, itemOptions: WebStorageItemOptions<T> = {}): WebStorageItem<T> {

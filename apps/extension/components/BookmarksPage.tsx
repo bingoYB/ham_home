@@ -889,7 +889,7 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
                     <FolderOpen className="h-4 w-4 mr-1" />
                     {t("bookmark:bookmark.batch.moveCategory")}
                   </Button>
-                  {capabilities.snapshots && (
+                  {capabilities.obsidianSync && (
                     <Button
                       variant="secondary"
                       size="sm"
@@ -1079,14 +1079,20 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
                           : undefined
                       }
                       onViewSnapshot={
-                        bm.hasSnapshot ? () => handleViewSnapshot(bm) : undefined
+                        capabilities.snapshots && bm.hasSnapshot
+                          ? () => handleViewSnapshot(bm)
+                          : undefined
                       }
                       onDeleteSnapshot={
-                        bm.hasSnapshot
+                        capabilities.snapshots && bm.hasSnapshot
                           ? () => handleDeleteBookmarkSnapshot(bm)
                           : undefined
                       }
-                      onSyncToObsidian={() => handleSyncToObsidian(bm)}
+                      onSyncToObsidian={
+                        capabilities.obsidianSync
+                          ? () => handleSyncToObsidian(bm)
+                          : undefined
+                      }
                       onTogglePin={() => handleToggleBookmarkPin(bm)}
                       isPinned={pinnedBookmarkIds.has(bm.id)}
                       onReanalyzeAI={
@@ -1142,16 +1148,20 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
                           : undefined
                       }
                       onViewSnapshot={
-                        bookmark.hasSnapshot
+                        capabilities.snapshots && bookmark.hasSnapshot
                           ? () => handleViewSnapshot(bookmark)
                           : undefined
                       }
                       onDeleteSnapshot={
-                        bookmark.hasSnapshot
+                        capabilities.snapshots && bookmark.hasSnapshot
                           ? () => handleDeleteBookmarkSnapshot(bookmark)
                           : undefined
                       }
-                      onSyncToObsidian={() => handleSyncToObsidian(bookmark)}
+                      onSyncToObsidian={
+                        capabilities.obsidianSync
+                          ? () => handleSyncToObsidian(bookmark)
+                          : undefined
+                      }
                       onTogglePin={() => handleToggleBookmarkPin(bookmark)}
                       isPinned={pinnedBookmarkIds.has(bookmark.id)}
                       onReanalyzeAI={

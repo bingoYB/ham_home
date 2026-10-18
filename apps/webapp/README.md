@@ -36,6 +36,7 @@ or on-device assets:
 | `browserIntegration` | Save panel mode, omnibox, side panel and shortcut settings |
 | `ai`, `semanticSearch` | AI settings, assistant launcher, batch organize, AI category generation, embeddings |
 | `snapshots`, `screenshots` | Snapshot and screenshot settings, storage cards, viewers and the gallery view |
+| `obsidianSync` | "Sync to Obsidian" in the bookmark menu and the batch toolbar (it needs a snapshot and the tabs API) |
 | `bookmarkHealth` | The health center |
 
 The web build adds `manualBookmarkEntry`: an "Add bookmark" button that opens the edit dialog in

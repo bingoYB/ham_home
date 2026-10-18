@@ -21,5 +21,6 @@ export const ai = !isWeb;
 export const semanticSearch = !isWeb;
 export const snapshots = !isWeb;
 export const screenshots = !isWeb;
+export const obsidianSync = !isWeb;
 export const bookmarkHealth = !isWeb;
 export const manualBookmarkEntry = isWeb;
