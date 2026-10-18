@@ -5,6 +5,7 @@ import {
   getClipHighlightBookmarkUrl,
   getClipImageBookmarkUrl,
   isSubjectClip,
+  resolveBookmarkContent,
 } from "../clip-context";
 import type { PageContent, SaveFlowClipContext } from "@/types";
 
@@ -155,5 +156,34 @@ describe("getClipHighlightBookmarkUrl", () => {
       "https://example.com/p#section-2",
     );
     expect(url).toBe("https://example.com/p#section-2:~:text=quote");
+  });
+});
+
+describe("resolveBookmarkContent", () => {
+  it("整页书签写入提取到的正文", () => {
+    expect(resolveBookmarkContent(undefined, "# body")).toBe("# body");
+  });
+
+  it("没有提取到正文时返回 undefined，不覆盖已保存的正文", () => {
+    // 编辑弹窗的书签列表不带 content，markdown 为空串；写入空串会让 updateBookmark 删掉原有正文
+    expect(resolveBookmarkContent(undefined, "")).toBeUndefined();
+  });
+
+  it("图片书签不保存页面正文", () => {
+    expect(
+      resolveBookmarkContent(imageClip("https://cdn.example.com/a.png"), "# body"),
+    ).toBe("");
+  });
+
+  it("文字剪藏只保存选中片段", () => {
+    expect(
+      resolveBookmarkContent({ type: "highlight", text: "  quote  " }, "# body"),
+    ).toBe("quote");
+  });
+
+  it("data: 图片按整页书签处理", () => {
+    expect(
+      resolveBookmarkContent(imageClip("data:image/png;base64,AAAA"), "# body"),
+    ).toBe("# body");
   });
 });

@@ -21,6 +21,8 @@ import {
   deriveHighlightTitle,
   getClipImageBookmarkUrl,
   isSubjectClip,
+  isTextClip,
+  resolveBookmarkContent,
 } from "@/utils/clip-context";
 import type {
   PageContent,
@@ -168,11 +170,6 @@ function createInitialFormState(
     categoryId: null,
     tags: [],
   };
-}
-
-/** 文字剪藏的展示主体就是选中内容，标题与摘要都不参与保存面板 */
-function isTextClip(clip?: SaveFlowClipContext): boolean {
-  return clip?.type === "highlight" && !!clip.text?.trim();
 }
 
 /**
@@ -587,12 +584,9 @@ export function useSavePanel({
         title: title.trim(),
         description: description.trim(),
         // 主体型剪藏不重复保存来源页正文（同页多条剪藏会各存一份）：
-        // 图片书签的主体是图片本身，文字书签的主体是选中片段
-        content: imageBookmarkUrl
-          ? ""
-          : isTextClip(initialClip)
-            ? (initialClip?.text?.trim() ?? "")
-            : markdown,
+        // 图片书签的主体是图片本身，文字书签的主体是选中片段。
+        // 没有提取到正文时不写入，避免编辑书签时清掉已保存的正文
+        content: resolveBookmarkContent(initialClip, markdown),
         categoryId,
         tags,
         favicon: pageContent.favicon,
