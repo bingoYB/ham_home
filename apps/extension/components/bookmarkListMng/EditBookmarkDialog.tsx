@@ -1,6 +1,7 @@
 /**
  * 编辑书签弹窗组件
  */
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Link2,
@@ -36,16 +37,21 @@ interface EditBookmarkDialogProps {
 export function EditBookmarkDialog({ bookmark, onSaved, onClose }: EditBookmarkDialogProps) {
   const { t } = useTranslation(['common', 'bookmark']);
 
-  // 从 bookmark 构建 pageContent
-  const pageContent: PageContent = {
-    url: bookmark.url,
-    title: bookmark.title,
-    content: bookmark.content || '',
-    htmlContent: '',
-    textContent: bookmark.description || '',
-    excerpt: bookmark.description || '',
-    favicon: bookmark.favicon || '',
-  };
+  // 从 bookmark 构建 pageContent。
+  // 必须保持引用稳定：useSavePanel 的初始化 effect 依赖它，每次渲染都新建对象会让 effect
+  // 反复重跑，而 effect 每次都会 setState 新数组再触发渲染，形成无限循环。
+  const pageContent = useMemo<PageContent>(
+    () => ({
+      url: bookmark.url,
+      title: bookmark.title,
+      content: bookmark.content || '',
+      htmlContent: '',
+      textContent: bookmark.description || '',
+      excerpt: bookmark.description || '',
+      favicon: bookmark.favicon || '',
+    }),
+    [bookmark],
+  );
 
   // 使用 useSavePanel hook
   const {
