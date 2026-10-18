@@ -41,8 +41,10 @@ interface EditBookmarkDialogProps {
 export function EditBookmarkDialog({ bookmark, onSaved, onClose }: EditBookmarkDialogProps) {
   const { t } = useTranslation(['common', 'bookmark']);
 
-  // 从 bookmark 构建 pageContent（新建时为空表单）
-  const pageContent: PageContent = useMemo(
+  // 从 bookmark 构建 pageContent（新建时为空表单）。
+  // 必须保持引用稳定：useSavePanel 的初始化 effect 依赖它，每次渲染都新建对象会让 effect
+  // 反复重跑，而 effect 每次都会 setState 新数组再触发渲染，形成无限循环。
+  const pageContent = useMemo<PageContent>(
     () => ({
       url: bookmark?.url ?? '',
       title: bookmark?.title ?? '',

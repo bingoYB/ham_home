@@ -1,10 +1,10 @@
 {
   "extName": {
-    "message": "HamHome",
+    "message": "HamHome — AI Bookmark Manager",
     "description": "Extension name"
   },
   "extDescription": {
-    "message": "Smart Browser Workspace -— Save tabs, auto-group sessions, and organize bookmarks and collections with AI",
+    "message": "Organize bookmarks with AI categories, tags, summaries, and semantic search. Local storage, your AI provider, and tab workspaces.",
     "description": "Extension description"
   },
   "commandSaveBookmark": {

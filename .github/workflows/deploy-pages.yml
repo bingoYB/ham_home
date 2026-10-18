@@ -55,11 +55,15 @@ jobs:
             ${{ runner.os }}-nextjs-${{ hashFiles('**/pnpm-lock.yaml') }}-
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
+      - name: Test web
+        run: pnpm --filter web test
       - name: Build with Next.js
         env:
           NEXT_PUBLIC_BASE_PATH: /ham_home
           NEXT_PUBLIC_SITE_URL: https://bingoyb.github.io/ham_home
         run: pnpm build:web
+      - name: Verify static export
+        run: pnpm --filter web verify:export
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v4
         with:

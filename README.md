@@ -6,32 +6,35 @@
 
 <img src="logo.png" alt="HamHome" width="200" />
 
-# HamHome
+# HamHome — AI Bookmark Manager
 
-### Organize bookmarks with AI, rediscover saved content, and pick up where you left off
+### AI categories, tags, summaries and semantic search for Chrome, Edge and Firefox
 
 [![Release](https://img.shields.io/github/v/release/bingoYB/ham_home?style=flat-square)](https://github.com/bingoYB/ham_home/releases)
 [![Stars](https://img.shields.io/github/stars/bingoYB/ham_home?style=flat-square)](https://github.com/bingoYB/ham_home/stargazers)
 [![Issues](https://img.shields.io/github/issues/bingoYB/ham_home?style=flat-square)](https://github.com/bingoYB/ham_home/issues)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue?style=flat-square)](./LICENSE)
 
-**Find what you saved. Resume what you started.**
+**Keep your collections organized and your tabs tidy, with help from AI.**
 
 <p>
-  <a href="https://bingoyb.github.io/ham_home/">Website</a> · <a href="#downloads">Install</a> · <a href="./docs/USAGE_en.md">Usage Guide</a> · <a href="#features">Features</a> · <a href="#development">Development</a>
+  <a href="https://bingoyb.github.io/ham_home/en/">Website</a> · <a href="#downloads">Install</a> · <a href="./docs/USAGE_en.md">Usage Guide</a> · <a href="#features">Features</a> · <a href="#development">Development</a>
 </p>
 
 </div>
 
 ## What is HamHome?
 
-HamHome is an AI browser workspace that brings bookmarks, page snapshots, and tab sessions together. Save content worth keeping, along with the browsing context you want to return to.
+HamHome is an open-source, local-first AI bookmark manager for Chrome, Edge and Firefox. Generate categories, tags and summaries, import existing bookmarks for bulk AI analysis, and find saved content with keyword or semantic search. Also save text and image clips and tab workspaces.
 
 - **Save with less sorting.** Let AI generate summaries, categories, and tags, keep page snapshots and screenshots, or clip just the passage or image you need.
+- **Organize existing bookmarks.** Import browser bookmarks or an HTML file into HamHome, select items for bulk AI analysis, and optionally write results back to the browser bookmark bar.
 - **Find it when you need it.** Search saved content with keywords or semantic search, browse page screenshots in the visual gallery, or ask the built-in Agent to find and summarize it.
 - **Pick up where you left off.** Save a set of tabs as a workspace, restore it when needed, and organize active tabs with grouping rules.
 
-**Local first. Your choice of AI.** Data stays in your browser by default, with no HamHome account required. AI features send relevant content to the provider you connect. WebDAV sync and file import/export are optional.
+**Local first. Your choice of AI.** Data stays in your browser by default, with no HamHome account required. AI features send relevant content to the provider you connect. AI requires your own provider or local endpoint; cloud API charges depend on the provider. Semantic search requires separate embedding configuration and an index. WebDAV sync and file import/export are optional.
+
+[Is HamHome right for you?](https://bingoyb.github.io/ham_home/en/guides/ai-bookmark-manager/) · [Import and organize old bookmarks](https://bingoyb.github.io/ham_home/en/guides/import-bookmarks/) · [Set up AI providers](https://bingoyb.github.io/ham_home/en/guides/ai-provider-setup/)
 
 ## Screenshots
 

@@ -2,6 +2,7 @@
 
 import { Header } from './Header';
 import { Footer } from './Footer';
+import { ScrollProgress } from './motion/ScrollProgress';
 import { FeatureHeroBanner } from './FeatureHeroBanner';
 import { FeatureShowcase } from './FeatureShowcase';
 import { LandingCapabilities } from './LandingCapabilities';
@@ -21,6 +22,8 @@ export function LandingPage({ language }: LandingPageProps) {
 
   return (
     <div className="home-page-shell min-h-screen text-foreground">
+      <ScrollProgress />
+
       {/* 顶部导航 */}
       <Header
         isDark={isDark}

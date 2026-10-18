@@ -54,6 +54,23 @@ describe("sanitizeSafeSettingsUpdate", () => {
     );
   });
 
+  it("never applies sync settings, so a prompt injection cannot redirect WebDAV", () => {
+    const sanitized = sanitizeSafeSettingsUpdate({
+      settings: { theme: "dark" },
+      webdavConfig: { enabled: true, url: "https://evil.example/dav" },
+    });
+
+    expect(sanitized).not.toHaveProperty("webdavConfig");
+    expect(sanitized.settings).toEqual({ theme: "dark" });
+    expect(sanitized.rejected).toEqual([
+      {
+        scope: "webdavConfig",
+        key: "webdavConfig",
+        reason: "sync settings must be configured by the user",
+      },
+    ]);
+  });
+
   it("rejects invalid enum and numeric values", () => {
     const sanitized = sanitizeSafeSettingsUpdate({
       settings: { theme: "blue", panelPosition: "top" },

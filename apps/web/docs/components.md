@@ -27,6 +27,9 @@ app/components/
 ├── ExtensionScreenshotFrame.tsx
 ├── extensionScreenshots.ts
 ├── showcaseFeatures.tsx
+├── motion/
+│   ├── Reveal.tsx
+│   └── ScrollProgress.tsx
 └── demos/
     ├── AIChatSearchDemo.tsx
     └── ...
@@ -85,7 +88,7 @@ app/components/
 ### 行为说明
 
 - 下载菜单通过 `getDownloadChannels()` 和 `getRecommendedDownloadChannel()` 自动推荐当前浏览器渠道。
-- 副标题来自 `PRODUCT_COPY`：AI 网页收藏与标签页管理 / AI Web Clipper & Tab Manager。
+- 副标题来自 `PRODUCT_COPY`：AI 书签管理与网页收藏插件 / AI Bookmark Manager。
 - 语言切换是带 `hrefLang` 与 `lang` 的真实链接（`Link`，关闭预取），静态 HTML 中即可发现另一语言版本；目标保留指南或隐私页面路径，点击时记录显式语言偏好。下载菜单抽取为 `DownloadDropdown`。
 
 ---
@@ -110,11 +113,12 @@ app/components/
 ### 行为说明
 
 - 轮播展示真实插件截图：书签库、视觉画廊、AI Agent、书签健康中心、工作空间、Tab 分组、导入导出与同步。
-- 能力标签为 2×2 网格：文字与图片剪藏、Agent 辅助管理与操作、工作空间与 Tab 分组、隐私边界可控。
-- 唯一的 `h1` 由 Logo、品牌名 HamHome 和类别标签组成（如「HamHome — AI 网页收藏与标签页管理」，与页面 title 一致）；Logo 为装饰图（空 alt），类别前有仅供读屏的「—」分隔。
+- 能力标签为 2×2 网格：AI 分类/标签/摘要、导入旧书签批量分析、关键词与语义搜索、本地存储与自选 AI。
+- 唯一的 `h1` 由 Logo、品牌名 HamHome 和类别标签组成（如「HamHome — AI 书签管理与网页收藏插件」，与页面 title 的 AI 书签管理定位一致）；Logo 为装饰图（空 alt），类别前有仅供读屏的「—」分隔。
 - 最终口号「借助 AI，让收藏有序，让标签页井然。」与对应英文作为 `h1` 之后的大号段落，来自 `PRODUCT_COPY`；轮播交给 `HeroScreenshotCarousel`。
 - 截图路径由 `getExtensionScreenshotSrc()` 生成，自动带上 `NEXT_PUBLIC_BASE_PATH`。
-- 不再使用 Imgur 老截图。
+- 安装操作复用 `LandingActionButtons`（开启 `pulse`）；按钮下方展示三个真实商店链接及 AI/Embedding 配置、费用与数据传输条件。
+- 首屏入场动画：文案区按 `--hero-delay` 依次上浮，截图轮播从右侧滑入并缓慢浮动，背景有两团缓慢漂移的品牌色光晕；能力标签卡片悬停时轻微上抬。动画是纯 CSS，无 JS 时也能播放；`prefers-reduced-motion` 下全部关闭。
 
 ---
 
@@ -227,8 +231,8 @@ app/components/
 
 ### 行为说明
 
-- 展示 AI 收藏、富剪藏、健康中心、Agent 代办、工作空间、Tab 分组、WebDAV、隐私保护八个摘要，桌面端 4 列。
-- 文案按保存内容、找回收藏、理顺标签页展开，AI 与 Agent 作为可选辅助能力。
+- 展示 AI 整理、富剪藏、旧书签整理、Agent 辅助、工作空间、语义搜索、WebDAV、隐私保护八个摘要，桌面端 4 列。
+- 文案按 AI 整理新旧书签、搜索找回展开，保留剪藏和工作空间能力。
 
 ---
 
@@ -323,6 +327,91 @@ app/components/
 ### 行为说明
 
 - 复用 `LandingActionButtons`，保证 Hero 与底部 CTA 的下载行为一致。
+- 整个行动区随滚动渐入（`Reveal`）。
+
+---
+
+## LandingActionButtons
+
+「安装扩展」与「GitHub」两个主按钮，下方带浏览器商店链接。Hero 与底部 CTA 共用。
+
+### Props
+
+| name | type | required | default | description |
+|------|------|----------|---------|-------------|
+| isEn | boolean | 是 | - | 当前是否为英文模式 |
+| className | string | 否 | - | 外层容器样式 |
+| downloadLabel | string | 否 | 按语言的默认文案 | 主按钮文案 |
+| githubLabel | string | 否 | `GitHub` | GitHub 按钮文案 |
+| pulse | boolean | 否 | false | 给主按钮加柔和的脉冲光圈，只用于 Hero |
+
+### Usage
+
+```tsx
+<LandingActionButtons isEn={isEn} pulse downloadLabel="安装扩展" />
+```
+
+### 行为说明
+
+- 主按钮点击时调用 `openRecommendedDownload()` 打开推荐渠道的下载地址；`href` 仍保留指向 GitHub Release 的真实链接。
+- `pulse` 对应全局样式 `.cta-pulse`；`prefers-reduced-motion` 下不播放。
+
+---
+
+## Reveal
+
+滚动渐入容器：子内容进入视口时淡入并位移到位，只触发一次。落地页各区块的标题、卡片网格、FAQ 分组都用它包裹。
+
+### Props
+
+| name | type | required | default | description |
+|------|------|----------|---------|-------------|
+| as | ElementType | 否 | `div` | 渲染的元素，如 `h2`、`nav`、`section`、`aside` |
+| variant | `up` \| `scale` \| `left` \| `right` | 否 | `up` | 入场方向：上浮、缩放、左滑、右滑 |
+| delay | number | 否 | 0 | 延迟毫秒数，用于同一排卡片错落出现 |
+| className | string | 否 | - | 元素样式；需要悬停上抬的卡片请把 `lift-card` 放在内层元素上 |
+| ...rest | HTMLAttributes | 否 | - | 其余属性（如 `id`、`aria-label`）透传到元素 |
+
+### Usage
+
+```tsx
+<Reveal as="h2" className="text-3xl font-bold">标题</Reveal>
+
+{items.map((item, index) => (
+  <Reveal key={item.id} variant="scale" delay={(index % 4) * 80} className="h-full">
+    <article className="lift-card h-full">{item.title}</article>
+  </Reveal>
+))}
+```
+
+### 行为说明
+
+- 内容始终在静态 HTML 中，只切换 `opacity` / `transform`，不影响 SEO 与 `verify:export` 检查；`SiteDocument` 的 `<noscript>` 样式保证无 JS 时内容可见。
+- 通过 `useInView` 观察，阈值为 0（元素任意一部分进入视口即触发），避免超高区块在小屏上永远达不到触发比例。
+- 触发线比视口底部上移 8%，让元素略微进入后再播放。
+- `prefers-reduced-motion` 下直接显示，不做位移与过渡。
+- `lift-card` 与 `Reveal` 不要放在同一个元素上：两者都过渡 `transform`，后者会被覆盖。
+
+---
+
+## ScrollProgress
+
+固定在页面顶部的细进度条，随页面滚动从左向右填满，品牌橙到青色渐变。
+
+### Props
+
+无。
+
+### Usage
+
+```tsx
+<ScrollProgress />
+```
+
+### 行为说明
+
+- 通过 ref + `requestAnimationFrame` 直接写 `transform: scaleX()`，滚动时不触发 React 重渲染。
+- 装饰元素，`aria-hidden`，不拦截指针事件。
 
 ---
 
@@ -418,7 +507,7 @@ app/components/
 
 ## LandingGuides
 
-四类任务指南的内部链接网格：AI 收藏、语义搜索、工作空间、隐私与同步。
+七类任务指南的内部链接网格：插件选型、旧书签整理、模型配置、AI 收藏、语义搜索、工作空间、隐私与同步。
 
 | Prop | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
@@ -443,7 +532,7 @@ app/components/
 <GuidePage language="en" guide={guide} />
 ```
 
-`generateStaticParams` 生成全部八篇指南；页面保留对应语言的导航、隐私链接与使用文档。路由同时输出 `TechArticle` 与面包屑 JSON-LD，`og:type` 为 `article`。
+`generateStaticParams` 生成全部十四篇双语指南；页面保留对应语言的导航、隐私链接与使用文档。路由同时输出 `TechArticle` 与面包屑 JSON-LD，`og:type` 为 `article`。
 
 ## AgentExamples
 
@@ -545,3 +634,31 @@ app/components/
 - `sitemap` 只列出正式语言路由；首页与指南的 `lastModified` 用 `CONTENT_UPDATED_AT`，隐私页用 `PRIVACY_POLICY_UPDATED_AT`。
 - 保留 `/` 与 `/privacy-policy/` 为兼容入口；目录静态导出用 `trailingSlash: true`。
 - 验证：先运行 `pnpm --filter web test`（vitest，覆盖语言路由、hreflang 与结构化数据），再运行 `NEXT_PUBLIC_BASE_PATH=/ham_home pnpm build:web`，然后 `pnpm --filter web verify:export`。该脚本检查 14 个 HTML 页面的语言、canonical 与 hreflang（含 x-default）、页头可抓取的语言切换链接、OG（含分享图文件与尺寸）、首页 `h1`、FAQ 首题与完整性、产品与指南结构化数据、隐私页描述、图标、内部链接和资源，以及 `404.html`、sitemap 与 robots。
+
+
+## LandingActionButtons
+
+首页首屏、底部 CTA 与指南页共用的安装入口，先展示安装/GitHub 按钮，再展示静态商店链接。安装按钮按浏览器推荐渠道；无 JavaScript 时仍可打开 releases 和各商店。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| isEn | boolean | 是 | — | 按钮与商店语言 |
+| className | string | 否 | — | 外层布局样式 |
+| downloadLabel | string | 否 | 下载安装 / Install & Download | 安装按钮文案 |
+| githubLabel | string | 否 | GitHub | 仓库按钮文案 |
+
+```tsx
+<LandingActionButtons isEn={false} className="mt-8" downloadLabel="安装扩展" />
+```
+
+## BrowserStoreLinks
+
+输出已发布的 Chrome、Edge、Firefox 商店链接，复用 `getDownloadChannels()` 的渠道数据，静态 HTML 可抓取。离线包保留在安装按钮和下载菜单中。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| isEn | boolean | 是 | — | 商店名称与导航标签语言 |
+
+```tsx
+<BrowserStoreLinks isEn={false} />
+```

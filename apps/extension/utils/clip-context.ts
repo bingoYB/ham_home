@@ -160,6 +160,27 @@ export function isSubjectClip(clip?: SaveFlowClipContext): boolean {
   return clip?.type === "image" || clip?.type === "highlight";
 }
 
+/** 文字剪藏的展示主体就是选中内容，标题与摘要都不参与保存面板 */
+export function isTextClip(clip?: SaveFlowClipContext): boolean {
+  return clip?.type === "highlight" && !!clip.text?.trim();
+}
+
+/**
+ * 保存书签时要写入的正文；返回 undefined 表示保持已存正文不变。
+ *
+ * 图片书签的主体是图片本身，不存页面正文；文字书签只存选中片段。
+ * 整页书签没有提取到正文时（例如编辑弹窗：列表里的书签不带 content，也没有 HTML 可转换）
+ * 不能写入空串，否则 updateBookmark 会把之前保存的正文删掉。
+ */
+export function resolveBookmarkContent(
+  clip: SaveFlowClipContext | undefined,
+  markdown: string,
+): string | undefined {
+  if (getClipImageBookmarkUrl(clip)) return "";
+  if (isTextClip(clip)) return clip?.text?.trim() ?? "";
+  return markdown || undefined;
+}
+
 /** 选中文字剪藏没有独立标题，用正文首句兜底，保证书签可检索。 */
 export function deriveHighlightTitle(text?: string): string {
   const normalized = text?.replace(/\s+/g, " ").trim();

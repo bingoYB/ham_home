@@ -5,6 +5,7 @@ import {
   classifyHttpStatus,
   filterBookmarkHealthTargets,
   normalizeHealthUrl,
+  planBookmarkHealthAlarm,
 } from "../bookmark-health-utils";
 import type { BookmarkHealthRecord, LocalBookmark } from "@/types";
 
@@ -109,5 +110,49 @@ describe("duplicate and metadata issues", () => {
       "missing_description",
       "duplicate_url:b1",
     ]);
+  });
+});
+
+describe("planBookmarkHealthAlarm", () => {
+  const WEEK = 7 * 24 * 60;
+  const MONTH = 30 * 24 * 60;
+
+  it("creates the alarm when it does not exist yet", () => {
+    expect(planBookmarkHealthAlarm("weekly", undefined)).toEqual({
+      action: "create",
+      periodInMinutes: WEEK,
+    });
+    expect(planBookmarkHealthAlarm("monthly", undefined)).toEqual({
+      action: "create",
+      periodInMinutes: MONTH,
+    });
+  });
+
+  it("keeps an existing alarm of the same period so its countdown is not restarted", () => {
+    // called on every service worker start and every settings change
+    expect(planBookmarkHealthAlarm("weekly", { periodInMinutes: WEEK })).toEqual({
+      action: "keep",
+    });
+  });
+
+  it("recreates the alarm when the period changed", () => {
+    expect(planBookmarkHealthAlarm("monthly", { periodInMinutes: WEEK })).toEqual({
+      action: "create",
+      periodInMinutes: MONTH,
+    });
+  });
+
+  it("recreates an alarm that has no period (one-shot or foreign)", () => {
+    expect(planBookmarkHealthAlarm("weekly", {})).toEqual({
+      action: "create",
+      periodInMinutes: WEEK,
+    });
+  });
+
+  it("clears the alarm when the schedule is off", () => {
+    expect(planBookmarkHealthAlarm("off", { periodInMinutes: WEEK })).toEqual({
+      action: "clear",
+    });
+    expect(planBookmarkHealthAlarm("off", undefined)).toEqual({ action: "clear" });
   });
 });

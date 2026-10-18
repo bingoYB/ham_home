@@ -92,8 +92,7 @@ test.describe("LIB 书签库核心流程", () => {
 
     await page.keyboard.press("Escape");
     await page.locator("#main-content").getByRole("button", { name: /清除筛选|Clear Filters/ }).click();
-    await page.getByText(/全部分类|All Categories/).click();
-    await page.getByText("开发工具", { exact: true }).last().click();
+    await page.getByRole("treeitem", { name: /开发工具/ }).click();
     await expect(page.getByText("React Docs")).toBeVisible();
     await expect(page.getByText("Figma Design")).toBeHidden();
     await attachStepScreenshot(page, testInfo, "LIB-002-分类筛选");
@@ -425,5 +424,115 @@ test.describe("LIB 书签库核心流程", () => {
     await expect(imageInfo.getByLabel("#102A18")).toBeVisible();
     await expect(imageInfo.getByLabel("#D8D0AA")).toBeVisible();
     await attachStepScreenshot(page, testInfo, "LIB-008-图片主色与文件信息");
+  });
+
+  test("LIB-010 分类树：父分类含子分类书签、面包屑跳转、隐藏后回退下拉", async ({
+    context,
+    extensionId,
+    extensionWorker,
+    e2eVariant,
+  }, testInfo) => {
+    const t = e2eVariant.text;
+    await seedCategories(extensionWorker, [
+      createCategoryFixture({ id: "cat-design", name: "设计", order: 0 }),
+      createCategoryFixture({
+        id: "cat-inspiration",
+        name: "灵感",
+        parentId: "cat-design",
+        order: 0,
+      }),
+      createCategoryFixture({ id: "cat-dev", name: "开发", order: 1 }),
+    ]);
+    await seedBookmarks(extensionWorker, [
+      createBookmarkFixture({
+        id: "bm-design-root",
+        title: "Design Root Page",
+        url: "https://example.com/design-root",
+        categoryId: "cat-design",
+      }),
+      createBookmarkFixture({
+        id: "bm-inspiration",
+        title: "Inspiration Board",
+        url: "https://example.com/inspiration",
+        categoryId: "cat-inspiration",
+      }),
+      createBookmarkFixture({
+        id: "bm-dev",
+        title: "Dev Handbook",
+        url: "https://example.com/dev-handbook",
+        categoryId: "cat-dev",
+      }),
+      createBookmarkFixture({
+        id: "bm-loose",
+        title: "Loose Link",
+        url: "https://example.com/loose",
+        categoryId: null,
+      }),
+    ]);
+
+    const page = await openAppPage(context, extensionId, "all");
+    const tree = page.getByRole("tree");
+    const item = (name: RegExp) => tree.getByRole("treeitem", { name });
+    const breadcrumb = page.getByRole("navigation", {
+      name: t("分类路径", "Category path"),
+    });
+
+    // 全部书签 / 未分类 / 分类各自带数量；父分类数量包含子分类，子分类默认收起
+    await expect(item(/全部书签|All Bookmarks/)).toContainText("4");
+    await expect(item(/未分类|Uncategorized/)).toContainText("1");
+    await expect(item(/设计/)).toContainText("2");
+    await expect(item(/灵感/)).toBeHidden();
+    await attachStepScreenshot(page, testInfo, "LIB-010-分类树初始状态");
+
+    // 选中父分类：列表包含子分类下的书签，并自动展开出子分类
+    await item(/设计/).click();
+    await expect(item(/设计/)).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByText("Design Root Page")).toBeVisible();
+    await expect(page.getByText("Inspiration Board")).toBeVisible();
+    await expect(page.getByText("Dev Handbook")).toBeHidden();
+    await expect(page.getByText("Loose Link")).toBeHidden();
+    await expect(item(/灵感/)).toBeVisible();
+    await expect(breadcrumb.getByRole("button", { name: "设计" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+    await attachStepScreenshot(page, testInfo, "LIB-010-选中父分类");
+
+    // 子分类跳转按钮：只剩子分类的书签，面包屑多一级
+    await page.getByRole("button", { name: /^灵感/ }).click();
+    await expect(page.getByText("Inspiration Board")).toBeVisible();
+    await expect(page.getByText("Design Root Page")).toBeHidden();
+    await expect(breadcrumb.getByRole("button", { name: "灵感" })).toHaveAttribute(
+      "aria-current",
+      "page",
+    );
+
+    // 面包屑根节点回到全部书签，分类结构条随之消失
+    await breadcrumb
+      .getByRole("button", { name: /全部书签|All Bookmarks/ })
+      .click();
+    await expect(page.getByText("Dev Handbook")).toBeVisible();
+    await expect(page.getByText("Loose Link")).toBeVisible();
+    await expect(breadcrumb).toBeHidden();
+
+    await item(/未分类|Uncategorized/).click();
+    await expect(page.getByText("Loose Link")).toBeVisible();
+    await expect(page.getByText("Dev Handbook")).toBeHidden();
+
+    // 隐藏分类栏后，筛选栏回退为分类下拉并给出重新显示入口
+    await page
+      .getByRole("button", { name: t("隐藏分类栏", "Hide category panel") })
+      .click();
+    await expect(tree).toBeHidden();
+    await expect(
+      page.getByRole("button", { name: t("显示分类栏", "Show category panel") }),
+    ).toBeVisible();
+    await expect(page.getByText(/未分类|Uncategorized/).first()).toBeVisible();
+    await attachStepScreenshot(page, testInfo, "LIB-010-隐藏分类栏回退下拉");
+
+    await page
+      .getByRole("button", { name: t("显示分类栏", "Show category panel") })
+      .click();
+    await expect(tree).toBeVisible();
   });
 });

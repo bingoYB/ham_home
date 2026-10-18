@@ -14,7 +14,6 @@ import {
   Settings,
   Moon,
   Sun,
-  Database,
   SunMoon,
   Languages,
   Github,
@@ -40,13 +39,9 @@ import {
   SidebarInset,
   SidebarTrigger,
   Button,
-  Avatar,
-  AvatarFallback,
-  AvatarImage,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
   Switch,
   Tooltip,
@@ -68,6 +63,7 @@ import { PrivacyPage } from "@/components/PrivacyPage";
 import { ImportExportPage } from "@/components/ImportExportPage";
 import { AboutPage } from "@/components/AboutPage";
 import { GlobalAgentLauncher } from "@/components/agent/GlobalAgentLauncher";
+import { AppSidebarFooter } from "@/components/layout/AppSidebarFooter";
 import { APP_GITHUB_REPO_URL } from "@/lib/constants/app-info";
 import { capabilities, isViewAvailable } from "@/lib/platform";
 import { safeCreateTab } from "@/utils/browser-api";
@@ -410,86 +406,12 @@ function AppContent() {
 
   // 侧边栏底部内容
   const sidebarFooter = (
-    <div className="space-y-3 p-2">
-      {/* 存储信息 */}
-      <div className="px-3 py-2 rounded-lg bg-muted/50 space-y-2">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <Database className="w-4 h-4" />
-            <span className="text-xs font-medium text-foreground">
-              {t("common:common.storage")}
-            </span>
-          </div>
-          <span className="text-xs text-muted-foreground">
-            {storageInfo.storageSize}
-          </span>
-        </div>
-
-        {/* 数据同步状态 */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <div
-              className="flex items-center justify-between border-t border-border/50 pt-2 mt-2 cursor-pointer hover:opacity-80 transition-opacity"
-              onClick={() => handleViewChange("settings?tab=storage")}
-            >
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <SyncIcon className={syncIconClassName} />
-                <span className="text-xs font-medium text-foreground">
-                  {t("settings:settings.sync.widget.title")}
-                </span>
-              </div>
-              <span className="text-[10px] text-muted-foreground">
-                {syncLabel}
-              </span>
-            </div>
-          </TooltipTrigger>
-          <TooltipContent side="right" className="max-w-[200px]">
-            <p className="font-medium text-sm">
-              {t("settings:settings.sync.widget.tooltipTitle")}
-            </p>
-            <p className="text-xs text-muted-foreground mt-1">
-              {t("settings:settings.sync.widget.tooltipDesc")}
-            </p>
-            <p
-              className="text-xs text-primary mt-2 flex items-center gap-1"
-              onClick={() => handleViewChange("settings?tab=storage")}
-            >
-              <Settings className="w-3 h-3" />{" "}
-              {t("settings:settings.sync.widget.goConfig")}
-            </p>
-          </TooltipContent>
-        </Tooltip>
-      </div>
-
-      {/* 用户信息 */}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button className="w-full flex items-center gap-3 p-2 rounded-lg hover:bg-accent transition-colors">
-            <Avatar className="h-8 w-8">
-              <AvatarImage src="https://api.dicebear.com/7.x/thumbs/svg?seed=HamHome" />
-              <AvatarFallback>🐹</AvatarFallback>
-            </Avatar>
-            <div className="flex-1 text-left">
-              <p className="font-medium text-sm text-foreground">HamHome</p>
-              <p className="text-xs text-muted-foreground">
-                {t("bookmark:bookmark.count", { count: bookmarks.length })}
-              </p>
-            </div>
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuItem onClick={() => handleViewChange("settings")}>
-            <Settings className="h-4 w-4 mr-2" />
-            {t("settings:settings.title")}
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => handleViewChange("import-export")}>
-            <Download className="h-4 w-4 mr-2" />
-            {t("settings:settings.importExport.title")}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
+    <AppSidebarFooter
+      bookmarkCount={bookmarks.length}
+      storageSize={storageInfo.storageSize}
+      sync={{ label: syncLabel, Icon: SyncIcon, iconClassName: syncIconClassName }}
+      onNavigate={handleViewChange}
+    />
   );
 
   // 获取当前页面标题
@@ -553,6 +475,7 @@ function AppContent() {
   return (
     <SidebarProvider>
       <AppSidebar
+        collapsible="icon"
         brand={brand}
         navMain={navMain}
         footer={sidebarFooter}
