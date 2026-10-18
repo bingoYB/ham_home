@@ -117,32 +117,40 @@
    Landing Page Motion
    ======================================== */
 
-/* Scroll reveal: toggled by <Reveal> through the .is-visible class */
+/*
+ * Scroll reveal: toggled by <Reveal> through the .is-visible class.
+ * Blocks are visible by default and only start hidden behind .reveal-gate, which an inline
+ * script sets on <html> and drops again if the app never hydrates (app/lib/reveal-gate.ts).
+ * Without JavaScript, or with reduced motion, nothing is ever hidden.
+ */
 .reveal {
-  opacity: 0;
-  transform: translate3d(0, 28px, 0);
-  transition:
-    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1) var(--reveal-delay, 0ms),
-    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1) var(--reveal-delay, 0ms);
-  will-change: opacity, transform;
+  --reveal-from: translate3d(0, 28px, 0);
 }
 
 .reveal[data-reveal='scale'] {
-  transform: translate3d(0, 20px, 0) scale(0.96);
+  --reveal-from: translate3d(0, 20px, 0) scale(0.96);
 }
 
 .reveal[data-reveal='left'] {
-  transform: translate3d(-32px, 0, 0);
+  --reveal-from: translate3d(-32px, 0, 0);
 }
 
 .reveal[data-reveal='right'] {
-  transform: translate3d(32px, 0, 0);
+  --reveal-from: translate3d(32px, 0, 0);
 }
 
-.reveal.is-visible {
-  opacity: 1;
-  transform: none;
-  will-change: auto;
+@media (prefers-reduced-motion: no-preference) {
+  .reveal {
+    transition:
+      opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1) var(--reveal-delay, 0ms),
+      transform 0.7s cubic-bezier(0.22, 1, 0.36, 1) var(--reveal-delay, 0ms);
+  }
+
+  .reveal-gate .reveal:not(.is-visible) {
+    opacity: 0;
+    transform: var(--reveal-from);
+    will-change: opacity, transform;
+  }
 }
 
 /* Hero entrance: plays once on load, staggered through --hero-delay */
@@ -158,14 +166,16 @@
   }
 }
 
+/*
+ * Movement only, no fade: the first carousel screenshot is the largest above-the-fold image,
+ * and an element at opacity 0 does not count as painted for Largest Contentful Paint.
+ */
 @keyframes hero-slide-in {
   from {
-    opacity: 0;
-    transform: translate3d(48px, 0, 0) scale(0.97);
+    transform: translate3d(40px, 0, 0) scale(0.97);
   }
 
   to {
-    opacity: 1;
     transform: none;
   }
 }
@@ -176,8 +186,7 @@
 }
 
 .hero-slide-in {
-  opacity: 0;
-  animation: hero-slide-in 1s cubic-bezier(0.22, 1, 0.36, 1) 250ms forwards;
+  animation: hero-slide-in 1s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 /* Slow vertical float for the hero screenshot stack */
@@ -270,15 +279,8 @@
   transform: scaleX(0);
 }
 
-/* Motion is decoration: respect the user's OS setting */
+/* Motion is decoration: respect the user's OS setting (.reveal is only animated under no-preference) */
 @media (prefers-reduced-motion: reduce) {
-  .reveal,
-  .reveal[data-reveal] {
-    opacity: 1;
-    transform: none;
-    transition: none;
-  }
-
   .hero-rise,
   .hero-slide-in {
     opacity: 1;

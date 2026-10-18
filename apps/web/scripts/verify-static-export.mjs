@@ -31,6 +31,24 @@ function checkIcons(html, path) {
   for (const href of icons) assert.ok(href?.startsWith(`${basePath}/`) && existsSync(localTarget(href)), `missing icon: ${path} → ${href}`);
 }
 
+// Scroll-reveal blocks may start hidden only behind the JS gate (app/lib/reveal-gate.ts), so the
+// exported page stays readable when scripts are off, blocked or fail to hydrate.
+function checkRevealGate(html, path) {
+  const head = html.match(/<head\b[^>]*>([\s\S]*?)<\/head>/)?.[1] || '';
+  assert.ok(head.includes("classList.add('reveal-gate')"), `reveal gate script in head: ${path}`);
+  assert.ok(/class="reveal\b/.test(html), `page uses scroll reveal: ${path}`);
+  let gatedRules = 0;
+  for (const link of html.matchAll(/<link[^>]*rel="stylesheet"[^>]*>/g)) {
+    const css = readFileSync(localTarget(attribute(link[0], 'href') || ''), 'utf8');
+    for (const [, selector, body] of css.matchAll(/([^{}]+)\{([^{}]*)\}/g)) {
+      if (!/\.reveal(?![\w-])/.test(selector) || !/(?:^|;)\s*opacity:\s*0(?![.\d])/.test(body)) continue;
+      assert.ok(selector.includes('.reveal-gate'), `reveal hidden without the JS gate: ${selector.trim()}`);
+      gatedRules += 1;
+    }
+  }
+  assert.ok(gatedRules > 0, `gated reveal rule in exported CSS: ${path}`);
+}
+
 function checkPage(path, language, canonicalPath = path) {
   const html = readPage(path);
   assert.match(html, new RegExp(`<html[^>]*lang="${language === 'zh' ? 'zh-CN' : 'en'}"`), `HTML language: ${path}`);
@@ -66,7 +84,8 @@ function checkPage(path, language, canonicalPath = path) {
 
 for (const language of ['zh', 'en']) {
   const html = checkPage(language, language);
-  const main = html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/)?.[1] || '';
+  checkRevealGate(html, language);
+  const main =html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/)?.[1] || '';
   for (const category of ['general', 'privacy', 'ai', 'sync']) assert.ok(main.includes(`id="faq-${category}"`), `static FAQ category: ${language}/${category}`);
   assert.ok((main.match(/<details\b/g) || []).length >= 22, `all FAQ answers must exist without JavaScript: ${language}`);
   const firstQuestion = decode(main.match(/<summary\b[^>]*>([\s\S]*?)<\/summary>/)?.[1] || '');
@@ -131,4 +150,4 @@ assert.equal((sitemap.match(/<loc>/g) || []).length, canonicalPageCount);
 assert.equal((sitemap.match(/hreflang="x-default"/g) || []).length, canonicalPageCount, 'sitemap x-default alternates');
 assert.ok(!sitemap.includes('hamhome.app'));
 assert.ok(readFileSync(resolve(output, 'robots.txt'), 'utf8').includes(`Sitemap: ${origin}/sitemap.xml`));
-console.log(`Verified ${canonicalPageCount + 2} static pages and 404.html: languages, canonical/alternates incl. x-default, crawlable language links, OG (incl. image file and size), h1, FAQ order and completeness, JSON-LD (software + guide articles), privacy descriptions, icons, links/assets, sitemap and robots.`);
+console.log(`Verified ${canonicalPageCount + 2} static pages and 404.html: languages, canonical/alternates incl. x-default, crawlable language links, OG (incl. image file and size), h1, FAQ order and completeness, scroll-reveal JS gate, JSON-LD (software + guide articles), privacy descriptions, icons, links/assets, sitemap and robots.`);
