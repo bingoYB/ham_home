@@ -11,6 +11,8 @@ interface LandingActionButtonsProps {
   className?: string;
   downloadLabel?: string;
   githubLabel?: string;
+  /** Adds a soft pulsing halo to the primary download button (hero only) */
+  pulse?: boolean;
 }
 
 export function LandingActionButtons({
@@ -18,6 +20,7 @@ export function LandingActionButtons({
   className,
   downloadLabel,
   githubLabel = 'GitHub',
+  pulse = false,
 }: LandingActionButtonsProps) {
   return (
     <div className={cn('space-y-4', className)}>
@@ -25,7 +28,7 @@ export function LandingActionButtons({
         <Button
           asChild
           size="lg"
-          className="gap-2 bg-[#ff742f] text-white shadow-sm hover:bg-[#ff651f]"
+          className={cn('gap-2 bg-[#ff742f] text-white shadow-sm hover:bg-[#ff651f]', pulse && 'cta-pulse')}
         >
           <a
             href={GITHUB_RELEASE_URL}

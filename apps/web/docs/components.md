@@ -27,6 +27,9 @@ app/components/
 ├── ExtensionScreenshotFrame.tsx
 ├── extensionScreenshots.ts
 ├── showcaseFeatures.tsx
+├── motion/
+│   ├── Reveal.tsx
+│   └── ScrollProgress.tsx
 └── demos/
     ├── AIChatSearchDemo.tsx
     └── ...
@@ -114,7 +117,8 @@ app/components/
 - 唯一的 `h1` 由 Logo、品牌名 HamHome 和类别标签组成（如「HamHome — AI 书签管理与网页收藏插件」，与页面 title 的 AI 书签管理定位一致）；Logo 为装饰图（空 alt），类别前有仅供读屏的「—」分隔。
 - 最终口号「借助 AI，让收藏有序，让标签页井然。」与对应英文作为 `h1` 之后的大号段落，来自 `PRODUCT_COPY`；轮播交给 `HeroScreenshotCarousel`。
 - 截图路径由 `getExtensionScreenshotSrc()` 生成，自动带上 `NEXT_PUBLIC_BASE_PATH`。
-- 安装操作复用 `LandingActionButtons`；按钮下方展示三个真实商店链接及 AI/Embedding 配置、费用与数据传输条件。
+- 安装操作复用 `LandingActionButtons`（开启 `pulse`）；按钮下方展示三个真实商店链接及 AI/Embedding 配置、费用与数据传输条件。
+- 首屏入场动画：文案区按 `--hero-delay` 依次上浮，截图轮播从右侧滑入并缓慢浮动，背景有两团缓慢漂移的品牌色光晕；能力标签卡片悬停时轻微上抬。动画是纯 CSS，无 JS 时也能播放；`prefers-reduced-motion` 下全部关闭。
 
 ---
 
@@ -323,6 +327,91 @@ app/components/
 ### 行为说明
 
 - 复用 `LandingActionButtons`，保证 Hero 与底部 CTA 的下载行为一致。
+- 整个行动区随滚动渐入（`Reveal`）。
+
+---
+
+## LandingActionButtons
+
+「安装扩展」与「GitHub」两个主按钮，下方带浏览器商店链接。Hero 与底部 CTA 共用。
+
+### Props
+
+| name | type | required | default | description |
+|------|------|----------|---------|-------------|
+| isEn | boolean | 是 | - | 当前是否为英文模式 |
+| className | string | 否 | - | 外层容器样式 |
+| downloadLabel | string | 否 | 按语言的默认文案 | 主按钮文案 |
+| githubLabel | string | 否 | `GitHub` | GitHub 按钮文案 |
+| pulse | boolean | 否 | false | 给主按钮加柔和的脉冲光圈，只用于 Hero |
+
+### Usage
+
+```tsx
+<LandingActionButtons isEn={isEn} pulse downloadLabel="安装扩展" />
+```
+
+### 行为说明
+
+- 主按钮点击时调用 `openRecommendedDownload()` 打开推荐渠道的下载地址；`href` 仍保留指向 GitHub Release 的真实链接。
+- `pulse` 对应全局样式 `.cta-pulse`；`prefers-reduced-motion` 下不播放。
+
+---
+
+## Reveal
+
+滚动渐入容器：子内容进入视口时淡入并位移到位，只触发一次。落地页各区块的标题、卡片网格、FAQ 分组都用它包裹。
+
+### Props
+
+| name | type | required | default | description |
+|------|------|----------|---------|-------------|
+| as | ElementType | 否 | `div` | 渲染的元素，如 `h2`、`nav`、`section`、`aside` |
+| variant | `up` \| `scale` \| `left` \| `right` | 否 | `up` | 入场方向：上浮、缩放、左滑、右滑 |
+| delay | number | 否 | 0 | 延迟毫秒数，用于同一排卡片错落出现 |
+| className | string | 否 | - | 元素样式；需要悬停上抬的卡片请把 `lift-card` 放在内层元素上 |
+| ...rest | HTMLAttributes | 否 | - | 其余属性（如 `id`、`aria-label`）透传到元素 |
+
+### Usage
+
+```tsx
+<Reveal as="h2" className="text-3xl font-bold">标题</Reveal>
+
+{items.map((item, index) => (
+  <Reveal key={item.id} variant="scale" delay={(index % 4) * 80} className="h-full">
+    <article className="lift-card h-full">{item.title}</article>
+  </Reveal>
+))}
+```
+
+### 行为说明
+
+- 内容始终在静态 HTML 中，只切换 `opacity` / `transform`，不影响 SEO 与 `verify:export` 检查；`SiteDocument` 的 `<noscript>` 样式保证无 JS 时内容可见。
+- 通过 `useInView` 观察，阈值为 0（元素任意一部分进入视口即触发），避免超高区块在小屏上永远达不到触发比例。
+- 触发线比视口底部上移 8%，让元素略微进入后再播放。
+- `prefers-reduced-motion` 下直接显示，不做位移与过渡。
+- `lift-card` 与 `Reveal` 不要放在同一个元素上：两者都过渡 `transform`，后者会被覆盖。
+
+---
+
+## ScrollProgress
+
+固定在页面顶部的细进度条，随页面滚动从左向右填满，品牌橙到青色渐变。
+
+### Props
+
+无。
+
+### Usage
+
+```tsx
+<ScrollProgress />
+```
+
+### 行为说明
+
+- 通过 ref + `requestAnimationFrame` 直接写 `transform: scaleX()`，滚动时不触发 React 重渲染。
+- 装饰元素，`aria-hidden`，不拦截指针事件。
 
 ---
 

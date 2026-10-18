@@ -11,6 +11,7 @@ import {
   Upload,
 } from "lucide-react";
 import type { ReactNode } from "react";
+import { Reveal } from "./motion/Reveal";
 
 interface LandingOverviewProps {
   isEn: boolean;
@@ -68,7 +69,7 @@ export function LandingOverview({ isEn }: LandingOverviewProps) {
 
   return (
     <section className="mx-auto w-full px-4 pb-16 sm:px-6 lg:px-8 lg:pb-24 container">
-      <div className="max-w-3xl pb-8">
+      <Reveal className="max-w-3xl pb-8">
         <p className="text-sm font-bold text-[#0f766e] dark:text-[#5eead4]">{content.kicker}</p>
         <h2 className="mt-3 text-3xl font-black leading-tight tracking-tight text-foreground sm:text-4xl">
           {content.title}
@@ -76,17 +77,19 @@ export function LandingOverview({ isEn }: LandingOverviewProps) {
         <p className="mt-4 text-base leading-relaxed text-muted-foreground sm:text-lg">
           {content.desc}
         </p>
-      </div>
+      </Reveal>
 
       <div className="grid gap-4 border-y border-border/70 py-8 sm:grid-cols-2 lg:grid-cols-4">
-        {content.stats.map((item) => (
-          <article key={item.title} className="min-h-28 rounded-xl bg-background/45 p-4 shadow-sm">
-            <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-[#ff5b24]/10 text-[#d94a1a] dark:text-[#ff9b6f]">
-              {item.icon}
-            </div>
-            <h3 className="text-lg font-bold text-foreground">{item.title}</h3>
-            <p className="mt-2 text-sm text-muted-foreground">{item.desc}</p>
-          </article>
+        {content.stats.map((item, index) => (
+          <Reveal key={item.title} variant="scale" delay={(index % 4) * 80} className="h-full">
+            <article className="lift-card h-full min-h-28 rounded-xl bg-background/45 p-4 shadow-sm">
+              <div className="lift-icon mb-3 flex h-10 w-10 items-center justify-center rounded-lg bg-[#ff5b24]/10 text-[#d94a1a] dark:text-[#ff9b6f]">
+                {item.icon}
+              </div>
+              <h3 className="text-lg font-bold text-foreground">{item.title}</h3>
+              <p className="mt-2 text-sm text-muted-foreground">{item.desc}</p>
+            </article>
+          </Reveal>
         ))}
       </div>
     </section>
