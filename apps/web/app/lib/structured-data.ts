@@ -24,7 +24,7 @@ export function buildSoftwareApplicationJsonLd(language: SupportedLanguage): Jso
     url: siteUrl(localizedPath(language)),
     applicationCategory: 'BrowserApplication',
     operatingSystem: 'Chrome, Microsoft Edge, Firefox',
-    softwareHelp: siteUrl(localizedPath(language, 'guides/ai-collections')),
+    softwareHelp: siteUrl(localizedPath(language, 'guides/ai-bookmark-manager')),
     license: `${REPOSITORY_URL}/blob/main/LICENSE`,
     author: AUTHOR_NODE,
     // The extension is free; AI provider fees are separate and explained in the FAQ.

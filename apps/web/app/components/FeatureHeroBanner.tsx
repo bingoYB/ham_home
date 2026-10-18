@@ -1,26 +1,21 @@
 "use client";
 
 import Image from "next/image";
-import { Button } from "@hamhome/ui";
 import {
-  Bot,
-  Download,
-  Github,
-  Highlighter,
-  Layers3,
+  Brain,
+  FolderInput,
+  Search,
   ShieldCheck,
   Sparkles,
 } from "lucide-react";
 import { PRODUCT_COPY } from "@/app/lib/site";
-import { GITHUB_RELEASE_URL, openRecommendedDownload } from "@/app/lib/download";
+import { LandingActionButtons } from "./LandingActionButtons";
 import { HeroScreenshotCarousel } from "./HeroScreenshotCarousel";
 
 interface FeatureHeroBannerProps {
   isEn: boolean;
   isDark: boolean;
 }
-
-const GITHUB_REPO_URL = "https://github.com/bingoYB/ham_home";
 
 
 export function FeatureHeroBanner({ isEn, isDark }: FeatureHeroBannerProps) {
@@ -35,19 +30,19 @@ export function FeatureHeroBanner({ isEn, isDark }: FeatureHeroBannerProps) {
 
   const highlights = [
     {
-      label: isEn ? "Text and image clips" : "文字与图片剪藏",
-      icon: <Highlighter className="h-4 w-4" />,
+      label: isEn ? "AI categories, tags and summaries" : "AI 分类、标签与摘要",
+      icon: <Brain className="h-4 w-4" />,
     },
     {
-      label: isEn ? "Agent assistance" : "Agent 辅助管理与操作",
-      icon: <Bot className="h-4 w-4" />,
+      label: isEn ? "Import and analyze old bookmarks" : "导入旧书签，批量分析",
+      icon: <FolderInput className="h-4 w-4" />,
     },
     {
-      label: isEn ? "Workspaces and Tab Groups" : "工作空间与 Tab 分组",
-      icon: <Layers3 className="h-4 w-4" />,
+      label: isEn ? "Keyword and semantic search" : "关键词与语义搜索",
+      icon: <Search className="h-4 w-4" />,
     },
     {
-      label: isEn ? "Privacy boundaries" : "隐私边界可控",
+      label: isEn ? "Local storage, your AI provider" : "本地存储，自选 AI",
       icon: <ShieldCheck className="h-4 w-4" />,
     },
   ];
@@ -82,33 +77,10 @@ export function FeatureHeroBanner({ isEn, isDark }: FeatureHeroBannerProps) {
               {texts.desc}
             </p>
 
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              <Button asChild size="lg" className="gap-2 bg-[#ff7a32] text-white hover:bg-[#ff6b1c]">
-                <a
-                  href={GITHUB_RELEASE_URL}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={(event) => {
-                    event.preventDefault();
-                    openRecommendedDownload();
-                  }}
-                >
-                  <Download className="h-4 w-4" />
-                  {texts.downloadButton}
-                </a>
-              </Button>
-              <Button
-                asChild
-                size="lg"
-                variant="secondary"
-                className="gap-2 border border-border bg-secondary text-secondary-foreground hover:bg-secondary/80"
-              >
-                <a href={GITHUB_REPO_URL} target="_blank" rel="noopener noreferrer">
-                  <Github className="h-4 w-4" />
-                  {texts.githubButton}
-                </a>
-              </Button>
-            </div>
+            <LandingActionButtons isEn={isEn} className="mt-8" downloadLabel={texts.downloadButton} />
+            <p className="mt-4 text-sm leading-relaxed text-muted-foreground">
+              {PRODUCT_COPY[isEn ? "en" : "zh"].setupNote}
+            </p>
 
             <div className="mt-8 grid gap-3 sm:grid-cols-2">
               {highlights.map((item) => (

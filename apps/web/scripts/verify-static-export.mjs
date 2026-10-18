@@ -6,8 +6,8 @@ import { fileURLToPath } from 'node:url';
 const output = fileURLToPath(new URL('../out/', import.meta.url));
 const origin = (process.env.NEXT_PUBLIC_SITE_URL || 'https://bingoyb.github.io/ham_home').replace(/\/+$/, '');
 const basePath = new URL(origin).pathname.replace(/\/$/, '');
-const slugs = ['ai-collections', 'semantic-search', 'tab-workspaces', 'privacy-sync'];
-const categories = { zh: 'AI 网页收藏与标签页管理', en: 'AI Web Clipper & Tab Manager' };
+const slugs = ['ai-bookmark-manager', 'import-bookmarks', 'ai-provider-setup', 'ai-collections', 'semantic-search', 'tab-workspaces', 'privacy-sync'];
+const categories = { zh: 'AI 书签管理与网页收藏插件', en: 'AI Bookmark Manager' };
 const readPage = (path) => readFileSync(resolve(output, path, 'index.html'), 'utf8');
 const decode = (text) => text.replaceAll('&amp;', '&').replaceAll('&quot;', '"').replaceAll('&#x27;', "'").replaceAll('&lt;', '<').replaceAll('&gt;', '>');
 const attribute = (tag, key) => {
@@ -68,12 +68,25 @@ for (const language of ['zh', 'en']) {
   const html = checkPage(language, language);
   const main = html.match(/<main\b[^>]*>([\s\S]*?)<\/main>/)?.[1] || '';
   for (const category of ['general', 'privacy', 'ai', 'sync']) assert.ok(main.includes(`id="faq-${category}"`), `static FAQ category: ${language}/${category}`);
-  assert.ok((main.match(/<details\b/g) || []).length >= 19, `all FAQ answers must exist without JavaScript: ${language}`);
+  assert.ok((main.match(/<details\b/g) || []).length >= 22, `all FAQ answers must exist without JavaScript: ${language}`);
   const firstQuestion = decode(main.match(/<summary\b[^>]*>([\s\S]*?)<\/summary>/)?.[1] || '');
   assert.equal(firstQuestion, language === 'zh' ? '什么是 HamHome？' : 'What is HamHome?', `FAQ opens with the product definition: ${language}`);
   const h1 = decode(html.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/)?.[1].replace(/<[^>]+>/g, '') || '');
   assert.ok(h1.includes('HamHome') && h1.includes(categories[language]), `h1 names the brand and category: ${language}`);
   assert.ok(main.includes(language === 'zh' ? '让收藏有序，让标签页井然' : 'Keep your collections organized and your tabs tidy'));
+  // Inspect rendered content, not hydration data: answers and store destinations must survive without JS.
+  const visibleText = decode(main.replace(/<script\b[^>]*>[\s\S]*?<\/script>/g, '').replace(/<[^>]+>/g, ' '));
+  for (const phrase of language === 'zh'
+    ? ['导入', '批量分析', '写回浏览器', 'Embedding', '费用', '相关网页内容']
+    : ['Import', 'bulk analysis', 'back to the browser', 'embedding', 'charges', 'relevant page content']) {
+    assert.ok(visibleText.includes(phrase), `visible workflow/setup boundary ${phrase}: ${language}`);
+  }
+  const anchors = [...main.matchAll(/<a\b[^>]*>/g)].map((match) => attribute(match[0], 'href'));
+  for (const host of ['chromewebstore.google.com', 'microsoftedge.microsoft.com', 'addons.mozilla.org']) {
+    assert.ok(anchors.some((href) => href?.startsWith(`https://${host}/`)), `crawlable store ${host}: ${language}`);
+  }
+  for (const slug of slugs) assert.ok(anchors.includes(`${basePath}/${language}/guides/${slug}/`), `discoverable guide: ${language}/${slug}`);
+
 
   const data = jsonLd(html);
   assert.equal(data['@type'], 'SoftwareApplication');
@@ -86,6 +99,10 @@ for (const language of ['zh', 'en']) {
   for (const slug of slugs) {
     const guide = checkPage(`${language}/guides/${slug}`, language);
     assert.equal(metaContent(guide, 'property', 'og:type'), 'article', `guide OG type: ${language}/${slug}`);
+    const guideMain = guide.match(/<main\b[^>]*>([\s\S]*?)<\/main>/)?.[1] || '';
+    assert.ok((guideMain.match(/<li\b/g) || []).length >= 6, `static steps and limits: ${language}/${slug}`);
+    assert.ok(guideMain.includes('Embedding') || guideMain.includes('embedding') || !['ai-bookmark-manager', 'ai-provider-setup'].includes(slug), `separate embedding setup: ${language}/${slug}`);
+
     const graph = jsonLd(guide)['@graph'] || [];
     const article = graph.find((node) => node['@type'] === 'TechArticle');
     assert.equal(article?.url, `${origin}/${language}/guides/${slug}/`, `guide article: ${language}/${slug}`);
@@ -109,8 +126,9 @@ assert.equal((notFound.match(/<h1\b/g) || []).length, 1, '404 single h1');
 for (const language of ['zh', 'en']) assert.ok(notFound.includes(`href="${basePath}/${language}/"`), `404 links to the ${language} home`);
 checkIcons(notFound, '404.html');
 const sitemap = readFileSync(resolve(output, 'sitemap.xml'), 'utf8');
-assert.equal((sitemap.match(/<loc>/g) || []).length, 12);
-assert.equal((sitemap.match(/hreflang="x-default"/g) || []).length, 12, 'sitemap x-default alternates');
+const canonicalPageCount = 2 * (2 + slugs.length);
+assert.equal((sitemap.match(/<loc>/g) || []).length, canonicalPageCount);
+assert.equal((sitemap.match(/hreflang="x-default"/g) || []).length, canonicalPageCount, 'sitemap x-default alternates');
 assert.ok(!sitemap.includes('hamhome.app'));
 assert.ok(readFileSync(resolve(output, 'robots.txt'), 'utf8').includes(`Sitemap: ${origin}/sitemap.xml`));
-console.log('Verified 14 static pages and 404.html: languages, canonical/alternates incl. x-default, crawlable language links, OG (incl. image file and size), h1, FAQ order and completeness, JSON-LD (software + guide articles), privacy descriptions, icons, links/assets, sitemap and robots.');
+console.log(`Verified ${canonicalPageCount + 2} static pages and 404.html: languages, canonical/alternates incl. x-default, crawlable language links, OG (incl. image file and size), h1, FAQ order and completeness, JSON-LD (software + guide articles), privacy descriptions, icons, links/assets, sitemap and robots.`);
