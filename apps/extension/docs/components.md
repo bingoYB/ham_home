@@ -3172,3 +3172,131 @@ Vector size picker in the embedding settings card. It renders nothing when the s
 - 提供四种类型选项：所有（`"all"`，默认）、书签（`"bookmark"`）、图片（`"image"`）、文本（`"text"`）。
 - 每个选项配有对应图标，选中后直接在触发器中展示图标与文字。
 - 与 `useBookmarkSearch` 协同工作，选择后实时过滤书签列表并在下方显示活动筛选徽章。
+
+## StorageStatCard
+
+设置页「存储管理」数据概览中的单个统计卡片（书签与分类、工作空间、网页快照、页面截图、语义向量索引）。文案自动换行，清除按钮允许增高，长文案本地化后也不会溢出卡片。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| title | `string` | ✓ | - | 卡片标题 |
+| primary | `string` | ✓ | - | 主数据行，如「1345 个书签 / 61 个分类」 |
+| secondary | `string` | - | - | 次级说明行，如占用大小 |
+| footnote | `string` | - | - | 无清除操作时的底部提示 |
+| clearLabel | `string` | - | - | 清除按钮文案，不传则不渲染按钮 |
+| isClearing | `boolean` | - | `false` | 清除进行中（按钮显示加载图标） |
+| clearDisabled | `boolean` | - | `false` | 禁用清除按钮 |
+| onClear | `() => void` | - | - | 点击清除按钮 |
+
+**用法示例：**
+
+```tsx
+<StorageStatCard
+  title={t("settings:settings.storage.snapshotData.title")}
+  primary={t("settings:settings.storage.snapshotData.count", { count })}
+  secondary={t("settings:settings.storage.snapshotData.size", { size })}
+  clearLabel={t("settings:settings.storage.snapshotData.clear")}
+  isClearing={isClearingSnapshots}
+  clearDisabled={!count}
+  onClear={onClearSnapshotData}
+/>
+```
+
+**行为说明：**
+
+- 卡片网格使用 `repeat(auto-fill, minmax(10rem, 1fr))`，随容器宽度自动调整列数，不再固定 5 列。
+
+## AppSidebarFooter
+
+主应用侧边栏底部：存储用量与同步状态摘要，以及用户菜单。侧边栏收起为图标列时，摘要卡片变成「存储」「同步」两个带 Tooltip 的图标按钮，用户菜单只保留头像。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| bookmarkCount | `number` | ✓ | - | 书签数量，显示在用户菜单中 |
+| storageSize | `string` | ✓ | - | 已格式化的存储占用 |
+| sync | `SidebarSyncIndicator` | ✓ | - | 同步状态：`label`、`Icon`、`iconClassName` |
+| onNavigate | `(view: string) => void` | ✓ | - | 跳转到应用内视图（如 `"settings?tab=storage"`） |
+
+**用法示例：**
+
+```tsx
+<AppSidebar
+  collapsible="icon"
+  footer={
+    <AppSidebarFooter
+      bookmarkCount={bookmarks.length}
+      storageSize={storageInfo.storageSize}
+      sync={{ label: syncLabel, Icon: SyncIcon, iconClassName }}
+      onNavigate={handleViewChange}
+    />
+  }
+/>
+```
+
+**行为说明：**
+
+- 通过父级 `Sidebar` 的 `group-data-[collapsible=icon]` 状态切换展开 / 收起样式，组件自身不持有状态。
+- 主应用 `AppSidebar` 使用 `collapsible="icon"`：收起后保留图标列，导航项悬停显示 Tooltip，数量角标隐藏。
+
+## CategoryTreePanel
+
+收藏页（「我的收藏」）左侧的传统分类树。顶部固定「全部书签」和「未分类」两项，其下为可展开的嵌套分类，每个节点右侧显示书签数量（父分类的数量包含全部子分类）。组件只负责展示，选中与展开状态由父组件通过 `useCategoryNavigation` 管理。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| tree | `CategoryTreeNode[]` | ✓ | - | 由 `buildCategoryTree` 构建的分类树 |
+| counts | `CategoryBookmarkCounts` | ✓ | - | 全部 / 未分类 / 各分类（含子分类）的书签数量 |
+| selectedId | `string` | ✓ | - | 当前选中项：`"all"`、`"uncategorized"` 或分类 ID |
+| expandedIds | `ReadonlySet<string>` | ✓ | - | 已展开的分类 ID |
+| onSelect | `(id: string) => void` | ✓ | - | 点击节点选中 |
+| onToggleExpand | `(id: string) => void` | ✓ | - | 点击箭头展开 / 收起 |
+| onExpandAll | `() => void` | ✓ | - | 展开全部分类 |
+| onCollapseAll | `() => void` | ✓ | - | 收起全部分类 |
+| onClose | `() => void` | ✓ | - | 隐藏分类栏 |
+
+**用法示例：**
+
+```tsx
+const nav = useCategoryNavigation({ bookmarks, categories, selectedCategory });
+
+<CategoryTreePanel
+  tree={nav.tree}
+  counts={nav.counts}
+  selectedId={selectedCategory}
+  expandedIds={nav.expandedIds}
+  onSelect={setSelectedCategory}
+  onToggleExpand={nav.toggleExpanded}
+  onExpandAll={nav.expandAll}
+  onCollapseAll={nav.collapseAll}
+  onClose={() => setPanelOpen(false)}
+/>
+```
+
+**行为说明：**
+
+- 选中父分类时，右侧列表包含其全部子分类下的书签（`useBookmarkSearch` 的 `includeSubCategories`）。
+- 选中状态变化时（树、面包屑、子分类按钮均会触发），`useCategoryNavigation` 会自动展开其祖先节点。
+- 分类栏隐藏后，筛选栏会退回 `CategoryFilterDropdown`，并显示「显示分类栏」按钮。
+- 切换分类（以及搜索词、标签、时间等任何筛选条件变化）后列表滚回顶部（`useScrollToTopOnChange`），避免新列表较短时停在被夹紧的中下部。
+
+## CategoryStructureBar
+
+书签列表上方的分类结构条：当前分类的可点击面包屑，以及其直接子分类的跳转按钮（带书签数）。未选中具体分类（全部 / 未分类）时不渲染。放在滚动区之外，不影响瀑布流与虚拟列表的偏移计算。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| trail | `CategoryTrailItem[]` | ✓ | - | 从根到当前分类的路径；为空时不渲染 |
+| subCategories | `CategoryTreeNode[]` | ✓ | - | 当前分类的直接子分类 |
+| counts | `CategoryBookmarkCounts` | ✓ | - | 各分类书签数量 |
+| onSelect | `(id: string) => void` | ✓ | - | 点击面包屑或子分类时切换分类，`"all"` 表示回到全部书签 |
+
+**用法示例：**
+
+```tsx
+<CategoryStructureBar
+  trail={nav.trail}
+  subCategories={nav.subCategories}
+  counts={nav.counts}
+  onSelect={setSelectedCategory}
+/>
+```

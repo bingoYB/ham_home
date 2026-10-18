@@ -110,6 +110,17 @@
       "obsidianSyncFailed": "Failed to sync to Obsidian",
       "obsidianBatchResult": "Obsidian sync completed: {{success}} succeeded, {{failed}} failed, {{skipped}} skipped",
       "noSnapshot": "No snapshot available"
+    },
+    "categoryTree": {
+      "title": "Categories",
+      "allBookmarks": "All Bookmarks",
+      "expandAll": "Expand all",
+      "collapseAll": "Collapse all",
+      "hide": "Hide category panel",
+      "show": "Show category panel",
+      "empty": "No categories yet",
+      "breadcrumb": "Category path",
+      "subCategories": "Sub-categories"
     }
   },
   "screenshotPreview": {

@@ -2,6 +2,7 @@
 
 import { PanelLeftOpen } from "lucide-react";
 import { FeatureSection } from "./FeatureSection";
+import { Reveal } from "./motion/Reveal";
 import { ExtensionScreenshotFrame } from "./ExtensionScreenshotFrame";
 import {
   EXTENSION_SCREENSHOTS,
@@ -42,18 +43,19 @@ export function FeatureShowcase({ isEn, isDark }: FeatureShowcaseProps) {
           <div className="grid gap-6 lg:grid-cols-[1fr_340px] lg:items-start">
             <div className={getScreenshotGridClass(feature.screenshotIds)}>
               {feature.screenshotIds.map((id, screenshotIndex) => (
-                <ExtensionScreenshotFrame
-                  key={id}
-                  id={id}
-                  isEn={isEn}
-                  isDark={isDark}
-                  priority={index === 0 && screenshotIndex === 0}
-                  className={feature.screenshotIds.length === 1 ? "w-full" : undefined}
-                />
+                <Reveal key={id} variant="scale" delay={screenshotIndex * 120} className="min-w-0">
+                  <ExtensionScreenshotFrame
+                    id={id}
+                    isEn={isEn}
+                    isDark={isDark}
+                    priority={index === 0 && screenshotIndex === 0}
+                    className={feature.screenshotIds.length === 1 ? "w-full" : undefined}
+                  />
+                </Reveal>
               ))}
             </div>
 
-            <aside className="rounded-2xl border border-border/70 bg-background/65 p-5 shadow-sm backdrop-blur">
+            <Reveal as="aside" variant="right" delay={200} className="rounded-2xl border border-border/70 bg-background/65 p-5 shadow-sm backdrop-blur">
               <div className="mb-4 flex items-center gap-2 text-sm font-bold text-[#0f766e] dark:text-[#5eead4]">
                 <PanelLeftOpen className="h-4 w-4" />
                 {isEn ? "What this reflects in the extension" : "对应插件真实能力"}
@@ -66,7 +68,7 @@ export function FeatureShowcase({ isEn, isDark }: FeatureShowcaseProps) {
                   </li>
                 ))}
               </ul>
-            </aside>
+            </Reveal>
           </div>
         </FeatureSection>
       ))}

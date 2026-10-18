@@ -83,4 +83,50 @@ test.describe("APP 核心壳层与导航", () => {
     );
     await attachStepScreenshot(page, testInfo, "APP-003-直接路由存储Tab");
   });
+
+  test("APP-004 侧边栏收起为图标列并可展开", async ({
+    context,
+    extensionId,
+    extensionWorker,
+    e2eVariant,
+  }, testInfo) => {
+    const t = e2eVariant.text;
+    const { bookmarks, categories } = createLibraryFixtures();
+    await seedCategories(extensionWorker, categories);
+    await seedBookmarks(extensionWorker, bookmarks.slice(0, 2));
+
+    const page = await openAppPage(context, extensionId, "all");
+    const sidebar = page.locator('[data-slot="sidebar"]');
+    const container = page.locator('[data-slot="sidebar-container"]');
+    const trigger = page.locator('[data-slot="sidebar-trigger"]');
+    const width = async () => (await container.boundingBox())!.width;
+
+    await expect(sidebar).toHaveAttribute("data-state", "expanded");
+    expect(await width()).toBeGreaterThan(200);
+
+    // 收起后只留图标列，而不是整个侧边栏消失
+    await trigger.click();
+    await expect(sidebar).toHaveAttribute("data-state", "collapsed");
+    await expect(sidebar).toHaveAttribute("data-collapsible", "icon");
+    await expect.poll(width).toBeLessThan(100);
+
+    // 导航仍在图标列里，悬停给出名称提示，点击可切换页面
+    const workspacesIcon = container.locator('a[href="#workspaces"]');
+    await expect(workspacesIcon).toBeVisible();
+    await workspacesIcon.hover();
+    await expect(page.getByRole("tooltip")).toContainText(t("工作空间", "Workspaces"));
+    await workspacesIcon.click();
+    await expectHash(page, "workspaces");
+
+    // 底部摘要卡片变成图标按钮，文字说明不再占位
+    await expect(
+      container.getByRole("button", { name: t("存储", "Storage") }),
+    ).toBeVisible();
+    await expect(container.getByText(t("存储", "Storage"), { exact: true })).toBeHidden();
+    await attachStepScreenshot(page, testInfo, "APP-004-侧边栏图标列");
+
+    await trigger.click();
+    await expect(sidebar).toHaveAttribute("data-state", "expanded");
+    await expect.poll(width).toBeGreaterThan(200);
+  });
 });

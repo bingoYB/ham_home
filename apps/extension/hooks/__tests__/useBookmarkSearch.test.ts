@@ -168,6 +168,53 @@ describe("mergeBookmarkSearchResults", () => {
   });
 });
 
+describe("includeSubCategories", () => {
+  const categories = [
+    { id: "design", name: "design", parentId: null, order: 0, createdAt: 0 },
+    { id: "inspiration", name: "inspiration", parentId: "design", order: 0, createdAt: 0 },
+    { id: "dev", name: "dev", parentId: null, order: 1, createdAt: 0 },
+  ];
+  const bookmarks = [
+    bookmark("in-design", { categoryId: "design" }),
+    bookmark("in-child", { categoryId: "inspiration" }),
+    bookmark("in-dev", { categoryId: "dev" }),
+    bookmark("loose", { categoryId: null }),
+  ];
+
+  function run(selectedCategory: string, includeSubCategories: boolean): string[] {
+    return mergeBookmarkSearchResults({
+      bookmarks,
+      searchQuery: "",
+      semanticBookmarkIds: [],
+      selectedTags: [],
+      selectedCategory,
+      timeRange: { type: "all" },
+      customFilter: null,
+      categories,
+      includeSubCategories,
+    })
+      .map((item) => item.id)
+      .sort();
+  }
+
+  it("keeps matching only the exact category by default", () => {
+    expect(run("design", false)).toEqual(["in-design"]);
+  });
+
+  it("also matches bookmarks in sub-categories when enabled", () => {
+    expect(run("design", true)).toEqual(["in-child", "in-design"]);
+  });
+
+  it("does not widen a leaf category", () => {
+    expect(run("inspiration", true)).toEqual(["in-child"]);
+  });
+
+  it("leaves the all and uncategorized selections untouched", () => {
+    expect(run("all", true)).toEqual(["in-child", "in-design", "in-dev", "loose"]);
+    expect(run("uncategorized", true)).toEqual(["loose"]);
+  });
+});
+
 describe("自定义筛选器的 createdAt 条件", () => {
   // 不带时区后缀的日期时间串按本地时间解析，和筛选里的整天换算保持一致
   const at = (local: string) => new Date(local).getTime();

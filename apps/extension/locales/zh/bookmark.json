@@ -111,6 +111,17 @@
       "obsidianBatchResult": "Obsidian 同步完成：成功 {{success}}，失败 {{failed}}，跳过 {{skipped}}",
       "noSnapshot": "暂无快照",
       "noSnapshotToSync": "选中的书签均无快照，无法同步到 Obsidian"
+    },
+    "categoryTree": {
+      "title": "分类",
+      "allBookmarks": "全部书签",
+      "expandAll": "展开全部",
+      "collapseAll": "收起全部",
+      "hide": "隐藏分类栏",
+      "show": "显示分类栏",
+      "empty": "还没有分类",
+      "breadcrumb": "分类路径",
+      "subCategories": "子分类"
     }
   },
   "screenshotPreview": {

@@ -23,6 +23,7 @@ import {
   Bookmark as BookmarkIcon,
   Highlighter,
   Image as ImageIcon,
+  PanelLeftOpen,
 } from "lucide-react";
 import {
   Button,
@@ -49,6 +50,8 @@ import {
   VisualBookmarkGallery,
   BookmarkSubjectDialog,
   BookmarkScreenshotViewer,
+  CategoryTreePanel,
+  CategoryStructureBar,
 } from "@/components/bookmarkListMng";
 import type { BookmarkSubjectContent } from "@hamhome/ui-business/bookmark";
 import { SearchInputArea } from "@/components/aiSearch";
@@ -58,6 +61,8 @@ import { FilterDropdownMenu } from "@/components/bookmarkPanel/FilterPopover";
 import { CustomFilterDialog } from "@/components/bookmarkPanel/CustomFilterDialog";
 import { CustomDateRangeDialog } from "@/components/bookmarkPanel/CustomDateRangeDialog";
 import { useBookmarkSearch } from "@/hooks/useBookmarkSearch";
+import { useCategoryNavigation } from "@/hooks/useCategoryNavigation";
+import { useScrollToTopOnChange } from "@/hooks/useScrollToTopOnChange";
 import { useBookmarkSelection } from "@/hooks/useBookmarkSelection";
 import { useMasonryLayout } from "@/hooks/useMasonryLayout";
 import { useVirtualBookmarkList } from "@/hooks/useVirtualBookmarkList";
@@ -198,9 +203,19 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
   } = useBookmarkSearch({
     bookmarks,
     categories,
+    // 侧边分类树选中父分类时，列表包含其全部子分类下的书签
+    includeSubCategories: true,
     customFilter: selectedCustomFilter,
     subjectIndex: clipSubjectIndex,
   });
+
+  // 分类树导航：树结构、各分类书签数、展开状态与面包屑
+  const categoryNav = useCategoryNavigation({
+    bookmarks,
+    categories,
+    selectedCategory,
+  });
+  const [isCategoryPanelOpen, setIsCategoryPanelOpen] = useState(true);
 
   // 视图模式
   const [viewMode, setViewMode] = useState<ViewMode>("grid");
@@ -288,6 +303,29 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
     [virtualListParentRef],
   );
   const getListViewport = useCallback(() => listViewportRef.current, []);
+
+  // 分类或筛选条件变化意味着列表整体换了一批内容：滚动位置回到顶部，
+  // 否则新列表较短时会停在被夹紧的中下部，看不到最前面的书签
+  const listScopeKey = useMemo(
+    () =>
+      JSON.stringify([
+        selectedCategory,
+        selectedTags,
+        searchQuery,
+        timeRange,
+        contentType,
+        selectedCustomFilterId ?? null,
+      ]),
+    [
+      selectedCategory,
+      selectedTags,
+      searchQuery,
+      timeRange,
+      contentType,
+      selectedCustomFilterId,
+    ],
+  );
+  useScrollToTopOnChange(getListViewport, listScopeKey);
 
   // 批量打标签弹窗状态
   const [showBatchTagDialog, setShowBatchTagDialog] = useState(false);
@@ -569,7 +607,22 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
   };
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col bg-background">
+    <div className="flex min-h-0 flex-1 bg-background">
+      {/* 左侧分类树 */}
+      {isCategoryPanelOpen && (
+        <CategoryTreePanel
+          tree={categoryNav.tree}
+          counts={categoryNav.counts}
+          selectedId={selectedCategory}
+          expandedIds={categoryNav.expandedIds}
+          onSelect={setSelectedCategory}
+          onToggleExpand={categoryNav.toggleExpanded}
+          onExpandAll={categoryNav.expandAll}
+          onCollapseAll={categoryNav.collapseAll}
+          onClose={() => setIsCategoryPanelOpen(false)}
+        />
+      )}
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
       {/* 筛选栏 */}
       <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b border-border px-6 py-4 pt-6">
         <div className="flex items-start justify-between gap-4">
@@ -613,12 +666,26 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
               </Button>
             </TagFilterDropdown>
 
-            {/* 分类筛选 */}
-            <CategoryFilterDropdown
-              categories={categories}
-              value={selectedCategory}
-              onChange={setSelectedCategory}
-            />
+            {/* 分类筛选：分类树隐藏时退回下拉，并提供展开入口 */}
+            {!isCategoryPanelOpen && (
+              <>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="h-9 w-9"
+                  onClick={() => setIsCategoryPanelOpen(true)}
+                  title={t("bookmark:bookmark.categoryTree.show")}
+                  aria-label={t("bookmark:bookmark.categoryTree.show")}
+                >
+                  <PanelLeftOpen className="h-4 w-4" />
+                </Button>
+                <CategoryFilterDropdown
+                  categories={categories}
+                  value={selectedCategory}
+                  onChange={setSelectedCategory}
+                />
+              </>
+            )}
 
             {/* 筛选器下拉菜单（时间范围和自定义筛选器） */}
             <FilterDropdownMenu
@@ -883,6 +950,14 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
           </div>
         )}
       </div>
+
+      {/* 分类结构：面包屑与子分类跳转（放在滚动区外，不影响瀑布流/虚拟列表的偏移计算） */}
+      <CategoryStructureBar
+        trail={categoryNav.trail}
+        subCategories={categoryNav.subCategories}
+        counts={categoryNav.counts}
+        onSelect={setSelectedCategory}
+      />
 
       {/* 书签列表：滚动条统一用组件库的 ScrollArea，不再暴露系统原生滚动条 */}
       <ScrollArea
@@ -1158,6 +1233,7 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
         categories={categories}
         onConfirm={handleBatchMoveCategory}
       />
+    </div>
     </div>
   );
 }

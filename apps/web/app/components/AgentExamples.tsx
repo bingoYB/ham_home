@@ -1,3 +1,5 @@
+import { Reveal } from './motion/Reveal';
+
 interface AgentExamplesProps { isEn: boolean; }
 
 export function AgentExamples({ isEn }: AgentExamplesProps) {
@@ -12,14 +14,18 @@ export function AgentExamples({ isEn }: AgentExamplesProps) {
   ];
   return (
     <section className="container mx-auto px-4 py-12 sm:px-6 lg:px-8">
-      <h2 className="text-3xl font-bold">{isEn ? 'Ask for help with a specific task' : '用一句话，让 Agent 帮你完成具体任务'}</h2>
-      <p className="mt-3 text-muted-foreground">{isEn ? 'The optional Agent searches, summarizes and runs supported tools, showing its execution steps.' : '按需启用 Agent，用自然语言查找、总结和执行支持的操作，执行过程可见。'}</p>
+      <Reveal>
+        <h2 className="text-3xl font-bold">{isEn ? 'Ask for help with a specific task' : '用一句话，让 Agent 帮你完成具体任务'}</h2>
+        <p className="mt-3 text-muted-foreground">{isEn ? 'The optional Agent searches, summarizes and runs supported tools, showing its execution steps.' : '按需启用 Agent，用自然语言查找、总结和执行支持的操作，执行过程可见。'}</p>
+      </Reveal>
       <div className="mt-6 grid gap-4 md:grid-cols-3">
-        {examples.map((example) => (
-          <article key={example.request} className="rounded-xl border border-border/70 p-5">
-            <h3 className="font-semibold">“{example.request}”</h3>
-            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{example.result}</p>
-          </article>
+        {examples.map((example, index) => (
+          <Reveal key={example.request} variant="scale" delay={index * 90} className="h-full">
+            <article className="lift-card h-full rounded-xl border border-border/70 p-5">
+              <h3 className="font-semibold">“{example.request}”</h3>
+              <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{example.result}</p>
+            </article>
+          </Reveal>
         ))}
       </div>
     </section>

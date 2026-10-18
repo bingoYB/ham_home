@@ -112,3 +112,193 @@
     animation-duration: 0.01ms !important;
   }
 }
+
+/* ========================================
+   Landing Page Motion
+   ======================================== */
+
+/* Scroll reveal: toggled by <Reveal> through the .is-visible class */
+.reveal {
+  opacity: 0;
+  transform: translate3d(0, 28px, 0);
+  transition:
+    opacity 0.7s cubic-bezier(0.22, 1, 0.36, 1) var(--reveal-delay, 0ms),
+    transform 0.7s cubic-bezier(0.22, 1, 0.36, 1) var(--reveal-delay, 0ms);
+  will-change: opacity, transform;
+}
+
+.reveal[data-reveal='scale'] {
+  transform: translate3d(0, 20px, 0) scale(0.96);
+}
+
+.reveal[data-reveal='left'] {
+  transform: translate3d(-32px, 0, 0);
+}
+
+.reveal[data-reveal='right'] {
+  transform: translate3d(32px, 0, 0);
+}
+
+.reveal.is-visible {
+  opacity: 1;
+  transform: none;
+  will-change: auto;
+}
+
+/* Hero entrance: plays once on load, staggered through --hero-delay */
+@keyframes hero-rise {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 24px, 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes hero-slide-in {
+  from {
+    opacity: 0;
+    transform: translate3d(48px, 0, 0) scale(0.97);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.hero-rise {
+  opacity: 0;
+  animation: hero-rise 0.8s cubic-bezier(0.22, 1, 0.36, 1) var(--hero-delay, 0ms) forwards;
+}
+
+.hero-slide-in {
+  opacity: 0;
+  animation: hero-slide-in 1s cubic-bezier(0.22, 1, 0.36, 1) 250ms forwards;
+}
+
+/* Slow vertical float for the hero screenshot stack */
+@keyframes hero-float {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+
+  50% {
+    transform: translate3d(0, -8px, 0);
+  }
+}
+
+.hero-float {
+  animation: hero-float 7s ease-in-out 1.2s infinite;
+}
+
+/* Drifting brand-colored glows behind the hero */
+@keyframes glow-drift-a {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  50% {
+    transform: translate3d(40px, 30px, 0) scale(1.12);
+  }
+}
+
+@keyframes glow-drift-b {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  50% {
+    transform: translate3d(-36px, -24px, 0) scale(1.1);
+  }
+}
+
+.hero-glow-a {
+  animation: glow-drift-a 14s ease-in-out infinite;
+}
+
+.hero-glow-b {
+  animation: glow-drift-b 17s ease-in-out infinite;
+}
+
+/* Soft pulsing halo on the primary call to action */
+@keyframes cta-pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 rgba(255, 91, 36, 0.35);
+  }
+
+  60% {
+    box-shadow: 0 0 0 12px rgba(255, 91, 36, 0);
+  }
+}
+
+.cta-pulse {
+  animation: cta-pulse 2.6s ease-out 1.6s infinite;
+}
+
+/* Cards that lift on hover; the icon tile tilts a little */
+.lift-card {
+  transition:
+    transform 0.3s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.3s ease,
+    border-color 0.3s ease;
+}
+
+.lift-card:hover {
+  transform: translate3d(0, -4px, 0);
+  box-shadow: 0 16px 32px -16px rgba(28, 25, 23, 0.25);
+}
+
+.lift-card .lift-icon {
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.lift-card:hover .lift-icon {
+  transform: scale(1.1) rotate(-6deg);
+}
+
+/* Top-of-page scroll progress bar (scaleX is set from JS) */
+.scroll-progress-bar {
+  background: linear-gradient(90deg, #ff5b24, #ff8c5a 55%, #2dd4bf);
+  transform: scaleX(0);
+}
+
+/* Motion is decoration: respect the user's OS setting */
+@media (prefers-reduced-motion: reduce) {
+  .reveal,
+  .reveal[data-reveal] {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+
+  .hero-rise,
+  .hero-slide-in {
+    opacity: 1;
+    animation: none;
+  }
+
+  .hero-float,
+  .hero-glow-a,
+  .hero-glow-b,
+  .cta-pulse {
+    animation: none;
+  }
+
+  .lift-card,
+  .lift-card .lift-icon {
+    transition: none;
+  }
+
+  .lift-card:hover,
+  .lift-card:hover .lift-icon {
+    transform: none;
+  }
+}
