@@ -95,7 +95,7 @@ export function BookmarkHealthPage() {
   // 重复项实时计算，不依赖体检结果，未体检也能直接清理
   const { roles: duplicateRoles, redundantIds } =
     useDuplicateBookmarks(healthBookmarks);
-  const { selectedIds, toggleSelect, deselectAll, toggleSelectAll } =
+  const { selectedIds, toggleSelect, deselectAll, toggleSelectAll, retainOnly } =
     useBookmarkSelection();
 
   const recordMap = useMemo(
@@ -154,10 +154,10 @@ export function BookmarkHealthPage() {
     });
   }, [duplicateRoles, filter, getCurrentRecord, healthBookmarks, query]);
 
-  // 勾选只对当前可见列表有意义，换筛选条件后重新开始
+  // 勾选只对当前可见列表有意义：换筛选条件或搜索词后，被隐藏的书签退出选中集合
   useEffect(() => {
-    deselectAll();
-  }, [deselectAll, filter]);
+    retainOnly(filteredBookmarks.map((bookmark) => bookmark.id));
+  }, [filteredBookmarks, retainOnly]);
 
   // 上千条书签全量渲染会把页面切换卡住（每行都有 Checkbox、徽章和按钮），
   // 这里只渲染视口内的行；整页共用一个滚动容器，所以要带 scrollMargin

@@ -72,7 +72,8 @@ async function getSafeSettingsSnapshot() {
     },
     webdavConfig: {
       enabled: webdavConfig.enabled,
-      url: webdavConfig.url,
+      // The URL may embed credentials and tells where bookmarks are uploaded; summarize only.
+      hasUrl: !!webdavConfig.url?.trim(),
       hasUsername: !!webdavConfig.username?.trim(),
       hasPassword: !!webdavConfig.password?.trim(),
       hasE2EPassword: !!webdavConfig.e2ePassword?.trim(),
@@ -135,7 +136,7 @@ export async function createGlobalAgentTools(
     {
       name: "update_safe_plugin_settings",
       description:
-        "Update safe HamHome settings by allowlist. Never accepts apiKey, baseUrl, privacyDomains, sync credentials, or browser shortcuts.",
+        "Update safe HamHome settings by allowlist. Never accepts apiKey, baseUrl, privacyDomains, sync (WebDAV) settings or credentials, or browser shortcuts.",
       parameters: {
         type: "object",
         properties: {
@@ -190,14 +191,6 @@ export async function createGlobalAgentTools(
             },
             additionalProperties: false,
           },
-          webdavConfig: {
-            type: "object",
-            properties: {
-              enabled: { type: "boolean" },
-              url: { type: "string" },
-            },
-            additionalProperties: false,
-          },
         },
         additionalProperties: false,
       },
@@ -208,7 +201,7 @@ export async function createGlobalAgentTools(
           await configStorage.getEmbeddingConfig(),
         );
 
-        const [settings, aiConfig, embeddingConfig, webdavConfig] = await Promise.all([
+        const [settings, aiConfig, embeddingConfig] = await Promise.all([
           hasPatch(sanitized.settings as Record<string, unknown>)
             ? configStorage.setSettings(sanitized.settings)
             : configStorage.getSettings(),
@@ -218,9 +211,6 @@ export async function createGlobalAgentTools(
           hasPatch(sanitized.embeddingConfig as Record<string, unknown>)
             ? configStorage.setEmbeddingConfig(sanitized.embeddingConfig)
             : configStorage.getEmbeddingConfig(),
-          hasPatch(sanitized.webdavConfig as Record<string, unknown>)
-            ? syncConfigStorage.setConfig(sanitized.webdavConfig)
-            : syncConfigStorage.getConfig(),
         ]);
 
         return {
@@ -228,7 +218,6 @@ export async function createGlobalAgentTools(
             settings: sanitized.settings,
             aiConfig: sanitized.aiConfig,
             embeddingConfig: sanitized.embeddingConfig,
-            webdavConfig: sanitized.webdavConfig,
           },
           rejected: sanitized.rejected,
           nextStep:
@@ -255,10 +244,6 @@ export async function createGlobalAgentTools(
               model: embeddingConfig.model,
               dimensions: embeddingConfig.dimensions,
               batchSize: embeddingConfig.batchSize,
-            },
-            webdavConfig: {
-              enabled: webdavConfig.enabled,
-              url: webdavConfig.url,
             },
           },
         };

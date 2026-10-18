@@ -6,6 +6,7 @@ import type {
   BookmarkHealthRecord,
   BookmarkHealthStatus,
   LocalBookmark,
+  LocalSettings,
 } from "@/types";
 
 const TRACKING_PARAMS = new Set([
@@ -99,4 +100,39 @@ export function appendLocalIssueCodes(
   if (!bookmark.description.trim()) issues.add("missing_description");
   for (const issue of duplicateIssues.get(bookmark.id) ?? []) issues.add(issue);
   return { ...record, issueCodes: Array.from(issues) };
+}
+
+const DAY_MINUTES = 24 * 60;
+
+/** Scan period of each schedule; "off" has none. */
+export const BOOKMARK_HEALTH_PERIOD_MINUTES: Record<
+  Exclude<LocalSettings["bookmarkHealthSchedule"], "off">,
+  number
+> = {
+  weekly: 7 * DAY_MINUTES,
+  monthly: 30 * DAY_MINUTES,
+};
+
+export type BookmarkHealthAlarmPlan =
+  | { action: "clear" }
+  | { action: "keep" }
+  | { action: "create"; periodInMinutes: number };
+
+/**
+ * Decides what to do with the periodic scan alarm.
+ *
+ * `alarms.create` replaces an alarm of the same name and restarts its countdown. The alarm
+ * is configured on every service worker start and every settings change, and an MV3 worker
+ * restarts far more often than a week, so recreating it unconditionally pushed the first
+ * fire out again each time and the scheduled scan never ran. The alarm is therefore only
+ * (re)created when it is missing or its period changed.
+ */
+export function planBookmarkHealthAlarm(
+  schedule: LocalSettings["bookmarkHealthSchedule"],
+  existing: { periodInMinutes?: number } | undefined,
+): BookmarkHealthAlarmPlan {
+  if (schedule === "off") return { action: "clear" };
+  const periodInMinutes = BOOKMARK_HEALTH_PERIOD_MINUTES[schedule];
+  if (existing?.periodInMinutes === periodInMinutes) return { action: "keep" };
+  return { action: "create", periodInMinutes };
 }

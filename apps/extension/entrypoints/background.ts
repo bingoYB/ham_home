@@ -27,6 +27,7 @@ import type {
   TabGroupPageMetadata,
 } from "@/types";
 import { applyDevConfigPreset } from "@/lib/dev/dev-config-preset";
+import { planBookmarkHealthAlarm } from "@/lib/health/bookmark-health-utils";
 
 // 右键菜单 ID
 const PAGE_CONTEXT_MENU_ID = "save-page-to-hamhome";
@@ -262,14 +263,16 @@ async function runBookmarkRetentionSweep(): Promise<void> {
 
 async function configureBookmarkHealthAlarm(): Promise<void> {
   const settings = await configStorage.getSettings();
-  await browser.alarms.clear(BOOKMARK_HEALTH_ALARM_ID);
-  if (settings.bookmarkHealthSchedule === "off") return;
-  browser.alarms.create(BOOKMARK_HEALTH_ALARM_ID, {
-    periodInMinutes:
-      settings.bookmarkHealthSchedule === "weekly"
-        ? 7 * 24 * 60
-        : 30 * 24 * 60,
-  });
+  const existing = await browser.alarms.get(BOOKMARK_HEALTH_ALARM_ID);
+  // 不能每次都重建：create 会重置倒计时，而这里每次 Service Worker 启动、每次设置变更都会调用
+  const plan = planBookmarkHealthAlarm(settings.bookmarkHealthSchedule, existing);
+  if (plan.action === "clear") {
+    await browser.alarms.clear(BOOKMARK_HEALTH_ALARM_ID);
+  } else if (plan.action === "create") {
+    browser.alarms.create(BOOKMARK_HEALTH_ALARM_ID, {
+      periodInMinutes: plan.periodInMinutes,
+    });
+  }
 }
 
 async function autoGroupTabFromRules(

@@ -32,7 +32,7 @@ export function TrashPage() {
   const { bookmarks, refreshBookmarks } = useBookmarks();
   const [trashed, setTrashed] = useState<LocalBookmark[]>([]);
   const [query, setQuery] = useState("");
-  const { selectedIds, toggleSelect, deselectAll, toggleSelectAll } =
+  const { selectedIds, toggleSelect, deselectAll, toggleSelectAll, retainOnly } =
     useBookmarkSelection();
 
   const loadTrash = useCallback(async () => {
@@ -54,6 +54,11 @@ export function TrashPage() {
       `${bookmark.title} ${bookmark.url}`.toLowerCase().includes(keyword),
     );
   }, [query, trashed]);
+
+  // 搜索过滤后被隐藏的条目不能留在选中集合里，「彻底删除所选」不可撤销
+  useEffect(() => {
+    retainOnly(filtered.map((bookmark) => bookmark.id));
+  }, [filtered, retainOnly]);
 
   const refresh = useCallback(async () => {
     deselectAll();
