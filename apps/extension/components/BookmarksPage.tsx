@@ -225,9 +225,16 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
     selectedIds,
     toggleSelect,
     toggleSelectAll,
+    retainOnly,
     removeFromSelection,
     deselectAll,
   } = useBookmarkSelection();
+
+  // 勾选只对当前可见列表有意义：切换分类 / 搜索 / 标签 / 时间筛选后，
+  // 被隐藏的书签要退出选中集合，否则批量删除、移动、打标签会作用到看不见的书签
+  useEffect(() => {
+    retainOnly(filteredBookmarks.map((bookmark) => bookmark.id));
+  }, [filteredBookmarks, retainOnly]);
 
   // 批量 AI 任务
   const {
