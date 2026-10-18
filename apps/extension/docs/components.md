@@ -3201,3 +3201,35 @@ Vector size picker in the embedding settings card. It renders nothing when the s
 **行为说明：**
 
 - 卡片网格使用 `repeat(auto-fill, minmax(10rem, 1fr))`，随容器宽度自动调整列数，不再固定 5 列。
+
+## AppSidebarFooter
+
+主应用侧边栏底部：存储用量与同步状态摘要，以及用户菜单。侧边栏收起为图标列时，摘要卡片变成「存储」「同步」两个带 Tooltip 的图标按钮，用户菜单只保留头像。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| bookmarkCount | `number` | ✓ | - | 书签数量，显示在用户菜单中 |
+| storageSize | `string` | ✓ | - | 已格式化的存储占用 |
+| sync | `SidebarSyncIndicator` | ✓ | - | 同步状态：`label`、`Icon`、`iconClassName` |
+| onNavigate | `(view: string) => void` | ✓ | - | 跳转到应用内视图（如 `"settings?tab=storage"`） |
+
+**用法示例：**
+
+```tsx
+<AppSidebar
+  collapsible="icon"
+  footer={
+    <AppSidebarFooter
+      bookmarkCount={bookmarks.length}
+      storageSize={storageInfo.storageSize}
+      sync={{ label: syncLabel, Icon: SyncIcon, iconClassName }}
+      onNavigate={handleViewChange}
+    />
+  }
+/>
+```
+
+**行为说明：**
+
+- 通过父级 `Sidebar` 的 `group-data-[collapsible=icon]` 状态切换展开 / 收起样式，组件自身不持有状态。
+- 主应用 `AppSidebar` 使用 `collapsible="icon"`：收起后保留图标列，导航项悬停显示 Tooltip，数量角标隐藏。
