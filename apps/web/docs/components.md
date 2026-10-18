@@ -119,6 +119,7 @@ app/components/
 - 截图路径由 `getExtensionScreenshotSrc()` 生成，自动带上 `NEXT_PUBLIC_BASE_PATH`。
 - 安装操作复用 `LandingActionButtons`（开启 `pulse`）；按钮下方展示三个真实商店链接及 AI/Embedding 配置、费用与数据传输条件。
 - 首屏入场动画：文案区按 `--hero-delay` 依次上浮，截图轮播从右侧滑入并缓慢浮动，背景有两团缓慢漂移的品牌色光晕；能力标签卡片悬停时轻微上抬。动画是纯 CSS，无 JS 时也能播放；`prefers-reduced-motion` 下全部关闭。
+- 截图轮播的入场只做位移、不做淡入：首张截图通常是首屏最大的图片（LCP 元素），透明度为 0 时不计入绘制，会推迟 LCP。
 
 ---
 
@@ -386,10 +387,15 @@ app/components/
 
 ### 行为说明
 
-- 内容始终在静态 HTML 中，只切换 `opacity` / `transform`，不影响 SEO 与 `verify:export` 检查；`SiteDocument` 的 `<noscript>` 样式保证无 JS 时内容可见。
+- 内容始终在静态 HTML 中，只切换 `opacity` / `transform`，不影响 SEO 与 `verify:export` 检查。
+- 默认可见，只有 `<html>` 带 `reveal-gate` 类时，未进入视口的区块才隐藏（`app/lib/reveal-gate.ts`）：
+  - `SiteDocument` 在 `<head>` 内联一段脚本，页面绘制前加上 `reveal-gate`，因此有 JS 时不会先闪一下内容再隐藏。
+  - `Reveal` 挂载（即已水合）后给 `<html>` 加 `reveal-ready`；若 3 秒内仍未就绪（JS 加载慢、被拦截或水合出错），脚本会移除 `reveal-gate`，所有区块直接显示。
+  - 禁用 JS 时脚本不执行，`reveal-gate` 不存在，静态内容全部可见，无需 `<noscript>` 样式。
+  - `verify:export` 会检查首页 `<head>` 中有该脚本，且导出 CSS 里隐藏 `.reveal` 的规则都限定在 `.reveal-gate` 下。
 - 通过 `useInView` 观察，阈值为 0（元素任意一部分进入视口即触发），避免超高区块在小屏上永远达不到触发比例。
 - 触发线比视口底部上移 8%，让元素略微进入后再播放。
-- `prefers-reduced-motion` 下直接显示，不做位移与过渡。
+- `prefers-reduced-motion` 下直接显示，不做位移与过渡（隐藏与过渡规则只写在 `prefers-reduced-motion: no-preference` 中）。
 - `lift-card` 与 `Reveal` 不要放在同一个元素上：两者都过渡 `transform`，后者会被覆盖。
 
 ---
