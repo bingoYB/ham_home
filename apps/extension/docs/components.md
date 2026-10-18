@@ -3168,3 +3168,36 @@ Vector size picker in the embedding settings card. It renders nothing when the s
 - 提供四种类型选项：所有（`"all"`，默认）、书签（`"bookmark"`）、图片（`"image"`）、文本（`"text"`）。
 - 每个选项配有对应图标，选中后直接在触发器中展示图标与文字。
 - 与 `useBookmarkSearch` 协同工作，选择后实时过滤书签列表并在下方显示活动筛选徽章。
+
+## StorageStatCard
+
+设置页「存储管理」数据概览中的单个统计卡片（书签与分类、工作空间、网页快照、页面截图、语义向量索引）。文案自动换行，清除按钮允许增高，长文案本地化后也不会溢出卡片。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| title | `string` | ✓ | - | 卡片标题 |
+| primary | `string` | ✓ | - | 主数据行，如「1345 个书签 / 61 个分类」 |
+| secondary | `string` | - | - | 次级说明行，如占用大小 |
+| footnote | `string` | - | - | 无清除操作时的底部提示 |
+| clearLabel | `string` | - | - | 清除按钮文案，不传则不渲染按钮 |
+| isClearing | `boolean` | - | `false` | 清除进行中（按钮显示加载图标） |
+| clearDisabled | `boolean` | - | `false` | 禁用清除按钮 |
+| onClear | `() => void` | - | - | 点击清除按钮 |
+
+**用法示例：**
+
+```tsx
+<StorageStatCard
+  title={t("settings:settings.storage.snapshotData.title")}
+  primary={t("settings:settings.storage.snapshotData.count", { count })}
+  secondary={t("settings:settings.storage.snapshotData.size", { size })}
+  clearLabel={t("settings:settings.storage.snapshotData.clear")}
+  isClearing={isClearingSnapshots}
+  clearDisabled={!count}
+  onClear={onClearSnapshotData}
+/>
+```
+
+**行为说明：**
+
+- 卡片网格使用 `repeat(auto-fill, minmax(10rem, 1fr))`，随容器宽度自动调整列数，不再固定 5 列。
