@@ -5,7 +5,6 @@ import type {
   LocalSettings,
   PanelPosition,
   ThemeMode,
-  WebDAVConfig,
 } from "@/types";
 import {
   getEmbeddingDimensionSpec,
@@ -16,7 +15,8 @@ type SafeSettingsPatch = Partial<{
   settings: Record<string, unknown>;
   aiConfig: Record<string, unknown>;
   embeddingConfig: Record<string, unknown>;
-  webdavConfig: Record<string, unknown>;
+  /** Never applied: only inspected so that a sync change request is reported as rejected. */
+  webdavConfig: unknown;
 }>;
 
 interface RejectedSetting {
@@ -29,7 +29,6 @@ export interface SanitizedSafeSettingsUpdate {
   settings: Partial<LocalSettings>;
   aiConfig: Partial<AIConfig>;
   embeddingConfig: Partial<EmbeddingConfig>;
-  webdavConfig: Partial<WebDAVConfig>;
   rejected: RejectedSetting[];
 }
 
@@ -133,7 +132,6 @@ export function sanitizeSafeSettingsUpdate(
   const settings: Partial<LocalSettings> = {};
   const aiConfig: Partial<AIConfig> = {};
   const embeddingConfig: Partial<EmbeddingConfig> = {};
-  const webdavConfig: Partial<WebDAVConfig> = {};
 
   const rawSettings = isObject(patch.settings) ? patch.settings : {};
   inspectUnknownKeys(
@@ -359,27 +357,13 @@ export function sanitizeSafeSettingsUpdate(
     reject(rejected, "embeddingConfig", "batchSize", "batchSize must be an integer between 1 and 128");
   }
 
-  const rawWebdavConfig = isObject(patch.webdavConfig) ? patch.webdavConfig : {};
-  inspectUnknownKeys(
-    rejected,
-    "webdavConfig",
-    rawWebdavConfig,
-    new Set(["enabled", "url"]),
-  );
-
-  if (isBoolean(rawWebdavConfig.enabled)) {
-    webdavConfig.enabled = rawWebdavConfig.enabled;
-  } else if ("enabled" in rawWebdavConfig) {
-    reject(rejected, "webdavConfig", "enabled", "value must be boolean");
-  }
-  
-  if (isString(rawWebdavConfig.url) && rawWebdavConfig.url.trim()) {
-    webdavConfig.url = rawWebdavConfig.url.trim();
-  } else if ("url" in rawWebdavConfig) {
-    reject(rejected, "webdavConfig", "url", "url must be a non-empty string");
+  // The sync URL decides where bookmarks and the stored credentials are sent. The agent reads
+  // untrusted page text, so a prompt injection must never be able to redirect it.
+  if ("webdavConfig" in patch) {
+    reject(rejected, "webdavConfig", "webdavConfig", "sync settings must be configured by the user");
   }
 
-  return { settings, aiConfig, embeddingConfig, webdavConfig, rejected };
+  return { settings, aiConfig, embeddingConfig, rejected };
 }
 
 /**
