@@ -3233,3 +3233,66 @@ Vector size picker in the embedding settings card. It renders nothing when the s
 
 - 通过父级 `Sidebar` 的 `group-data-[collapsible=icon]` 状态切换展开 / 收起样式，组件自身不持有状态。
 - 主应用 `AppSidebar` 使用 `collapsible="icon"`：收起后保留图标列，导航项悬停显示 Tooltip，数量角标隐藏。
+
+## CategoryTreePanel
+
+收藏页（「我的收藏」）左侧的传统分类树。顶部固定「全部书签」和「未分类」两项，其下为可展开的嵌套分类，每个节点右侧显示书签数量（父分类的数量包含全部子分类）。组件只负责展示，选中与展开状态由父组件通过 `useCategoryNavigation` 管理。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| tree | `CategoryTreeNode[]` | ✓ | - | 由 `buildCategoryTree` 构建的分类树 |
+| counts | `CategoryBookmarkCounts` | ✓ | - | 全部 / 未分类 / 各分类（含子分类）的书签数量 |
+| selectedId | `string` | ✓ | - | 当前选中项：`"all"`、`"uncategorized"` 或分类 ID |
+| expandedIds | `ReadonlySet<string>` | ✓ | - | 已展开的分类 ID |
+| onSelect | `(id: string) => void` | ✓ | - | 点击节点选中 |
+| onToggleExpand | `(id: string) => void` | ✓ | - | 点击箭头展开 / 收起 |
+| onExpandAll | `() => void` | ✓ | - | 展开全部分类 |
+| onCollapseAll | `() => void` | ✓ | - | 收起全部分类 |
+| onClose | `() => void` | ✓ | - | 隐藏分类栏 |
+
+**用法示例：**
+
+```tsx
+const nav = useCategoryNavigation({ bookmarks, categories, selectedCategory });
+
+<CategoryTreePanel
+  tree={nav.tree}
+  counts={nav.counts}
+  selectedId={selectedCategory}
+  expandedIds={nav.expandedIds}
+  onSelect={setSelectedCategory}
+  onToggleExpand={nav.toggleExpanded}
+  onExpandAll={nav.expandAll}
+  onCollapseAll={nav.collapseAll}
+  onClose={() => setPanelOpen(false)}
+/>
+```
+
+**行为说明：**
+
+- 选中父分类时，右侧列表包含其全部子分类下的书签（`useBookmarkSearch` 的 `includeSubCategories`）。
+- 选中状态变化时（树、面包屑、子分类按钮均会触发），`useCategoryNavigation` 会自动展开其祖先节点。
+- 分类栏隐藏后，筛选栏会退回 `CategoryFilterDropdown`，并显示「显示分类栏」按钮。
+- 切换分类（以及搜索词、标签、时间等任何筛选条件变化）后列表滚回顶部（`useScrollToTopOnChange`），避免新列表较短时停在被夹紧的中下部。
+
+## CategoryStructureBar
+
+书签列表上方的分类结构条：当前分类的可点击面包屑，以及其直接子分类的跳转按钮（带书签数）。未选中具体分类（全部 / 未分类）时不渲染。放在滚动区之外，不影响瀑布流与虚拟列表的偏移计算。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| trail | `CategoryTrailItem[]` | ✓ | - | 从根到当前分类的路径；为空时不渲染 |
+| subCategories | `CategoryTreeNode[]` | ✓ | - | 当前分类的直接子分类 |
+| counts | `CategoryBookmarkCounts` | ✓ | - | 各分类书签数量 |
+| onSelect | `(id: string) => void` | ✓ | - | 点击面包屑或子分类时切换分类，`"all"` 表示回到全部书签 |
+
+**用法示例：**
+
+```tsx
+<CategoryStructureBar
+  trail={nav.trail}
+  subCategories={nav.subCategories}
+  counts={nav.counts}
+  onSelect={setSelectedCategory}
+/>
+```
