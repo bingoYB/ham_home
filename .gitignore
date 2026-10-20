@@ -58,3 +58,6 @@ docs/blog/
 
 temp  
 .agents
+
+# Bundle analysis report (ANALYZE=true)
+stats.html

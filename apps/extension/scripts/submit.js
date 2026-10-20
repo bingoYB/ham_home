@@ -97,18 +97,21 @@ function loadEnvFile(filePath) {
 // Child processes (pnpm, the wxt shim) resolve `node` from PATH, which may be
 // a different version than the one running this script. Put this script's
 // Node first so the version guard also covers them.
-const childEnv = {
-  ...process.env,
-  PATH: [path.dirname(process.execPath), process.env.PATH]
-    .filter(Boolean)
-    .join(path.delimiter),
-};
+// Built on every call so variables loaded from .env.submit are passed on too.
+function buildChildEnv() {
+  return {
+    ...process.env,
+    PATH: [path.dirname(process.execPath), process.env.PATH]
+      .filter(Boolean)
+      .join(path.delimiter),
+  };
+}
 
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, {
     cwd: appRoot,
     stdio: "inherit",
-    env: childEnv,
+    env: buildChildEnv(),
     ...options,
   });
 
@@ -202,11 +205,32 @@ function requireFile(filePath, label) {
   return filePath;
 }
 
+const STORE_ENV_KEYS = {
+  chrome: [
+    "CHROME_EXTENSION_ID",
+    "CHROME_CLIENT_ID",
+    "CHROME_CLIENT_SECRET",
+    "CHROME_REFRESH_TOKEN",
+  ],
+  firefox: ["FIREFOX_EXTENSION_ID", "FIREFOX_JWT_ISSUER", "FIREFOX_JWT_SECRET"],
+  edge: ["EDGE_PRODUCT_ID", "EDGE_CLIENT_ID", "EDGE_API_KEY"],
+};
+
 function hasEnv(keys) {
   return keys.every((key) => {
     const value = process.env[key];
     return typeof value === "string" && value.trim().length > 0;
   });
+}
+
+function getEnabledStores() {
+  return Object.keys(STORE_ENV_KEYS).filter((store) =>
+    hasEnv(STORE_ENV_KEYS[store]),
+  );
+}
+
+function getBuildStampPath(packageBaseName, version) {
+  return path.join(outputDir, `${packageBaseName}-${version}.submit-stamp.json`);
 }
 
 function printHelp() {
@@ -216,8 +240,9 @@ Builds the store zips with \`pnpm zip:all\` and submits them with \`wxt submit\`
 to every store configured in apps/extension/.env.submit (or process env).
 
 Options:
-  --skip-zip     Reuse the zips in .output/ instead of rebuilding them. Fails if a
-                 zip for the current version is missing or older than the HEAD commit.
+  --skip-zip     Reuse the zips in .output/ instead of rebuilding them. Only zips
+                 built by an earlier run of this script from the current HEAD
+                 (recorded in a build stamp) are accepted.
   --allow-dirty  Submit even if the git working tree has uncommitted changes.
   -h, --help     Show this help and exit.
 
@@ -247,16 +272,24 @@ function assertSupportedNodeVersion() {
   assertNodeVersionSupported(process.versions.node, "running this script");
 
   // Double-check the Node that `pnpm exec wxt submit` will actually use.
+  // pnpm is a .cmd shim on Windows, which spawnSync can only start via a shell.
   const result = spawnSync(
     pnpmCommand,
     ["exec", "node", "-p", "process.versions.node"],
-    { cwd: appRoot, env: childEnv, encoding: "utf8" },
+    {
+      cwd: appRoot,
+      env: buildChildEnv(),
+      encoding: "utf8",
+      shell: process.platform === "win32",
+    },
   );
   const childVersion = result.status === 0 ? result.stdout.trim() : "";
 
   if (!/^\d+\.\d+\.\d+/.test(childVersion)) {
+    const detail = result.error?.message || result.stderr?.trim();
     fail(
-      "Cannot determine the Node.js version used by `pnpm exec`. Make sure pnpm is installed for this Node version.",
+      "Cannot determine the Node.js version used by `pnpm exec`. Make sure pnpm is installed for this Node version." +
+        (detail ? ` (${detail})` : ""),
     );
   }
 
@@ -295,7 +328,7 @@ function readGitState() {
   );
   // --no-show-signature keeps gpg output (log.showSignature) out of the line.
   const head = runGit(
-    ["log", "-1", "--no-show-signature", "--format=%h%x09%ct%x09%s"],
+    ["log", "-1", "--no-show-signature", "--format=%H%x09%h%x09%ct%x09%s"],
     repoRoot,
   );
 
@@ -303,7 +336,9 @@ function readGitState() {
     return null;
   }
 
-  const [shortSha, commitTime, ...subjectParts] = head.trim().split("\t");
+  const [fullSha, shortSha, commitTime, ...subjectParts] = head
+    .trim()
+    .split("\t");
 
   if (!Number.isFinite(Number(commitTime))) {
     return null;
@@ -317,6 +352,7 @@ function readGitState() {
   return {
     repoRoot,
     branch: !branch || branch === "HEAD" ? "(detached HEAD)" : branch,
+    head: fullSha,
     shortSha,
     commitTimeMs: Number(commitTime) * 1000,
     subject: subjectParts.join("\t"),
@@ -384,33 +420,94 @@ function describeZip(zip) {
   return `${zip.label}: ${relativePath} (modified ${modifiedAt})`;
 }
 
-function assertZipsFresh(submittedZips, gitState) {
+function assertTreeUnchangedAfterBuild(gitState) {
+  const afterBuild = readGitState();
+
+  if (!afterBuild) {
+    fail("Cannot read the git state after building the zips.");
+  }
+
+  if (afterBuild.head !== gitState.head) {
+    fail(
+      `HEAD moved from ${gitState.shortSha} to ${afterBuild.shortSha} while the zips were being built. Run again.`,
+    );
+  }
+
+  if (afterBuild.changes.length > 0) {
+    fail(
+      "The working tree changed while the zips were being built. Commit or revert the changes and run again.",
+    );
+  }
+}
+
+// Records which commit the zips were built from, so --skip-zip can reject zips
+// from another commit (after a pull, reset or checkout) or from a dirty tree.
+function writeBuildStamp(stampPath) {
+  const gitState = readGitState();
+  const stamp = {
+    head: gitState?.head ?? null,
+    clean: Boolean(gitState) && gitState.changes.length === 0,
+    builtAt: new Date().toISOString(),
+  };
+
+  fs.writeFileSync(stampPath, `${JSON.stringify(stamp, null, 2)}\n`);
+}
+
+function assertZipsMatchHead(submittedZips, stampPath, gitState) {
   if (!gitState) {
     log(
-      "Cannot compare zip times with the last commit; check the times above.",
+      "WARNING: cannot verify which commit the zips were built from; check the times above.",
     );
     return;
   }
 
-  const staleZips = submittedZips.filter(
-    (zip) => fs.statSync(zip.filePath).mtimeMs < gitState.commitTimeMs,
-  );
+  const relativeStampPath = path.relative(appRoot, stampPath);
 
-  if (staleZips.length > 0) {
-    // The Edge target may reuse the Chrome zip, so de-duplicate the paths.
-    const stalePaths = [
-      ...new Set(staleZips.map((zip) => path.relative(appRoot, zip.filePath))),
-    ].join(", ");
-
+  if (!fileExists(stampPath)) {
     fail(
-      `These zips are older than commit ${gitState.shortSha} and may be stale: ${stalePaths}. Run again without --skip-zip to rebuild them.`,
+      `No build stamp (${relativeStampPath}): these zips were not built by this script. Run again without --skip-zip.`,
     );
   }
 
-  log(`All submitted zips are newer than commit ${gitState.shortSha}.`);
+  let stamp;
+  try {
+    stamp = readJson(stampPath);
+  } catch {
+    fail(`Cannot read the build stamp ${relativeStampPath}. Run again without --skip-zip.`);
+  }
+
+  if (stamp.head !== gitState.head) {
+    fail(
+      `The zips were built from ${String(stamp.head).slice(0, 7)}, not from HEAD ${gitState.shortSha}. Run again without --skip-zip.`,
+    );
+  }
+
+  if (!stamp.clean && !allowDirty) {
+    fail(
+      "The zips were built from a working tree with uncommitted changes. Run again without --skip-zip.",
+    );
+  }
+
+  // Zips are written before the stamp, so a newer zip was rebuilt outside this script.
+  const stampTime = fs.statSync(stampPath).mtimeMs;
+  const rebuiltZips = [
+    ...new Set(
+      submittedZips
+        .filter((zip) => fs.statSync(zip.filePath).mtimeMs > stampTime)
+        .map((zip) => path.relative(appRoot, zip.filePath)),
+    ),
+  ];
+
+  if (rebuiltZips.length > 0) {
+    fail(
+      `These zips changed after the build stamp was written: ${rebuiltZips.join(", ")}. Run again without --skip-zip.`,
+    );
+  }
+
+  log(`The zips were built by this script from HEAD ${gitState.shortSha}.`);
 }
 
-function buildSubmitArgs(packageBaseName, version) {
+function buildSubmitArgs(packageBaseName, version, enabledStores) {
   const zipPaths = {
     chrome: path.join(outputDir, `${packageBaseName}-${version}-chrome.zip`),
     edge: path.join(outputDir, `${packageBaseName}-${version}-edge.zip`),
@@ -419,61 +516,37 @@ function buildSubmitArgs(packageBaseName, version) {
   };
 
   const args = ["exec", "wxt", "submit"];
-  const enabledStores = [];
   const submittedZips = [];
 
-  if (
-    hasEnv([
-      "CHROME_EXTENSION_ID",
-      "CHROME_CLIENT_ID",
-      "CHROME_CLIENT_SECRET",
-      "CHROME_REFRESH_TOKEN",
-    ])
-  ) {
+  if (enabledStores.includes("chrome")) {
     args.push("--chrome-zip", requireFile(zipPaths.chrome, "Chrome zip"));
-    enabledStores.push("chrome");
     submittedZips.push({ label: "Chrome zip", filePath: zipPaths.chrome });
   }
 
-  if (
-    hasEnv([
-      "FIREFOX_EXTENSION_ID",
-      "FIREFOX_JWT_ISSUER",
-      "FIREFOX_JWT_SECRET",
-    ])
-  ) {
+  if (enabledStores.includes("firefox")) {
     args.push(
       "--firefox-zip",
       requireFile(zipPaths.firefox, "Firefox zip"),
       "--firefox-sources-zip",
       requireFile(zipPaths.sources, "Firefox sources zip"),
     );
-    enabledStores.push("firefox");
     submittedZips.push(
       { label: "Firefox zip", filePath: zipPaths.firefox },
       { label: "Firefox sources", filePath: zipPaths.sources },
     );
   }
 
-  if (hasEnv(["EDGE_PRODUCT_ID", "EDGE_CLIENT_ID", "EDGE_API_KEY"])) {
+  if (enabledStores.includes("edge")) {
     const edgeZipPath = fileExists(zipPaths.edge)
       ? zipPaths.edge
       : requireFile(zipPaths.chrome, "Edge zip fallback (Chrome zip)");
 
     args.push("--edge-zip", edgeZipPath);
-    enabledStores.push("edge");
     submittedZips.push({ label: "Edge zip", filePath: edgeZipPath });
-  }
-
-  if (enabledStores.length === 0) {
-    fail(
-      "No publishing target is configured. Please check apps/extension/.env.submit.",
-    );
   }
 
   return {
     args: args.concat(passthroughArgs),
-    enabledStores,
     submittedZips,
   };
 }
@@ -492,24 +565,36 @@ function main() {
 
   loadEnvFile(envFile);
 
+  // Check the store credentials before spending minutes on the build.
+  const enabledStores = getEnabledStores();
+
+  if (enabledStores.length === 0) {
+    fail(
+      "No publishing target is configured. Please check apps/extension/.env.submit.",
+    );
+  }
+
+  const stampPath = getBuildStampPath(packageBaseName, version);
+
   if (!shouldSkipZip) {
     log("Building zip packages with `pnpm zip:all`...");
     run(pnpmCommand, ["zip:all"]);
 
     // Edits saved while the build ran (editor autosave, another process in
     // this checkout) would end up in the zips, so check the tree again.
-    if (gitState && !allowDirty && readGitState()?.changes.length !== 0) {
-      fail(
-        "The working tree changed while the zips were being built. Commit or revert the changes and run again.",
-      );
+    if (gitState && !allowDirty) {
+      assertTreeUnchangedAfterBuild(gitState);
     }
+
+    writeBuildStamp(stampPath);
   } else {
     log("Skip zipping because `--skip-zip` was provided.");
   }
 
-  const { args, enabledStores, submittedZips } = buildSubmitArgs(
+  const { args, submittedZips } = buildSubmitArgs(
     packageBaseName,
     version,
+    enabledStores,
   );
 
   log(`Detected package: ${packageBaseName}`);
@@ -518,7 +603,7 @@ function main() {
   submittedZips.forEach((zip) => log(describeZip(zip)));
 
   if (shouldSkipZip) {
-    assertZipsFresh(submittedZips, gitState);
+    assertZipsMatchHead(submittedZips, stampPath, gitState);
   }
 
   log(`Running: ${pnpmCommand} ${args.join(" ")}`);

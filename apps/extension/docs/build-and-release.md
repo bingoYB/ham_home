@@ -1,6 +1,6 @@
 # HamHome 扩展打包与发布文档
 
-**版本：** 1.2.0  
+**版本：** 1.4.4  
 **更新日期：** 2026-10-20  
 **构建工具：** WXT 0.20+ / pnpm 9 / Turborepo 2
 
@@ -182,7 +182,7 @@ hamhome-{version}-edge.zip
 hamhome-{version}-sources.zip    # Firefox 审核要求的源码包
 ```
 
-> `version` 取自 `wxt.config.ts` 的 `manifest.version` 字段，当前为 **1.2.0**。
+> `version` 取自 `wxt.config.ts` 的 `manifest.version` 字段，当前为 **1.4.4**。
 
 ---
 
@@ -202,13 +202,13 @@ hamhome-{version}-sources.zip    # Firefox 审核要求的源码包
 ### Manifest 关键配置（`wxt.config.ts`）
 
 ```typescript
-version: "1.2.0"
+version: "1.4.4"
 default_locale: "zh_CN"
 permissions: [
   "storage", "unlimitedStorage", "activeTab", "tabs",
   "tabGroups",   // 仅 Chromium
   "scripting", "clipboardWrite", "contextMenus",
-  "bookmarks", "alarms", "favicon"
+  "bookmarks", "alarms"
 ]
 host_permissions: ["<all_urls>"]
 omnibox: { keyword: "ham" }
@@ -265,16 +265,16 @@ pnpm --filter hamhome submit:all -- --help
 1. 检查 Node 版本：运行脚本的 Node 和 `pnpm exec` 实际使用的 Node 只要有一个 >= 24 就直接退出（原因见 [常见问题](#11-常见问题)）；子进程会优先使用运行脚本的那个 Node
 2. 从 `wxt.config.ts` 读取版本号，打印仓库路径、当前分支、HEAD commit 和待发布版本号
 3. 检查 git 工作区：`git status --porcelain` 非空则拒绝发布（除非传入 `--allow-dirty`）
-4. 读取 `.env.submit`
-5. 调用 `pnpm zip:all` 生成最新 ZIP（除非传入 `--skip-zip`），打包完成后再检查一次工作区，期间有文件被改动就退出
-6. 根据环境变量确定需要发布的商店，打印每个待上传 ZIP 的路径和修改时间
+4. 读取 `.env.submit`，根据环境变量确定需要发布的商店；一个都没有配置时直接退出，不会先花几分钟打包
+5. 调用 `pnpm zip:all` 生成最新 ZIP（除非传入 `--skip-zip`）。打包完成后再检查一次：HEAD 变化或工作区出现改动都会退出；通过后在 `.output/` 写入构建戳 `hamhome-<version>.submit-stamp.json`，记录打包时的 HEAD 以及工作区是否干净
+6. 打印每个待上传 ZIP 的路径和修改时间；使用 `--skip-zip` 时校验构建戳
 7. 构建 `wxt submit` 参数并执行
 
 **脚本参数：**
 
 | 参数 | 说明 |
 |------|------|
-| `--skip-zip` | 复用 `.output/` 中已有的 ZIP。对应当前版本的 ZIP 缺失，或修改时间早于 HEAD commit 时，脚本会报错退出 |
+| `--skip-zip` | 复用 `.output/` 中已有的 ZIP。只接受本脚本之前在当前 HEAD、干净工作区下打出的包（依据构建戳）；没有构建戳、HEAD 已变化（pull、reset、切换分支后）或 ZIP 在构建戳之后被改动时报错退出 |
 | `--allow-dirty` | 工作区有未提交改动时仍然发布（会打印改动列表和警告），仅在明确知道后果时使用 |
 | `-h` / `--help` | 打印参数说明后退出，不做任何检查 |
 | 其他参数 | 原样透传给 `wxt submit`，例如 `--dry-run` |
@@ -297,8 +297,9 @@ pnpm --filter hamhome submit:all -- --help
 > pnpm submit:extension
 > ```
 
-> **`--skip-zip` 的新鲜度检查**只能证明 ZIP 是在 HEAD commit 之后生成的，不能证明一定由 HEAD 打包
-> （例如打包后又切换过分支）。脚本会打印每个 ZIP 的路径和修改时间，发布前请核对；拿不准时去掉 `--skip-zip` 重新打包。
+> **`--skip-zip` 的构建戳校验**：只有本脚本打包时才会写构建戳，所以直接用 `pnpm zip:extension` 打出的包不能配合 `--skip-zip` 使用。
+> 构建戳记录的是完整 HEAD sha，`git pull`、`git reset` 或切换分支后 HEAD 变化，旧包会被拒绝；之后又手动重新打包，ZIP 比构建戳新，也会被拒绝。
+> 拿不准时去掉 `--skip-zip` 重新打包。
 
 ### 8.3 初始化提交配置
 
@@ -346,7 +347,7 @@ pnpm --filter hamhome analyze
 ```typescript
 // apps/extension/wxt.config.ts
 manifest: () => ({
-  version: "1.2.0",   // ← 修改此处
+  version: "1.4.4",   // ← 修改此处
   ...
 })
 ```
@@ -413,9 +414,9 @@ pnpm --filter hamhome submit:all -- --allow-dirty
 
 ---
 
-### Q：使用 `--skip-zip` 时提示 ZIP `older than commit`
+### Q：使用 `--skip-zip` 时提示构建戳不匹配（`No build stamp` / `not from HEAD` / `changed after the build stamp`）
 
-**原因：** `.output/` 中当前版本 ZIP 的修改时间早于 HEAD commit，说明它是用旧代码打的包。  
+**原因：** `.output/` 中的 ZIP 不是本脚本在当前 HEAD、干净工作区下打出的：没有构建戳（例如直接运行了 `pnpm zip:extension`），HEAD 已变化（pull、reset、切换分支），或者 ZIP 在构建戳写入后又被重新打包。  
 **解决：** 去掉 `--skip-zip` 重新执行，让脚本重新打包。
 
 ---
