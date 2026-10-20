@@ -3,7 +3,7 @@
  * a clickable breadcrumb of the selected category plus its direct
  * sub-categories as jump chips. Renders nothing when no category is selected.
  */
-import { Fragment } from "react";
+import { Fragment, useId } from "react";
 import { useTranslation } from "react-i18next";
 import { ChevronRight, FolderClosed } from "lucide-react";
 import { cn } from "@hamhome/ui";
@@ -25,8 +25,11 @@ export function CategoryStructureBar({
   onSelect,
 }: CategoryStructureBarProps) {
   const { t } = useTranslation(["bookmark"]);
+  const subCategoriesLabelId = useId();
 
   if (trail.length === 0) return null;
+
+  const currentCategoryId = trail[trail.length - 1].id;
 
   return (
     <div className="shrink-0 space-y-2 border-b border-border bg-muted/20 px-6 py-3">
@@ -65,25 +68,46 @@ export function CategoryStructureBar({
       </nav>
 
       {subCategories.length > 0 && (
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-xs text-muted-foreground">
+        <div className="flex items-start gap-2">
+          {/* h-7.5 matches one chip row so the label lines up with the first row */}
+          <span
+            id={subCategoriesLabelId}
+            className="flex h-7.5 shrink-0 items-center text-xs text-muted-foreground"
+          >
             {t("bookmark:bookmark.categoryTree.subCategories")}
           </span>
-          {subCategories.map((node) => (
-            <button
-              key={node.id}
-              type="button"
-              className="group flex max-w-48 items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 py-1 text-sm transition-colors hover:border-primary/40 hover:bg-primary/5"
-              onClick={() => onSelect(node.id)}
-              title={node.name}
-            >
-              <FolderClosed className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
-              <span className="truncate">{node.name}</span>
-              <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
-                {counts.byCategory.get(node.id) ?? 0}
-              </span>
-            </button>
-          ))}
+          {/*
+            Height-capped chip strip: this bar sits outside the list ScrollArea,
+            so an uncapped strip would squeeze the bookmark list. max-h shows
+            about two and a half chip rows (the clipped row hints at more) and
+            scrolls the rest. -m-1/p-1 leaves room for focus outlines that
+            overflow would otherwise clip. No tabIndex: the chips are buttons,
+            so Tab moves through them and the browser scrolls each into view.
+            Keyed by the current category so a new category starts at the top
+            instead of inheriting the previous scroll position.
+          */}
+          <div
+            key={currentCategoryId}
+            role="group"
+            aria-labelledby={subCategoriesLabelId}
+            className="scrollbar-slim -m-1 flex max-h-25 min-w-0 flex-1 flex-wrap items-center gap-2 overflow-y-auto overscroll-contain p-1"
+          >
+            {subCategories.map((node) => (
+              <button
+                key={node.id}
+                type="button"
+                className="group flex max-w-48 items-center gap-1.5 rounded-lg border border-border bg-background px-2.5 py-1 text-sm transition-colors hover:border-primary/40 hover:bg-primary/5"
+                onClick={() => onSelect(node.id)}
+                title={node.name}
+              >
+                <FolderClosed className="h-3.5 w-3.5 shrink-0 text-emerald-500" />
+                <span className="truncate">{node.name}</span>
+                <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
+                  {counts.byCategory.get(node.id) ?? 0}
+                </span>
+              </button>
+            ))}
+          </div>
         </div>
       )}
     </div>
