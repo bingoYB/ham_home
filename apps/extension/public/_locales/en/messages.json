@@ -18,5 +18,9 @@
   "commandTogglePanel": {
     "message": "Toggle bookmark panel",
     "description": "Command description for toggle panel"
+  },
+  "commandReadLater": {
+    "message": "Read later and close the current tab",
+    "description": "Read later command description"
   }
 }

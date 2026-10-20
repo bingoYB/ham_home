@@ -18,6 +18,8 @@ export interface TabGroupRuleFormState {
   groupTitle: string;
   color: TabGroupRuleColor;
   collapsed: boolean;
+  /** Auto archive and making room skip tabs in this group */
+  protectTabs: boolean;
   matchers: TabGroupRuleMatcherFormState[];
 }
 
@@ -36,6 +38,7 @@ export interface TabGroupRuleGroup {
   groupTitle: string;
   color: TabGroupRuleColor;
   collapsed: boolean;
+  protectTabs: boolean;
   rules: TabGroupRule[];
 }
 
@@ -62,6 +65,7 @@ function createDefaultForm(): TabGroupRuleFormState {
     groupTitle: "",
     color: "blue",
     collapsed: false,
+    protectTabs: false,
     matchers: [createMatcher()],
   };
 }
@@ -79,6 +83,7 @@ function groupTabGroupRules(rules: TabGroupRule[]): TabGroupRuleGroup[] {
     if (group) {
       group.rules.push(rule);
       group.enabled = group.enabled || rule.enabled;
+      group.protectTabs = group.protectTabs || !!rule.protectTabs;
       continue;
     }
 
@@ -89,6 +94,7 @@ function groupTabGroupRules(rules: TabGroupRule[]): TabGroupRuleGroup[] {
       groupTitle: rule.groupTitle,
       color: rule.color,
       collapsed: rule.collapsed,
+      protectTabs: !!rule.protectTabs,
       rules: [rule],
     });
   }
@@ -106,6 +112,7 @@ function toFormState(group: TabGroupRuleGroup): TabGroupRuleFormState {
     groupTitle: group.groupTitle,
     color: group.color,
     collapsed: group.collapsed,
+    protectTabs: group.protectTabs,
     matchers: group.rules.map(createMatcher),
   };
 }
@@ -211,6 +218,7 @@ export function useTabGroupRules() {
         groupTitle,
         color: form.color,
         collapsed: form.collapsed,
+        protectTabs: form.protectTabs,
       };
 
       if (editingGroupKey) {

@@ -234,6 +234,7 @@ export const RemoteTabGroupRuleSchema = z.object({
     "orange",
   ]),
   collapsed: z.boolean(),
+  protectTabs: z.boolean().optional(),
   order: z.number(),
   createdAt: z.number(),
   updatedAt: z.number(),
@@ -257,3 +258,28 @@ export const RemoteTabGroupConfigFileSchema = z.object({
 });
 
 export type RemoteTabGroupRule = z.infer<typeof RemoteTabGroupRuleSchema>;
+
+// ============ Read later & tab lifecycle ============
+
+/**
+ * Read later queue state (bookmarks/read-later.json), one entry per bookmark.
+ * Loose on purpose: fields added by newer clients must survive a round trip through
+ * this version, otherwise an older client would erase them when it writes back.
+ */
+export const RemoteReadLaterEntrySchema = z.looseObject({
+  bookmarkId: z.string(),
+  updatedAt: z.number(),
+});
+
+export const RemoteReadLaterFileSchema = z.object({
+  version: z.number().optional(),
+  entries: z.array(RemoteReadLaterEntrySchema),
+});
+
+/** Lifecycle settings (tab-lifecycle-config.json), normalized on import */
+export const RemoteTabLifecycleConfigFileSchema = z.object({
+  version: z.number().optional(),
+  settings: z.looseObject({
+    updatedAt: z.number().default(0),
+  }),
+});

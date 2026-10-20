@@ -36,9 +36,41 @@ describe("hamhome-feature-skill", () => {
     const detail = getHamHomeFeatureDetail("workspaces-tab-groups");
 
     expect(detail?.detail).toContain("Tab 标签页 AI 自动分组");
-    expect(detail?.detail).toContain("读取当前窗口标签页");
+    expect(detail?.detail).toContain("先匹配手动规则");
     expect(detail?.detail).toContain("AI 生成分组建议");
-    expect(detail?.detail).toContain("用户确认后再应用");
+    expect(detail?.detail).toContain("自定义分类要求");
+    expect(detail?.detail).toContain("按域名自动分组");
+    expect(detail?.detail).toContain("保护分组中的标签页");
+  });
+
+  it("documents clipping, screenshots, bookmark health and trash", () => {
+    const clipping = getHamHomeFeatureDetail("clipping");
+    const screenshots = getHamHomeFeatureDetail("screenshots-gallery");
+    const healthTrash = getHamHomeFeatureDetail("health-trash");
+
+    expect(clipping?.detail).toContain("保存选中内容");
+    expect(clipping?.detail).toContain("保存图片");
+    expect(clipping?.detail).toContain("enableImageAnalysis");
+    expect(screenshots?.detail).toContain("视觉画廊");
+    expect(screenshots?.detail).toContain("screenshotPrivatePagePolicy");
+    expect(screenshots?.detail).toContain("不进入 WebDAV 同步和 JSON 备份");
+    expect(healthTrash?.detail).toContain("采用新地址");
+    expect(healthTrash?.detail).toContain("清理重复项");
+    expect(healthTrash?.detail).toContain("保留 30 天");
+  });
+
+  it("documents the AI assistant, entry points and approval rules", () => {
+    const assistant = getHamHomeFeatureDetail("ai-assistant");
+    const quickAccess = getHamHomeFeatureDetail("quick-access");
+    const tabLifecycle = getHamHomeFeatureDetail("tab-lifecycle");
+
+    expect(assistant?.detail).toContain("审批卡片");
+    expect(assistant?.detail).toContain("2 分钟");
+    expect(assistant?.detail).toContain("不能开启自动归档或自动腾位");
+    expect(quickAccess?.detail).toContain("read-later-close");
+    expect(quickAccess?.detail).toContain("稍后读此链接");
+    expect(tabLifecycle?.detail).toContain("自动腾位");
+    expect(tabLifecycle?.detail).toContain("审批卡片");
   });
 
   it("documents discovery, organization, workspace, and sync edge cases", () => {
@@ -72,6 +104,10 @@ describe("hamhome-feature-skill", () => {
     expect(skill.documents?.[0]?.content).toContain("功能清单");
     expect(skill.documents?.[0]?.content).toContain("从 0 开始");
     expect(skill.documents?.[0]?.content).toContain("Agent 可以");
+    expect(skill.documents?.[0]?.content).toContain("需要用户确认");
+    for (const feature of getHamHomeFeatureOverview()) {
+      expect(skill.documents?.[0]?.content).toContain(`- ${feature.id}:`);
+    }
     expect(skill.tools?.[0]?.tool.name).toBe("get_hamhome_feature_detail");
   });
 

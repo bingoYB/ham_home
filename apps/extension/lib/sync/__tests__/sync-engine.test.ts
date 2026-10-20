@@ -19,6 +19,10 @@ const mocks = vi.hoisted(() => ({
   getTombstones: vi.fn(),
   replaceTombstones: vi.fn(),
   deleteFile: vi.fn(),
+  getReadLater: vi.fn(),
+  replaceReadLater: vi.fn(),
+  getLifecycleSettings: vi.fn(),
+  importLifecycleSettings: vi.fn(),
 }));
 
 vi.mock("../webdav-client", async () => {
@@ -91,6 +95,27 @@ vi.mock("../../storage/tab-group-rules-storage", () => ({
     getAutoGroupSettings: mocks.getAutoGroupSettings,
     importRawRule: mocks.importRawRule,
     importRawAutoGroupSettings: mocks.importRawAutoGroupSettings,
+  },
+}));
+
+vi.mock("../../storage/read-later-storage", () => ({
+  readLaterStorage: {
+    getAll: mocks.getReadLater,
+    replaceAll: mocks.replaceReadLater,
+    replaceWith: async (build: (current: Record<string, unknown>) => Record<string, unknown> | null) => {
+      const current = await mocks.getReadLater();
+      const next = build({ ...current });
+      if (!next) return current;
+      await mocks.replaceReadLater(next);
+      return next;
+    },
+  },
+}));
+
+vi.mock("../../storage/tab-lifecycle-config-storage", () => ({
+  tabLifecycleConfigStorage: {
+    getRawSettings: mocks.getLifecycleSettings,
+    importRawSettings: mocks.importLifecycleSettings,
   },
 }));
 
@@ -467,6 +492,135 @@ describe("SyncEngine deletion tombstones", () => {
     expect(mocks.deleteFile).toHaveBeenCalledTimes(1);
     expect(mocks.deleteFile).toHaveBeenCalledWith(
       expect.stringContaining("/chunks/new.gz.txt"),
+    );
+  });
+});
+
+describe("SyncEngine read later and lifecycle settings", () => {
+  const entry = (bookmarkId: string, patch: Record<string, unknown> = {}) => ({
+    bookmarkId,
+    status: "unread",
+    queueOnly: true,
+    source: "manual",
+    addedAt: 1000,
+    updatedAt: 1000,
+    ...patch,
+  });
+  const bookmark = (id: string, patch: Record<string, unknown> = {}) => ({
+    id,
+    url: `https://example.com/${id}`,
+    title: id,
+    description: "",
+    categoryId: null,
+    tags: [],
+    hasSnapshot: false,
+    createdAt: 1,
+    updatedAt: 1,
+    ...patch,
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.getTombstones.mockResolvedValue([]);
+    mocks.getBookmarksForSync.mockResolvedValue([bookmark("a"), bookmark("b"), bookmark("c")]);
+  });
+
+  it("merges queue state by last write and keeps fields of newer clients", async () => {
+    mocks.getReadLater.mockResolvedValue({
+      a: entry("a", { status: "read", updatedAt: 3000 }),
+      b: entry("b", { updatedAt: 1000 }),
+    });
+    mocks.getJSON.mockImplementation(async (filename: string) =>
+      filename.endsWith("/bookmarks/read-later.json")
+        ? {
+            version: 1,
+            entries: [
+              entry("a", { status: "unread", updatedAt: 2000 }),
+              entry("b", { status: "expired", updatedAt: 2000, futureField: "keep" }),
+              entry("c", { updatedAt: 500 }),
+            ],
+          }
+        : null,
+    );
+
+    const { syncEngine } = await import("../sync-engine");
+    await (syncEngine as unknown as { syncReadLater: () => Promise<void> }).syncReadLater();
+
+    const merged = mocks.replaceReadLater.mock.calls[0][0];
+    expect(merged.a.status).toBe("read");
+    expect(merged.b).toMatchObject({ status: "expired", futureField: "keep" });
+    expect(merged.c).toBeDefined();
+    expect(mocks.putJSON).toHaveBeenCalledWith(
+      expect.stringMatching(/bookmarks\/read-later\.json$/),
+      expect.objectContaining({ version: 1 }),
+    );
+  });
+
+  it("keeps queue changes made while the remote file was loading", async () => {
+    let store: Record<string, unknown> = { a: entry("a", { updatedAt: 1000 }) };
+    mocks.getReadLater.mockImplementation(async () => ({ ...store }));
+    mocks.replaceReadLater.mockImplementation(async (next: Record<string, unknown>) => {
+      store = { ...next };
+    });
+    mocks.getJSON.mockImplementation(async (filename: string) => {
+      if (!filename.endsWith("/bookmarks/read-later.json")) return null;
+      // "Read later & close" while the request is in flight
+      store = { ...store, q: entry("q", { updatedAt: 4000 }) };
+      return { version: 1, entries: [entry("a", { status: "read", updatedAt: 2000 })] };
+    });
+
+    const { syncEngine } = await import("../sync-engine");
+    await (syncEngine as unknown as { syncReadLater: () => Promise<void> }).syncReadLater();
+
+    expect(store).toMatchObject({ a: { status: "read" }, q: { bookmarkId: "q" } });
+    const uploaded = mocks.putJSON.mock.calls[0][1] as { entries: Array<{ bookmarkId: string }> };
+    expect(uploaded.entries.map((item) => item.bookmarkId).sort()).toEqual(["a", "q"]);
+  });
+
+  it("drops the queue state of bookmarks deleted for good", async () => {
+    mocks.getReadLater.mockResolvedValue({ a: entry("a"), gone: entry("gone") });
+    mocks.getTombstones.mockResolvedValue([{ id: "gone", deletedAt: 5000 }]);
+    mocks.getJSON.mockResolvedValue(null);
+
+    const { syncEngine } = await import("../sync-engine");
+    await (syncEngine as unknown as { syncReadLater: () => Promise<void> }).syncReadLater();
+
+    const uploaded = mocks.putJSON.mock.calls[0][1] as { entries: Array<{ bookmarkId: string }> };
+    expect(uploaded.entries.map((item) => item.bookmarkId)).toEqual(["a"]);
+  });
+
+  it("never overwrites a remote read later file it cannot parse", async () => {
+    mocks.getReadLater.mockResolvedValue({ a: entry("a") });
+    mocks.getJSON.mockResolvedValue({ entries: "not-a-list" });
+
+    const { syncEngine } = await import("../sync-engine");
+    await (syncEngine as unknown as { syncReadLater: () => Promise<void> }).syncReadLater();
+
+    expect(mocks.putJSON).not.toHaveBeenCalled();
+    expect(mocks.replaceReadLater).not.toHaveBeenCalled();
+  });
+
+  it("imports newer remote lifecycle settings and uploads newer local ones", async () => {
+    const { syncEngine } = await import("../sync-engine");
+    const sync = () =>
+      (syncEngine as unknown as { syncTabLifecycleConfig: () => Promise<void> }).syncTabLifecycleConfig();
+    const remote = { activityTracking: true, budget: { enabled: true, limit: 20 }, updatedAt: 2000 };
+
+    mocks.getLifecycleSettings.mockResolvedValue({ activityTracking: true, updatedAt: 1000 });
+    mocks.getJSON.mockResolvedValue({ version: 1, settings: remote });
+    await sync();
+    expect(mocks.importLifecycleSettings).toHaveBeenCalledWith(remote);
+    expect(mocks.putJSON).not.toHaveBeenCalled();
+
+    vi.clearAllMocks();
+    const local = { activityTracking: false, updatedAt: 3000 };
+    mocks.getLifecycleSettings.mockResolvedValue(local);
+    mocks.getJSON.mockResolvedValue({ version: 1, settings: remote });
+    await sync();
+    expect(mocks.importLifecycleSettings).not.toHaveBeenCalled();
+    expect(mocks.putJSON).toHaveBeenCalledWith(
+      expect.stringMatching(/tab-lifecycle-config\.json$/),
+      { version: 1, settings: local },
     );
   });
 });

@@ -441,6 +441,8 @@ export interface TabGroupRule {
   groupTitle: string;
   color: TabGroupRuleColor;
   collapsed: boolean;
+  /** Tabs in this rule's group are never closed by auto archive or making room */
+  protectTabs?: boolean;
   order: number;
   createdAt: number;
   updatedAt: number;
@@ -1079,3 +1081,7 @@ export interface SaveFlowTrigger {
 
 // ============ WebDAV 同步相关 ============
 export * from "./sync";
+
+// ============ Tab lifecycle & read later ============
+export * from "./tab-lifecycle";
+export * from "./read-later";

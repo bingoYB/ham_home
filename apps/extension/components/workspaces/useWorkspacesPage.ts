@@ -20,9 +20,12 @@ import {
   UNCATEGORIZED,
 } from "./workspace-ui";
 
-interface UseWorkspacesPageOptions { }
+interface UseWorkspacesPageOptions {
+  /** Runs before a restore (e.g. the tab budget check); resolve false to cancel */
+  beforeRestore?: (workspace: Workspace, pageCount: number) => Promise<boolean>;
+}
 
-export function useWorkspacesPage({ }: UseWorkspacesPageOptions) {
+export function useWorkspacesPage({ beforeRestore }: UseWorkspacesPageOptions) {
   const { t } = useTranslation("bookmark");
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [workspaceCategories, setWorkspaceCategories] = useState<
@@ -271,9 +274,10 @@ export function useWorkspacesPage({ }: UseWorkspacesPageOptions) {
 
   const restoreWorkspace = useCallback(
     async (workspace: Workspace, mode: WorkspaceRestoreMode) => {
+      if (beforeRestore && !(await beforeRestore(workspace, workspace.pages.length))) return;
       await runRestore(workspace, mode, undefined, confirmRestore, t);
     },
-    [confirmRestore, t],
+    [beforeRestore, confirmRestore, t],
   );
 
   const deleteWorkspace = useCallback(

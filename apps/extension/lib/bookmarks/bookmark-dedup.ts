@@ -58,7 +58,10 @@ export interface DuplicateGroup<T extends DedupCandidate> {
  * 规则必须是纯函数且与设备无关：先比创建时间，再比 ID 字典序，
  * 这样每台设备都会独立得出同一个结论，同步才能收敛。
  */
-function compareCandidates(a: DedupCandidate, b: DedupCandidate): number {
+export function compareDedupCandidates(
+  a: Pick<DedupCandidate, "id" | "createdAt">,
+  b: Pick<DedupCandidate, "id" | "createdAt">,
+): number {
   if (a.createdAt !== b.createdAt) return a.createdAt - b.createdAt;
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }
@@ -92,7 +95,7 @@ export function buildDuplicateGroups<T extends DedupCandidate>(
   const result: DuplicateGroup<T>[] = [];
   for (const [normalizedUrl, group] of groups) {
     if (group.length < 2) continue;
-    const [canonical, ...duplicates] = [...group].sort(compareCandidates);
+    const [canonical, ...duplicates] = [...group].sort(compareDedupCandidates);
     result.push({ normalizedUrl, canonical, duplicates });
   }
   return result;

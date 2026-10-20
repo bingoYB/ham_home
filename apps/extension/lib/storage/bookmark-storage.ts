@@ -14,6 +14,7 @@ import { bookmarkClipStorage } from './bookmark-clip-storage';
 import { bookmarkHealthStorage } from './bookmark-health-storage';
 import { bookmarkScreenshotStorage } from './bookmark-screenshot-storage';
 import { bookmarkTombstoneStorage } from './bookmark-tombstone-storage';
+import { readLaterStorage } from './read-later-storage';
 import { snapshotStorage } from './snapshot-storage';
 import { vectorStore } from './vector-store';
 import type {
@@ -318,6 +319,8 @@ class BookmarkStorage {
 
     await Promise.all([
       bookmarkClipStorage.deleteByBookmarks(ids),
+      // The queue state goes with the bookmark; other devices drop it via the tombstone
+      readLaterStorage.remove(ids),
       bookmarkHealthStorage.deleteMany(ids),
       bookmarkScreenshotStorage.deleteMany(ids),
       vectorStore.deleteEmbeddings(ids),

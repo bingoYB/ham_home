@@ -18,5 +18,9 @@
   "commandTogglePanel": {
     "message": "切换书签面板",
     "description": "切换面板命令描述"
+  },
+  "commandReadLater": {
+    "message": "稍后读并关闭当前标签页",
+    "description": "稍后读命令描述"
   }
 }

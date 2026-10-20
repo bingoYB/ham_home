@@ -7,6 +7,7 @@ import {
 } from "@/lib/storage";
 import type { AgentToolApprovalRequest, Language, LocalCategory } from "@/types";
 import { getToolDisplayName } from "../tools/tool-display-names";
+import { isAutoApprovedCall } from "../tools/tool-approval-rules";
 
 /**
  * Unanswered approvals are rejected after this delay, so a closed panel never
@@ -94,6 +95,8 @@ export function createToolApprovalPolicy(options: {
       mode: gatedToolNames.has(toolName) ? "ask" : "allow",
     }),
     onAsk: async (toolName, input) => {
+      // Some tools only need approval for batches; single items run directly
+      if (isAutoApprovedCall(toolName, isRecord(input) ? input : {})) return true;
       const description = await describeToolCall(
         toolName,
         isRecord(input) ? input : {},
@@ -158,9 +161,44 @@ async function describeToolCall(
       const rules = await tabGroupRulesStorage.getRules();
       return { title, target: rules.find((rule) => rule.id === id)?.name || id };
     }
+    case "move_tabs_to_read_later":
+    case "archive_tabs": {
+      const tabIds = Array.isArray(input.tabIds) ? input.tabIds.map(Number) : [];
+      const titles = await describeTabs(tabIds);
+      return {
+        title,
+        target: titles,
+        detail:
+          toolName === "archive_tabs"
+            ? isZh
+              ? `关闭 ${tabIds.length} 个标签页，可在“标签页 → 归档”中找回。`
+              : `Closes ${tabIds.length} tabs; they can be found under Tabs → Archive.`
+            : isZh
+              ? `加入稍后读并关闭 ${tabIds.length} 个标签页。`
+              : `Adds ${tabIds.length} tabs to Read later and closes them.`,
+      };
+    }
+    case "update_read_later_status": {
+      const ids = Array.isArray(input.bookmarkIds) ? input.bookmarkIds.length : 0;
+      return {
+        title,
+        detail: isZh ? `更新 ${ids} 个稍后读条目。` : `Updates ${ids} Read later items.`,
+      };
+    }
     default:
       return { title, detail: JSON.stringify(input).slice(0, 200) };
   }
+}
+
+async function describeTabs(tabIds: number[]): Promise<string> {
+  const { browser } = await import("wxt/browser");
+  const titles = await Promise.all(
+    tabIds.slice(0, 5).map(async (tabId) => {
+      const tab = await browser.tabs.get(tabId).catch(() => null);
+      return tab?.title || tab?.url || String(tabId);
+    }),
+  );
+  return titles.join("、") + (tabIds.length > 5 ? ` …(${tabIds.length})` : "");
 }
 
 function countDescendants(categories: LocalCategory[], parentId: string): number {

@@ -8,6 +8,7 @@ import React, {
   useState,
   useEffect,
   useCallback,
+  useMemo,
   useRef,
   ReactNode,
 } from "react";
@@ -17,6 +18,9 @@ import { tabGroupRulesStorage } from "@/lib/storage/tab-group-rules-storage";
 import { bookmarkClipStorage } from "@/lib/storage/bookmark-clip-storage";
 import { bookmarkHealthStorage } from "@/lib/storage/bookmark-health-storage";
 import { bookmarkScreenshotStorage } from "@/lib/storage/bookmark-screenshot-storage";
+import { readLaterStorage } from "@/lib/storage/read-later-storage";
+import { tabLifecycleConfigStorage } from "@/lib/storage/tab-lifecycle-config-storage";
+import { filterLibraryBookmarks } from "@/lib/read-later/read-later.utils";
 import {
   configStorage,
   DEFAULT_AI_CONFIG,
@@ -28,6 +32,7 @@ import type {
   AIConfig,
   LocalSettings,
   CreateBookmarkInput,
+  ReadLaterEntryMap,
   WebDAVConfig,
   SyncStatus,
 } from "@/types";
@@ -46,7 +51,12 @@ export interface StorageInfo {
 // Context 类型定义
 interface BookmarkContextType {
   // 数据状态
+  /** Library bookmarks: queue-only read later items left out */
   bookmarks: LocalBookmark[];
+  /** Every bookmark not deleted, queue-only items included (Read later page, global search) */
+  allBookmarks: LocalBookmark[];
+  /** Read later state by bookmark ID */
+  readLaterEntries: ReadLaterEntryMap;
   categories: LocalCategory[];
   allTags: string[];
   aiConfig: AIConfig;
@@ -88,7 +98,10 @@ interface BookmarkContextType {
   // 数据管理
   clearAllData: () => Promise<void>;
   clearBookmarkData: () => Promise<void>;
-  exportData: (format: "json" | "html") => Promise<void>;
+  exportData: (
+    format: "json" | "html",
+    options?: { includeTabArchive?: boolean },
+  ) => Promise<void>;
 
   // 批量导入辅助：暂停/恢复 storage watcher，避免每条写入都触发全量刷新
   pauseWatchers: () => void;
@@ -101,7 +114,8 @@ const BookmarkContext = createContext<BookmarkContextType | undefined>(
 
 export function BookmarkProvider({ children }: { children: ReactNode }) {
   // 数据状态
-  const [bookmarks, setBookmarks] = useState<LocalBookmark[]>([]);
+  const [allBookmarks, setAllBookmarks] = useState<LocalBookmark[]>([]);
+  const [readLaterEntries, setReadLaterEntries] = useState<ReadLaterEntryMap>({});
   const [categories, setCategories] = useState<LocalCategory[]>([]);
   const [allTags, setAllTags] = useState<string[]>([]);
   const [aiConfig, setAIConfig] = useState<AIConfig>(DEFAULT_AI_CONFIG);
@@ -134,18 +148,23 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
   // 刷新书签数据（复用已加载的书签列表给 getAllTags，避免二次读取）
   const refreshBookmarks = useCallback(async () => {
     try {
-      const data = await bookmarkStorage.getBookmarks();
-      setBookmarks(data);
+      const [data, entries] = await Promise.all([
+        bookmarkStorage.getBookmarks(),
+        readLaterStorage.getAll(),
+      ]);
+      setAllBookmarks(data);
+      setReadLaterEntries(entries);
 
-      // 复用已加载的书签提取标签，不再内部重新加载
-      const tags = await bookmarkStorage.getAllTags(data);
+      // Tags and counts cover the library only, not queue-only items
+      const library = filterLibraryBookmarks(data, entries);
+      const tags = await bookmarkStorage.getAllTags(library);
       setAllTags(tags);
 
       // 获取工作空间列表以用于计算
       const workspaces = await workspaceStorage.getWorkspaces();
 
       // 更新存储信息
-      updateStorageInfo(data, categoriesRef.current, workspaces.length);
+      updateStorageInfo(library, categoriesRef.current, workspaces.length);
     } catch (error) {
       console.error("[BookmarkContext] Failed to refresh bookmarks:", error);
     }
@@ -184,7 +203,7 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
     const loadData = async () => {
       setLoading(true);
       try {
-        const [bms, cats, config, settings, sConfig, sStatus, wss] =
+        const [bms, cats, config, settings, sConfig, sStatus, wss, entries] =
           await Promise.all([
             bookmarkStorage.getBookmarks(),
             bookmarkStorage.getCategories(),
@@ -193,19 +212,22 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
             syncConfigStorage.getConfig(),
             syncConfigStorage.getStatus(),
             workspaceStorage.getWorkspaces(),
+            readLaterStorage.getAll(),
           ]);
 
-        // 复用已加载的 bms 提取标签
-        const tags = await bookmarkStorage.getAllTags(bms);
+        // Reuse the loaded bookmarks for tags (library only)
+        const library = filterLibraryBookmarks(bms, entries);
+        const tags = await bookmarkStorage.getAllTags(library);
 
-        setBookmarks(bms);
+        setAllBookmarks(bms);
+        setReadLaterEntries(entries);
         setCategories(cats);
         setAllTags(tags);
         setAIConfig(config);
         setAppSettings(settings);
         setSyncConfig(sConfig);
         setSyncStatus(sStatus);
-        updateStorageInfo(bms, cats, wss.length);
+        updateStorageInfo(library, cats, wss.length);
       } catch (error) {
         console.error("[BookmarkContext] Failed to load data:", error);
       } finally {
@@ -239,8 +261,14 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
         workspaceCount: workspaces.length,
       }));
     });
+    // Keeping an item or queueing a bookmark changes what the library shows
+    const unwatchReadLater = readLaterStorage.watch(() => {
+      if (watcherPausedRef.current > 0) return;
+      refreshBookmarks();
+    });
 
     return () => {
+      unwatchReadLater();
       unwatchBookmarks();
       unwatchCategories();
       unwatchSyncConfig();
@@ -248,6 +276,12 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
       unwatchWorkspaces();
     };
   }, [refreshBookmarks, refreshCategories]);
+
+  // Library views: queue-only items left out
+  const bookmarks = useMemo(
+    () => filterLibraryBookmarks(allBookmarks, readLaterEntries),
+    [allBookmarks, readLaterEntries],
+  );
 
   // 书签操作
   const addBookmark = async (
@@ -392,8 +426,10 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
       bookmarkClipStorage.importRawClips([]),
       bookmarkHealthStorage.clear(),
       bookmarkScreenshotStorage.clear(),
+      readLaterStorage.clear(),
     ]);
-    setBookmarks([]);
+    setAllBookmarks([]);
+    setReadLaterEntries({});
     setCategories([]);
     setAllTags([]);
     setStorageInfo(prev => ({
@@ -411,31 +447,50 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
   };
 
   // 导出数据
-  const exportData = async (format: "json" | "html") => {
+  const exportData = async (
+    format: "json" | "html",
+    options: { includeTabArchive?: boolean } = {},
+  ) => {
     const [
       workspaces,
       workspaceCategories,
       tabGroupRules,
       tabGroupAutoGroupSettings,
       clips,
+      tabLifecycleSettings,
     ] = await Promise.all([
       workspaceStorage.getWorkspaces(),
       workspaceStorage.getCategories(),
       tabGroupRulesStorage.getRules(),
       tabGroupRulesStorage.getAutoGroupSettings(),
       bookmarkClipStorage.getAllClips(),
+      tabLifecycleConfigStorage.getSettings(),
     ]);
+
+    // The tab archive is exported only on request: it may hold sign-in links or one-time tokens
+    const tabArchive = options.includeTabArchive
+      ? await import("@/lib/storage/tab-archive-storage").then(
+          async ({ tabArchiveStorage }) => ({
+            entries: await tabArchiveStorage.getAllEntries(),
+            batches: await tabArchiveStorage.getAllBatches(),
+          }),
+        )
+      : undefined;
 
     const data = {
       version: "1.0.0",
       exportedAt: Date.now(),
-      bookmarks,
+      // JSON exports include queue-only items and their state; HTML exports only the library
+      bookmarks: allBookmarks,
       categories,
       workspaces,
       workspaceCategories,
       tabGroupRules,
       tabGroupAutoGroupSettings,
       clips,
+      readLaterEntries: Object.values(readLaterEntries),
+      tabLifecycleSettings,
+      ...(tabArchive ? { tabArchive } : {}),
     };
 
     if (format === "json") {
@@ -457,6 +512,8 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
     <BookmarkContext.Provider
       value={{
         bookmarks,
+        allBookmarks,
+        readLaterEntries,
         categories,
         allTags,
         aiConfig,

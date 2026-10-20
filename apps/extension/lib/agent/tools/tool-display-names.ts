@@ -12,6 +12,14 @@ const TOOL_DISPLAY_NAMES: Record<string, Record<Language, string>> = {
   delete_category: { zh: "删除分类", en: "Delete category" },
   delete_custom_filter: { zh: "删除自定义筛选器", en: "Delete custom filter" },
   delete_tab_group_rule: { zh: "删除标签页分组规则", en: "Delete tab group rule" },
+  list_open_tabs: { zh: "查看打开的标签页", en: "List open tabs" },
+  get_tab_lifecycle_status: { zh: "读取标签页概况", en: "Read tab overview" },
+  search_tab_archive: { zh: "搜索标签页归档", en: "Search tab archive" },
+  restore_archived_tabs: { zh: "恢复归档的标签页", en: "Restore archived tabs" },
+  move_tabs_to_read_later: { zh: "稍后读并关闭标签页", en: "Read later & close tabs" },
+  archive_tabs: { zh: "归档并关闭标签页", en: "Archive & close tabs" },
+  list_read_later: { zh: "查看稍后读", en: "List Read later" },
+  update_read_later_status: { zh: "更新稍后读状态", en: "Update Read later items" },
 };
 
 /**
