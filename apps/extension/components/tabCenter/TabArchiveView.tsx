@@ -3,7 +3,7 @@
  * day and batch, searchable and filterable (virtualized for 10,000 entries), with
  * restore / read later / bookmark / workspace / delete, one by one or in batch.
  */
-import { useCallback, useMemo, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Archive, BookOpen, BookmarkPlus, Briefcase, RotateCcw, Trash2 } from "lucide-react";
 import { Button, ScrollArea, confirm } from "@hamhome/ui";
@@ -34,15 +34,25 @@ export function TabArchiveView({ header }: TabArchiveViewProps) {
   const { t, i18n } = useTranslation(["bookmark", "common"]);
   const archive = useTabArchive();
   const { bookmarks } = useBookmarks();
-  const { selectedIds, toggleSelect, selectAll, deselectAll, toggleSelectAll } = useBookmarkSelection();
+  const { selectedIds, toggleSelect, selectAll, deselectAll, toggleSelectAll, retainOnly } = useBookmarkSelection();
   const [bookmarkEntry, setBookmarkEntry] = useState<TabArchiveEntry | null>(null);
   const [workspaceEntries, setWorkspaceEntries] = useState<TabArchiveEntry[] | null>(null);
 
   const libraryUrls = useMemo(() => new Set(bookmarks.map((bookmark) => normalizeBookmarkUrl(bookmark.url))), [bookmarks]);
   const rows = useMemo(() => buildArchiveRows(archive.filtered, archive.batches), [archive.batches, archive.filtered]);
   const visibleIds = useMemo(() => archive.filtered.map((item) => item.entry.id), [archive.filtered]);
-  const entriesById = useMemo(() => new Map(archive.entries.map((entry) => [entry.id, entry])), [archive.entries]);
-  const selected = useMemo(() => Array.from(selectedIds).filter((id) => entriesById.has(id)), [entriesById, selectedIds]);
+  // Batch actions and the delete confirmation only cover entries on screen, never ones
+  // hidden by the search / filters (or already gone from the archive)
+  const selectedEntries = useMemo(
+    () => archive.filtered.flatMap(({ entry }) => (selectedIds.has(entry.id) ? [entry] : [])),
+    [archive.filtered, selectedIds],
+  );
+  const selected = useMemo(() => selectedEntries.map((entry) => entry.id), [selectedEntries]);
+
+  // Entries hidden by a search / filter change leave the selection
+  useEffect(() => {
+    retainOnly(visibleIds);
+  }, [retainOnly, visibleIds]);
 
   const getItemKey = useCallback((index: number) => rows[index]?.key ?? index, [rows]);
   const virtual = useScrollAreaVirtualList({ count: rows.length, estimateSize: 58, gap: 4, getItemKey });
@@ -103,7 +113,7 @@ export function TabArchiveView({ header }: TabArchiveViewProps) {
             <BookmarkPlus className="mr-1.5 h-4 w-4" />
             {t("bookmark:tabCenter.actions.bookmark")}
           </Button>
-          <Button variant="outline" size="sm" disabled={selected.length === 0} onClick={() => setWorkspaceEntries(selected.map((id) => entriesById.get(id)!))}>
+          <Button variant="outline" size="sm" disabled={selected.length === 0} onClick={() => setWorkspaceEntries(selectedEntries)}>
             <Briefcase className="mr-1.5 h-4 w-4" />
             {t("bookmark:tabCenter.actions.workspace")}
           </Button>

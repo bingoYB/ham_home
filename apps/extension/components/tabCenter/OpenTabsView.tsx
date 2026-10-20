@@ -94,7 +94,7 @@ export function OpenTabsView({
         <OpenTabsBatchBar
           visibleTabIds={list.visibleTabIds}
           selectedTabs={list.selectedTabs}
-          onToggleSelectAll={(ids) => list.selectOnly(list.selected.size === ids.length ? [] : ids)}
+          onToggleSelectAll={list.toggleSelectAll}
           onReadLater={run(actions.readLater)}
           onBookmark={run(actions.bookmark)}
           onWorkspace={() => setWorkspaceTabs(list.selectedTabs)}

@@ -1894,7 +1894,7 @@ The tab center's Open view, rendered by `TabCenterPage` once a snapshot exists: 
 
 - List state (search, grouping, sort, filters, selection) comes from `useOpenTabsList`; rows are virtualized with `useScrollAreaVirtualList`, and "No tabs match" shows when no row is left.
 - A non-empty `preselectTabIds` replaces the selection, then `onPreselectConsumed` is called.
-- Row and batch actions go through `useOpenTabActions`; batch actions run on the selected tab IDs and clear the selection afterwards.
+- Row and batch actions go through `useOpenTabActions`; batch actions run on the selected tabs that are currently visible (`useOpenTabsList().selectedTabs`) and clear the selection afterwards. Tabs that are closed or hidden by the search / filters drop out of the selection, and select all selects exactly the visible tabs (`useOpenTabsList().toggleSelectAll`).
 - "Tidy up" resets `useTabTidy` (every suggestion selected) and opens `TabTidyDialog`; "AI tidy-up" opens `TabAITriageDialog`; "Add to workspace" opens `AddToWorkspaceDialog` with the selected tabs.
 - Grouping by tab group is offered only when `chrome.tabGroups` exists.
 
@@ -1975,7 +1975,7 @@ Sticky bar of batch actions for the selected open tabs; rendered by `OpenTabsVie
 | Prop | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | visibleTabIds | `number[]` | ✓ | - | IDs of the tabs currently listed |
-| selectedTabs | `OpenTabInfo[]` | ✓ | - | Selected tabs |
+| selectedTabs | `OpenTabInfo[]` | ✓ | - | Selected tabs that are currently visible |
 | onToggleSelectAll | `(tabIds: number[]) => void` | ✓ | - | Select-all checkbox; called with `visibleTabIds` |
 | onReadLater | `() => void` | ✓ | - | Read later |
 | onBookmark | `() => void` | ✓ | - | Bookmark |
@@ -1993,7 +1993,7 @@ Sticky bar of batch actions for the selected open tabs; rendered by `OpenTabsVie
 <OpenTabsBatchBar
   visibleTabIds={list.visibleTabIds}
   selectedTabs={list.selectedTabs}
-  onToggleSelectAll={(ids) => list.selectOnly(list.selected.size === ids.length ? [] : ids)}
+  onToggleSelectAll={list.toggleSelectAll}
   onReadLater={run(actions.readLater)}
   onBookmark={run(actions.bookmark)}
   onWorkspace={() => setWorkspaceTabs(list.selectedTabs)}
@@ -2316,6 +2316,7 @@ The tab center's Archive view, rendered by `TabCenterPage`: every tab HamHome cl
 
 - Data and actions come from `useTabArchive`; a "Latest: time · reason · N tabs" card offers "Restore this batch" for the newest batch that still has entries.
 - `BatchSelectionToolbar` (select all covers the filtered entries) holds restore, Read later, bookmark, add to workspace and delete; they are disabled without a selection and clear it when done.
+- The selection only covers visible entries: entries hidden by a search / filter change leave the selection (`useBookmarkSelection().retainOnly`), and the batch actions, the selected count and the delete confirmation count are built from the filtered entries only.
 - Deleting more than one entry asks for a destructive confirmation first; a single delete from a row does not.
 - Restoring one entry from its row also switches to the restored tab (`restore([id], true)`); batch restores do not switch.
 - A row's bookmark opens `WorkspacePageBookmarkDialog` (the save panel), while the batch bookmark saves in the background; rows show "Bookmarked" when the normalized URL is already in the library.
@@ -4611,7 +4612,7 @@ const openTabCount = useOpenTabCount();
 
 ### useOpenTabsList
 
-View state of the tab center's open tabs list: search, grouping, sorting, filters, virtual-list rows (`buildOpenTabsRows`) and a selection of tab IDs. Closed tabs drop out of the selection automatically.
+View state of the tab center's open tabs list: search, grouping, sorting, filters, virtual-list rows (`buildOpenTabsRows`) and a selection of tab IDs. Tabs that are closed or hidden by the search / filters drop out of the selection automatically (`retainVisibleSelection`), and batch targets come from the pure helper `getSelectedVisibleTabs(rows, selected)` in `lib/tabs/tab-view.utils.ts`.
 
 ```ts
 function useOpenTabsList(snapshot: OpenTabsSnapshot | null): UseOpenTabsListResult
@@ -4631,8 +4632,9 @@ function useOpenTabsList(snapshot: OpenTabsSnapshot | null): UseOpenTabsListResu
 | toggleSelect | `(tabId: number) => void` | Toggles one tab |
 | setSelected | `(tabIds: number[], selected: boolean) => void` | Adds or removes several tabs |
 | selectOnly | `(tabIds: number[]) => void` | Replaces the selection |
+| toggleSelectAll | `(tabIds: readonly number[]) => void` | Selects exactly the given (visible) tabs, or clears the selection when all of them are already selected |
 | clearSelection | `() => void` | Clears the selection |
-| selectedTabs | `OpenTabInfo[]` | Snapshot tabs that are selected |
+| selectedTabs | `OpenTabInfo[]` | Selected tabs that are currently visible, in list order (target of batch actions) |
 
 **Usage:**
 

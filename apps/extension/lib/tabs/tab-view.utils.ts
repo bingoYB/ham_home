@@ -130,3 +130,14 @@ export function buildOpenTabsRows(
   }
   return rows;
 }
+
+/**
+ * Selected tabs among the visible rows, in list order. Tabs hidden by the search or
+ * filters (or already closed) are left out, so batch actions never reach them.
+ */
+export function getSelectedVisibleTabs(
+  rows: readonly OpenTabsRow[],
+  selected: ReadonlySet<number>,
+): OpenTabInfo[] {
+  return rows.flatMap((row) => (row.type === "tab" && selected.has(row.tab.tabId) ? [row.tab] : []));
+}

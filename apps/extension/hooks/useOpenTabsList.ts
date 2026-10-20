@@ -5,12 +5,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import {
   buildOpenTabsRows,
+  getSelectedVisibleTabs,
   type OpenTabsFilter,
   type OpenTabsGroupBy,
   type OpenTabsRow,
   type OpenTabsSort,
 } from "@/lib/tabs/tab-view.utils";
 import type { OpenTabInfo, OpenTabsSnapshot } from "@/types";
+import { retainVisibleSelection, toggleAllVisible } from "@/utils/bookmark-selection.utils";
 
 export interface UseOpenTabsListResult {
   query: string;
@@ -28,9 +30,13 @@ export interface UseOpenTabsListResult {
   toggleSelect: (tabId: number) => void;
   setSelected: (tabIds: number[], selected: boolean) => void;
   selectOnly: (tabIds: number[]) => void;
+  /** Selects every given (visible) tab, or clears when they are all selected already */
+  toggleSelectAll: (tabIds: readonly number[]) => void;
   clearSelection: () => void;
+  /** Selected tabs that are currently visible, in list order: the target of batch actions */
   selectedTabs: OpenTabInfo[];
 }
+
 
 export function useOpenTabsList(snapshot: OpenTabsSnapshot | null): UseOpenTabsListResult {
   const [query, setQuery] = useState("");
@@ -52,15 +58,11 @@ export function useOpenTabsList(snapshot: OpenTabsSnapshot | null): UseOpenTabsL
     [rows],
   );
 
-  // Closed tabs drop out of the selection
+  // Tabs that are closed or hidden by the search / filters drop out of the selection,
+  // so the selection never covers tabs the user cannot see
   useEffect(() => {
-    if (!snapshot) return;
-    const open = new Set(snapshot.tabs.map((tab) => tab.tabId));
-    setSelectedSet((current) => {
-      const next = new Set(Array.from(current).filter((id) => open.has(id)));
-      return next.size === current.size ? current : next;
-    });
-  }, [snapshot]);
+    setSelectedSet((current) => retainVisibleSelection(current, visibleTabIds));
+  }, [visibleTabIds]);
 
   const toggleFilter = useCallback((filter: OpenTabsFilter) => {
     setFilterSet((current) => {
@@ -96,10 +98,11 @@ export function useOpenTabsList(snapshot: OpenTabsSnapshot | null): UseOpenTabsL
   const selectOnly = useCallback((tabIds: number[]) => setSelectedSet(new Set(tabIds)), []);
   const clearSelection = useCallback(() => setSelectedSet(new Set()), []);
 
-  const selectedTabs = useMemo(
-    () => (snapshot?.tabs ?? []).filter((tab) => selected.has(tab.tabId)),
-    [selected, snapshot],
-  );
+  const toggleSelectAll = useCallback((tabIds: readonly number[]) => {
+    setSelectedSet((current) => toggleAllVisible(current, tabIds));
+  }, []);
+
+  const selectedTabs = useMemo(() => getSelectedVisibleTabs(rows, selected), [rows, selected]);
 
   return {
     query,
@@ -117,6 +120,7 @@ export function useOpenTabsList(snapshot: OpenTabsSnapshot | null): UseOpenTabsL
     toggleSelect,
     setSelected,
     selectOnly,
+    toggleSelectAll,
     clearSelection,
     selectedTabs,
   };

@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { OpenTabInfo } from "@/types";
-import { buildOpenTabsRows, filterOpenTabs } from "../tab-view.utils";
+import {
+  buildOpenTabsRows,
+  filterOpenTabs,
+  getSelectedVisibleTabs,
+  type OpenTabsViewOptions,
+} from "../tab-view.utils";
 
 const NOW = 1_800_000_000_000;
 const DAY = 24 * 60 * 60 * 1000;
@@ -104,5 +109,38 @@ describe("open tabs view", () => {
     expect(ids(["duplicates", "protected"])).toEqual([2, 3]);
     expect(ids(["expiring"])).toEqual([4]);
     expect(ids([], "pricing")).toEqual([3]);
+  });
+});
+
+describe("getSelectedVisibleTabs", () => {
+  const tabs = [
+    tab(1, { title: "Alpha docs" }),
+    tab(2, { title: "Beta blog", protection: ["pinned"] }),
+    tab(3, { windowId: 2, title: "Alpha issues" }),
+  ];
+
+  function rows(patch: Partial<OpenTabsViewOptions> = {}) {
+    return buildOpenTabsRows(
+      { tabs, windows },
+      { groupBy: "window", sort: "position", filters: new Set(), query: "", now: NOW, ...patch },
+    );
+  }
+
+  it("returns the selected tabs in list order", () => {
+    expect(getSelectedVisibleTabs(rows(), new Set([3, 1])).map((item) => item.tabId)).toEqual([1, 3]);
+  });
+
+  it("leaves out selected tabs hidden by the search", () => {
+    const visible = rows({ query: "alpha" });
+    expect(getSelectedVisibleTabs(visible, new Set([1, 2, 3])).map((item) => item.tabId)).toEqual([1, 3]);
+  });
+
+  it("leaves out selected tabs hidden by a filter", () => {
+    const visible = rows({ filters: new Set(["protected"]) });
+    expect(getSelectedVisibleTabs(visible, new Set([1, 2, 3])).map((item) => item.tabId)).toEqual([2]);
+  });
+
+  it("ignores selected ids of tabs that are no longer open", () => {
+    expect(getSelectedVisibleTabs(rows(), new Set([2, 99])).map((item) => item.tabId)).toEqual([2]);
   });
 });
