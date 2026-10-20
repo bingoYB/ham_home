@@ -74,6 +74,10 @@ export function EditBookmarkDialog({ bookmark, onSaved, onClose }: EditBookmarkD
   } = useSavePanel({
     pageContent,
     existingBookmark: bookmark,
+    // Editing only changes metadata. The active tab is the HamHome page itself, so an
+    // automatic snapshot / screenshot here would capture the app instead of the bookmark.
+    initialSaveSnapshot: false,
+    initialSaveScreenshot: false,
     onSaved,
   });
 
