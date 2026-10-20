@@ -1,10 +1,20 @@
 import { describe, expect, it } from "vitest";
+import { sanitizeSafeSettingsUpdate } from "../../tools/safe-settings";
 import {
   createGetHamHomeFeatureDetailTool,
   createHamHomeFeatureSkill,
   getHamHomeFeatureDetail,
   getHamHomeFeatureOverview,
 } from "../hamhome-feature-skill";
+
+/** The "agent 可自动修改的安全项" block of the settings doc, up to the next blank line. */
+function getSettingsAllowlistSection(): string {
+  const detail = getHamHomeFeatureDetail("settings")?.detail ?? "";
+  const start = detail.indexOf("agent 可自动修改的安全项");
+  expect(start).toBeGreaterThanOrEqual(0);
+  const end = detail.indexOf("\n\n", start);
+  return detail.slice(start, end === -1 ? undefined : end);
+}
 
 describe("hamhome-feature-skill", () => {
   it("exposes a feature overview and detailed docs by id", () => {
@@ -109,6 +119,43 @@ describe("hamhome-feature-skill", () => {
       expect(skill.documents?.[0]?.content).toContain(`- ${feature.id}:`);
     }
     expect(skill.tools?.[0]?.tool.name).toBe("get_hamhome_feature_detail");
+  });
+
+  it("lists only the setting scopes the safe settings tool applies", () => {
+    const documentedScopes = [
+      ...getSettingsAllowlistSection().matchAll(/^- (\w+):/gm),
+    ].map((match) => match[1]);
+    const appliedScopes = Object.keys(sanitizeSafeSettingsUpdate({})).filter(
+      (key) => key !== "rejected",
+    );
+
+    expect(documentedScopes.sort()).toEqual(appliedScopes.sort());
+    expect(getSettingsAllowlistSection()).not.toMatch(/webdav/i);
+  });
+
+  it("does not claim the agent can change WebDAV sync settings", () => {
+    const skillContent = createHamHomeFeatureSkill().documents?.[0]?.content ?? "";
+    const allDocs = [
+      skillContent,
+      ...getHamHomeFeatureOverview().map(
+        (feature) => getHamHomeFeatureDetail(feature.id)?.detail ?? "",
+      ),
+    ].join("\n");
+    const canDoLine =
+      skillContent.split("\n").find((line) => line.startsWith("Agent 可以")) ?? "";
+
+    expect(allDocs).not.toMatch(/webdavConfig:\s*enabled/);
+    expect(allDocs).not.toMatch(/agent 可以[^\n]*(开关|修改)\s*WebDAV/i);
+    expect(canDoLine).not.toBe("");
+    expect(canDoLine).not.toMatch(/WebDAV[^，。；]*(开关|地址)/);
+    expect(skillContent).toContain("不能开关 WebDAV 同步");
+    expect(getHamHomeFeatureDetail("import-export-sync")?.detail).toContain(
+      "agent 不能开关 WebDAV 同步或修改任何 WebDAV 配置",
+    );
+    expect(getHamHomeFeatureDetail("settings")?.detail).toContain(
+      "update_safe_plugin_settings 会拒绝任何 webdavConfig 修改",
+    );
+    expect(getHamHomeFeatureDetail("settings")?.detail).toContain("hasUrl");
   });
 
   it("returns detailed feature content from the tool", async () => {
