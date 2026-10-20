@@ -1,6 +1,6 @@
 # HamHome 商店文案 V2
 
-更新日期：2026-10-17。适用于 Chrome Web Store、Edge Add-ons 和 Firefox Add-ons 的本地化资料。本文件是待提交文案；修改文件与扩展 manifest 不代表商店页面已更新。
+更新日期：2026-10-20（补回 1.4.3 起已有的标签页减负段落）。适用于 Chrome Web Store、Edge Add-ons 和 Firefox Add-ons 的本地化资料。本文件是待提交文案；修改文件与扩展 manifest 不代表商店页面已更新。
 
 ## 名称与简述
 
@@ -32,6 +32,12 @@ HamHome 是一款开源、本地优先的 AI 书签管理插件，支持 Chrome�
 **保存浏览现场**
 
 把一组标签页保存为工作空间，稍后恢复全部或选中页面。Chrome 与 Edge 可使用原生 Tab Group 自动分组；当前 Firefox 构建使用工作空间保存和恢复页面，不运行原生 Tab Group 自动分组。
+
+**给标签页减负，留住值得读的内容**
+
+- 一键加入稍后读并关闭页面，按阅读状态管理队列；可添加备注、标记已读或转入收藏库。
+- 在标签页中心归档并恢复页面；闲置自动归档和标签预算按需开启，自动归档需本机确认。
+- 用 AI 查看并调整保留、稍后读和归档建议，配合本周概览回顾使用情况。
 
 **本地存储，自选 AI**
 
@@ -66,6 +72,12 @@ Search titles, URLs, descriptions and page text by keyword. Configure embeddings
 
 Save a group of tabs as a workspace and restore all or selected pages later. Chrome and Edge support native Tab Group automation. The current Firefox build saves and restores workspaces without native Tab Group automation.
 
+**Reduce tab clutter and keep what is worth reading**
+
+- Add a page to Read later and close the tab. Track reading status, add notes, mark items as read or keep them in the library.
+- Archive and restore pages from the tab center. Enable idle auto-archiving and tab budgets when needed; auto-archiving requires consent on each device.
+- Review and adjust AI suggestions to keep, read later or archive tabs, and revisit your activity with the weekly overview.
+
 **Local storage, your AI provider**
 
 No HamHome account is required. Primary collection data stays in your browser by default. Basic bookmark management and keyword search work without AI. AI requires your own provider account/API key or local endpoint, with options including OpenAI, DeepSeek, Anthropic Claude and Ollama. Cloud AI and embedding charges depend on your providers.
@@ -81,5 +93,6 @@ Source code: https://github.com/bingoYB/ham_home
 
 - 网站新指南上线后再提交含这些链接的商店长描述，检查各语言商店预览。
 - 扩展名称与简介随下一次经过验证的扩展版本提交；商店审核与公开展示状态分别记录。
+- 1.4.3 起扩展包含稍后读、标签页中心、归档和标签预算。“给标签页减负 / Reduce tab clutter”段落沿用 `apps/web/docs/aeo-plan.md` §9.2，Chrome 当前长描述已包含；替换长描述时保留这一段，避免商店页面漏掉已上线功能。
 - 以实际插件截图展示导入、批量分析和搜索步骤；示例图片不作为真实整理成功率的证明。
 - 发布后分别记录 ChatGPT 等产品的查询日期、问题、是否联网、引用 URL 和是否提及 HamHome。推荐结果是观察指标，不保证收录或推荐。
