@@ -31,15 +31,14 @@ export function FeatureSection({
   return (
     <section
       id={id}
-      className={cn(
-        'relative py-16 sm:py-20 lg:py-24 overflow-hidden',
-        alternate && 'bg-muted/30',
-        className,
-      )}
+      className={cn('relative py-16 sm:py-20 lg:py-24 overflow-hidden', className)}
     >
-      {/* 装饰性背景渐变 */}
+      {/* 交替背景：色带上下边缘羽化，与相邻区块自然过渡，不出现一条硬线 */}
       {alternate && (
-        <div className="pointer-events-none absolute inset-0">
+        <div
+          aria-hidden="true"
+          className="feature-band pointer-events-none absolute inset-0 overflow-hidden bg-muted/30"
+        >
           <div className="absolute -left-40 -top-40 h-80 w-80 rounded-full bg-primary/5 blur-3xl" />
           <div className="absolute -right-40 -bottom-40 h-80 w-80 rounded-full bg-primary/5 blur-3xl" />
         </div>

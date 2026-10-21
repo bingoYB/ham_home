@@ -35,10 +35,8 @@ export function LandingPage({ language }: LandingPageProps) {
 
       {/* 主内容 */}
       <main className="home-page">
-        {/* Hero 区块 */}
-        <div className="container mx-auto px-4 py-8">
-          <FeatureHeroBanner isEn={isEn} isDark={isDark} />
-        </div>
+        {/* Hero 区块：背景横向铺满整个页面宽度，内容容器由 Hero 自己提供 */}
+        <FeatureHeroBanner isEn={isEn} isDark={isDark} />
 
         <LandingOverview isEn={isEn} />
         <LandingGuides language={language} />
