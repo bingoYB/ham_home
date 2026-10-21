@@ -77,7 +77,7 @@ export function FeatureHeroBanner({ isEn, isDark }: FeatureHeroBannerProps) {
                 {texts.category}
               </span>
             </h1>
-            <p style={heroDelay(120)} className="hero-rise mt-5 max-w-full break-words [font-family:var(--font-display)] text-[2rem] font-semibold leading-[1.14] tracking-normal text-foreground sm:text-[2.75rem] lg:text-[3rem]">
+            <p style={heroDelay(120)} className="hero-rise mt-5 max-w-full break-keep break-words text-pretty [font-family:var(--font-display)] text-[2rem] font-semibold leading-[1.14] tracking-normal text-foreground sm:text-[2.75rem] lg:text-[3rem]">
               {texts.title}
             </p>
             <p style={heroDelay(210)} className="hero-rise mt-5 max-w-full break-words text-lg leading-relaxed text-foreground/75 sm:text-xl">

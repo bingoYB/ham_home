@@ -121,7 +121,7 @@ app/components/
 - 安装操作复用 `LandingActionButtons`（开启 `pulse`）；按钮下方展示三个真实商店链接及 AI/Embedding 配置、费用与数据传输条件。
 - 首屏入场动画：文案区按 `--hero-delay` 依次上浮，截图轮播从右侧滑入并缓慢浮动，背景（`HeroBackdrop`）有两团缓慢漂移的品牌色光晕；能力标签卡片悬停时轻微上抬。动画是纯 CSS，无 JS 时也能播放；`prefers-reduced-motion` 下全部关闭。
 - 自己提供内容容器（`container mx-auto px-4`）和横向铺满页面宽度的外层 `section`，不再由 `LandingPage` 包一层容器：背景光晕因此不会被内容容器裁成方块。`section` 带 `overflow-x-clip`，只防止入场位移撑宽页面，不裁剪纵向内容和阴影。
-- 背景交给 `HeroBackdrop`，Hero 本身只负责内容。
+- 背景交给 `HeroBackdrop`，Hero 本身只负责内容；口号用 `break-keep`（`word-break: keep-all`），中文只在标点和空格处换行，不会把「有序」拆开或让「井然。」孤零零占一行；`text-pretty` 避免英文窄栏下最后一行只剩一个单词（如单独一行「AI.」）；`break-words` 仍保留，极窄屏下超长片段照样折行。
 - 说明段落和下方的配置提示用 `text-foreground/75`、`text-foreground/70`，而不是 `text-muted-foreground`：它们压在 `HeroBackdrop` 的光晕上，灰色文字在带色背景上对比度不够（亮色主题实测约 3.5–4.2:1）；现在两种主题、各宽度下都不低于 5.2:1（WCAG AA 要求 4.5:1）。
 - 截图轮播的入场只做位移、不做淡入：首张截图通常是首屏最大的图片（LCP 元素），透明度为 0 时不计入绘制，会推迟 LCP。
 
