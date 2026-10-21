@@ -205,7 +205,7 @@
   animation: hero-float 7s ease-in-out 1.2s infinite;
 }
 
-/* Drifting brand-colored glows behind the hero */
+/* Drifting brand-colored glows behind the hero (transform only; edges stay transparent) */
 @keyframes glow-drift-a {
   0%,
   100% {
@@ -228,12 +228,76 @@
   }
 }
 
+/*
+ * Full-bleed backdrop (see HeroBackdrop). Nothing may clip a glow into a visible edge:
+ * - each glow is a radial gradient that is already transparent at its own box edge, with an
+ *   eased falloff (a plain two-stop gradient shows a rim), so drifting never reveals a box;
+ * - the layer fades out at the top (under the header) and at the bottom (into the next
+ *   section) through a mask, so it never ends in a straight line.
+ */
+.hero-backdrop {
+  --hero-glow-orange: 0.17;
+  --hero-glow-teal: 0.13;
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 5rem,
+    #000 calc(100% - 10rem),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 5rem,
+    #000 calc(100% - 10rem),
+    transparent 100%
+  );
+}
+
+.dark .hero-backdrop {
+  --hero-glow-orange: 0.26;
+  --hero-glow-teal: 0.18;
+}
+
 .hero-glow-a {
+  background: radial-gradient(
+    closest-side,
+    rgb(255 91 36 / var(--hero-glow-orange)) 0%,
+    rgb(255 91 36 / calc(var(--hero-glow-orange) * 0.55)) 35%,
+    rgb(255 91 36 / calc(var(--hero-glow-orange) * 0.18)) 68%,
+    rgb(255 91 36 / 0) 100%
+  );
   animation: glow-drift-a 14s ease-in-out infinite;
 }
 
 .hero-glow-b {
+  background: radial-gradient(
+    closest-side,
+    rgb(45 212 191 / var(--hero-glow-teal)) 0%,
+    rgb(45 212 191 / calc(var(--hero-glow-teal) * 0.55)) 35%,
+    rgb(45 212 191 / calc(var(--hero-glow-teal) * 0.18)) 68%,
+    rgb(45 212 191 / 0) 100%
+  );
   animation: glow-drift-b 17s ease-in-out infinite;
+}
+
+/* Alternate feature sections: a tinted band whose top and bottom feather out, so neighbouring
+ * sections blend into each other instead of meeting at a straight line. */
+.feature-band {
+  -webkit-mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 5rem,
+    #000 calc(100% - 5rem),
+    transparent 100%
+  );
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0,
+    #000 5rem,
+    #000 calc(100% - 5rem),
+    transparent 100%
+  );
 }
 
 /* Soft pulsing halo on the primary call to action */

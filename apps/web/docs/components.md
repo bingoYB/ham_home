@@ -22,6 +22,7 @@ app/components/
 ├── LandingFAQ.tsx
 ├── LandingCta.tsx
 ├── FeatureHeroBanner.tsx
+├── HeroBackdrop.tsx
 ├── FeatureSection.tsx
 ├── FeatureShowcase.tsx
 ├── ExtensionScreenshotFrame.tsx
@@ -118,8 +119,40 @@ app/components/
 - 最终口号「借助 AI，让收藏有序，让标签页井然。」与对应英文作为 `h1` 之后的大号段落，来自 `PRODUCT_COPY`；轮播交给 `HeroScreenshotCarousel`。
 - 截图路径由 `getExtensionScreenshotSrc()` 生成，自动带上 `NEXT_PUBLIC_BASE_PATH`。
 - 安装操作复用 `LandingActionButtons`（开启 `pulse`）；按钮下方展示三个真实商店链接及 AI/Embedding 配置、费用与数据传输条件。
-- 首屏入场动画：文案区按 `--hero-delay` 依次上浮，截图轮播从右侧滑入并缓慢浮动，背景有两团缓慢漂移的品牌色光晕；能力标签卡片悬停时轻微上抬。动画是纯 CSS，无 JS 时也能播放；`prefers-reduced-motion` 下全部关闭。
+- 首屏入场动画：文案区按 `--hero-delay` 依次上浮，截图轮播从右侧滑入并缓慢浮动，背景（`HeroBackdrop`）有两团缓慢漂移的品牌色光晕；能力标签卡片悬停时轻微上抬。动画是纯 CSS，无 JS 时也能播放；`prefers-reduced-motion` 下全部关闭。
+- 自己提供内容容器（`container mx-auto px-4`）和横向铺满页面宽度的外层 `section`，不再由 `LandingPage` 包一层容器：背景光晕因此不会被内容容器裁成方块。`section` 带 `overflow-x-clip`，只防止入场位移撑宽页面，不裁剪纵向内容和阴影。
+- 背景交给 `HeroBackdrop`，Hero 本身只负责内容；口号用 `break-keep`（`word-break: keep-all`），中文只在标点和空格处换行，不会把「有序」拆开或让「井然。」孤零零占一行；`text-pretty` 避免英文窄栏下最后一行只剩一个单词（如单独一行「AI.」）；`break-words` 仍保留，极窄屏下超长片段照样折行。
+- 说明段落和下方的配置提示用 `text-foreground/75`、`text-foreground/70`，而不是 `text-muted-foreground`：它们压在 `HeroBackdrop` 的光晕上，灰色文字在带色背景上对比度不够（亮色主题实测约 3.5–4.2:1）；现在两种主题、各宽度下都不低于 5.2:1（WCAG AA 要求 4.5:1）。
 - 截图轮播的入场只做位移、不做淡入：首张截图通常是首屏最大的图片（LCP 元素），透明度为 0 时不计入绘制，会推迟 LCP。
+
+---
+
+## HeroBackdrop
+
+首屏背景：两团品牌色光晕（橙色在左上、青色在右下），横向铺满页面宽度，位于 Hero 内容之后。
+
+### Props
+
+| name | type | required | default | description |
+|------|------|----------|---------|-------------|
+| - | - | - | - | 无 props |
+
+### Usage
+
+```tsx
+<section className="relative isolate overflow-x-clip">
+  <HeroBackdrop />
+  <div className="container mx-auto px-4 py-8">...</div>
+</section>
+```
+
+### 行为说明
+
+- 必须放在 `relative isolate` 的整宽容器里：自身 `absolute inset-0 -z-10`，装饰性元素（`aria-hidden`、`pointer-events-none`），不参与读屏和点击。
+- 不会出现硬边：光晕是 `radial-gradient(closest-side, …)`，边缘已是完全透明，缓慢漂移时也不会露出盒子边界（不再使用 `blur` 滤镜，也不会被容器的 `overflow-hidden` 切成矩形）；整层再用 `mask-image` 在顶部（紧贴导航栏下方）和底部（衔接下一区块）渐隐。
+- 光晕强度由 `.hero-backdrop` 上的 `--hero-glow-orange` / `--hero-glow-teal` 控制，深色主题（`.dark`）下更强；调整样式时改这两个变量，不要给光晕加 `blur` 或把它放进带 `overflow-hidden` 的容器。
+- 橙色光晕的中心放在 Logo 和口号后面（左上），说明段落处强度已明显减弱；改光晕的位置、尺寸或强度后，要重新核对首屏正文与背景的对比度（深浅两种主题，且包括漂移到最远的位置）。
+- 漂移动画是纯 `transform`（`hero-glow-a` / `hero-glow-b`），`prefers-reduced-motion: reduce` 下关闭。
 
 ---
 
@@ -210,7 +243,7 @@ app/components/
 
 ### 行为说明
 
-- 偶数/奇数区块可交替背景，提高长页面扫读性。
+- 偶数/奇数区块可交替背景，提高长页面扫读性。交替背景是单独的一层（`.feature-band`）：上下各 5rem 用 `mask-image` 羽化，与相邻区块自然过渡，不会在区块交界处出现一条硬线；不要把背景色直接写在 `section` 上。
 
 ---
 
