@@ -16,10 +16,13 @@ import {
   Input,
 } from '@hamhome/ui';
 import { useBookmarks } from '@/contexts/BookmarkContext';
+import { TabActivityPrivacyCard } from '@/components/privacy/TabActivityPrivacyCard';
+import { useTabLifecycleSettings } from '@/hooks/useTabLifecycleSettings';
 
 export function PrivacyPage() {
   const { t } = useTranslation(['common', 'settings']);
   const { appSettings, aiConfig, updateAppSettings, updateAIConfig } = useBookmarks();
+  const { settings: lifecycleSettings } = useTabLifecycleSettings();
   const [newDomain, setNewDomain] = useState('');
 
   // 添加隐私域名
@@ -88,6 +91,14 @@ export function PrivacyPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Tab activity, archive and local stats: this device only */}
+      <TabActivityPrivacyCard
+        trackingEnabled={lifecycleSettings.activityTracking}
+        onOpenRules={() => {
+          window.location.hash = 'tabs?view=rules';
+        }}
+      />
 
       {/* AI 隐私设置 */}
       <Card className="mb-6">

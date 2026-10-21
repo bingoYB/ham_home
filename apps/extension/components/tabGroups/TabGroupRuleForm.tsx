@@ -255,6 +255,17 @@ export function TabGroupRuleForm({
               onCheckedChange={(checked) => updateForm("enabled", checked)}
             />
           </div>
+          <div className="flex items-center justify-between gap-4 rounded-md border p-3 md:col-span-2">
+            <div className="space-y-0.5">
+              <Label htmlFor="tab-rule-protect">{t("tabGroups.form.protectTabs")}</Label>
+              <p className="text-xs text-muted-foreground">{t("tabGroups.form.protectTabsHint")}</p>
+            </div>
+            <Switch
+              id="tab-rule-protect"
+              checked={form.protectTabs}
+              onCheckedChange={(checked) => updateForm("protectTabs", checked)}
+            />
+          </div>
         </div>
 
         <DialogFooter>

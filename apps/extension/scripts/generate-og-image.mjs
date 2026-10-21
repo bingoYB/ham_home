@@ -3,114 +3,141 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 
+/**
+ * Generates the HamHome social preview image (1200×630) and the store small promo tile (440×280).
+ * The copy mirrors PRODUCT_COPY in apps/web/app/lib/site.ts; update both when the positioning changes.
+ * Fonts resolve from macOS system fonts (Avenir Next, PingFang SC), so run it on macOS:
+ *   node apps/extension/scripts/generate-og-image.mjs
+ */
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const assetsDir = path.join(__dirname, '../assets');
-const outputDir = path.join(__dirname, '../public'); // Output to public directly
+const repoRoot = path.join(__dirname, '../../..');
+const logoPath = path.join(__dirname, '../assets/logo.png');
 
-if (!fs.existsSync(outputDir)) {
-  fs.mkdirSync(outputDir, { recursive: true });
-}
-
-const CONFIG = {
-  width: 1200,
-  height: 630,
-  logoPath: path.join(assetsDir, 'logo.png'), 
-  outputPath: path.join(outputDir, 'og-image.png'),
-  
-  // Color Palette (based on oklch values approximated to hex)
-  backgroundColor: '#f5f3ff', // Light violet/gray
-  primaryColor: '#8b5cf6',    // Violet
-  secondaryColor: '#a78bfa',  // Light violet
-  textColor: '#1e1b4b',       // Dark navy
-  subtitleColor: '#4c1d95',   // Deep violet
+const COPY = {
+  title: 'HamHome',
+  categoryEn: 'AI Web Clipper & Tab Manager',
+  categoryZh: 'AI 网页收藏与标签页管理',
+  pills: [
+    { en: 'Save & Clip', zh: '网页、文本与图片' },
+    { en: 'Tab Workspaces', zh: '标签页工作空间' },
+    { en: 'Local First', zh: '本地优先' },
+  ],
+  footer: 'Open source · Chrome · Edge · Firefox',
 };
 
-async function generateOGImage() {
-  try {
-    // 1. Prepare Logo (resize and convert to base64 for embedding in SVG)
-    const logoBuffer = await sharp(CONFIG.logoPath)
-      .resize(300, 300, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
-      .toBuffer();
-    
-    const logoBase64 = `data:image/png;base64,${logoBuffer.toString('base64')}`;
+// Warm palette shared with the landing page (brand orange #ff5b24, teal accent).
+const COLORS = {
+  backgroundFrom: '#fffaf5',
+  backgroundTo: '#ffeedd',
+  brand: '#ff5b24',
+  brandText: '#c2410c',
+  accent: '#2dd4bf',
+  title: '#1e1b4b',
+  muted: '#9a3412',
+};
 
-    // 2. Construct SVG
-    // We use a modern, clean layout with a gradient background and feature highlights
-    const svgContent = `
-    <svg width="${CONFIG.width}" height="${CONFIG.height}" viewBox="0 0 ${CONFIG.width} ${CONFIG.height}" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-      <defs>
-        <linearGradient id="bgGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#ffffff" />
-          <stop offset="100%" stop-color="${CONFIG.backgroundColor}" />
-        </linearGradient>
-        <filter id="dropShadow" x="-20%" y="-20%" width="140%" height="140%">
-          <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
-          <feOffset dx="2" dy="2" result="offsetblur"/>
-          <feComponentTransfer>
-            <feFuncA type="linear" slope="0.2"/>
-          </feComponentTransfer>
-          <feMerge> 
-            <feMergeNode/>
-            <feMergeNode in="SourceGraphic"/> 
-          </feMerge>
-        </filter>
-      </defs>
+const LATIN_FONT = "'Avenir Next', 'Helvetica Neue', Arial, sans-serif";
+const CJK_FONT = "'PingFang SC', 'Hiragino Sans GB', sans-serif";
 
-      <!-- Minimalist Background with abstract shapes -->
-      <rect width="100%" height="100%" fill="url(#bgGradient)" />
-      
-      <!-- Abstract circle bottom left -->
-      <circle cx="0" cy="630" r="300" fill="${CONFIG.primaryColor}" opacity="0.05" />
-      
-      <!-- Abstract circle top right -->
-      <circle cx="1200" cy="0" r="400" fill="${CONFIG.secondaryColor}" opacity="0.05" />
+const LAYOUTS = {
+  // Open Graph / Twitter card: logo on the left, title, bilingual category, feature pills and a footer line.
+  og: {
+    width: 1200,
+    height: 630,
+    logo: { x: 100, y: 165, size: 300 },
+    textX: 450,
+    title: { y: 232, size: 100 },
+    categoryEn: { y: 302, size: 40 },
+    categoryZh: { y: 354, size: 32 },
+    pills: { y: 398, width: 210, height: 74, gap: 20, enSize: 20, zhSize: 16 },
+    footer: { x: 1140, y: 588, size: 18 },
+    circles: [
+      { cx: 1200, cy: 0, r: 420, color: 'brand', opacity: 0.08 },
+      { cx: 0, cy: 630, r: 300, color: 'accent', opacity: 0.1 },
+    ],
+  },
+  // Chrome Web Store small promo tile: fewer words and larger type so it stays legible.
+  tile: {
+    width: 440,
+    height: 280,
+    logo: { x: 22, y: 80, size: 120 },
+    textX: 158,
+    title: { y: 130, size: 46 },
+    categoryEn: { y: 160, size: 17 },
+    categoryZh: { y: 186, size: 15 },
+    circles: [
+      { cx: 440, cy: 0, r: 160, color: 'brand', opacity: 0.08 },
+      { cx: 0, cy: 280, r: 110, color: 'accent', opacity: 0.1 },
+    ],
+  },
+};
 
-      <!-- Main Layout Group -->
-      <g transform="translate(100, 165)">
-        
-        <!-- Logo Image -->
-        <image x="0" y="0" width="300" height="300" href="${logoBase64}" />
+const OUTPUTS = [
+  { file: 'apps/web/public/og-image.png', layout: 'og' },
+  { file: 'docs/og-image.png', layout: 'og' },
+  { file: 'docs/og-image-440x280.png', layout: 'tile' },
+];
 
-        <!-- Text Group -->
-        <g transform="translate(350, 60)">
-          <text x="0" y="0" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-weight="800" font-size="96" fill="${CONFIG.textColor}">HamHome</text>
-          
-          <text x="0" y="70" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-weight="500" font-size="42" fill="${CONFIG.subtitleColor}">Intelligent Bookmark Assistant</text>
-          <text x="0" y="120" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" font-weight="400" font-size="32" fill="${CONFIG.subtitleColor}" opacity="0.9">智能书签助手</text>
+const escapeXml = (value) => value.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
 
-          <!-- Feature pills -->
-          <g transform="translate(0, 180)">
-             <!-- Pill 1 -->
-            <rect x="0" y="0" width="200" height="70" rx="16" fill="${CONFIG.primaryColor}" opacity="0.1" />
-            <text x="100" y="32" font-family="Arial, sans-serif" font-size="20" fill="${CONFIG.primaryColor}" text-anchor="middle" font-weight="bold">AI Analysis</text>
-            <text x="100" y="58" font-family="Arial, sans-serif" font-size="16" fill="${CONFIG.primaryColor}" text-anchor="middle" opacity="0.9">AI 智能分析</text>
+function text(x, y, value, { size, weight = 400, color, font = LATIN_FONT, anchor = 'start', opacity = 1 }) {
+  return `<text x="${x}" y="${y}" font-family="${font}" font-size="${size}" font-weight="${weight}" fill="${color}" fill-opacity="${opacity}" text-anchor="${anchor}">${escapeXml(value)}</text>`;
+}
 
-            <!-- Pill 2 -->
-            <rect x="220" y="0" width="200" height="70" rx="16" fill="${CONFIG.primaryColor}" opacity="0.1" />
-            <text x="320" y="32" font-family="Arial, sans-serif" font-size="20" fill="${CONFIG.primaryColor}" text-anchor="middle" font-weight="bold">Smart Org</text>
-            <text x="320" y="58" font-family="Arial, sans-serif" font-size="16" fill="${CONFIG.primaryColor}" text-anchor="middle" opacity="0.9">智能整理</text>
+function pills(layout) {
+  if (!layout.pills) return '';
+  const { y, width, height, gap, enSize, zhSize } = layout.pills;
+  return COPY.pills.map((pill, index) => {
+    const x = layout.textX + index * (width + gap);
+    const center = x + width / 2;
+    return [
+      `<rect x="${x}" y="${y}" width="${width}" height="${height}" rx="18" fill="${COLORS.brand}" fill-opacity="0.1" stroke="${COLORS.brand}" stroke-opacity="0.2" />`,
+      text(center, y + height * 0.44, pill.en, { size: enSize, weight: 700, color: COLORS.brandText, anchor: 'middle' }),
+      text(center, y + height * 0.8, pill.zh, { size: zhSize, weight: 500, color: COLORS.muted, font: CJK_FONT, anchor: 'middle' }),
+    ].join('');
+  }).join('');
+}
 
-            <!-- Pill 3 -->
-            <rect x="440" y="0" width="200" height="70" rx="16" fill="${CONFIG.primaryColor}" opacity="0.1" />
-            <text x="540" y="32" font-family="Arial, sans-serif" font-size="20" fill="${CONFIG.primaryColor}" text-anchor="middle" font-weight="bold">Privacy First</text>
-            <text x="540" y="58" font-family="Arial, sans-serif" font-size="16" fill="${CONFIG.primaryColor}" text-anchor="middle" opacity="0.9">隐私优先</text>
-          </g>
-        </g>
-      </g>
-    </svg>
-    `;
+async function buildSvg(layout) {
+  const { width, height, logo } = layout;
+  const logoBuffer = await sharp(logoPath)
+    .resize(logo.size, logo.size, { fit: 'contain', background: { r: 0, g: 0, b: 0, alpha: 0 } })
+    .png()
+    .toBuffer();
+  const circles = layout.circles
+    .map(({ cx, cy, r, color, opacity }) => `<circle cx="${cx}" cy="${cy}" r="${r}" fill="${COLORS[color]}" fill-opacity="${opacity}" />`)
+    .join('');
 
-    // 3. Render SVG to PNG using Sharp
-    await sharp(Buffer.from(svgContent))
-      .png()
-      .toFile(CONFIG.outputPath);
+  return `<svg width="${width}" height="${height}" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="background" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="${COLORS.backgroundFrom}" />
+      <stop offset="100%" stop-color="${COLORS.backgroundTo}" />
+    </linearGradient>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#background)" />
+  ${circles}
+  <image x="${logo.x}" y="${logo.y}" width="${logo.size}" height="${logo.size}" href="data:image/png;base64,${logoBuffer.toString('base64')}" />
+  ${text(layout.textX, layout.title.y, COPY.title, { size: layout.title.size, weight: 700, color: COLORS.title })}
+  ${text(layout.textX, layout.categoryEn.y, COPY.categoryEn, { size: layout.categoryEn.size, weight: 600, color: COLORS.brandText })}
+  ${text(layout.textX, layout.categoryZh.y, COPY.categoryZh, { size: layout.categoryZh.size, weight: 600, color: COLORS.muted, font: CJK_FONT })}
+  ${pills(layout)}
+  ${layout.footer ? text(layout.footer.x, layout.footer.y, COPY.footer, { size: layout.footer.size, weight: 500, color: COLORS.muted, anchor: 'end', opacity: 0.75 }) : ''}
+</svg>`;
+}
 
-    console.log('OG Image generated successfully at:', CONFIG.outputPath);
-
-  } catch (err) {
-    console.error('Error generating OG image:', err);
-    process.exit(1);
+async function generateImages() {
+  for (const output of OUTPUTS) {
+    const target = path.join(repoRoot, output.file);
+    fs.mkdirSync(path.dirname(target), { recursive: true });
+    const svg = await buildSvg(LAYOUTS[output.layout]);
+    await sharp(Buffer.from(svg)).png({ compressionLevel: 9 }).toFile(target);
+    console.log(`Generated ${output.file}`);
   }
 }
 
-generateOGImage();
+generateImages().catch((error) => {
+  console.error('Error generating OG image:', error);
+  process.exit(1);
+});

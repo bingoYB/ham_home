@@ -9,7 +9,10 @@ import { useTranslation } from "react-i18next";
 import { Bookmark, CheckCircle2, Loader2, X, AlertCircle } from "lucide-react";
 import { Button, cn } from "@hamhome/ui";
 import { SavePanel } from "./SavePanel";
+import { ReadLaterInsteadButton } from "./ReadLaterInsteadButton";
 import { useInPageSave } from "@/hooks/useInPageSave";
+import { useTabBusySignal } from "@/hooks/useTabBusySignal";
+import { contentTabSignalService } from "@/lib/services/content-tab-signal-service";
 import { useContentUI } from "@/utils/ContentUIContext";
 import { isSubjectClip } from "@/utils/clip-context";
 
@@ -32,6 +35,12 @@ export function InPageSaveFlow() {
   } = useInPageSave();
 
   const isOpen = phase !== "idle";
+  const readLaterInstead = () => {
+    close();
+    contentTabSignalService.readLaterThisTab();
+  };
+  // While the overlay is open the tab is protected from auto archive and making room
+  useTabBusySignal(isOpen);
 
   // Esc 关闭浮窗（捕获阶段监听，避免被页面自身的处理拦截）
   useEffect(() => {
@@ -133,6 +142,7 @@ export function InPageSaveFlow() {
                 ? t("bookmark:inPageSave.updateTitle")
                 : t("bookmark:inPageSave.title")}
             </span>
+            {!clipContext && <ReadLaterInsteadButton onClick={readLaterInstead} />}
             <CloseButton onClick={close} label={t("common:common.close")} />
           </div>
 

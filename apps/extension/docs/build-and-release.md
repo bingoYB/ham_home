@@ -1,7 +1,7 @@
 # HamHome 扩展打包与发布文档
 
-**版本：** 1.2.0  
-**更新日期：** 2026-06-23  
+**版本：** 1.4.4  
+**更新日期：** 2026-10-20  
 **构建工具：** WXT 0.20+ / pnpm 9 / Turborepo 2
 
 ---
@@ -26,7 +26,7 @@
 
 | 工具 | 版本要求 | 说明 |
 |------|---------|------|
-| Node.js | >= 18.0.0（推荐 18–24） | Node 25+ 可能导致 `wxt submit` 异常 |
+| Node.js | >= 18.0.0（发布推荐 22） | Node 24+ 下 `wxt submit` 上传异常，发布脚本会直接拒绝运行，见 [8.2](#82-一键发布) |
 | pnpm | 9.x | 项目强制 `packageManager: pnpm@9.0.0` |
 | Chrome / Edge | 最新稳定版 | 用于加载未打包扩展调试 |
 | Firefox | >= 109.0 | 扩展最低支持版本 |
@@ -182,7 +182,7 @@ hamhome-{version}-edge.zip
 hamhome-{version}-sources.zip    # Firefox 审核要求的源码包
 ```
 
-> `version` 取自 `wxt.config.ts` 的 `manifest.version` 字段，当前为 **1.2.0**。
+> `version` 取自 `wxt.config.ts` 的 `manifest.version` 字段，当前为 **1.4.4**。
 
 ---
 
@@ -202,13 +202,13 @@ hamhome-{version}-sources.zip    # Firefox 审核要求的源码包
 ### Manifest 关键配置（`wxt.config.ts`）
 
 ```typescript
-version: "1.2.0"
+version: "1.4.4"
 default_locale: "zh_CN"
 permissions: [
   "storage", "unlimitedStorage", "activeTab", "tabs",
   "tabGroups",   // 仅 Chromium
   "scripting", "clipboardWrite", "contextMenus",
-  "bookmarks", "alarms", "favicon"
+  "bookmarks", "alarms"
 ]
 host_permissions: ["<all_urls>"]
 omnibox: { keyword: "ham" }
@@ -250,18 +250,56 @@ EDGE_API_KEY=your_api_key
 ### 8.2 一键发布
 
 ```bash
-# 从根目录
-pnpm submit:extension       # 自动执行：zip:all → 读取 .env.submit → wxt submit
+# 从根目录，必须使用 Node 22 且工作区干净
+nvm use 22
+pnpm submit:extension       # 自动执行：发布前检查 → 读取 .env.submit → zip:all → wxt submit
 
 # 跳过重新打包（使用已有 ZIP）
 pnpm --filter hamhome submit:all -- --skip-zip
+
+# 查看脚本参数说明
+pnpm --filter hamhome submit:all -- --help
 ```
 
 发布脚本（`scripts/submit.js`）执行逻辑：
-1. 调用 `pnpm zip:all` 生成最新 ZIP（除非传入 `--skip-zip`）
-2. 从 `wxt.config.ts` 读取版本号
-3. 根据 `.env.submit` 中配置的环境变量，确定需要发布的商店
-4. 构建 `wxt submit` 参数并执行
+1. 检查 Node 版本：运行脚本的 Node 和 `pnpm exec` 实际使用的 Node 只要有一个 >= 24 就直接退出（原因见 [常见问题](#11-常见问题)）；子进程会优先使用运行脚本的那个 Node
+2. 从 `wxt.config.ts` 读取版本号，打印仓库路径、当前分支、HEAD commit 和待发布版本号
+3. 检查 git 工作区：`git status --porcelain` 非空则拒绝发布（除非传入 `--allow-dirty`）
+4. 读取 `.env.submit`，根据环境变量确定需要发布的商店；一个都没有配置时直接退出，不会先花几分钟打包
+5. 调用 `pnpm zip:all` 生成最新 ZIP（除非传入 `--skip-zip`）。打包完成后再检查一次：HEAD 变化或工作区出现改动都会退出；通过后在 `.output/` 写入构建戳 `hamhome-<version>.submit-stamp.json`，记录打包时的 HEAD 以及工作区是否干净
+6. 打印每个待上传 ZIP 的路径和修改时间；使用 `--skip-zip` 时校验构建戳
+7. 构建 `wxt submit` 参数并执行
+
+**脚本参数：**
+
+| 参数 | 说明 |
+|------|------|
+| `--skip-zip` | 复用 `.output/` 中已有的 ZIP。只接受本脚本之前在当前 HEAD、干净工作区下打出的包（依据构建戳）；没有构建戳、HEAD 已变化（pull、reset、切换分支后）或 ZIP 在构建戳之后被改动时报错退出 |
+| `--allow-dirty` | 工作区有未提交改动时仍然发布（会打印改动列表和警告），仅在明确知道后果时使用 |
+| `-h` / `--help` | 打印参数说明后退出，不做任何检查 |
+| 其他参数 | 原样透传给 `wxt submit`，例如 `--dry-run` |
+
+> **为什么要求工作区干净**
+>
+> `zip:all` 打包的是当前工作区的代码，而不是某个 commit。工作区里有未提交的改动时，
+> 这些改动会被直接发到商店，事后也无法从 git 历史中还原线上版本。
+> 检查范围是整个仓库（扩展依赖 `packages/*`），已暂存、未暂存和未跟踪的文件都算改动；
+> 被 `.gitignore` 忽略的文件（`.env.submit`、`.output/`、`node_modules/` 等）不影响检查。
+>
+> `.env.submit` 一般只放在日常开发的 checkout 里，而那里往往有未提交的工作。推荐在干净的 worktree 中发布：
+>
+> ```bash
+> git worktree add --detach ../ham_home-release <发布分支或 commit>
+> cp apps/extension/.env.submit ../ham_home-release/apps/extension/.env.submit
+> cd ../ham_home-release
+> pnpm install
+> nvm use 22
+> pnpm submit:extension
+> ```
+
+> **`--skip-zip` 的构建戳校验**：只有本脚本打包时才会写构建戳，所以直接用 `pnpm zip:extension` 打出的包不能配合 `--skip-zip` 使用。
+> 构建戳记录的是完整 HEAD sha，`git pull`、`git reset` 或切换分支后 HEAD 变化，旧包会被拒绝；之后又手动重新打包，ZIP 比构建戳新，也会被拒绝。
+> 拿不准时去掉 `--skip-zip` 重新打包。
 
 ### 8.3 初始化提交配置
 
@@ -309,7 +347,7 @@ pnpm --filter hamhome analyze
 ```typescript
 // apps/extension/wxt.config.ts
 manifest: () => ({
-  version: "1.2.0",   // ← 修改此处
+  version: "1.4.4",   // ← 修改此处
   ...
 })
 ```
@@ -320,8 +358,9 @@ manifest: () => ({
 
 1. 修改 `apps/extension/wxt.config.ts` 中的 `version`
 2. 同步修改 `apps/extension/package.json` 中的 `version`（保持一致，便于维护）
-3. 执行 `pnpm zip:extension` 生成新版 ZIP
-4. 执行 `pnpm submit:extension` 发布
+3. 提交改动，确保 `git status` 干净（发布脚本会拒绝在有未提交改动的工作区运行）
+4. 执行 `pnpm zip:extension` 生成新版 ZIP
+5. 切换到 Node 22，执行 `pnpm submit:extension` 发布
 
 ---
 
@@ -343,14 +382,42 @@ pnpm --filter @hamhome/agent build
 
 ---
 
-### Q：`wxt submit` 报错 Node.js 版本兼容问题
+### Q：发布显示成功，但商店里还是旧版本，或 Firefox 返回 415
 
-**原因：** Node.js >= 25 与 `wxt submit` 的上游依赖存在已知兼容问题。  
-**解决：** 切换到 Node 18–24，推荐使用 nvm：
+**原因：** `wxt submit` 依赖的 `publish-browser-extension@2.3.1` 通过 ofetch / 原生 fetch 发送 `formdata-node` 的 FormData。
+在 Node.js >= 24 上，请求体会被序列化成字符串 `"[object FormData]"`（`Content-Type: text/plain;charset=UTF-8`），而且不会抛错：
+Chrome 会把之前上传的草稿当作新版本发布，工具仍然报告成功；Firefox 则返回 415。
+已在 Node 24.19 和 25.5 上复现，Node 18 / 20 / 22 会正常发送 multipart 请求。  
+**解决：** 发布脚本在 Node >= 24 时会直接报错退出。切换到 Node 22 后重新发布：
 
 ```bash
-nvm use 20
+nvm use 22
+node -v                     # 确认是 v22.x
+pnpm submit:extension
 ```
+
+如果已经在 Node 24+ 上用旧版脚本发布过，请到各商店后台确认线上版本号和包内容。
+升级 wxt / `publish-browser-extension` 并确认问题修复后，再调整 `scripts/submit.js` 中的 `FIRST_UNSUPPORTED_NODE_MAJOR`。
+
+---
+
+### Q：发布脚本提示 `Refusing to submit: the zips would include uncommitted code`
+
+**原因：** 当前仓库 `git status --porcelain` 非空（已暂存、未暂存或未跟踪的文件），脚本会打印改动列表并拒绝发布，避免把未提交的代码打包上传。  
+**解决：**
+1. 提交这些改动（或用 `git stash -u` 临时收起）后重新执行；或按 [8.2](#82-一键发布) 的方式在干净的 worktree 中发布
+2. 确实需要发布当前工作区时，显式传入 `--allow-dirty`：
+
+```bash
+pnpm --filter hamhome submit:all -- --allow-dirty
+```
+
+---
+
+### Q：使用 `--skip-zip` 时提示构建戳不匹配（`No build stamp` / `not from HEAD` / `changed after the build stamp`）
+
+**原因：** `.output/` 中的 ZIP 不是本脚本在当前 HEAD、干净工作区下打出的：没有构建戳（例如直接运行了 `pnpm zip:extension`），HEAD 已变化（pull、reset、切换分支），或者 ZIP 在构建戳写入后又被重新打包。  
+**解决：** 去掉 `--skip-zip` 重新执行，让脚本重新打包。
 
 ---
 

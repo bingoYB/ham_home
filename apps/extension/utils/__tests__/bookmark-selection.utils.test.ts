@@ -49,3 +49,19 @@ describe("toggleAllVisible", () => {
     expect(toggleAllVisible(new Set(["a"]), [])).toEqual(new Set());
   });
 });
+
+describe("numeric ids (tab center)", () => {
+  it("drops tab ids that are no longer visible", () => {
+    expect(retainVisibleSelection(new Set([1, 2, 3]), [3, 1])).toEqual(new Set([1, 3]));
+  });
+
+  it("keeps the same Set when every selected tab is visible", () => {
+    const selected = new Set([1, 2]);
+    expect(retainVisibleSelection(selected, [1, 2, 3])).toBe(selected);
+  });
+
+  it("toggles over the visible tab ids by membership", () => {
+    expect(toggleAllVisible(new Set([7, 8]), [1, 2])).toEqual(new Set([1, 2]));
+    expect(toggleAllVisible(new Set([1, 2]), [1, 2])).toEqual(new Set());
+  });
+});

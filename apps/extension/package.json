@@ -1,6 +1,6 @@
 {
   "name": "hamhome",
-  "version": "1.2.0",
+  "version": "1.4.4",
   "private": true,
   "description": "HamHome 浏览器插件",
   "scripts": {

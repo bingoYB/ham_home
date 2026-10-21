@@ -6,8 +6,10 @@
  */
 import { Readability, isProbablyReaderable } from "@mozilla/readability";
 import Defuddle from "defuddle";
+import { createMarkdownContent } from "defuddle/full";
 import { getFavicon as getFaviconUrl } from "@hamhome/utils";
-import type { PageContent, PageMetadata } from "@/types";
+import { estimateReadingMinutes } from "@/lib/read-later/read-later.utils";
+import type { PageContent, PageMetadata, ReadingPageContent } from "@/types";
 
 /**
  * 将 document 中的相对 URL 转为绝对 URL
@@ -227,4 +229,43 @@ function getPageFavicon(): string {
   return getFaviconUrl(window.location.href);
 }
 
+/**
+ * Content for read later and quick bookmarking: title, description, Markdown body and
+ * an estimated reading time. Runs in the content script because the Markdown
+ * conversion needs a DOM, which the background service worker does not have.
+ */
+export async function extractReadingContent(): Promise<ReadingPageContent> {
+  const url = window.location.href;
+  const content = await extractPageContent();
+  if (!content) {
+    return {
+      url,
+      title: document.title,
+      description: extractMetadata().description || "",
+      markdown: "",
+      estimatedMinutes: estimateReadingMinutes(document.body?.innerText),
+      favicon: getPageFavicon(),
+      isReaderable: false,
+    };
+  }
+
+  let markdown = "";
+  if (content.content && content.htmlContent) {
+    try {
+      markdown = createMarkdownContent(content.htmlContent, url);
+    } catch (error) {
+      console.warn("[HamHome] Failed to convert reading content:", error);
+    }
+  }
+
+  return {
+    url: content.url,
+    title: content.title || document.title,
+    description: content.excerpt || "",
+    markdown,
+    estimatedMinutes: estimateReadingMinutes(content.textContent || document.body?.innerText),
+    favicon: content.favicon,
+    isReaderable: !!content.isReaderable,
+  };
+}
 

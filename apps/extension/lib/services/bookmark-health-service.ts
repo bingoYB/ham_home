@@ -2,6 +2,8 @@ import pLimit from "p-limit";
 import { bookmarkStorage } from "@/lib/storage/bookmark-storage";
 import { bookmarkClipStorage } from "@/lib/storage/bookmark-clip-storage";
 import { bookmarkHealthStorage } from "@/lib/storage/bookmark-health-storage";
+import { readLaterStorage } from "@/lib/storage/read-later-storage";
+import { filterLibraryBookmarks } from "@/lib/read-later/read-later.utils";
 import {
   appendLocalIssueCodes,
   buildDuplicateIssueMap,
@@ -87,7 +89,11 @@ export class BookmarkHealthService {
   }
 
   async scan(bookmarkIds?: string[]): Promise<BookmarkHealthRecord[]> {
-    const allBookmarks = await bookmarkStorage.getBookmarks();
+    // Queue-only read later items are not part of the library, so they are not checked
+    const allBookmarks = filterLibraryBookmarks(
+      await bookmarkStorage.getBookmarks(),
+      await readLaterStorage.getAll(),
+    );
     const subjectIndex = await bookmarkClipStorage.getSubjectIndex();
     const healthBookmarks = filterBookmarkHealthTargets(
       allBookmarks,

@@ -1,4 +1,4 @@
-import { Edit, Trash2 } from "lucide-react";
+import { Edit, ShieldCheck, Trash2 } from "lucide-react";
 import {
   Button,
   Switch,
@@ -60,6 +60,15 @@ export function TabGroupRuleList({
               <h3 className="truncate text-lg">
                 {group.name} ({group.groupTitle})
               </h3>
+              {group.protectTabs && (
+                <span
+                  className="flex shrink-0 items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400"
+                  title={t("tabGroups.form.protectTabsHint")}
+                >
+                  <ShieldCheck className="h-3.5 w-3.5" />
+                  {t("tabGroups.list.protected")}
+                </span>
+              )}
             </div>
 
             <div className="overflow-x-auto">

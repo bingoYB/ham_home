@@ -745,8 +745,10 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
         </div>
 
         {/* 筛选状态和批量操作 */}
+        {/* Wraps instead of overflowing: next to the category tree the actions
+            may not fit beside the filter chips, and <main> clips overflow. */}
         {(hasFilters || selectedIds.size > 0) && (
-          <div className="flex items-center justify-between mt-3 pt-3 border-t border-border/50">
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 mt-3 pt-3 border-t border-border/50">
             {/* 左侧：当前分类、内容类型和筛选标签 */}
             <div className="flex items-center gap-2 flex-wrap">
               {contentType !== "all" && (
@@ -836,7 +838,9 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
               </span>
             </div>
 
-            <div className="flex items-center gap-2">
+            {/* ml-auto keeps the actions right-aligned once they wrap onto
+                their own line; empty:hidden avoids a blank wrapped line */}
+            <div className="ml-auto flex flex-wrap items-center justify-end gap-2 empty:hidden">
               {filteredBookmarks.length > 0 && (
                 <Button
                   variant="ghost"

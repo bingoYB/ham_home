@@ -2,6 +2,8 @@ import { nanoid } from "nanoid";
 import { browser } from "wxt/browser";
 import { getFavicon } from "@hamhome/utils";
 import { workspaceRestoreSuppressionStorage } from "@/lib/storage/workspace-restore-suppression-storage";
+import { tabSessionStorage } from "@/lib/storage/tab-session-storage";
+import { BULK_OPEN_SUPPRESSION_MS } from "@/lib/tabs/tab-budget.utils";
 import { workspaceStorage } from "@/lib/storage/workspace-storage";
 import type {
   CreateWorkspaceInput,
@@ -302,16 +304,21 @@ class WorkspaceService {
     await workspaceRestoreSuppressionStorage.suppressUrls(
       pagesToRestore.map((page) => page.url),
     );
+    // Bulk-opened tabs trigger no budget nudge or making room for 2 minutes; mark them before the tabs are created
+    await tabSessionStorage.markBulkOpened([], Date.now() + BULK_OPEN_SUPPRESSION_MS);
 
     const restoredTabs =
       options.mode === "newWindow"
         ? await this.restorePagesToNewWindow(pagesToRestore)
         : await this.restorePagesToCurrentWindow(pagesToRestore);
 
-    await workspaceRestoreSuppressionStorage.suppressTabIds(
-      restoredTabs
-        .map(({ tab }) => tab.id)
-        .filter((tabId): tabId is number => typeof tabId === "number"),
+    const restoredTabIds = restoredTabs
+      .map(({ tab }) => tab.id)
+      .filter((tabId): tabId is number => typeof tabId === "number");
+    await workspaceRestoreSuppressionStorage.suppressTabIds(restoredTabIds);
+    await tabSessionStorage.markBulkOpened(
+      restoredTabIds,
+      Date.now() + BULK_OPEN_SUPPRESSION_MS,
     );
 
     await this.restoreTabGroups(workspace, restoredTabs);
