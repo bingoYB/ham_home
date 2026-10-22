@@ -6199,7 +6199,8 @@ Vector size picker in the embedding settings card. It renders nothing when the s
 | Prop | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | storageInfo | `any` | ✓ | - | 基础数据统计 |
-| syncConfig | `SyncConfig` | ✓ | - | WebDAV 同步配置 |
+| syncConfig | `WebDAVConfig` | ✓ | - | WebDAV 连接配置及当前设备的同步策略 |
+| updateSyncConfig | `(updates: Partial<WebDAVConfig>) => void` | ✓ | - | 保存配置变更 |
 | ... | ... | ... | ... | 详见源代码 props 定义 |
 
 **行为说明：**
@@ -6208,7 +6209,47 @@ Vector size picker in the embedding settings card. It renders nothing when the s
 - 支持 JSON/HTML 格式的书签导出。
 - 提供分项清理（书签、快照、远端同步数据）及全量数据重置入口。
 - WebDAV 同步用户设置和 AI 自动分组设置时按 `updatedAt` 合并；本地刚修改的配置会优先上传，远端更新时才下载覆盖本地。
-- WebDAV 同步支持端到端加密（E2E）。
+- WebDAV 启用后展示 `SyncStrategySettings`，独立配置实时、启动、定时同步开关及时间；全部关闭后仅手动同步。策略仅对当前设备生效。
+
+**使用示例：**
+
+```tsx
+<StorageTab {...storageTabProps} syncConfig={syncConfig} updateSyncConfig={updateSyncConfig} />
+```
+
+### SyncStrategySettings
+
+WebDAV 自动同步策略表单，复用三个 `SyncStrategyRow`，按当前配置显示各项开关、时间及手动模式提示。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| config | `WebDAVConfig` | ✓ | - | 当前设备配置；旧配置缺失策略字段时补默认值 |
+| onChange | `(updates: Partial<WebDAVConfig>) => void` | ✓ | - | 保存单项变更 |
+
+**行为说明：** 默认实时同步延迟 300 秒、启动同步延迟 5 秒、定时同步间隔 30 分钟，三项默认开启。实时/启动延迟允许 1–3600 整数秒，定时间隔允许 1–1440 整数分钟。输入失焦或按 Enter 后校验并保存，开关即时保存；关闭策略时禁用对应数值输入。后台休眠可能推迟执行。
+
+```tsx
+<SyncStrategySettings config={syncConfig} onChange={updateSyncConfig} />
+```
+
+### SyncStrategyRow
+
+可复用的同步策略行，包含已关联标签的开关、数值输入、单位、说明和校验提示；草稿及校验由 `useSyncStrategyInput` 管理。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| id | `string` | ✓ | - | 标签、输入及说明的唯一 ID 前缀 |
+| label / description / unit | `string` | ✓ | - | 名称、触发说明及时间单位 |
+| enabled | `boolean` | ✓ | - | 是否启用此策略 |
+| value / min / max | `number` | ✓ | - | 已保存的值及合法范围 |
+| onEnabledChange | `(enabled: boolean) => void` | ✓ | - | 切换开关 |
+| onValueChange | `(value: number) => void` | ✓ | - | 提交合法整数 |
+
+```tsx
+<SyncStrategyRow id="webdav-realtime" label="实时同步" description="本地变更后延迟同步"
+  unit="秒" enabled={true} value={5} min={1} max={3600}
+  onEnabledChange={setRealtimeEnabled} onValueChange={setRealtimeDelay} />
+```
 
 ---
 

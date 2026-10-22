@@ -1,4 +1,5 @@
 import type { WebDAVConfig, SyncStatus } from '@/types';
+import { DEFAULT_SYNC_STRATEGY, normalizeSyncStrategy } from './sync-strategy';
 
 // Simple fixed key for AES-GCM local storage obfuscation
 // Obfuscates plain text passwords against casual local storage inspection
@@ -60,6 +61,7 @@ async function decrypt(cipherText: string): Promise<string> {
 }
 
 const DEFAULT_WEBDAV_CONFIG: WebDAVConfig = {
+  ...DEFAULT_SYNC_STRATEGY,
   enabled: false,
   url: '',
   username: '',
@@ -82,9 +84,11 @@ const syncStatusItem = storage.defineItem<SyncStatus>('local:syncStatus', {
 });
 
 class SyncConfigStorage {
+  private configWrites: Promise<unknown> = Promise.resolve();
+
   async getConfig(): Promise<WebDAVConfig> {
     const config = await webdavConfigItem.getValue();
-    const result = { ...config };
+    const result = { ...DEFAULT_WEBDAV_CONFIG, ...config, ...normalizeSyncStrategy(config) };
     if (result.password) {
       result.password = await decrypt(result.password);
     }
@@ -94,9 +98,16 @@ class SyncConfigStorage {
     return result;
   }
 
-  async setConfig(config: Partial<WebDAVConfig>): Promise<WebDAVConfig> {
+  setConfig(config: Partial<WebDAVConfig>): Promise<WebDAVConfig> {
+    // Rapid edits to independent controls must not overwrite each other's values.
+    const write = this.configWrites.then(() => this.writeConfig(config));
+    this.configWrites = write.catch(() => undefined);
+    return write;
+  }
+
+  private async writeConfig(config: Partial<WebDAVConfig>): Promise<WebDAVConfig> {
     const current = await this.getConfig();
-    const updated = { ...current, ...config };
+    const updated = { ...current, ...config, ...normalizeSyncStrategy({ ...current, ...config }) };
 
     // Values pasted from a password manager often carry stray whitespace/newlines,
     // which servers reject with a 401 that is indistinguishable from a wrong password.
@@ -129,7 +140,7 @@ class SyncConfigStorage {
 
   watchConfig(callback: (config: WebDAVConfig) => void): () => void {
     return webdavConfigItem.watch(async (newValue: WebDAVConfig | null) => {
-      const config = newValue ? { ...newValue } : { ...DEFAULT_WEBDAV_CONFIG };
+      const config = { ...DEFAULT_WEBDAV_CONFIG, ...newValue, ...normalizeSyncStrategy(newValue ?? {}) };
       if (config.password) {
         config.password = await decrypt(config.password);
       }

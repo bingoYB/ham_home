@@ -13,6 +13,7 @@ import {
 } from "@hamhome/ui";
 import { syncEngine } from "@/lib/sync/sync-engine";
 import { StorageStatCard } from "./StorageStatCard";
+import { SyncStrategySettings } from "./SyncStrategySettings";
 import type { WebDAVConfig, SyncStatus, EmbeddingConfig } from "@/types";
 import type { VectorStoreStats } from "@/lib/storage/vector-store";
 
@@ -268,6 +269,7 @@ export function StorageTab({
               </p>
             </div>
             <Switch
+              aria-label={t("settings:settings.sync.config.enabled")}
               checked={syncConfig.enabled}
               onCheckedChange={(checked) => updateSyncConfig({ enabled: checked })}
             />
@@ -308,6 +310,8 @@ export function StorageTab({
                   />
                 </div>
               </div>
+
+              <SyncStrategySettings config={syncConfig} onChange={updateSyncConfig} />
 
               <div className="flex gap-2 pt-2">
                 <Button

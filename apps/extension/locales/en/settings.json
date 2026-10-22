@@ -575,7 +575,7 @@
         "title": "WebDAV Data Sync",
         "description": "Configure WebDAV service to sync your bookmarks, categories, and settings across multiple devices. If you accidentally enter the wrong sync configuration and cause a lock, you can directly clear all local data below to cut off the sync connection.",
         "enabled": "Enable WebDAV Sync",
-        "enabledDesc": "When enabled, two-way sync will automatically run in the background",
+        "enabledDesc": "Enable manual sync and automatic two-way sync using the strategies below",
         "url": "WebDAV Server URL",
         "username": "Username / Account",
         "password": "Password / App Token",
@@ -604,6 +604,27 @@
           "notInitialized": "Sync is not initialized: please re-enter the server URL and credentials.",
           "unknown": "Sync failed: see the error details below."
         }
+      },
+      "strategy": {
+        "title": "Sync strategy",
+        "description": "Choose when to sync automatically. Changes are saved automatically and apply only to this device.",
+        "seconds": "sec",
+        "minutes": "min",
+        "range": "Whole numbers, {{min}}–{{max}} {{unit}}",
+        "realtime": {
+          "label": "Real-time sync",
+          "description": "Sync after bookmarks, categories, workspaces or settings change. Each new change restarts the delay."
+        },
+        "startup": {
+          "label": "Startup sync",
+          "description": "Sync once after the browser starts or the extension is installed or updated, following this delay. Enabling this strategy also triggers a sync."
+        },
+        "periodic": {
+          "label": "Periodic sync",
+          "description": "Run two-way sync at this interval, including updates from other devices even when nothing changes locally."
+        },
+        "manualOnly": "All automatic sync is off. Use “Sync Now” to sync manually.",
+        "timingHint": "Times are targets; background suspension or device sleep may delay sync. Manual sync is always available."
       }
     }
   }

@@ -89,6 +89,11 @@ export class SyncEngine {
 
   constructor() {}
 
+  /** Whether this background engine is already syncing or clearing remote data. */
+  get isBusy(): boolean {
+    return this.isSyncing;
+  }
+
   /**
    * Compress string to base64 gzip
    */

@@ -6,7 +6,7 @@ import { browser, type Browser } from "wxt/browser";
 import { registerBackgroundService } from "@/lib/services/background-service-server";
 import { configStorage } from "@/lib/storage";
 import { bookmarkStorage } from "@/lib/storage/bookmark-storage";
-import { bookmarkClipStorage } from "@/lib/storage/bookmark-clip-storage";
+import { SyncScheduler } from "@/lib/sync/sync-scheduler";
 import { workspaceStorage } from "@/lib/storage/workspace-storage";
 import { workspaceRestoreSuppressionStorage } from "@/lib/storage/workspace-restore-suppression-storage";
 import { savePopupFallbackStorage } from "@/lib/storage/save-popup-fallback-storage";
@@ -17,7 +17,6 @@ import { bookmarkRetentionService } from "@/lib/services/bookmark-retention-serv
 import { readLaterService } from "@/lib/services/read-later-service";
 import { registerTabLifecycleBackground } from "@/lib/services/tab-lifecycle-background";
 import { readLaterStorage } from "@/lib/storage/read-later-storage";
-import { tabLifecycleConfigStorage } from "@/lib/storage/tab-lifecycle-config-storage";
 import {
   safeOpenPopup,
   safeSendMessageToActiveTab,
@@ -501,54 +500,8 @@ export default defineBackground(() => {
     }
   });
 
-  // 1. 初始化并订阅 WebDAV 存储变更自动同步
-  Promise.all([
-    import("@/lib/sync/sync-engine"),
-    import("@/lib/sync/sync-config-storage"),
-  ]).then(([{ syncEngine }, { syncConfigStorage }]) => {
-    // 设置定期执行 WebDAV 同步钩子 (30 minutes)
-    browser.alarms.create("webdav-periodic-sync", { periodInMinutes: 30 });
-    browser.alarms.onAlarm.addListener((alarm) => {
-      if (
-        alarm.name === "webdav-periodic-sync" ||
-        alarm.name === "webdav-local-change-sync"
-      ) {
-        syncEngine.doSync().catch(console.error);
-      }
-    });
-
-    // 激活插件时检查上次同步时间，如果超过 30 分钟则触发一次同步
-    syncConfigStorage
-      .getStatus()
-      .then((status) => {
-        const lastSyncTime = status.lastSyncTime || 0;
-        const now = Date.now();
-        const THIRTY_MINUTES = 30 * 60 * 1000;
-        if (now - lastSyncTime >= THIRTY_MINUTES) {
-          console.log(
-            "[HamHome Background] 距离上次同步已超过 30 分钟，触发同步...",
-          );
-          syncEngine.doSync().catch(console.error);
-        }
-      })
-      .catch(console.error);
-
-    // 订阅本地书签变动，防抖触发同步
-    bookmarkStorage.watchBookmarks(() => {
-      // 在 Manifest V3 中，长时间的 setTimeout 会在其休眠时被取消，
-      // 所以对于 5 分钟的延迟，必须使用 browser.alarms 来实现可靠的防抖
-      browser.alarms.create("webdav-local-change-sync", { delayInMinutes: 5 });
-    });
-    bookmarkClipStorage.watch(() => {
-      browser.alarms.create("webdav-local-change-sync", { delayInMinutes: 5 });
-    });
-    readLaterStorage.watch(() => {
-      browser.alarms.create("webdav-local-change-sync", { delayInMinutes: 5 });
-    });
-    tabLifecycleConfigStorage.watchSettings(() => {
-      browser.alarms.create("webdav-local-change-sync", { delayInMinutes: 5 });
-    });
-  });
+  // 同步注册监听器，后台唤醒时也能接收触发本次唤醒的事件。
+  new SyncScheduler().start();
 
   // 调试：输出已注册的快捷键
   browser.commands.getAll().then((commands) => {
