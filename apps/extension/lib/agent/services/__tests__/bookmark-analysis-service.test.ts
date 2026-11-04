@@ -129,6 +129,75 @@ describe("bookmark analysis compatibility mode", () => {
     expect(mocks.createCategory).not.toHaveBeenCalled();
   });
 
+  it.each(["category", "tags", "all", undefined] as const)(
+    "limits applied metadata and category side effects for mode %s",
+    async (mode) => {
+      mocks.run.mockResolvedValue({
+        output: mode === "category" ? "开发" : mode === "tags" ? "新标签" :
+          { title: "标题", summary: "新摘要", category: "开发", tags: ["新标签"] },
+      });
+      mocks.createCategory.mockResolvedValue({ categoryId: "new-category", newCategories: [] });
+      const { bookmarkAnalysisService } = await import("../bookmark-analysis-service");
+      const result = await bookmarkAnalysisService.analyzeBookmarkForLibrary({
+        url: pageContent.url,
+        title: pageContent.title,
+        currentCategories: [],
+        mode,
+      });
+      expect(result).toEqual({
+        description: !mode || mode === "all" ? "新摘要" : "",
+        categoryId: mode === "tags" ? null : "new-category",
+        tags: mode === "category" ? [] : ["新标签"],
+        newCategories: [],
+      });
+      expect(mocks.createCategory).toHaveBeenCalledTimes(mode === "tags" ? 0 : 1);
+      expect(mocks.matchCategory).toHaveBeenCalledTimes(mode === "tags" ? 0 : 1);
+    },
+  );
+
+  it.each([
+    { mode: "category" as const, smallModelMode: false },
+    { mode: "tags" as const, smallModelMode: false },
+    { mode: "category" as const, smallModelMode: true },
+    { mode: "tags" as const, smallModelMode: true },
+  ])("requests only $mode with smallModelMode=$smallModelMode", async ({ mode, smallModelMode }) => {
+    mocks.config.rawConfig.smallModelMode = smallModelMode;
+    mocks.run.mockResolvedValue({ output: mode === "category" ? "开发" : "TypeScript" });
+    const { bookmarkAnalysisService } = await import("../bookmark-analysis-service");
+    const result = await bookmarkAnalysisService.analyzeBookmark({
+      pageContent, mode, existingTags: ["TypeScript"],
+    });
+
+    expect(mocks.run).toHaveBeenCalledTimes(1);
+    const [command, input, options] = mocks.run.mock.calls[0];
+    expect(command.name).toBe("analyzeBookmarkField");
+    expect(command.outputSchema).toBeUndefined();
+    expect(command.ignoreBaseSystemPrompt).toBe(true);
+    expect(input.field).toBe(mode);
+    expect(command.prompt(input, {})).toContain(mode === "category" ? "只输出一个最合适的分类" : "只输出一至五个");
+    expect(options.systemPrompt).not.toContain("结构化");
+    expect(result.summary).toBe("");
+    expect(result.title).toBe("");
+    if (mode === "category") {
+      expect(input.existingTags).toBeUndefined();
+      expect(input.presetTags).toBeUndefined();
+      expect(result.tags).toEqual([]);
+    } else {
+      expect(input.userCategories).toBeUndefined();
+      expect(result.category).toBe("");
+    }
+  });
+
+  it.each(["category", "tags"] as const)("retries only %s and fails without category writes", async (mode) => {
+    mocks.run.mockResolvedValue({ output: "" });
+    const { bookmarkAnalysisService } = await import("../bookmark-analysis-service");
+    await expect(bookmarkAnalysisService.analyzeBookmarkForLibrary({
+      url: pageContent.url, title: pageContent.title, currentCategories: [], mode,
+    })).rejects.toThrow("生成失败");
+    expect(mocks.run.mock.calls.map((call) => call[1].field)).toEqual([mode, mode]);
+    expect(mocks.createCategory).not.toHaveBeenCalled();
+  });
+
   it("propagates request errors without repeatedly calling the model", async () => {
     mocks.config.rawConfig.smallModelMode = true;
     mocks.run.mockRejectedValue(new Error("connection refused"));

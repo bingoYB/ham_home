@@ -3407,3 +3407,23 @@ const nav = useCategoryNavigation({ bookmarks, categories, selectedCategory });
 **行为说明：**
 
 - 卡片网格使用 `repeat(auto-fill, minmax(10rem, 1fr))`，随容器宽度自动调整列数，不再固定 5 列。
+
+### BatchAIOrganizeButton
+
+收藏批量管理的 AI 整理分体按钮。主按钮执行完整整理，右侧下拉提供“重新分类”“重新打标”“整理所有”，均仅处理已选收藏。重新分类保留摘要和标签，重新打标替换标签并保留摘要、分类（不会创建分类），整理所有更新摘要、分类和标签。无有效结果时保留原值并计入失败。处理中禁用两个按钮；任务持久化保存模式，旧任务默认完整整理。
+
+| Prop | 类型 | 说明 |
+| --- | --- | --- |
+| `isProcessing` | `boolean` | 是否正在处理任务 |
+| `onOrganize` | `(mode: BookmarkOrganizeMode) => void` | 执行 `category`、`tags` 或 `all` 模式 |
+
+```tsx
+<BatchAIOrganizeButton
+  isProcessing={isProcessing}
+  onOrganize={(mode) => startTask(selectedIds, mode)}
+/>
+```
+
+BookmarksPage 的批量 AI 整理入口使用此组件，页面 props 不变。
+
+批量 AI 请求模式：`category` 和 `tags` 使用独立的单字段提示词与纯文本命令，普通模型和小模型均只请求所选字段，校验失败仅重试该字段一次；`all` 保持完整分析。字段生成失败时不写入书签。
