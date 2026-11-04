@@ -74,6 +74,7 @@ export function ImportExportPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   // 取消导入的信号 flag，由 handleCancelImport 置为 true
   const cancelledRef = useRef(false);
+  const importAbortControllerRef = useRef<AbortController | null>(null);
   const {
     getBookmarks: getChromeBookmarks,
     loading: loadingBrowserBookmarks,
@@ -199,6 +200,7 @@ export function ImportExportPage() {
   // 取消正在进行的 HTML 导入任务
   const handleCancelImport = async () => {
     cancelledRef.current = true;
+    importAbortControllerRef.current?.abort();
     await importTaskStorage.cancelHtmlTask();
   };
 
@@ -256,6 +258,7 @@ export function ImportExportPage() {
             : undefined,
         });
       } finally {
+        importAbortControllerRef.current = null;
         // 恢复 watcher 并统一刷新一次
         resumeWatchers();
         await refreshBookmarks();
@@ -302,6 +305,7 @@ export function ImportExportPage() {
         details: resolveBookmarkError(error),
       });
     } finally {
+      importAbortControllerRef.current = null;
       // 恢复 watcher 并统一刷新一次
       resumeWatchers();
       await refreshBookmarks();
@@ -338,6 +342,7 @@ export function ImportExportPage() {
             : t("settings.importExport.errors.unknown", { ns: "settings" }),
       });
     } finally {
+      importAbortControllerRef.current = null;
       // 恢复 watcher 并统一刷新一次
       resumeWatchers();
       await refreshBookmarks();
@@ -656,6 +661,7 @@ export function ImportExportPage() {
     currentCategories: LocalCategory[],
     existingTags: string[] = [],
     shouldFetchPageContent = false,
+    signal?: AbortSignal,
   ): Promise<{
     description: string;
     categoryId: string | null;
@@ -670,6 +676,7 @@ export function ImportExportPage() {
         currentCategories,
         existingTags,
         shouldFetchPageContent,
+        signal,
       });
 
       console.log(
@@ -677,6 +684,7 @@ export function ImportExportPage() {
       );
       return result;
     } catch (err) {
+      if (signal?.aborted) throw err;
       console.error("[ImportExport] AI analysis failed:", err);
       console.log(
         `[ImportExport][Perf] analyzeBookmarkWithAI FAILED(${url}): ${(performance.now() - aiStart).toFixed(1)}ms`,
@@ -845,6 +853,9 @@ export function ImportExportPage() {
   };
 
   const runHtmlImportTask = async (task: HtmlImportTask) => {
+    const abortController = new AbortController();
+    importAbortControllerRef.current = abortController;
+    if (cancelledRef.current) abortController.abort();
     const taskStart = performance.now();
     console.log(
       `[ImportExport][Perf] === Import task started === total: ${task.payload.total}, options:`,
@@ -950,6 +961,7 @@ export function ImportExportPage() {
       if (options.enableAIAnalysis && !options.preserveFolders) {
         preprocessed = [];
         for (const bm of batch) {
+          if (cancelledRef.current) break;
           // 用 normalized URL 去重
           const normalizedUrl = bookmarkStorage.normalizeUrlPublic(bm.url);
           if (existingNormalizedUrls.has(normalizedUrl)) {
@@ -979,6 +991,7 @@ export function ImportExportPage() {
               allCategories,
               tagsSnapshot,
               options.fetchPageContent,
+              abortController.signal,
             );
             description = aiResult.description;
             categoryId = aiResult.categoryId;
@@ -996,6 +1009,7 @@ export function ImportExportPage() {
               }
             }
           } catch (err) {
+            if (cancelledRef.current) break;
             // AI 分析失败记录一次错误原因，但不阻断导入
             if (!firstAiError) {
               firstAiError = err instanceof Error ? err.message : String(err);
@@ -1104,7 +1118,7 @@ export function ImportExportPage() {
       }
 
       existingTags = Array.from(knownTags);
-      currentIndex = batchStart + batch.length;
+      currentIndex = batchStart + preprocessed.length;
       setImportProgress({ current: currentIndex, total });
 
       const tPersist = performance.now();

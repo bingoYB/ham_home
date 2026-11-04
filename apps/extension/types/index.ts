@@ -66,6 +66,8 @@ export interface LocalCategory {
   parentId: string | null;
   order: number;
   createdAt: number; // 时间戳
+  /** Last modification time, used to resolve sync conflicts; older data falls back to createdAt. */
+  updatedAt?: number;
 }
 
 // ============ AI 配置相关 ============
@@ -113,6 +115,7 @@ export interface AIConfig {
   model?: string;
   temperature?: number;
   apiMode?: "chat" | "responses"; // 请求模式，主要用于 OpenAI 兼容的 provider
+  smallModelMode?: boolean; // 整页书签分析逐字段请求，兼容结构化输出能力较弱的模型
   enableTranslation: boolean; // 是否启用翻译
   enableSmartCategory: boolean; // 是否启用智能分类
   enableTagSuggestion: boolean; // 是否启用标签推荐
@@ -296,6 +299,8 @@ export interface WorkspaceCategory {
   parentId: string | null;
   order: number;
   createdAt: number;
+  /** Last modification time, used to resolve sync conflicts; older data falls back to createdAt. */
+  updatedAt?: number;
 }
 
 export type WorkspacePageBookmarkStatus =

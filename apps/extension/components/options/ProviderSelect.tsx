@@ -7,21 +7,22 @@ import {
   SelectValue,
   Label,
 } from "@hamhome/ui";
-import type { AIProvider, AIConfig } from "@/types";
+import type { AIProvider } from "@/types";
 
 interface ProviderSelectProps {
   value: AIProvider;
   onChange: (value: AIProvider) => void;
+  disabled?: boolean;
 }
 
-export function ProviderSelect({ value, onChange }: ProviderSelectProps) {
+export function ProviderSelect({ value, onChange, disabled }: ProviderSelectProps) {
   const { t } = useTranslation(["common", "settings"]);
 
   return (
     <div className="space-y-2">
       <Label htmlFor="provider">{t("settings:settings.ai.provider")}</Label>
-      <Select value={value} onValueChange={(val: AIProvider) => onChange(val)}>
-        <SelectTrigger id="provider">
+      <Select value={value} onValueChange={(val: AIProvider) => onChange(val)} disabled={disabled}>
+        <SelectTrigger id="provider" aria-describedby="providerConnectionHint">
           <SelectValue />
         </SelectTrigger>
         <SelectContent>
@@ -41,6 +42,9 @@ export function ProviderSelect({ value, onChange }: ProviderSelectProps) {
           <SelectItem value="custom">{t("settings:settings.providers.custom")}</SelectItem>
         </SelectContent>
       </Select>
+      <p id="providerConnectionHint" className="text-xs text-muted-foreground">
+        {t("settings:settings.ai.providerConnectionHint")}
+      </p>
     </div>
   );
 }

@@ -181,14 +181,23 @@ export class WebDAVAdapter {
     }
   }
 
+  /**
+   * Read and parse a remote JSON file. `null` means the file does not exist.
+   *
+   * A file that exists but is not valid JSON throws `invalidRemoteData`: treating it as
+   * missing (the old behaviour) made the engine overwrite it with local data.
+   */
   async getJSON<T>(filename: string): Promise<T | null> {
     const contents = await this.getFileContents(filename);
-    if (!contents) return null;
+    // An empty file holds no data worth protecting: treat it like a missing one.
+    if (contents === null || contents === undefined || contents.trim() === '') return null;
     try {
       return JSON.parse(contents) as T;
     } catch (err) {
-      console.error(`Failed to parse JSON from ${filename}`, err);
-      return null;
+      throw new SyncError(
+        'invalidRemoteData',
+        `Remote file ${filename} is not valid JSON: ${(err as Error)?.message ?? String(err)}`,
+      );
     }
   }
 

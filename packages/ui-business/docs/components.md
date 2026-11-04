@@ -134,6 +134,8 @@ const labels: WorkspaceLabels = {
 
 书签管理网格卡片，展示分类、创建时间、favicon、摘要、标签和更多操作菜单。
 
+文字收藏复用网站收藏的紧凑卡片布局：正文最多三行（72px），超出部分显示省略号，标签保留在正文下方。点击正文通过 `onOpenSubject` 查看全文；图片收藏保留图片预览布局。
+
 #### Props
 
 | name | type | required | default | description |
@@ -145,6 +147,8 @@ const labels: WorkspaceLabels = {
 | `isHighlighted` | `boolean` | - | `false` | 是否高亮当前书签 |
 | `columnSize` | `number` | - | - | 网格/瀑布流列宽；不传时自适应容器 |
 | `faviconSrc` | `string \| null` | - | `bookmark.favicon` | 外部解析后的 favicon URL |
+| `subject` | `BookmarkSubjectContent` | - | - | 图片或文字剪藏主体 |
+| `onOpenSubject` | `() => void` | - | - | 点击剪藏正文时打开完整内容 |
 | `onToggleSelect` | `() => void` | ✓ | - | 切换选中状态 |
 | `onOpen` | `() => void` | ✓ | - | 更多菜单中的打开动作 |
 | `onEdit` | `() => void` | ✓ | - | 编辑动作 |

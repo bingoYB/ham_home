@@ -149,6 +149,11 @@ export async function createExtensionAgent(
     model: config.model,
     apiKey: config.apiKey,
     baseUrl: config.baseUrl,
+    // Ollama's OpenAI-compatible endpoint supports JSON Schema, but the SDK's
+    // generic compatible provider defaults to JSON-object mode without it.
+    providerOptions: config.provider === "ollama"
+      ? { supportsStructuredOutputs: true, ...options.providerOptions }
+      : options.providerOptions,
     invocationMode: config.invocationMode,
     temperature: config.temperature,
   });

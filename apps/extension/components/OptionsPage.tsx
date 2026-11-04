@@ -111,6 +111,9 @@ export function OptionsPage() {
     onTestConnection: handleTestConnection,
     onFetchModels: handleFetchModels,
     recommendedModels,
+    isSwitchingProvider,
+    onProviderChange,
+    onSaveModel,
     onClearAllData: handleClearData,
     onClearBookmarkData: handleClearBookmarkData,
     onClearSnapshotData: handleClearSnapshotData,
@@ -174,6 +177,7 @@ export function OptionsPage() {
             isAdvancedOpen={isAdvancedOpen}
             newTag={newTag}
             recommendedModels={recommendedModels}
+            isSwitchingProvider={isSwitchingProvider}
             vectorStats={vectorStats}
             isLoadingStats={isLoadingStats}
             isRebuilding={isRebuilding}
@@ -194,6 +198,8 @@ export function OptionsPage() {
             setLocalEmbeddingBaseUrl={setLocalEmbeddingBaseUrl}
             setLocalEmbeddingModel={setLocalEmbeddingModel}
             updateAIConfig={updateAIConfig}
+            onProviderChange={onProviderChange}
+            onSaveModel={onSaveModel}
             updateEmbeddingConfig={updateEmbeddingConfig}
             onTestConnection={handleTestConnection}
             onFetchModels={handleFetchModels}

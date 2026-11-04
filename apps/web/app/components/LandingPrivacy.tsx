@@ -1,5 +1,7 @@
 'use client';
 
+import { Reveal } from './motion/Reveal';
+
 interface LandingPrivacyProps {
   isEn: boolean;
 }
@@ -31,7 +33,7 @@ export function LandingPrivacy({ isEn }: LandingPrivacyProps) {
 
   return (
     <section className="mx-auto grid w-full gap-8 px-4 py-16 sm:px-6 lg:grid-cols-[0.85fr_1.15fr] lg:px-8 lg:py-24 container">
-      <div className="max-w-2xl">
+      <Reveal variant="left" className="max-w-2xl">
         <p className="text-sm font-bold text-[#0f766e] dark:text-[#5eead4]">{texts.kicker}</p>
         <h2 className="mt-3 text-3xl font-black leading-tight tracking-tight text-foreground sm:text-4xl">
           {texts.title}
@@ -39,39 +41,47 @@ export function LandingPrivacy({ isEn }: LandingPrivacyProps) {
         <p className="mt-4 text-base leading-relaxed text-muted-foreground sm:text-lg">
           {texts.desc}
         </p>
-      </div>
+      </Reveal>
 
       <div className="grid gap-4 md:grid-cols-2">
-        <article className="rounded-lg border bg-card/60 p-6 shadow-sm">
-          <h3 className="text-lg font-bold text-foreground">{texts.localTitle}</h3>
-          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{texts.localDesc}</p>
-          <div className="mt-5 h-2 overflow-hidden rounded-full bg-muted">
-            <span className="block h-full w-[64%] rounded-full bg-gradient-to-r from-[#2dd4bf] to-[#818cf8]" />
-          </div>
-        </article>
+        <Reveal variant="scale" delay={0} className="h-full">
+          <article className="lift-card h-full rounded-lg border bg-card/60 p-6 shadow-sm">
+            <h3 className="text-lg font-bold text-foreground">{texts.localTitle}</h3>
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{texts.localDesc}</p>
+            <div className="mt-5 h-2 overflow-hidden rounded-full bg-muted">
+              <span className="block h-full w-[64%] rounded-full bg-gradient-to-r from-[#2dd4bf] to-[#818cf8]" />
+            </div>
+          </article>
+        </Reveal>
 
-        <article className="rounded-lg border bg-card/60 p-6 shadow-sm">
-          <h3 className="text-lg font-bold text-foreground">{texts.domainTitle}</h3>
-          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{texts.domainDesc}</p>
-          <div className="mt-5 flex flex-wrap gap-2">
-            <span className="rounded-md bg-muted px-3 py-1.5 text-xs text-muted-foreground">
-              mail.example.com
-            </span>
-            <span className="rounded-md bg-muted px-3 py-1.5 text-xs text-muted-foreground">
-              bank.example.com
-            </span>
-          </div>
-        </article>
+        <Reveal variant="scale" delay={90} className="h-full">
+          <article className="lift-card h-full rounded-lg border bg-card/60 p-6 shadow-sm">
+            <h3 className="text-lg font-bold text-foreground">{texts.domainTitle}</h3>
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{texts.domainDesc}</p>
+            <div className="mt-5 flex flex-wrap gap-2">
+              <span className="rounded-md bg-muted px-3 py-1.5 text-xs text-muted-foreground">
+                mail.example.com
+              </span>
+              <span className="rounded-md bg-muted px-3 py-1.5 text-xs text-muted-foreground">
+                bank.example.com
+              </span>
+            </div>
+          </article>
+        </Reveal>
 
-        <article className="rounded-lg border bg-card/60 p-6 shadow-sm">
-          <h3 className="text-lg font-bold text-foreground">{texts.syncTitle}</h3>
-          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{texts.syncDesc}</p>
-        </article>
+        <Reveal variant="scale" delay={180} className="h-full">
+          <article className="lift-card h-full rounded-lg border bg-card/60 p-6 shadow-sm">
+            <h3 className="text-lg font-bold text-foreground">{texts.syncTitle}</h3>
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{texts.syncDesc}</p>
+          </article>
+        </Reveal>
 
-        <article className="rounded-lg border bg-card/60 p-6 shadow-sm">
-          <h3 className="text-lg font-bold text-foreground">{texts.sensitiveTitle}</h3>
-          <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{texts.sensitiveDesc}</p>
-        </article>
+        <Reveal variant="scale" delay={270} className="h-full">
+          <article className="lift-card h-full rounded-lg border bg-card/60 p-6 shadow-sm">
+            <h3 className="text-lg font-bold text-foreground">{texts.sensitiveTitle}</h3>
+            <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{texts.sensitiveDesc}</p>
+          </article>
+        </Reveal>
       </div>
     </section>
   );

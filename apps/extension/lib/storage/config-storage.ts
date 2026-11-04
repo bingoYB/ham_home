@@ -2,7 +2,11 @@
  * 配置存储模块
  * 基于 WXT Storage 存储 AI 配置和用户设置
  */
-import type { AIConfig, LocalSettings, CustomFilter, EmbeddingConfig } from '@/types';
+import type { AIConfig, AIProvider, LocalSettings, CustomFilter, EmbeddingConfig } from '@/types';
+import { getDefaultBaseUrl, getDefaultModel } from '@/lib/agent/provider-config';
+
+type AIProviderConnection = Pick<AIConfig, 'apiKey' | 'baseUrl' | 'model' | 'apiMode'>;
+type AIProviderConnections = Partial<Record<AIProvider, AIProviderConnection>>;
 
 // 默认 AI 配置
 const DEFAULT_AI_CONFIG: AIConfig = {
@@ -11,6 +15,7 @@ const DEFAULT_AI_CONFIG: AIConfig = {
   baseUrl: '',
   model: 'gpt-3.5-turbo',
   temperature: 0.3,
+  smallModelMode: false, // 默认使用单次结构化输出
   enableTranslation: false, // 默认关闭翻译
   enableSmartCategory: true, // 默认开启智能分类
   enableTagSuggestion: true, // 默认开启标签推荐
@@ -50,6 +55,11 @@ const aiConfigItem = storage.defineItem<AIConfig>('sync:aiConfig', {
   fallback: DEFAULT_AI_CONFIG,
 });
 
+// Inactive providers (including their credentials) stay on this device.
+const aiProviderConnectionsItem = storage.defineItem<AIProviderConnections>('local:aiProviderConnections', {
+  fallback: {},
+});
+
 const settingsItem = storage.defineItem<LocalSettings>('sync:settings', {
   fallback: DEFAULT_SETTINGS,
 });
@@ -68,6 +78,14 @@ function normalizeSettings(settings?: Partial<LocalSettings> | null): LocalSetti
 }
 
 class ConfigStorage {
+  private aiWriteQueue: Promise<void> = Promise.resolve();
+
+  private enqueueAIWrite<T>(operation: () => Promise<T>): Promise<T> {
+    const result = this.aiWriteQueue.then(operation);
+    this.aiWriteQueue = result.then(() => undefined, () => undefined);
+    return result;
+  }
+
   /**
    * 获取 AI 配置
    */
@@ -79,10 +97,37 @@ class ConfigStorage {
    * 设置 AI 配置
    */
   async setAIConfig(config: Partial<AIConfig>): Promise<AIConfig> {
-    const current = await aiConfigItem.getValue();
-    const updated = { ...current, ...config };
-    await aiConfigItem.setValue(updated);
-    return updated;
+    return this.enqueueAIWrite(async () => {
+      const current = await aiConfigItem.getValue();
+      const nextProvider = config.provider ?? current.provider;
+      let connection: AIProviderConnection = {};
+
+      if (nextProvider !== current.provider) {
+        const savedConnections = await aiProviderConnectionsItem.getValue();
+        const connections = {
+          ...savedConnections,
+          [current.provider]: {
+            apiKey: current.apiKey ?? '',
+            baseUrl: current.baseUrl ?? '',
+            model: current.model ?? '',
+            apiMode: current.apiMode,
+          },
+        };
+        const saved = connections[nextProvider];
+        connection = {
+          apiKey: saved?.apiKey ?? '',
+          baseUrl: saved?.baseUrl ?? getDefaultBaseUrl(nextProvider),
+          model: saved?.model ?? getDefaultModel(nextProvider),
+          apiMode: saved?.apiMode,
+        };
+        // Save the old connection before replacing the active one.
+        await aiProviderConnectionsItem.setValue(connections);
+      }
+
+      const updated = { ...current, ...connection, ...config };
+      await aiConfigItem.setValue(updated);
+      return updated;
+    });
   }
 
   /**
@@ -113,8 +158,11 @@ class ConfigStorage {
    * 重置 AI 配置为默认值
    */
   async resetAIConfig(): Promise<AIConfig> {
-    await aiConfigItem.setValue(DEFAULT_AI_CONFIG);
-    return DEFAULT_AI_CONFIG;
+    return this.enqueueAIWrite(async () => {
+      await aiProviderConnectionsItem.setValue({});
+      await aiConfigItem.setValue(DEFAULT_AI_CONFIG);
+      return DEFAULT_AI_CONFIG;
+    });
   }
 
   /**

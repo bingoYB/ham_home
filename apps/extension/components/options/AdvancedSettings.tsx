@@ -75,6 +75,22 @@ export function AdvancedSettings({
         </div>
         <div className="flex items-center justify-between gap-4">
           <div className="space-y-1">
+            <Label htmlFor="smallModelMode">
+              {t("settings:settings.ai.smallModelMode")}
+            </Label>
+            <p id="smallModelModeHint" className="text-xs text-muted-foreground">
+              {t("settings:settings.ai.smallModelModeHint")}
+            </p>
+          </div>
+          <Switch
+            id="smallModelMode"
+            aria-describedby="smallModelModeHint"
+            checked={aiConfig.smallModelMode === true}
+            onCheckedChange={(checked) => onUpdate({ smallModelMode: checked })}
+          />
+        </div>
+        <div className="flex items-center justify-between gap-4">
+          <div className="space-y-1">
             <Label htmlFor="enableImageAnalysis">
               {t("settings:settings.ai.enableImageAnalysis")}
             </Label>

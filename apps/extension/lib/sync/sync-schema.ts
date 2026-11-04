@@ -8,6 +8,8 @@ export const SyncSysSchema = z.object({
   last_sync_time: z.number(), // timestamp
   lock_status: z.enum(['locked', 'unlocked']),
   lock_timestamp: z.number(), // to check for deadlocks
+  // Random token of the client holding the lock; read back after writing to detect a lost race.
+  lock_owner: z.string().optional(),
 });
 
 export type SyncSys = z.infer<typeof SyncSysSchema>;
@@ -24,7 +26,11 @@ export const RemoteBookmarkMetaSchema = z.object({
   createdAt: z.number(),
   updatedAt: z.number(),
   isDeleted: z.boolean().optional(),
-});
+  // Content fingerprint (length + hash) telling whether the remote chunk differs from the local
+  // content. Entries written by older versions do not have it.
+  contentHash: z.string().optional(),
+  // loose: keep fields added by newer versions instead of stripping them on write-back.
+}).loose();
 
 export type RemoteBookmarkMeta = z.infer<typeof RemoteBookmarkMetaSchema>;
 
@@ -73,7 +79,7 @@ export const RemoteBookmarkClipSchema = z.object({
   createdAt: z.number(),
   updatedAt: z.number(),
   isDeleted: z.boolean().optional(),
-});
+}).loose();
 
 export const RemoteBookmarkClipsFileSchema = z.object({
   clips: z.array(RemoteBookmarkClipSchema),
@@ -97,7 +103,7 @@ export const RemoteSettingsSchema = z.object({
   panelPosition: z.enum(['left', 'right']),
   panelShortcut: z.string(),
   updatedAt: z.number().default(0),
-});
+}).loose();
 
 export type RemoteSettings = z.infer<typeof RemoteSettingsSchema>;
 
@@ -105,10 +111,14 @@ export type RemoteSettings = z.infer<typeof RemoteSettingsSchema>;
 export const RemoteCategorySchema = z.object({
   id: z.string(),
   name: z.string(),
+  // Missing from the old schema, so zod stripped every category icon during sync.
+  icon: z.string().optional(),
   parentId: z.string().nullable(),
   order: z.number(),
   createdAt: z.number(),
-});
+  // Older versions did not write updatedAt; createdAt is used instead.
+  updatedAt: z.number().optional(),
+}).loose();
 
 export type RemoteCategory = z.infer<typeof RemoteCategorySchema>;
 
@@ -161,7 +171,8 @@ export const RemoteWorkspaceCategorySchema = z.object({
   parentId: z.string().nullable(),
   order: z.number(),
   createdAt: z.number(),
-});
+  updatedAt: z.number().optional(),
+}).loose();
 
 export const RemoteWorkspaceAnalysisSchema = z.object({
   analyzedAt: z.number(),
@@ -202,7 +213,7 @@ export const RemoteWorkspaceSchema = z.object({
   convertedToBookmarks: z.boolean(),
   createdAt: z.number(),
   updatedAt: z.number(),
-});
+}).loose();
 
 export type RemoteWorkspace = z.infer<typeof RemoteWorkspaceSchema>;
 export type RemoteWorkspaceCategory = z.infer<typeof RemoteWorkspaceCategorySchema>;
@@ -237,7 +248,7 @@ export const RemoteTabGroupRuleSchema = z.object({
   order: z.number(),
   createdAt: z.number(),
   updatedAt: z.number(),
-});
+}).loose();
 
 export const RemoteTabGroupAutoGroupSettingsSchema = z.object({
   aiAutoGroupEnabled: z.boolean(),
@@ -257,3 +268,22 @@ export const RemoteTabGroupConfigFileSchema = z.object({
 });
 
 export type RemoteTabGroupRule = z.infer<typeof RemoteTabGroupRuleSchema>;
+
+// ============ Deletion records of non-bookmark entities ============
+
+/**
+ * deletions.json: deletion records of categories, workspaces, workspace categories and
+ * tab-group rules. A separate file instead of a new field in categories.json etc., so older
+ * clients keep reading and writing those files unchanged.
+ */
+const DeletionListSchema = z.array(RemoteBookmarkDeletionSchema).default([]);
+
+export const RemoteDeletionsFileSchema = z.object({
+  version: z.number().default(1),
+  categories: DeletionListSchema,
+  workspaces: DeletionListSchema,
+  workspaceCategories: DeletionListSchema,
+  tabGroupRules: DeletionListSchema,
+});
+
+export type RemoteDeletionsFile = z.infer<typeof RemoteDeletionsFileSchema>;

@@ -5,6 +5,7 @@
 import { useState, useMemo, useCallback, useEffect } from 'react';
 import { parseISODate } from '@hamhome/ui';
 import type { LocalBookmark, LocalCategory, CustomFilter, FilterCondition } from '@/types';
+import { collectCategoryScopeIds } from '@/utils/category-tree.utils';
 
 const SEMANTIC_SEARCH_MIN_SCORE = 0.3;
 
@@ -61,6 +62,11 @@ export interface BookmarkSearchResult {
 export interface UseBookmarkSearchOptions {
   bookmarks: LocalBookmark[];
   categories?: LocalCategory[];
+  /**
+   * When true, selecting a category also matches bookmarks filed under its
+   * sub-categories (tree navigation). Requires `categories`.
+   */
+  includeSubCategories?: boolean;
   initialState?: Partial<BookmarkSearchState>;
   customFilter?: CustomFilter | null; // 自定义筛选器
   subjectIndex?: Readonly<Record<string, { type: 'image' | 'text' }>> | null;
@@ -232,6 +238,7 @@ function matchesBookmarkFilters(
   customFilter: CustomFilter | null,
   contentType: BookmarkContentType = 'all',
   subjectIndex?: Readonly<Record<string, { type: 'image' | 'text' }>> | null,
+  categoryScope: ReadonlySet<string> | null = null,
 ): boolean {
   if (contentType !== 'all' && subjectIndex) {
     const subject = subjectIndex[bookmark.id];
@@ -254,6 +261,8 @@ function matchesBookmarkFilters(
   if (selectedCategory !== 'all') {
     if (selectedCategory === 'uncategorized') {
       if (bookmark.categoryId) return false;
+    } else if (categoryScope) {
+      if (!bookmark.categoryId || !categoryScope.has(bookmark.categoryId)) return false;
     } else if (bookmark.categoryId !== selectedCategory) {
       return false;
     }
@@ -282,6 +291,8 @@ interface MergeBookmarkSearchResultsOptions {
   customFilter: CustomFilter | null;
   contentType?: BookmarkContentType;
   subjectIndex?: Readonly<Record<string, { type: 'image' | 'text' }>> | null;
+  categories?: LocalCategory[];
+  includeSubCategories?: boolean;
 }
 
 export function mergeBookmarkSearchResults({
@@ -294,8 +305,17 @@ export function mergeBookmarkSearchResults({
   customFilter,
   contentType = 'all',
   subjectIndex = null,
+  categories,
+  includeSubCategories = false,
 }: MergeBookmarkSearchResultsOptions): LocalBookmark[] {
   const timeBounds = getTimeRangeBounds(timeRange);
+  const categoryScope =
+    includeSubCategories &&
+    categories &&
+    selectedCategory !== 'all' &&
+    selectedCategory !== 'uncategorized'
+      ? collectCategoryScopeIds(categories, selectedCategory)
+      : null;
   const baseFilteredBookmarks = bookmarks.filter((bookmark) =>
     matchesBookmarkFilters(
       bookmark,
@@ -305,6 +325,7 @@ export function mergeBookmarkSearchResults({
       customFilter,
       contentType,
       subjectIndex,
+      categoryScope,
     ),
   );
 
@@ -361,6 +382,8 @@ async function searchSemanticBookmarkIds(
  */
 export function useBookmarkSearch({
   bookmarks,
+  categories,
+  includeSubCategories = false,
   initialState = {},
   customFilter = null,
   subjectIndex = null,
@@ -419,6 +442,8 @@ export function useBookmarkSearch({
       customFilter,
       contentType,
       subjectIndex,
+      categories,
+      includeSubCategories,
     });
   }, [
     bookmarks,
@@ -430,6 +455,8 @@ export function useBookmarkSearch({
     customFilter,
     contentType,
     subjectIndex,
+    categories,
+    includeSubCategories,
   ]);
 
   // 切换标签选择

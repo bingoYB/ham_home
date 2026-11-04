@@ -11,3 +11,5 @@ export { VisualBookmarkGallery } from './VisualBookmarkGallery';
 export { BookmarkSubjectDialog } from './BookmarkSubjectDialog';
 export { ImageClipMetadata } from './ImageClipMetadata';
 export { BookmarkScreenshotViewer } from './BookmarkScreenshotViewer';
+export { CategoryTreePanel } from './CategoryTreePanel';
+export { CategoryStructureBar } from './CategoryStructureBar';

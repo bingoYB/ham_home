@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import Image from "next/image";
 import {
   Button,
@@ -28,6 +28,10 @@ interface FeatureHeroBannerProps {
 }
 
 const GITHUB_REPO_URL = "https://github.com/bingoYB/ham_home";
+
+/** Staggers the hero entrance animation through the --hero-delay variable */
+const heroDelay = (ms: number): CSSProperties =>
+  ({ "--hero-delay": `${ms}ms` }) as CSSProperties;
 
 const HERO_SCREENSHOTS: ExtensionScreenshotId[] = [
   "bookmarkLibrary",
@@ -100,13 +104,18 @@ export function FeatureHeroBanner({ isEn, isDark }: FeatureHeroBannerProps) {
   return (
     <section>
       <div className="relative overflow-hidden bg-transparent py-10 sm:py-14 lg:py-16">
+        {/* Drifting brand glows behind the hero */}
+        <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+          <div className="hero-glow-a absolute -left-24 top-0 h-72 w-72 rounded-full bg-[#ff5b24]/15 blur-3xl" />
+          <div className="hero-glow-b absolute -right-16 bottom-0 h-80 w-80 rounded-full bg-[#2dd4bf]/15 blur-3xl" />
+        </div>
         <div className="relative z-10 grid min-w-0 items-center gap-10 lg:grid-cols-[0.9fr_1.1fr]">
           <div className="min-w-0 max-w-2xl">
-            <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-[#ff5b24]/20 bg-[#ff5b24]/10 px-3 py-1.5 text-sm font-semibold text-[#d94a1a] dark:text-[#ff9b6f]">
+            <div style={heroDelay(0)} className="hero-rise mb-5 inline-flex items-center gap-2 rounded-full border border-[#ff5b24]/20 bg-[#ff5b24]/10 px-3 py-1.5 text-sm font-semibold text-[#d94a1a] dark:text-[#ff9b6f]">
               <Sparkles className="h-4 w-4" />
               {texts.eyebrow}
             </div>
-            <div className="flex items-center gap-3 sm:gap-4">
+            <div style={heroDelay(90)} className="hero-rise flex items-center gap-3 sm:gap-4">
               <Image
                 src={`${process.env.NEXT_PUBLIC_BASE_PATH || ''}/icon/128.png`}
                 alt="HamHome Logo"
@@ -116,15 +125,15 @@ export function FeatureHeroBanner({ isEn, isDark }: FeatureHeroBannerProps) {
               />
               <p className="text-5xl font-black tracking-tight text-[#ff5b24]">{texts.brand}</p>
             </div>
-            <h1 className="mt-5 max-w-full break-words [font-family:var(--font-display)] text-[2rem] font-semibold leading-[1.14] tracking-normal text-foreground sm:text-[2.75rem] lg:text-[3rem]">
+            <h1 style={heroDelay(180)} className="hero-rise mt-5 max-w-full break-words [font-family:var(--font-display)] text-[2rem] font-semibold leading-[1.14] tracking-normal text-foreground sm:text-[2.75rem] lg:text-[3rem]">
               {texts.title}
             </h1>
-            <p className="mt-5 max-w-full break-words text-lg leading-relaxed text-muted-foreground sm:text-xl">
+            <p style={heroDelay(270)} className="hero-rise mt-5 max-w-full break-words text-lg leading-relaxed text-muted-foreground sm:text-xl">
               {texts.desc}
             </p>
 
-            <div className="mt-8 flex flex-wrap items-center gap-3">
-              <Button asChild size="lg" className="gap-2 bg-[#ff7a32] text-white hover:bg-[#ff6b1c]">
+            <div style={heroDelay(360)} className="hero-rise mt-8 flex flex-wrap items-center gap-3">
+              <Button asChild size="lg" className="cta-pulse gap-2 bg-[#ff7a32] text-white hover:bg-[#ff6b1c]">
                 <a
                   href={GITHUB_RELEASE_URL}
                   target="_blank"
@@ -151,13 +160,13 @@ export function FeatureHeroBanner({ isEn, isDark }: FeatureHeroBannerProps) {
               </Button>
             </div>
 
-            <div className="mt-8 grid gap-3 sm:grid-cols-2">
+            <div style={heroDelay(450)} className="hero-rise mt-8 grid gap-3 sm:grid-cols-2">
               {highlights.map((item) => (
                 <div
                   key={item.label}
-                  className="flex min-h-14 items-center gap-3 rounded-xl border border-border/70 bg-background/55 px-3 py-2 text-sm font-medium text-foreground shadow-sm backdrop-blur"
+                  className="lift-card flex min-h-14 items-center gap-3 rounded-xl border border-border/70 bg-background/55 px-3 py-2 text-sm font-medium text-foreground shadow-sm backdrop-blur"
                 >
-                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[#2dd4bf]/10 text-[#0f766e] dark:text-[#5eead4]">
+                  <span className="lift-icon flex h-8 w-8 items-center justify-center rounded-lg bg-[#2dd4bf]/10 text-[#0f766e] dark:text-[#5eead4]">
                     {item.icon}
                   </span>
                   {item.label}
@@ -166,7 +175,8 @@ export function FeatureHeroBanner({ isEn, isDark }: FeatureHeroBannerProps) {
             </div>
           </div>
 
-          <div className="mx-auto min-w-0 w-full max-w-[760px]">
+          <div className="hero-slide-in mx-auto min-w-0 w-full max-w-[760px]">
+            <div className="hero-float">
             <Carousel 
               opts={{ loop: true }}
               setApi={setApi} 
@@ -198,6 +208,7 @@ export function FeatureHeroBanner({ isEn, isDark }: FeatureHeroBannerProps) {
                 ))}
               </div>
             </Carousel>
+            </div>
           </div>
         </div>
       </div>

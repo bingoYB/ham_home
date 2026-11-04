@@ -1,5 +1,27 @@
 # Extension 组件文档
 
+## AIStatus
+
+保存面板的 AI 分析状态提示。错误提示最大宽度为 280px，并随容器收缩；长错误单行省略，图标和重试按钮保持可见。悬停或键盘聚焦错误文字可查看完整信息，浮层保留换行、长词自动换行，超长内容可滚动。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| status | `AIStatusType` | ✓ | - | `idle`、`loading`、`success`、`error` 或 `disabled` |
+| error | `string \| null` | - | - | 完整错误信息 |
+| onRetry | `() => void` | - | - | 重试 AI 分析 |
+| onConfigure | `() => void` | - | - | 打开 AI 设置 |
+| className | `string` | - | - | 自定义样式 |
+| portalContainer | `HTMLElement` | - | - | Tooltip portal 容器，页内 Shadow DOM 浮窗必传 |
+
+```tsx
+<AIStatus
+  status="error"
+  error={aiError}
+  onRetry={retryAnalysis}
+  portalContainer={portalContainer}
+/>
+```
+
 ## SavePanel
 
 保存当前页面为 HamHome 书签的弹出面板，负责书签表单、AI 推荐入口和页面快照/Obsidian 保存开关。
@@ -2592,13 +2614,14 @@ const unwatch = bookmarkStorage.watchBookmarks((newBookmarks) => {
 
 ### config-storage
 
-AI 配置和用户设置存储，基于 **WXT Storage (sync)** 实现，支持跨设备同步。
+当前 AI 配置和用户设置基于 **WXT Storage (sync)** 实现；切换时保留的各服务商连接信息使用本机存储。
 
 #### 存储项
 
 | Key                  | Type             | Description                |
 | -------------------- | ---------------- | -------------------------- |
 | `sync:aiConfig`      | `AIConfig`       | AI 配置（跨设备同步）      |
+| `local:aiProviderConnections` | 服务商连接信息映射 | 非当前服务商的 API Key、Base URL、模型及请求版本（仅本机） |
 | `sync:settings`      | `LocalSettings`  | 用户设置（跨设备同步）     |
 | `sync:customFilters` | `CustomFilter[]` | 自定义筛选器（跨设备同步） |
 
@@ -2637,7 +2660,8 @@ AI 配置和用户设置存储，基于 **WXT Storage (sync)** 实现，支持�
 - 大多数提供商兼容 OpenAI API，使用统一的 OpenAI SDK 调用
 - `azure` 和 `custom` 需要用户手动配置 Base URL
 - `ollama` 不需要 API Key，使用本地服务
-- 切换提供商时自动选择第一个模型作为默认值
+- 首次切换到某个提供商时使用该提供商的默认地址和模型，API Key 为空；再次切换时恢复该服务商上次的连接信息
+- 切换前自动保留当前输入，当前配置仍保存在浏览器同步存储中，其他服务商的连接信息仅保存在本机
 - 模型选择器支持从预设列表选择，也支持输入自定义模型名称
 - 设置页支持通过当前 provider 的官方 `/models` 接口拉取可用模型列表，并与预设推荐一起展示
 
@@ -2794,7 +2818,7 @@ const result = await globalAgentService.runTurn({
 
 #### bookmarkAnalysisService.analyzeBookmark
 
-一次性分析书签内容，生成标题、摘要、分类、标签。
+分析书签内容，生成标题、摘要、分类、标签。
 
 **参数（EnhancedAnalyzeInput）：**
 
@@ -2803,11 +2827,14 @@ const result = await globalAgentService.runTurn({
 | pageContent    | `PageContent`     | ✓        | 页面内容对象                               |
 | userCategories | `LocalCategory[]` | -        | 用户已有分类（用于优先复用分类）           |
 | existingTags   | `string[]`        | -        | 用户已有标签（避免生成语义相近的重复标签） |
+| signal         | `AbortSignal`     | -        | 中断模型请求及后续字段分析                 |
 
 **行为说明：**
 
 - 使用统一 agent 配置工厂初始化模型
 - 输出固定结构：`title`、`summary`、`category`、`tags`
+- 开启小模型兼容模式时逐字段请求；字段格式无效会单独重试一次，全部校验通过后才返回结果
+- 批量 AI 整理在小模型模式下逐条分析，避免同时向本地模型发送多组请求
 - AI 失败时直接抛出错误，由调用方决定 UI 提示
 
 **用法示例：**
@@ -3047,17 +3074,59 @@ AI 配置标签页，负责大模型服务商配置、模型选择、高级参�
 | --- | --- | --- | --- | --- |
 | aiConfig | `AIConfig` | ✓ | - | AI 基础配置 |
 | embeddingConfig | `EmbeddingConfig` | ✓ | - | 语义搜索配置 |
+| isSwitchingProvider | `boolean` | ✓ | - | 是否正在保存并切换服务商 |
+| onProviderChange | `(provider: AIProvider) => void` | ✓ | - | 保存当前输入并切换服务商 |
+| onSaveModel | `(provider: AIProvider, model: string) => void` | ✓ | - | 保存当前服务商的模型，并忽略切换后的延迟失焦事件 |
 | ... | ... | ... | ... | 详见源代码 props 定义 |
 
 **行为说明：**
 
 - 支持多种 AI 提供商（OpenAI, Anthropic, Google 等）及其自定义镜像。
+- 各服务商独立保留 API Key、Base URL、模型及请求版本；切换过程中暂时禁用表单，避免不同服务商的输入互相覆盖。
 - 提供模型拉取（Fetch Models）功能，自动发现可用模型。
 - 包含语义搜索开关及向量索引统计信息展示。
 - 支持增量/全量索引重建及向量数据清理。
 - Incremental rebuild re-embeds bookmarks whose text changed or whose vector came from another embedding model or dimensions, so switching models does not need a full rebuild.
 - The embedding card shows `EmbeddingDimensionsField` only for models that accept a custom vector size; switching to a fixed-size model clears the stored size.
 - 高级设置中提供 temperature、请求版本（仅 OpenAI）以及「图片剪藏 AI 分析」开关（默认开启）：关闭后保存图片剪藏不会把图片发送给模型；隐私页面无论开关状态都不会发送。
+- 高级设置可开启「小模型兼容模式」（默认关闭）：整页书签的标题、摘要、分类和标签逐项生成，图片及划词剪藏保持原有流程；多次请求可能需要更长时间。
+
+```tsx
+<AITab {...aiTabProps} />
+```
+
+---
+
+### ProviderSelect
+
+AI 服务商选择器，切换时显示各服务商连接信息的保存范围。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| value | `AIProvider` | ✓ | - | 当前服务商 |
+| onChange | `(provider: AIProvider) => void` | ✓ | - | 选择服务商时调用 |
+| disabled | `boolean` | - | `false` | 禁用服务商选择 |
+
+```tsx
+<ProviderSelect value={aiConfig.provider} onChange={onProviderChange} disabled={isSwitchingProvider} />
+```
+
+---
+
+### AdvancedSettings
+
+AI 高级参数设置，包括 temperature、请求版本和分析模式开关。小模型兼容模式仅用于整页书签分析。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| aiConfig | `AIConfig` | ✓ | - | 当前 AI 配置 |
+| isOpen | `boolean` | ✓ | - | 高级设置是否展开 |
+| onOpenChange | `(open: boolean) => void` | ✓ | - | 展开状态变化回调 |
+| onUpdate | `(updates: Partial<AIConfig>) => void` | ✓ | - | 保存配置变更 |
+
+```tsx
+<AdvancedSettings aiConfig={aiConfig} isOpen={isOpen} onOpenChange={setIsOpen} onUpdate={updateAIConfig} />
+```
 
 ---
 
@@ -3114,7 +3183,8 @@ Vector size picker in the embedding settings card. It renders nothing when the s
 | Prop | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
 | storageInfo | `any` | ✓ | - | 基础数据统计 |
-| syncConfig | `SyncConfig` | ✓ | - | WebDAV 同步配置 |
+| syncConfig | `WebDAVConfig` | ✓ | - | WebDAV 连接配置及当前设备的同步策略 |
+| updateSyncConfig | `(updates: Partial<WebDAVConfig>) => void` | ✓ | - | 保存配置变更 |
 | ... | ... | ... | ... | 详见源代码 props 定义 |
 
 **行为说明：**
@@ -3123,7 +3193,47 @@ Vector size picker in the embedding settings card. It renders nothing when the s
 - 支持 JSON/HTML 格式的书签导出。
 - 提供分项清理（书签、快照、远端同步数据）及全量数据重置入口。
 - WebDAV 同步用户设置和 AI 自动分组设置时按 `updatedAt` 合并；本地刚修改的配置会优先上传，远端更新时才下载覆盖本地。
-- WebDAV 同步支持端到端加密（E2E）。
+- WebDAV 启用后展示 `SyncStrategySettings`，独立配置实时、启动、定时同步开关及时间；全部关闭后仅手动同步。策略仅对当前设备生效。
+
+**使用示例：**
+
+```tsx
+<StorageTab {...storageTabProps} syncConfig={syncConfig} updateSyncConfig={updateSyncConfig} />
+```
+
+### SyncStrategySettings
+
+WebDAV 自动同步策略表单，复用三个 `SyncStrategyRow`，按当前配置显示各项开关、时间及手动模式提示。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| config | `WebDAVConfig` | ✓ | - | 当前设备配置；旧配置缺失策略字段时补默认值 |
+| onChange | `(updates: Partial<WebDAVConfig>) => void` | ✓ | - | 保存单项变更 |
+
+**行为说明：** 默认实时同步延迟 300 秒、启动同步延迟 5 秒、定时同步间隔 30 分钟，三项默认开启。实时/启动延迟允许 1–3600 整数秒，定时间隔允许 1–1440 整数分钟。输入失焦或按 Enter 后校验并保存，开关即时保存；关闭策略时禁用对应数值输入。后台休眠可能推迟执行。
+
+```tsx
+<SyncStrategySettings config={syncConfig} onChange={updateSyncConfig} />
+```
+
+### SyncStrategyRow
+
+可复用的同步策略行，包含已关联标签的开关、数值输入、单位、说明和校验提示；草稿及校验由 `useSyncStrategyInput` 管理。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| id | `string` | ✓ | - | 标签、输入及说明的唯一 ID 前缀 |
+| label / description / unit | `string` | ✓ | - | 名称、触发说明及时间单位 |
+| enabled | `boolean` | ✓ | - | 是否启用此策略 |
+| value / min / max | `number` | ✓ | - | 已保存的值及合法范围 |
+| onEnabledChange | `(enabled: boolean) => void` | ✓ | - | 切换开关 |
+| onValueChange | `(value: number) => void` | ✓ | - | 提交合法整数 |
+
+```tsx
+<SyncStrategyRow id="webdav-realtime" label="实时同步" description="本地变更后延迟同步"
+  unit="秒" enabled={true} value={5} min={1} max={3600}
+  onEnabledChange={setRealtimeEnabled} onValueChange={setRealtimeDelay} />
+```
 
 ---
 
@@ -3168,3 +3278,132 @@ Vector size picker in the embedding settings card. It renders nothing when the s
 - 提供四种类型选项：所有（`"all"`，默认）、书签（`"bookmark"`）、图片（`"image"`）、文本（`"text"`）。
 - 每个选项配有对应图标，选中后直接在触发器中展示图标与文字。
 - 与 `useBookmarkSearch` 协同工作，选择后实时过滤书签列表并在下方显示活动筛选徽章。
+
+## CategoryTreePanel
+
+收藏页（「我的收藏」）左侧的传统分类树。顶部固定「全部书签」和「未分类」两项，其下为可展开的嵌套分类，每个节点右侧显示书签数量（父分类的数量包含全部子分类）。组件只负责展示，选中与展开状态由父组件通过 `useCategoryNavigation` 管理。
+
+树内容右侧保留 20px 内边距，为滚动条留出空间，避免节点数量和选中背景紧贴滚动条。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| tree | `CategoryTreeNode[]` | ✓ | - | 由 `buildCategoryTree` 构建的分类树 |
+| counts | `CategoryBookmarkCounts` | ✓ | - | 全部 / 未分类 / 各分类（含子分类）的书签数量 |
+| selectedId | `string` | ✓ | - | 当前选中项：`"all"`、`"uncategorized"` 或分类 ID |
+| expandedIds | `ReadonlySet<string>` | ✓ | - | 已展开的分类 ID |
+| onSelect | `(id: string) => void` | ✓ | - | 点击节点选中 |
+| onToggleExpand | `(id: string) => void` | ✓ | - | 点击箭头展开 / 收起 |
+| onExpandAll | `() => void` | ✓ | - | 展开全部分类 |
+| onCollapseAll | `() => void` | ✓ | - | 收起全部分类 |
+| onClose | `() => void` | ✓ | - | 隐藏分类栏 |
+
+**用法示例：**
+
+```tsx
+const nav = useCategoryNavigation({ bookmarks, categories, selectedCategory });
+
+<CategoryTreePanel
+  tree={nav.tree}
+  counts={nav.counts}
+  selectedId={selectedCategory}
+  expandedIds={nav.expandedIds}
+  onSelect={setSelectedCategory}
+  onToggleExpand={nav.toggleExpanded}
+  onExpandAll={nav.expandAll}
+  onCollapseAll={nav.collapseAll}
+  onClose={() => setPanelOpen(false)}
+/>
+```
+
+**行为说明：**
+
+- 选中父分类时，右侧列表包含其全部子分类下的书签（`useBookmarkSearch` 的 `includeSubCategories`）。
+- 选中状态变化时（树、面包屑、子分类按钮均会触发），`useCategoryNavigation` 会自动展开其祖先节点。
+- 分类栏隐藏后，筛选栏会退回 `CategoryFilterDropdown`，并显示「显示分类栏」按钮。
+
+## CategoryStructureBar
+
+书签列表上方的分类结构条：当前分类的可点击面包屑，以及其直接子分类的跳转按钮（带书签数）。未选中具体分类（全部 / 未分类）时不渲染。放在滚动区之外，不影响瀑布流与虚拟列表的偏移计算。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| trail | `CategoryTrailItem[]` | ✓ | - | 从根到当前分类的路径；为空时不渲染 |
+| subCategories | `CategoryTreeNode[]` | ✓ | - | 当前分类的直接子分类 |
+| counts | `CategoryBookmarkCounts` | ✓ | - | 各分类书签数量 |
+| onSelect | `(id: string) => void` | ✓ | - | 点击面包屑或子分类时切换分类，`"all"` 表示回到全部书签 |
+
+**用法示例：**
+
+```tsx
+<CategoryStructureBar
+  trail={nav.trail}
+  subCategories={nav.subCategories}
+  counts={nav.counts}
+  onSelect={setSelectedCategory}
+/>
+```
+
+## AppSidebarFooter
+
+主应用侧边栏底部：存储用量与同步状态摘要，以及用户菜单。侧边栏收起为图标列时，摘要卡片变成「存储」「同步」两个带 Tooltip 的图标按钮，用户菜单只保留头像。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| bookmarkCount | `number` | ✓ | - | 书签数量，显示在用户菜单中 |
+| storageSize | `string` | ✓ | - | 已格式化的存储占用 |
+| sync | `SidebarSyncIndicator` | ✓ | - | 同步状态：`label`、`Icon`、`iconClassName` |
+| onNavigate | `(view: string) => void` | ✓ | - | 跳转到应用内视图（如 `"settings?tab=storage"`） |
+
+**用法示例：**
+
+```tsx
+<AppSidebar
+  collapsible="icon"
+  footer={
+    <AppSidebarFooter
+      bookmarkCount={bookmarks.length}
+      storageSize={storageInfo.storageSize}
+      sync={{ label: syncLabel, Icon: SyncIcon, iconClassName }}
+      onNavigate={handleViewChange}
+    />
+  }
+/>
+```
+
+**行为说明：**
+
+- 通过父级 `Sidebar` 的 `group-data-[collapsible=icon]` 状态切换展开 / 收起样式，组件自身不持有状态。
+- 主应用 `AppSidebar` 使用 `collapsible="icon"`：收起后保留图标列，导航项悬停显示 Tooltip，数量角标隐藏。
+
+## StorageStatCard
+
+设置页「存储管理」数据概览中的单个统计卡片（书签与分类、工作空间、网页快照、页面截图、语义向量索引）。文案自动换行，清除按钮允许增高，长文案本地化后也不会溢出卡片。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| title | `string` | ✓ | - | 卡片标题 |
+| primary | `string` | ✓ | - | 主数据行，如「1345 个书签 / 61 个分类」 |
+| secondary | `string` | - | - | 次级说明行，如占用大小 |
+| footnote | `string` | - | - | 无清除操作时的底部提示 |
+| clearLabel | `string` | - | - | 清除按钮文案，不传则不渲染按钮 |
+| isClearing | `boolean` | - | `false` | 清除进行中（按钮显示加载图标） |
+| clearDisabled | `boolean` | - | `false` | 禁用清除按钮 |
+| onClear | `() => void` | - | - | 点击清除按钮 |
+
+**用法示例：**
+
+```tsx
+<StorageStatCard
+  title={t("settings:settings.storage.snapshotData.title")}
+  primary={t("settings:settings.storage.snapshotData.count", { count })}
+  secondary={t("settings:settings.storage.snapshotData.size", { size })}
+  clearLabel={t("settings:settings.storage.snapshotData.clear")}
+  isClearing={isClearingSnapshots}
+  clearDisabled={!count}
+  onClear={onClearSnapshotData}
+/>
+```
+
+**行为说明：**
+
+- 卡片网格使用 `repeat(auto-fill, minmax(10rem, 1fr))`，随容器宽度自动调整列数，不再固定 5 列。

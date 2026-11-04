@@ -2,6 +2,7 @@
 
 import type { ReactNode } from 'react';
 import { cn } from '@hamhome/ui';
+import { Reveal } from './motion/Reveal';
 
 interface FeatureSectionProps {
   id: string;
@@ -46,7 +47,7 @@ export function FeatureSection({
 
       <div className="container relative mx-auto px-4">
         {/* 区块标题 */}
-        <div className="mb-10 max-w-2xl sm:mb-12">
+        <Reveal className="mb-10 max-w-2xl sm:mb-12">
           <div className="mb-4 flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
               {icon}
@@ -58,7 +59,7 @@ export function FeatureSection({
           <p className="text-base leading-relaxed text-muted-foreground sm:text-lg">
             {description}
           </p>
-        </div>
+        </Reveal>
 
         {/* Demo 内容 */}
         <div className="relative">{children}</div>

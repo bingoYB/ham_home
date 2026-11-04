@@ -1,6 +1,7 @@
 'use client';
 
 import { LandingActionButtons } from './LandingActionButtons';
+import { Reveal } from './motion/Reveal';
 
 interface LandingCtaProps {
   isEn: boolean;
@@ -18,7 +19,7 @@ export function LandingCta({ isEn }: LandingCtaProps) {
 
   return (
     <section className="mx-auto w-full px-4 py-16 sm:px-6 lg:px-8 container">
-      <div className="flex flex-col gap-6 border-t border-border/70 pt-10 lg:flex-row lg:items-end lg:justify-between">
+      <Reveal className="flex flex-col gap-6 border-t border-border/70 pt-10 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-3xl">
           <h2 className="text-3xl font-bold leading-tight text-foreground sm:text-4xl">
             {texts.title}
@@ -33,7 +34,7 @@ export function LandingCta({ isEn }: LandingCtaProps) {
           downloadLabel={texts.download}
           githubLabel={texts.github}
         />
-      </div>
+      </Reveal>
     </section>
   );
 }

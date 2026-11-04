@@ -1,4 +1,14 @@
-export interface WebDAVConfig {
+export interface WebDAVSyncStrategy {
+  realtimeSyncEnabled: boolean;
+  realtimeSyncDelaySeconds: number;
+  startupSyncEnabled: boolean;
+  startupSyncDelaySeconds: number;
+  periodicSyncEnabled: boolean;
+  periodicSyncIntervalMinutes: number;
+}
+
+// Optional strategy fields keep existing stored configurations compatible.
+export interface WebDAVConfig extends Partial<WebDAVSyncStrategy> {
   enabled: boolean;
   url: string;
   username: string;
@@ -15,6 +25,7 @@ export type SyncErrorCode =
   | 'server'
   | 'invalidUrl'
   | 'notInitialized'
+  | 'invalidRemoteData'
   | 'unknown';
 
 export interface SyncStatus {

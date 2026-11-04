@@ -10,6 +10,7 @@ import type {
   WorkspaceCategory,
   WorkspaceQuery,
 } from "@/types";
+import { syncTombstoneStorage } from "./sync-tombstone-storage";
 
 const workspacesItem = storage.defineItem<Workspace[]>("local:workspaces", {
   fallback: [],
@@ -116,6 +117,8 @@ class WorkspaceStorage {
   }
 
   async deleteWorkspace(id: string): Promise<void> {
+    // Leave a deletion record, otherwise other devices' copies come back on the next sync.
+    await syncTombstoneStorage.add("workspaces", [id]);
     const workspaces = await workspacesItem.getValue();
     await workspacesItem.setValue(
       workspaces.filter((workspace) => workspace.id !== id),
@@ -159,13 +162,15 @@ class WorkspaceStorage {
       throw new Error("工作空间分类已存在");
     }
 
+    const now = Date.now();
     const category: WorkspaceCategory = {
       id: nanoid(),
       name: normalizedName,
       icon,
       parentId,
       order: categories.length,
-      createdAt: Date.now(),
+      createdAt: now,
+      updatedAt: now,
     };
     await workspaceCategoriesItem.setValue([...categories, category]);
     return category;
@@ -184,6 +189,7 @@ class WorkspaceStorage {
     const updated = {
       ...categories[index],
       ...data,
+      updatedAt: Date.now(),
     };
     await workspaceCategoriesItem.setValue(
       categories.map((c, i) => (i === index ? updated : c)),
@@ -192,6 +198,7 @@ class WorkspaceStorage {
   }
 
   async deleteCategory(id: string): Promise<void> {
+    await syncTombstoneStorage.add("workspaceCategories", [id]);
     const categories = await workspaceCategoriesItem.getValue();
     await workspaceCategoriesItem.setValue(
       categories.filter((c) => c.id !== id),

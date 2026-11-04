@@ -18,7 +18,7 @@ import { EmbeddingConfigCard } from "./EmbeddingConfig";
 import type { AIConfig, AIProvider, EmbeddingConfig } from "@/types";
 import type { VectorStoreStats } from "@/lib/storage/vector-store";
 import type { QueueProgress } from "@/lib/embedding/embedding-queue";
-import { getDefaultBaseUrl, getDefaultModel } from "@/lib/agent/provider-config";
+import { getDefaultBaseUrl } from "@/lib/agent/provider-config";
 
 interface AITabProps {
   aiConfig: AIConfig;
@@ -35,6 +35,7 @@ interface AITabProps {
   isAdvancedOpen: boolean;
   newTag: string;
   recommendedModels: string[];
+  isSwitchingProvider: boolean;
   vectorStats: VectorStoreStats | null;
   isLoadingStats: boolean;
   isRebuilding: boolean;
@@ -59,6 +60,8 @@ interface AITabProps {
   setLocalEmbeddingBaseUrl: (val: string) => void;
   setLocalEmbeddingModel: (val: string) => void;
   updateAIConfig: (updates: Partial<AIConfig>) => void;
+  onProviderChange: (provider: AIProvider) => void;
+  onSaveModel: (provider: AIProvider, model: string) => void;
   updateEmbeddingConfig: (updates: Partial<EmbeddingConfig>) => void;
   onTestConnection: () => void;
   onFetchModels: () => void;
@@ -87,6 +90,7 @@ export function AITab({
   isAdvancedOpen,
   newTag,
   recommendedModels,
+  isSwitchingProvider,
   vectorStats,
   isLoadingStats,
   isRebuilding,
@@ -111,6 +115,8 @@ export function AITab({
   setLocalEmbeddingBaseUrl,
   setLocalEmbeddingModel,
   updateAIConfig,
+  onProviderChange,
+  onSaveModel,
   updateEmbeddingConfig,
   onTestConnection,
   onFetchModels,
@@ -133,79 +139,76 @@ export function AITab({
           <CardDescription>{t("settings:settings.ai.description")}</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <ProviderSelect
-            value={aiConfig.provider}
-            onChange={(value: AIProvider) => {
-              const defaultBaseUrl = getDefaultBaseUrl(value);
-              const defaultModel = getDefaultModel(value);
-              setLocalBaseUrl(defaultBaseUrl);
-              setLocalModel(defaultModel);
-              updateAIConfig({ provider: value, baseUrl: defaultBaseUrl, model: defaultModel });
-            }}
-          />
+          <fieldset disabled={isSwitchingProvider} className="min-w-0 space-y-6">
+            <ProviderSelect
+              value={aiConfig.provider}
+              onChange={onProviderChange}
+              disabled={isSwitchingProvider}
+            />
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>{t("settings:settings.ai.apiKey")}</Label>
-              <Input
-                type="password"
-                value={localApiKey}
-                onChange={(e) => setLocalApiKey(e.target.value)}
-                onBlur={(e) => updateAIConfig({ apiKey: e.target.value })}
-                placeholder={aiConfig.provider === "ollama" ? t("settings:settings.ai.noApiKeyNeeded") : "sk-..."}
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>{t("settings:settings.ai.apiKey")}</Label>
+                <Input
+                  type="password"
+                  value={localApiKey}
+                  onChange={(e) => setLocalApiKey(e.target.value)}
+                  onBlur={(e) => updateAIConfig({ apiKey: e.target.value })}
+                  placeholder={aiConfig.provider === "ollama" ? t("settings:settings.ai.noApiKeyNeeded") : "sk-..."}
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>{t("settings:settings.ai.baseUrl")}</Label>
+                <Input
+                  type="url"
+                  value={localBaseUrl}
+                  onChange={(e) => setLocalBaseUrl(e.target.value)}
+                  onBlur={(e) => updateAIConfig({ baseUrl: e.target.value })}
+                  placeholder={getDefaultBaseUrl(aiConfig.provider) || "https://api.openai.com/v1"}
+                />
+              </div>
             </div>
-            <div className="space-y-2">
-              <Label>{t("settings:settings.ai.baseUrl")}</Label>
-              <Input
-                type="url"
-                value={localBaseUrl}
-                onChange={(e) => setLocalBaseUrl(e.target.value)}
-                onBlur={(e) => updateAIConfig({ baseUrl: e.target.value })}
-                placeholder={getDefaultBaseUrl(aiConfig.provider) || "https://api.openai.com/v1"}
-              />
-            </div>
-          </div>
 
-          <ModelSelector
-            value={localModel}
-            remoteModels={remoteModels}
-            recommendedModels={recommendedModels}
-            isFetchingModels={isFetchingModels}
-            modelFetchResult={modelFetchResult}
-            open={modelSelectorOpen}
-            onOpenChange={setModelSelectorOpen}
-            onSelect={(model) => {
-              setLocalModel(model);
-              updateAIConfig({ model });
-            }}
-            onChange={setLocalModel}
-            onBlur={(model) => updateAIConfig({ model })}
-            onFetchModels={onFetchModels}
-          />
+            <ModelSelector
+              value={localModel}
+              remoteModels={remoteModels}
+              recommendedModels={recommendedModels}
+              isFetchingModels={isFetchingModels}
+              modelFetchResult={modelFetchResult}
+              open={modelSelectorOpen}
+              onOpenChange={setModelSelectorOpen}
+              onSelect={(model) => {
+                setLocalModel(model);
+                onSaveModel(aiConfig.provider, model);
+              }}
+              onChange={setLocalModel}
+              onBlur={(model) => onSaveModel(aiConfig.provider, model)}
+              onFetchModels={onFetchModels}
+            />
 
-          <AIConnectionTest
-            isTesting={isTesting}
-            testResult={testResult}
-            onTest={onTestConnection}
-            disabled={!aiConfig.apiKey && aiConfig.provider !== "ollama"}
-          />
+            <AIConnectionTest
+              isTesting={isTesting}
+              testResult={testResult}
+              onTest={onTestConnection}
+              disabled={!aiConfig.apiKey && aiConfig.provider !== "ollama"}
+            />
 
-          <AdvancedSettings
-            aiConfig={aiConfig}
-            isOpen={isAdvancedOpen}
-            onOpenChange={setIsAdvancedOpen}
-            onUpdate={updateAIConfig}
-          />
+            <AdvancedSettings
+              aiConfig={aiConfig}
+              isOpen={isAdvancedOpen}
+              onOpenChange={setIsAdvancedOpen}
+              onUpdate={updateAIConfig}
+            />
 
-          <PresetTags
-            tags={aiConfig.presetTags || []}
-            newTag={newTag}
-            onNewTagChange={setNewTag}
-            onAdd={onAddTag}
-            onRemove={onRemoveTag}
-            onKeyDown={onKeyDown}
-          />
+            <PresetTags
+              tags={aiConfig.presetTags || []}
+              newTag={newTag}
+              onNewTagChange={setNewTag}
+              onAdd={onAddTag}
+              onRemove={onRemoveTag}
+              onKeyDown={onKeyDown}
+            />
+          </fieldset>
         </CardContent>
       </Card>
 

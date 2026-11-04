@@ -129,6 +129,10 @@
       "remoteModels": "Official /models",
       "recommendedModels": "Recommended",
       "advanced": "Advanced Settings",
+      "providerConnectionHint": "Each provider remembers its own API key, Base URL and model. Other providers' settings stay on this device; the active configuration still uses browser sync.",
+      "providerSaveFailed": "Could not switch providers. Please try again.",
+      "smallModelMode": "Small model compatibility mode",
+      "smallModelModeHint": "Generate the title, summary, category and tags separately when analyzing a full-page bookmark to reduce format errors. Multiple requests may take longer. Image and text clips are unaffected.",
       "advancedOptions": "Advanced Options",
       "apiMode": "API Version",
       "apiModeDefault": "Auto-detect (Recommended)",
@@ -557,7 +561,7 @@
         "title": "WebDAV Data Sync",
         "description": "Configure WebDAV service to sync your bookmarks, categories, and settings across multiple devices. If you accidentally enter the wrong sync configuration and cause a lock, you can directly clear all local data below to cut off the sync connection.",
         "enabled": "Enable WebDAV Sync",
-        "enabledDesc": "When enabled, two-way sync will automatically run in the background",
+        "enabledDesc": "Enable manual sync and automatic two-way sync using the strategies below",
         "url": "WebDAV Server URL",
         "username": "Username / Account",
         "password": "Password / App Token",
@@ -584,8 +588,30 @@
           "server": "The server returned an error (5xx): try again later or check the server logs.",
           "invalidUrl": "Invalid server URL: the address must start with http:// or https://.",
           "notInitialized": "Sync is not initialized: please re-enter the server URL and credentials.",
+          "invalidRemoteData": "Unreadable remote data: sync stopped to avoid overwriting it. A remote file may be corrupted or written by a newer HamHome version; update the extension and retry, or clear the remote data and sync again.",
           "unknown": "Sync failed: see the error details below."
         }
+      },
+      "strategy": {
+        "title": "Sync strategy",
+        "description": "Choose when to sync automatically. Changes are saved automatically and apply only to this device.",
+        "seconds": "sec",
+        "minutes": "min",
+        "range": "Whole numbers, {{min}}–{{max}} {{unit}}",
+        "realtime": {
+          "label": "Real-time sync",
+          "description": "Sync after bookmarks, categories, workspaces or settings change. Each new change restarts the delay."
+        },
+        "startup": {
+          "label": "Startup sync",
+          "description": "Sync once after the browser starts or the extension is installed or updated, following this delay. Enabling this strategy also triggers a sync."
+        },
+        "periodic": {
+          "label": "Periodic sync",
+          "description": "Run two-way sync at this interval, including updates from other devices even when nothing changes locally."
+        },
+        "manualOnly": "All automatic sync is off. Use “Sync Now” to sync manually.",
+        "timingHint": "Times are targets; background suspension or device sleep may delay sync. Manual sync is always available."
       }
     }
   }

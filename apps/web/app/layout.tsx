@@ -80,6 +80,10 @@ export default function RootLayout({
   return (
     <html lang="zh-CN" suppressHydrationWarning>
       <body className="min-h-screen bg-background antialiased scroll-table-fix">
+        {/* Without JS nothing flips .is-visible, so keep scroll-reveal content shown */}
+        <noscript>
+          <style>{`.reveal,.hero-rise,.hero-slide-in{opacity:1!important;transform:none!important;animation:none!important}`}</style>
+        </noscript>
         {children}
         <Script id="microsoft-clarity" strategy="afterInteractive">
           {`

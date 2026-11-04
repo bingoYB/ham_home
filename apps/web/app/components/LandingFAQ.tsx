@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@ui/components/accordion';
 import { cn } from '@ui/lib/utils';
+import { Reveal } from './motion/Reveal';
 
 interface LandingFAQProps {
   isEn: boolean;
@@ -133,11 +134,11 @@ export function LandingFAQ({ isEn }: LandingFAQProps) {
     <section className="mx-auto w-full px-4 py-16 sm:px-6 lg:px-8 lg:py-24 container border-t border-border/10">
       <div className="w-full">
         {/* 标题 */}
-        <h2 className="text-4xl md:text-5xl font-semibold mb-16 tracking-tight">
+        <Reveal as="h2" className="text-4xl md:text-5xl font-semibold mb-16 tracking-tight">
           {title}
-        </h2>
+        </Reveal>
 
-        <div className="flex flex-col md:flex-row gap-12 md:gap-24">
+        <Reveal delay={120} className="flex flex-col md:flex-row gap-12 md:gap-24">
           {/* 左侧分类导航 */}
           <div className="md:w-1/4 flex-shrink-0">
             <div className="flex md:flex-col gap-2 overflow-x-auto pb-4 md:pb-0 md:sticky md:top-24 scrollbar-none">
@@ -197,7 +198,7 @@ export function LandingFAQ({ isEn }: LandingFAQProps) {
               })}
             </Accordion>
           </div>
-        </div>
+        </Reveal>
       </div>
     </section>
   );

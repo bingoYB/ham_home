@@ -1,9 +1,6 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useTranslation } from "react-i18next";
 import { useBookmarks } from "@/contexts/BookmarkContext";
-import { useLanguage } from "@/hooks/useLanguage";
-import { useShortcuts } from "@/hooks/useShortcuts";
-import { configStorage } from "@/lib/storage/config-storage";
 import {
   agentConfigService,
   getProviderModels,
@@ -24,13 +21,16 @@ export interface UseAIConfigReturn {
   isAdvancedOpen: boolean;
   newTag: string;
   recommendedModels: string[];
+  isSwitchingProvider: boolean;
   setLocalApiKey: (val: string) => void;
   setLocalBaseUrl: (val: string) => void;
   setLocalModel: (val: string) => void;
   setModelSelectorOpen: (val: boolean) => void;
   setIsAdvancedOpen: (val: boolean) => void;
   setNewTag: (val: string) => void;
-  updateAIConfig: (updates: Partial<AIConfig>) => void;
+  updateAIConfig: (updates: Partial<AIConfig>) => Promise<void>;
+  onProviderChange: (provider: AIProvider) => void;
+  onSaveModel: (provider: AIProvider, model: string) => void;
   onTestConnection: () => void;
   onFetchModels: () => void;
   onAddTag: () => void;
@@ -49,6 +49,11 @@ export function useAIConfig(): UseAIConfigReturn {
     message: string;
   } | null>(null);
   const [newTag, setNewTag] = useState("");
+  const [isSwitchingProvider, setIsSwitchingProvider] = useState(false);
+  const switchingProviderRef = useRef(false);
+  const activeProviderRef = useRef(aiConfig.provider);
+  const modelRequestRef = useRef(0);
+  const connectionTestRef = useRef(0);
 
   const [localApiKey, setLocalApiKey] = useState("");
   const [localBaseUrl, setLocalBaseUrl] = useState("");
@@ -62,27 +67,65 @@ export function useAIConfig(): UseAIConfigReturn {
   } | null>(null);
 
   useEffect(() => {
-    setLocalApiKey(aiConfig.apiKey || "");
-    setLocalBaseUrl(aiConfig.baseUrl || "");
-    setLocalModel(aiConfig.model || "");
-  }, [aiConfig.apiKey, aiConfig.baseUrl, aiConfig.model]);
+    if (!switchingProviderRef.current) activeProviderRef.current = aiConfig.provider;
+  }, [aiConfig.provider]);
+  useEffect(() => setLocalApiKey(aiConfig.apiKey || ""), [aiConfig.provider, aiConfig.apiKey]);
+  useEffect(() => setLocalBaseUrl(aiConfig.baseUrl || ""), [aiConfig.provider, aiConfig.baseUrl]);
+  useEffect(() => setLocalModel(aiConfig.model || ""), [aiConfig.provider, aiConfig.model]);
 
   useEffect(() => {
+    modelRequestRef.current++;
     setRemoteModels([]);
     setModelFetchResult(null);
+    setIsFetchingModels(false);
   }, [aiConfig.provider, localApiKey, localBaseUrl]);
 
   const recommendedModels = getProviderModels(aiConfig.provider).filter(
     (model) => !remoteModels.includes(model),
   );
 
+  const handleProviderChange = async (provider: AIProvider) => {
+    if (switchingProviderRef.current || provider === activeProviderRef.current) return;
+    const previousProvider = activeProviderRef.current;
+    switchingProviderRef.current = true;
+    activeProviderRef.current = provider;
+    setIsSwitchingProvider(true);
+    modelRequestRef.current++;
+    connectionTestRef.current++;
+    setIsFetchingModels(false);
+    setIsTesting(false);
+    setTestResult(null);
+    setModelSelectorOpen(false);
+
+    try {
+      // The model input commits on a short delay; save the actual drafts before
+      // switching so a delayed blur cannot overwrite the next provider's model.
+      await updateAIConfig({ apiKey: localApiKey, baseUrl: localBaseUrl, model: localModel });
+      await updateAIConfig({ provider });
+    } catch {
+      activeProviderRef.current = previousProvider;
+      setTestResult({ status: "error", message: t("settings:settings.ai.providerSaveFailed") });
+    } finally {
+      switchingProviderRef.current = false;
+      setIsSwitchingProvider(false);
+    }
+  };
+
+  const handleSaveModel = (provider: AIProvider, model: string) => {
+    if (!switchingProviderRef.current && provider === activeProviderRef.current) {
+      void updateAIConfig({ model });
+    }
+  };
+
   const handleTestConnection = async () => {
+    const requestId = ++connectionTestRef.current;
     setIsTesting(true);
     setTestResult(null);
 
     try {
       await updateAIConfig({});
       const result = await agentConfigService.testConnection();
+      if (requestId !== connectionTestRef.current) return;
 
       if (result.success) {
         setTestResult({ status: "success", message: result.message });
@@ -90,15 +133,17 @@ export function useAIConfig(): UseAIConfigReturn {
         setTestResult({ status: "error", message: result.message });
       }
     } catch (error) {
+      if (requestId !== connectionTestRef.current) return;
       const message =
         error instanceof Error ? error.message : "连接失败，请检查配置";
       setTestResult({ status: "error", message });
     } finally {
-      setIsTesting(false);
+      if (requestId === connectionTestRef.current) setIsTesting(false);
     }
   };
 
   const handleFetchModels = async () => {
+    const requestId = ++modelRequestRef.current;
     setIsFetchingModels(true);
     setModelFetchResult(null);
     setModelSelectorOpen(true);
@@ -109,6 +154,7 @@ export function useAIConfig(): UseAIConfigReturn {
         apiKey: localApiKey.trim(),
         baseUrl: localBaseUrl.trim(),
       });
+      if (requestId !== modelRequestRef.current) return;
 
       setRemoteModels(result.models);
       setModelFetchResult({
@@ -118,6 +164,7 @@ export function useAIConfig(): UseAIConfigReturn {
         }),
       });
     } catch (error) {
+      if (requestId !== modelRequestRef.current) return;
       const message =
         error instanceof Error ? error.message : t("common:common.error");
 
@@ -129,7 +176,7 @@ export function useAIConfig(): UseAIConfigReturn {
         }),
       });
     } finally {
-      setIsFetchingModels(false);
+      if (requestId === modelRequestRef.current) setIsFetchingModels(false);
     }
   };
 
@@ -171,6 +218,7 @@ export function useAIConfig(): UseAIConfigReturn {
     isAdvancedOpen,
     newTag,
     recommendedModels,
+    isSwitchingProvider,
     setLocalApiKey,
     setLocalBaseUrl,
     setLocalModel,
@@ -178,6 +226,8 @@ export function useAIConfig(): UseAIConfigReturn {
     setIsAdvancedOpen,
     setNewTag,
     updateAIConfig,
+    onProviderChange: handleProviderChange,
+    onSaveModel: handleSaveModel,
     onTestConnection: handleTestConnection,
     onFetchModels: handleFetchModels,
     onAddTag: handleAddTag,

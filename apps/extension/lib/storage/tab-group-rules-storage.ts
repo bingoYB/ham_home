@@ -6,6 +6,7 @@ import type {
   TabGroupRule,
   UpdateTabGroupRuleInput,
 } from "@/types";
+import { syncTombstoneStorage } from "./sync-tombstone-storage";
 
 const MAX_AI_CACHE_ENTRIES = 500;
 
@@ -96,6 +97,8 @@ class TabGroupRulesStorage {
   }
 
   async deleteRule(ruleId: string): Promise<void> {
+    // Leave a deletion record, otherwise other devices' copies come back on the next sync.
+    await syncTombstoneStorage.add("tabGroupRules", [ruleId]);
     const rules = await this.getRules();
     await this.setRules(rules.filter((rule) => rule.id !== ruleId));
   }

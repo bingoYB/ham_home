@@ -20,6 +20,7 @@ import {
 import { getAgentErrorMessage } from "../errors";
 import { fetchPageContentForAI } from "../fetch-page-content";
 import { createExtensionAgent } from "../factory";
+import { analyzeBookmarkWithSmallModel } from "./small-model-bookmark-analysis";
 
 const analyzeBookmarkCommand: AgentCommand<
   BookmarkAnalysisPromptInput,
@@ -36,6 +37,7 @@ export interface EnhancedAnalyzeInput {
   pageContent: PageContent;
   userCategories?: LocalCategory[];
   existingTags?: string[];
+  signal?: AbortSignal;
 }
 
 export interface BookmarkAnalysisApplyResult {
@@ -47,25 +49,29 @@ export interface BookmarkAnalysisApplyResult {
 
 class BookmarkAnalysisService {
   async analyzeBookmark(input: EnhancedAnalyzeInput): Promise<AnalysisResult> {
+    input.signal?.throwIfAborted();
     const { agent, config } = await createExtensionAgent();
 
     try {
-      const result = await agent.commands.run(
-        analyzeBookmarkCommand,
-        {
-          language: config.language,
-          pageContent: input.pageContent,
-          userCategories: input.userCategories,
-          existingTags: input.existingTags,
-          presetTags: config.rawConfig.presetTags,
-        },
-        {
+      const promptInput: BookmarkAnalysisPromptInput = {
+        language: config.language,
+        pageContent: input.pageContent,
+        userCategories: input.userCategories,
+        existingTags: input.existingTags,
+        presetTags: config.rawConfig.presetTags,
+      };
+      const temperature = config.temperature ?? 0.2;
+      let output: BookmarkAnalysisOutput;
+      if (config.rawConfig.smallModelMode) {
+        output = await analyzeBookmarkWithSmallModel(agent, promptInput, temperature, input.signal);
+      } else {
+        const result = await agent.commands.run(analyzeBookmarkCommand, promptInput, {
           systemPrompt: buildBookmarkAnalysisSystemPrompt(config.language),
-          temperature: config.temperature ?? 0.2,
-        },
-      );
-
-      const output = bookmarkAnalysisResultSchema.parse(result.output);
+          temperature,
+          signal: input.signal,
+        });
+        output = bookmarkAnalysisResultSchema.parse(result.output);
+      }
 
       return {
         title: output.title.trim(),
@@ -74,6 +80,7 @@ class BookmarkAnalysisService {
         tags: [...new Set(output.tags.map((tag) => tag.trim()).filter(Boolean))],
       };
     } catch (error) {
+      input.signal?.throwIfAborted();
       throw new Error(getAgentErrorMessage(error, "书签分析失败"));
     }
   }
@@ -85,17 +92,21 @@ class BookmarkAnalysisService {
     currentCategories: LocalCategory[];
     existingTags?: string[];
     shouldFetchPageContent?: boolean;
+    signal?: AbortSignal;
   }): Promise<BookmarkAnalysisApplyResult> {
+    options.signal?.throwIfAborted();
     let content = "";
     if (options.shouldFetchPageContent) {
       try {
-        content = await fetchPageContentForAI(options.url);
+        content = await fetchPageContentForAI(options.url, options.signal);
       } catch (error) {
+        options.signal?.throwIfAborted();
         console.warn(`[BookmarkAnalysisService] Failed to fetch page content for ${options.url}, falling back to description. Error:`, error);
         content = options.description || "";
       }
     }
 
+    options.signal?.throwIfAborted();
     const hostname = (() => {
       try {
         return new URL(options.url).hostname;
@@ -118,8 +129,10 @@ class BookmarkAnalysisService {
       },
       userCategories: options.currentCategories,
       existingTags: options.existingTags,
+      signal: options.signal,
     });
 
+    options.signal?.throwIfAborted();
     let categoryId: string | null = null;
     let newCategories: LocalCategory[] = [];
 

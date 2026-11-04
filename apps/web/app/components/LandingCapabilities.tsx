@@ -12,6 +12,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@hamhome/ui';
+import { Reveal } from './motion/Reveal';
 
 interface LandingCapabilitiesProps {
   isEn: boolean;
@@ -72,24 +73,26 @@ export function LandingCapabilities({ isEn }: LandingCapabilitiesProps) {
 
   return (
     <section className="mx-auto w-full px-4 py-16 sm:px-6 lg:px-8 lg:py-24 container">
-      <div className="max-w-3xl">
+      <Reveal className="max-w-3xl">
         <p className="text-sm font-bold text-[#0f766e] dark:text-[#5eead4]">{texts.kicker}</p>
         <h2 className="mt-3 text-3xl font-black leading-tight tracking-tight text-foreground sm:text-4xl">
           {texts.title}
         </h2>
-      </div>
+      </Reveal>
 
       <div className="mt-8 grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-        {capabilities.map((item) => {
+        {capabilities.map((item, index) => {
           const Icon = item.icon;
           return (
-            <article key={item.title} className="rounded-xl border border-border/70 bg-card/60 p-5 shadow-sm">
-              <div className={cn('flex h-10 w-10 items-center justify-center rounded-lg', item.tone)}>
-                <Icon className="h-5 w-5" />
-              </div>
-              <h3 className="mt-5 text-lg font-bold text-foreground">{item.title}</h3>
-              <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{item.desc}</p>
-            </article>
+            <Reveal key={item.title} variant="scale" delay={(index % 4) * 80} className="h-full">
+              <article className="lift-card h-full rounded-xl border border-border/70 bg-card/60 p-5 shadow-sm">
+                <div className={cn('lift-icon flex h-10 w-10 items-center justify-center rounded-lg', item.tone)}>
+                  <Icon className="h-5 w-5" />
+                </div>
+                <h3 className="mt-5 text-lg font-bold text-foreground">{item.title}</h3>
+                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">{item.desc}</p>
+              </article>
+            </Reveal>
           );
         })}
       </div>

@@ -14,6 +14,7 @@ import { bookmarkClipStorage } from './bookmark-clip-storage';
 import { bookmarkHealthStorage } from './bookmark-health-storage';
 import { bookmarkScreenshotStorage } from './bookmark-screenshot-storage';
 import { bookmarkTombstoneStorage } from './bookmark-tombstone-storage';
+import { syncTombstoneStorage } from './sync-tombstone-storage';
 import { snapshotStorage } from './snapshot-storage';
 import { vectorStore } from './vector-store';
 import type {
@@ -349,12 +350,14 @@ class BookmarkStorage {
       throw new Error('分类名称已存在');
     }
 
+    const now = Date.now();
     const category: LocalCategory = {
       id: nanoid(),
       name,
       parentId,
       order: categories.length,
-      createdAt: Date.now(),
+      createdAt: now,
+      updatedAt: now,
       icon,
     };
 
@@ -376,7 +379,7 @@ class BookmarkStorage {
       throw new Error('分类不存在');
     }
 
-    const updated = { ...categories[index], ...data };
+    const updated = { ...categories[index], ...data, updatedAt: Date.now() };
     await categoriesItem.setValue(
       categories.map((c: LocalCategory, i: number) => (i === index ? updated : c))
     );
@@ -385,8 +388,9 @@ class BookmarkStorage {
 
   /**
    * 删除分类（将该分类及子分类下的书签移至"未分类"）
+   * @returns IDs of the removed categories, sub-categories included
    */
-  async deleteCategory(id: string): Promise<void> {
+  async deleteCategory(id: string): Promise<string[]> {
     const [categories, metaList]: [LocalCategory[], BookmarkMeta[]] = await Promise.all([
       categoriesItem.getValue(),
       bookmarkMetaItem.getValue(),
@@ -411,10 +415,15 @@ class BookmarkStorage {
         : b
     );
 
+    // Leave deletion records, otherwise other devices' copies come back on the next sync.
+    await syncTombstoneStorage.add('categories', Array.from(idsToDelete));
+
     await Promise.all([
       categoriesItem.setValue(categories.filter((c: LocalCategory) => !idsToDelete.has(c.id))),
       bookmarkMetaItem.setValue(updatedMetaList),
     ]);
+
+    return Array.from(idsToDelete);
   }
 
   // ============ 标签操作 ============
@@ -690,7 +699,7 @@ class BookmarkStorage {
     categories = categories.map((c: LocalCategory) => {
       if (c.parentId && mapping[c.parentId]) {
         hasCategoryChanges = true;
-        return { ...c, parentId: mapping[c.parentId] };
+        return { ...c, parentId: mapping[c.parentId], updatedAt: now };
       }
       return c;
     });
@@ -743,6 +752,30 @@ class BookmarkStorage {
     }
   }
 
+  /**
+   * Imports raw bookmarks from sync in one read/write of the metadata and content maps,
+   * instead of rewriting the whole bookmark list (and firing a change event) per bookmark.
+   */
+  async importRawBookmarks(bookmarks: LocalBookmark[], contents: Record<string, string> = {}): Promise<void> {
+    if (bookmarks.length > 0) {
+      const metaList: BookmarkMeta[] = await bookmarkMetaItem.getValue();
+      const indexById = new Map(metaList.map((b: BookmarkMeta, i: number) => [b.id, i]));
+      const next = [...metaList];
+      for (const bookmark of bookmarks) {
+        const { content: _content, ...meta } = bookmark;
+        const index = indexById.get(meta.id);
+        if (index === undefined) {
+          indexById.set(meta.id, next.length);
+          next.push(meta);
+        } else {
+          next[index] = { ...next[index], ...meta };
+        }
+      }
+      await bookmarkMetaItem.setValue(next);
+    }
+    await this.setBookmarkContents(contents);
+  }
+
   // ============ 监听器 ============
 
   /**
@@ -777,6 +810,22 @@ class BookmarkStorage {
   async getBookmarkContent(bookmarkId: string): Promise<string | undefined> {
     const contentsMap = await bookmarkContentsItem.getValue();
     return contentsMap[bookmarkId];
+  }
+
+  /**
+   * Reads all bookmark contents at once (used by sync to avoid reading the whole content map per bookmark).
+   */
+  async getContentsMap(): Promise<Record<string, string>> {
+    return { ...(await bookmarkContentsItem.getValue()) };
+  }
+
+  /**
+   * Writes several bookmark contents with a single read/write of the content map.
+   */
+  async setBookmarkContents(entries: Record<string, string>): Promise<void> {
+    if (Object.keys(entries).length === 0) return;
+    const contentsMap = await bookmarkContentsItem.getValue();
+    await bookmarkContentsItem.setValue({ ...contentsMap, ...entries });
   }
 
   /**

@@ -2,6 +2,7 @@
 
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
+import { ScrollProgress } from './components/motion/ScrollProgress';
 import { FeatureHeroBanner } from './components/FeatureHeroBanner';
 import { FeatureShowcase } from './components/FeatureShowcase';
 import { LandingCapabilities } from './components/LandingCapabilities';
@@ -16,6 +17,8 @@ export default function HomePage() {
 
   return (
     <div className="home-page-shell min-h-screen text-foreground">
+      <ScrollProgress />
+
       {/* 顶部导航 */}
       <Header
         isDark={isDark}

@@ -15,6 +15,8 @@ const mocks = vi.hoisted(() => ({
   getBookmarkById: vi.fn(),
   getBookmarkContent: vi.fn(),
   importRawBookmark: vi.fn(),
+  importRawBookmarks: vi.fn(),
+  getContentsMap: vi.fn(),
   purgeBookmarks: vi.fn(),
   getTombstones: vi.fn(),
   replaceTombstones: vi.fn(),
@@ -42,6 +44,17 @@ vi.mock("../sync-config-storage", () => ({
   syncConfigStorage: {
     getConfig: vi.fn(),
     setStatus: vi.fn(),
+    // The one-time content repair is covered in sync-engine-integrity.test.ts
+    getContentRepairState: vi.fn(async () => ({ done: true, attempted: [] })),
+    setContentRepairState: vi.fn(),
+  },
+}));
+
+vi.mock("../../storage/sync-tombstone-storage", () => ({
+  syncTombstoneStorage: {
+    getAll: vi.fn(async () => ({ categories: [], workspaces: [], workspaceCategories: [], tabGroupRules: [] })),
+    replaceAll: vi.fn(),
+    add: vi.fn(),
   },
 }));
 
@@ -53,7 +66,10 @@ vi.mock("../../storage/bookmark-storage", () => ({
     getBookmarkById: mocks.getBookmarkById,
     getBookmarkContent: mocks.getBookmarkContent,
     importRawBookmark: mocks.importRawBookmark,
+    importRawBookmarks: mocks.importRawBookmarks,
+    getContentsMap: mocks.getContentsMap,
     importRawCategory: vi.fn(),
+    deleteCategory: vi.fn(async (id: string) => [id]),
     mergeCategories: vi.fn(),
     deleteBookmark: vi.fn(),
     purgeBookmarks: mocks.purgeBookmarks,
@@ -91,6 +107,7 @@ vi.mock("../../storage/tab-group-rules-storage", () => ({
     getAutoGroupSettings: mocks.getAutoGroupSettings,
     importRawRule: mocks.importRawRule,
     importRawAutoGroupSettings: mocks.importRawAutoGroupSettings,
+    deleteRule: vi.fn(),
   },
 }));
 
@@ -98,6 +115,7 @@ vi.mock("../../storage/bookmark-clip-storage", () => ({
   bookmarkClipStorage: {
     getAllClips: mocks.getAllClips,
     importRawClip: mocks.importRawClip,
+    upsertRawClips: vi.fn(),
   },
 }));
 
@@ -282,6 +300,7 @@ async function runBookmarkSync(options: {
     options.local.find((item) => item.id === id) ?? null,
   );
   mocks.getBookmarkContent.mockResolvedValue(undefined);
+  mocks.getContentsMap.mockResolvedValue({});
   mocks.getTombstones.mockResolvedValue(options.localTombstones ?? []);
   mocks.getJSON.mockImplementation(async (filename: string) =>
     filename.endsWith("/bookmarks/meta.json") && options.remote
@@ -301,6 +320,11 @@ async function runBookmarkSync(options: {
       | undefined,
     deletions: metaCall?.[1]?.deletions as Tombstone[] | undefined,
   };
+}
+
+/** Every bookmark written to local storage through the batch import. */
+function importedBookmarks(): Array<Record<string, unknown>> {
+  return mocks.importRawBookmarks.mock.calls.flatMap(([list]: [Array<Record<string, unknown>>]) => list);
 }
 
 describe("SyncEngine bookmark merge", () => {
@@ -326,7 +350,7 @@ describe("SyncEngine bookmark merge", () => {
     expect([...alive[0].tags].sort()).toEqual(["本地", "远端"]);
     expect(uploaded?.find((item) => item.id === "local-1")?.isDeleted).toBe(true);
     // 被合并掉的那条要落到本地，用户才看不到重复项
-    expect(mocks.importRawBookmark).toHaveBeenCalledWith(
+    expect(importedBookmarks()).toContainEqual(
       expect.objectContaining({ id: "local-1", isDeleted: true }),
     );
   });
@@ -378,7 +402,7 @@ describe("SyncEngine bookmark merge", () => {
       ],
     });
 
-    expect(mocks.importRawBookmark).not.toHaveBeenCalled();
+    expect(importedBookmarks()).toEqual([]);
   });
 
   it("applies a remote restore back to a locally deleted bookmark", async () => {
@@ -391,7 +415,7 @@ describe("SyncEngine bookmark merge", () => {
       ],
     });
 
-    expect(mocks.importRawBookmark).toHaveBeenCalledWith(
+    expect(importedBookmarks()).toContainEqual(
       expect.objectContaining({ id: "b1", isDeleted: false }),
     );
   });

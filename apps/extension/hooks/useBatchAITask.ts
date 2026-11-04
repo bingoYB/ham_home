@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { aiTaskStorage } from '@/lib/storage/ai-task-storage';
 import { bookmarkStorage } from '@/lib/storage/bookmark-storage';
+import { configStorage } from '@/lib/storage/config-storage';
 import { bookmarkAnalysisService } from '@/lib/agent';
 import type { BatchAITask, BatchAITaskProgress } from '@/lib/storage/ai-task-storage';
 import { useBookmarks } from '@/contexts/BookmarkContext';
@@ -25,7 +26,8 @@ export function useBatchAITask() {
       let currentCategories = await bookmarkStorage.getCategories();
       let currentTags = await bookmarkStorage.getAllTags();
 
-      const BATCH_SIZE = 3;
+      // Avoid queueing several multi-request analyses on a local small model.
+      const BATCH_SIZE = (await configStorage.getAIConfig()).smallModelMode ? 1 : 3;
 
       for (let i = currentIndex; i < total; i += BATCH_SIZE) {
         // Check if task is still valid in storage

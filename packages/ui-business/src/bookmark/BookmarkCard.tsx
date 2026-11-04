@@ -69,7 +69,7 @@ export function BookmarkCard({
         </div>
       </div>
 
-      {subject ? (
+      {subject?.type === "image" ? (
         <>
           <BookmarkSubject
             subject={subject}
@@ -103,24 +103,36 @@ export function BookmarkCard({
         </>
       ) : (
         <div className="px-4 pb-4">
-          <a
-            href={bookmark.url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block"
-          >
-            <div className="flex gap-3">
-              <BookmarkFavicon src={resolvedFavicon} />
-              <div className="flex-1 min-w-0">
-                <h3 className="text-sm font-semibold text-foreground line-clamp-2 leading-tight mb-1">
-                  {bookmark.title}
-                </h3>
-                <p className="text-xs text-muted-foreground line-clamp-2">
-                  {bookmark.description || hostname}
-                </p>
+          {subject?.type === "text" ? (
+            <button
+              type="button"
+              onClick={onOpenSubject}
+              className="block w-full text-left rounded outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <span className="line-clamp-3 max-h-[72px] whitespace-pre-wrap break-words text-sm leading-6 text-foreground/90">
+                {subject.text}
+              </span>
+            </button>
+          ) : (
+            <a
+              href={bookmark.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="block"
+            >
+              <div className="flex gap-3">
+                <BookmarkFavicon src={resolvedFavicon} />
+                <div className="flex-1 min-w-0">
+                  <h3 className="text-sm font-semibold text-foreground line-clamp-2 leading-tight mb-1">
+                    {bookmark.title}
+                  </h3>
+                  <p className="text-xs text-muted-foreground line-clamp-2">
+                    {bookmark.description || hostname}
+                  </p>
+                </div>
               </div>
-            </div>
-          </a>
+            </a>
+          )}
 
           {bookmark.tags.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-3 pt-3 border-t border-border/50">
