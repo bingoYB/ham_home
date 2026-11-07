@@ -1,8 +1,10 @@
 import { nanoid } from 'nanoid';
+import type { BookmarkOrganizeMode } from '@/lib/agent/services/bookmark-analysis-service';
 
 export interface BatchAITaskPayload {
   id: string;
   bookmarkIds: string[];
+  mode?: BookmarkOrganizeMode;
   total: number;
   createdAt: number;
 }
@@ -33,13 +35,14 @@ const batchAITaskProgressItem = storage.defineItem<BatchAITaskProgress | null>('
 });
 
 class AiTaskStorage {
-  async createTask(bookmarkIds: string[]): Promise<BatchAITask> {
+  async createTask(bookmarkIds: string[], mode: BookmarkOrganizeMode = "all"): Promise<BatchAITask> {
     const now = Date.now();
     const id = nanoid();
 
     const payload: BatchAITaskPayload = {
       id,
       bookmarkIds,
+      mode,
       total: bookmarkIds.length,
       createdAt: now,
     };

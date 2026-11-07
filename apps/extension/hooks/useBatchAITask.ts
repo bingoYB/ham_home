@@ -1,8 +1,11 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { aiTaskStorage } from '@/lib/storage/ai-task-storage';
 import { bookmarkStorage } from '@/lib/storage/bookmark-storage';
+import { configStorage } from '@/lib/storage/config-storage';
 import { bookmarkAnalysisService } from '@/lib/agent';
 import type { BatchAITask, BatchAITaskProgress } from '@/lib/storage/ai-task-storage';
+import type { BookmarkOrganizeMode } from '@/lib/agent/services/bookmark-analysis-service';
+import type { LocalBookmark } from '@/types';
 import { useBookmarks } from '@/contexts/BookmarkContext';
 
 export function useBatchAITask() {
@@ -25,7 +28,8 @@ export function useBatchAITask() {
       let currentCategories = await bookmarkStorage.getCategories();
       let currentTags = await bookmarkStorage.getAllTags();
 
-      const BATCH_SIZE = 3;
+      // Avoid queueing several multi-request analyses on a local small model.
+      const BATCH_SIZE = (await configStorage.getAIConfig()).smallModelMode ? 1 : 3;
 
       for (let i = currentIndex; i < total; i += BATCH_SIZE) {
         // Check if task is still valid in storage
@@ -52,6 +56,7 @@ export function useBatchAITask() {
               currentCategories,
               existingTags: currentTags,
               shouldFetchPageContent: true,
+              mode: task.payload.mode ?? "all",
             });
             
             // 检测 AI 是否真正返回了有效结果（空结果表示失败）
@@ -61,7 +66,7 @@ export function useBatchAITask() {
             }
 
             // Build updates safely
-            const updates: any = {};
+            const updates: Partial<LocalBookmark> = {};
             if (aiResult.description) updates.description = aiResult.description;
             if (aiResult.categoryId) updates.categoryId = aiResult.categoryId;
             if (aiResult.tags && aiResult.tags.length > 0) updates.tags = aiResult.tags;
@@ -145,9 +150,9 @@ export function useBatchAITask() {
     resumePendingTask();
   }, [runTask]);
 
-  const startTask = async (bookmarkIds: string[]) => {
+  const startTask = async (bookmarkIds: string[], mode: BookmarkOrganizeMode = "all") => {
     if (isProcessing) return;
-    const task = await aiTaskStorage.createTask(bookmarkIds);
+    const task = await aiTaskStorage.createTask(bookmarkIds, mode);
     await runTask(task);
   };
 

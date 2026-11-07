@@ -50,7 +50,7 @@ export interface BookmarkAnalysisPromptInput {
   presetTags?: string[];
 }
 
-export function buildBookmarkAnalysisPrompt(
+export function buildBookmarkAnalysisContext(
   input: BookmarkAnalysisPromptInput,
 ): string {
   const { language, pageContent } = input;
@@ -65,6 +65,15 @@ export function buildBookmarkAnalysisPrompt(
     `existingCategories: ${JSON.stringify(buildCategoryContext(input.userCategories))}`,
     `presetTags: ${JSON.stringify(input.presetTags || [])}`,
     `pageContent: ${truncate(pageContent.content || pageContent.textContent, 12000)}`,
+  ]);
+}
+
+export function buildBookmarkAnalysisPrompt(
+  input: BookmarkAnalysisPromptInput,
+): string {
+  const { language } = input;
+  return joinPromptLines([
+    buildBookmarkAnalysisContext(input),
     language === "zh"
       ? "输出要求：title 为最终保存标题，summary 为 1-3 句摘要，category 为最合适分类，tags 为不重复的简短标签。"
       : "Output requirements: title should be the saved title, summary should be a 1-3 sentence summary, category should be the best fit, tags should be short deduplicated labels.",

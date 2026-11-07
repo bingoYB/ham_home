@@ -89,6 +89,24 @@ class BookmarkClipStorage {
     await clipsItem.setValue(next);
   }
 
+  /** Upserts clips pulled by sync, by id, with a single read/write. */
+  async upsertRawClips(items: BookmarkClip[]): Promise<void> {
+    if (items.length === 0) return;
+    const clips = await clipsItem.getValue();
+    const indexById = new Map(clips.map((clip, i) => [clip.id, i]));
+    const next = [...clips];
+    for (const clip of items) {
+      const index = indexById.get(clip.id);
+      if (index === undefined) {
+        indexById.set(clip.id, next.length);
+        next.push(clip);
+      } else {
+        next[index] = clip;
+      }
+    }
+    await clipsItem.setValue(next);
+  }
+
   async importRawClips(clips: BookmarkClip[]): Promise<void> {
     await clipsItem.setValue(clips);
   }

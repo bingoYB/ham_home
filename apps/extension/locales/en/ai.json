@@ -123,6 +123,10 @@
     "copySuccessDesc": "Copied {{count}} links to clipboard"
   },
   "batchOrganize": "Batch AI Organize",
+  "batchRecategorize": "Recategorize",
+  "batchRetag": "Retag",
+  "batchOrganizeAll": "Organize All",
+  "batchOrganizeMenu": "Choose AI organization mode",
   "batchOrganizeProgress": "AI is organizing bookmarks...",
   "batchOrganizeFailed": "AI organization completed: {{success}} succeeded, {{failed}} failed. Some bookmarks could not be processed. Please check your network and retry.",
   "reanalyze": "AI Re-analyze",

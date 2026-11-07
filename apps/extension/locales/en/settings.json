@@ -129,6 +129,10 @@
       "remoteModels": "Official /models",
       "recommendedModels": "Recommended",
       "advanced": "Advanced Settings",
+      "providerConnectionHint": "Each provider remembers its own API key, Base URL and model. Other providers' settings stay on this device; the active configuration still uses browser sync.",
+      "providerSaveFailed": "Could not switch providers. Please try again.",
+      "smallModelMode": "Small model compatibility mode",
+      "smallModelModeHint": "Generate the title, summary, category and tags separately when analyzing a full-page bookmark to reduce format errors. Multiple requests may take longer. Image and text clips are unaffected.",
       "advancedOptions": "Advanced Options",
       "apiMode": "API Version",
       "apiModeDefault": "Auto-detect (Recommended)",
@@ -602,6 +606,9 @@
           "server": "The server returned an error (5xx): try again later or check the server logs.",
           "invalidUrl": "Invalid server URL: the address must start with http:// or https://.",
           "notInitialized": "Sync is not initialized: please re-enter the server URL and credentials.",
+          "conflict": "Another device is syncing or this sync lock expired. Writes stopped; please retry later.",
+          "lockingUnsupported": "This WebDAV server does not support exclusive LOCK. Sync stopped to protect remote data. Use a server with WebDAV locking support.",
+          "invalidRemoteData": "Unreadable remote data: sync stopped to avoid overwriting it. A remote file may be corrupted or written by a newer HamHome version; update the extension and retry, or clear the remote data and sync again.",
           "unknown": "Sync failed: see the error details below."
         }
       },

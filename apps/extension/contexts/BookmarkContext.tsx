@@ -14,12 +14,7 @@ import React, {
 } from "react";
 import { bookmarkStorage } from "@/lib/storage/bookmark-storage";
 import { workspaceStorage } from "@/lib/storage/workspace-storage";
-import { tabGroupRulesStorage } from "@/lib/storage/tab-group-rules-storage";
-import { bookmarkClipStorage } from "@/lib/storage/bookmark-clip-storage";
-import { bookmarkHealthStorage } from "@/lib/storage/bookmark-health-storage";
-import { bookmarkScreenshotStorage } from "@/lib/storage/bookmark-screenshot-storage";
 import { readLaterStorage } from "@/lib/storage/read-later-storage";
-import { tabLifecycleConfigStorage } from "@/lib/storage/tab-lifecycle-config-storage";
 import { filterLibraryBookmarks } from "@/lib/read-later/read-later.utils";
 import {
   configStorage,
@@ -37,7 +32,7 @@ import type {
   SyncStatus,
 } from "@/types";
 import { syncConfigStorage } from "@/lib/sync/sync-config-storage";
-import { syncEngine } from "@/lib/sync/sync-engine";
+import { exportService } from "@/lib/services/export-service";
 
 // 存储信息类型
 export interface StorageInfo {
@@ -419,15 +414,7 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
 
   // 清除书签和分类数据（保留配置类数据）
   const clearBookmarkData = async () => {
-    await Promise.all([
-      storage.removeItem("local:bookmarks"),
-      storage.removeItem("local:bookmarkContents"),
-      storage.removeItem("sync:categories"),
-      bookmarkClipStorage.importRawClips([]),
-      bookmarkHealthStorage.clear(),
-      bookmarkScreenshotStorage.clear(),
-      readLaterStorage.clear(),
-    ]);
+    await bookmarkStorage.clearBookmarkData();
     setAllBookmarks([]);
     setReadLaterEntries({});
     setCategories([]);
@@ -451,47 +438,7 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
     format: "json" | "html",
     options: { includeTabArchive?: boolean } = {},
   ) => {
-    const [
-      workspaces,
-      workspaceCategories,
-      tabGroupRules,
-      tabGroupAutoGroupSettings,
-      clips,
-      tabLifecycleSettings,
-    ] = await Promise.all([
-      workspaceStorage.getWorkspaces(),
-      workspaceStorage.getCategories(),
-      tabGroupRulesStorage.getRules(),
-      tabGroupRulesStorage.getAutoGroupSettings(),
-      bookmarkClipStorage.getAllClips(),
-      tabLifecycleConfigStorage.getSettings(),
-    ]);
-
-    // The tab archive is exported only on request: it may hold sign-in links or one-time tokens
-    const tabArchive = options.includeTabArchive
-      ? await import("@/lib/storage/tab-archive-storage").then(
-          async ({ tabArchiveStorage }) => ({
-            entries: await tabArchiveStorage.getAllEntries(),
-            batches: await tabArchiveStorage.getAllBatches(),
-          }),
-        )
-      : undefined;
-
-    const data = {
-      version: "1.0.0",
-      exportedAt: Date.now(),
-      // JSON exports include queue-only items and their state; HTML exports only the library
-      bookmarks: allBookmarks,
-      categories,
-      workspaces,
-      workspaceCategories,
-      tabGroupRules,
-      tabGroupAutoGroupSettings,
-      clips,
-      readLaterEntries: Object.values(readLaterEntries),
-      tabLifecycleSettings,
-      ...(tabArchive ? { tabArchive } : {}),
-    };
+    const data = await exportService.createExport(options);
 
     if (format === "json") {
       const dataStr = JSON.stringify(data, null, 2);
@@ -500,7 +447,10 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
       const filename = `hamhome_bookmarks_${new Date().toISOString().split("T")[0]}.json`;
       downloadFile(dataUri, filename);
     } else {
-      const htmlContent = generateHtmlExport(bookmarks, categories);
+      const htmlContent = generateHtmlExport(
+        filterLibraryBookmarks(data.bookmarks, Object.fromEntries(data.readLaterEntries.map(entry => [entry.bookmarkId, entry]))),
+        data.categories,
+      );
       const dataUri =
         "data:text/html;charset=utf-8," + encodeURIComponent(htmlContent);
       const filename = `hamhome_bookmarks_${new Date().toISOString().split("T")[0]}.html`;

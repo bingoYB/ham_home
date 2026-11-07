@@ -222,7 +222,7 @@ export function CategoryTreePanel({
       </div>
 
       <ScrollArea type="auto" className="min-h-0 flex-1">
-        <nav role="tree" className="space-y-0.5 p-2 pb-24">
+        <nav role="tree" className="space-y-0.5 p-2 pr-5 pb-24">
           <TreeRow
             icon={<Library className="h-4 w-4 text-muted-foreground" />}
             label={t("bookmark:bookmark.categoryTree.allBookmarks")}

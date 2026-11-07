@@ -673,10 +673,10 @@ function BookmarkForm({
       {!hideTitleAndDescription && (
         <>
           <div className="space-y-1.5">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between gap-2">
               <Label
                 htmlFor="title"
-                className="flex items-center gap-2 text-sm font-medium"
+                className="flex shrink-0 items-center gap-2 text-sm font-medium"
               >
                 <FileText className="h-4 w-4 text-blue-500" />
                 {t("bookmark:savePanel.titleLabel")}
@@ -687,6 +687,7 @@ function BookmarkForm({
                   error={aiError}
                   onRetry={onRetry}
                   onConfigure={onConfigureAI}
+                  portalContainer={portalContainer}
                 />
               )}
             </div>
@@ -727,6 +728,7 @@ function BookmarkForm({
             error={aiError}
             onRetry={onRetry}
             onConfigure={onConfigureAI}
+            portalContainer={portalContainer}
           />
         </div>
       )}

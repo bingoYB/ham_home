@@ -1,5 +1,5 @@
-import { webdavClientAdapter, toSyncError } from './webdav-client';
-import { syncConfigStorage } from './sync-config-storage';
+import { webdavClientAdapter, toSyncError, SyncError } from './webdav-client';
+import { syncConfigStorage, type SyncContentRepairState } from './sync-config-storage';
 import { bookmarkStorage } from '../storage/bookmark-storage';
 import { configStorage } from '../storage/config-storage';
 import { workspaceStorage } from '../storage/workspace-storage';
@@ -13,25 +13,32 @@ import {
   reconcileEntriesWithBookmarks,
 } from '../read-later/read-later.utils';
 import { normalizeTabLifecycleSettings } from '../tabs/tab-lifecycle-settings.utils';
-import { z } from 'zod';
-import { 
-  SyncSysSchema, 
-  SyncSys, 
-  RemoteBookmarkMeta, 
-  RemoteSettingsSchema, 
-  RemoteSettings, 
-  RemoteCategorySchema, 
-  RemoteCategory, 
-  RemoteBookmarksFileSchema,
+import { syncTombstoneStorage } from '../storage/sync-tombstone-storage';
+import {
+  mergeSyncTombstones,
+  emptySyncTombstones,
+  SYNC_TOMBSTONE_KINDS,
+  type SyncTombstoneKind,
+  type SyncTombstones,
+} from './sync-tombstones';
+import {
+  SyncSys,
+  RemoteBookmarkMeta,
+  RemoteBookmarkMetaSchema,
+  RemoteSettingsSchema,
+  RemoteSettings,
+  RemoteCategorySchema,
   RemoteBookmarkDeletion,
-  RemoteBookmarkClipsFileSchema,
-  RemoteWorkspacesFileSchema,
-  RemoteWorkspace,
-  RemoteWorkspaceCategory,
+  RemoteBookmarkDeletionSchema,
+  RemoteBookmarkClipSchema,
+  RemoteWorkspaceSchema,
+  RemoteWorkspaceCategorySchema,
   RemoteTabGroupConfigFileSchema,
   RemoteTabGroupRule,
   RemoteReadLaterFileSchema,
   RemoteTabLifecycleConfigFileSchema,
+  RemoteTabGroupRuleSchema,
+  RemoteDeletionsFileSchema,
 } from './sync-schema';
 import type {
   BookmarkTombstone,
@@ -53,7 +60,9 @@ import {
 } from '../bookmarks/bookmark-retention';
 import { nanoid } from 'nanoid';
 import pLimit from 'p-limit';
-import { strFromU8, strToU8, gzipSync, unzipSync } from 'fflate';
+import { contentFingerprint, decodeContentChunk, encodeContentChunk } from './sync-codec';
+import { parseRemoteItems, requireListField, withPreservedItems } from './remote-parse';
+import { applyDeletions, mergeByIdLww } from './lww-merge';
 
 const SYNC_ROOT = '/HamHomeSync';
 const SYS_JSON = `${SYNC_ROOT}/sys.json`;
@@ -61,6 +70,7 @@ const SETTINGS_JSON = `${SYNC_ROOT}/settings.json`;
 const CATEGORIES_JSON = `${SYNC_ROOT}/categories.json`;
 const WORKSPACES_JSON = `${SYNC_ROOT}/workspaces.json`;
 const TAB_GROUP_CONFIG_JSON = `${SYNC_ROOT}/tab-group-config.json`;
+const DELETIONS_JSON = `${SYNC_ROOT}/deletions.json`;
 const META_JSON = `${SYNC_ROOT}/bookmarks/meta.json`;
 const CLIPS_JSON = `${SYNC_ROOT}/bookmarks/clips.json`;
 // Read later state and lifecycle settings use their own files: older clients do not know them, so they cannot strip new fields
@@ -69,6 +79,9 @@ const TAB_LIFECYCLE_CONFIG_JSON = `${SYNC_ROOT}/tab-lifecycle-config.json`;
 const CHUNKS_DIR = `${SYNC_ROOT}/bookmarks/chunks`;
 
 const LOCK_TIMEOUT_MS = 10 * 60 * 1000; // 10 minutes
+/** Bookmarks whose content is re-downloaded per sync by the one-time repair pass. */
+const CONTENT_REPAIR_BATCH = 200;
+const TRANSFER_CONCURRENCY = 5;
 
 /**
  * 单条书签在一次同步中的合并结论
@@ -84,100 +97,115 @@ interface BookmarkSyncEntry {
   uploadContent: boolean;
 }
 
+/** State shared by the modules of one sync run. */
+interface SyncRun {
+  /** Merged deletion records of categories, workspaces, workspace categories and rules. */
+  tombstones: SyncTombstones;
+  /** Deletion records cancelled during this run because the item was edited afterwards. */
+  revived: Record<SyncTombstoneKind, Set<string>>;
+}
+
+type ChunkDownload = { status: 'ok'; content: string } | { status: 'missing' } | { status: 'failed' };
+
+const categoryStamp = (c: { createdAt: number; updatedAt?: number }) => c.updatedAt ?? c.createdAt;
+
+function sameCategory(a: LocalCategory | WorkspaceCategory, b: LocalCategory | WorkspaceCategory): boolean {
+  return a.name === b.name && (a.icon ?? '') === (b.icon ?? '') && a.parentId === b.parentId && a.order === b.order;
+}
+
+function tombstoneMap(list: readonly BookmarkTombstone[]): Map<string, number> {
+  return new Map(list.map(({ id, deletedAt }) => [id, deletedAt]));
+}
+
+function sameTombstoneSets(a: SyncTombstones, b: Partial<SyncTombstones>): boolean {
+  const key = (list: readonly BookmarkTombstone[] | undefined) =>
+    JSON.stringify([...(list ?? [])].sort((x, y) => x.id.localeCompare(y.id)));
+  return SYNC_TOMBSTONE_KINDS.every((kind) => key(a[kind]) === key(b[kind]));
+}
+
 export class SyncEngine {
   private isSyncing = false;
 
   constructor() {}
 
-  /** Whether this background engine is already syncing or clearing remote data. */
+  /** True while a sync (or a remote wipe) is running; local writes in that window are the engine's own. */
   get isBusy(): boolean {
     return this.isSyncing;
   }
 
-  /**
-   * Compress string to base64 gzip
-   */
-  private compressStr(str: string): string {
-    const zipped = gzipSync(strToU8(str));
-    let binary = '';
-    for (let i = 0; i < zipped.length; i++) {
-        binary += String.fromCharCode(zipped[i]);
-    }
-    return btoa(binary);
+  private emptyRun(): SyncRun {
+    return {
+      tombstones: emptySyncTombstones(),
+      revived: { categories: new Set(), workspaces: new Set(), workspaceCategories: new Set(), tabGroupRules: new Set() },
+    };
   }
 
-  /**
-   * Decompress base64 gzip to string
-   */
-  private decompressStr(b64: string): string {
-    const binary = atob(b64);
-    const bytes = new Uint8Array(binary.length);
-    for (let i = 0; i < binary.length; i++) {
-        bytes[i] = binary.charCodeAt(i);
-    }
-    const unzipped = unzipSync(bytes);
-    // fflate unzipSync returns Uint8Array when passing Uint8Array
-    return strFromU8(unzipped as unknown as Uint8Array);
-  }
-
-  /**
-   * Try acquire lock
-   */
-  private async acquireLock(): Promise<boolean> {
+  /** Reads a remote JSON file; a corrupt lock file is simply replaced. */
+  private async readSys(): Promise<SyncSys | null> {
     try {
-      let sys: SyncSys | null = null;
-      sys = await webdavClientAdapter.getJSON<SyncSys>(SYS_JSON);
-      
-      const now = Date.now();
-      if (sys && sys.lock_status === 'locked') {
-        const timeDiff = now - sys.lock_timestamp;
-        if (timeDiff < LOCK_TIMEOUT_MS) {
-          console.warn(`Sync is locked by another client. Locked for ${timeDiff}ms`);
-          return false;
-        } else {
-          console.warn(`Lock timeout exceeded (${timeDiff}ms). Breaking lock.`);
-        }
-      }
-
-      // Create new sys state or update
-      const newSys: SyncSys = {
-        version: 1,
-        sync_version: sys?.sync_version || nanoid(),
-        last_sync_time: sys?.last_sync_time || 0,
-        lock_status: 'locked',
-        lock_timestamp: now,
-      };
-
-      await webdavClientAdapter.putJSON(SYS_JSON, newSys);
-      return true;
-    } catch (err: any) {
-      if (err.status === 404) {
-        const newSys: SyncSys = {
-          version: 1,
-          sync_version: nanoid(),
-          last_sync_time: 0,
-          lock_status: 'locked',
-          lock_timestamp: Date.now(),
-        };
-        await webdavClientAdapter.putJSON(SYS_JSON, newSys);
-        return true;
-      }
+      return await webdavClientAdapter.getJSON<SyncSys>(SYS_JSON);
+    } catch (err) {
+      if (toSyncError(err).code === 'invalidRemoteData') return null;
       throw err;
     }
   }
 
   /**
+   * Try acquire lock
+   *
+   * Legacy marker for older clients. This is only read/written while holding the
+   * server-side exclusive collection LOCK; the marker is not a mutex.
+   */
+  private async acquireLock(token: string): Promise<boolean> {
+    const sys = await this.readSys();
+
+    const now = Date.now();
+    if (sys && sys.lock_status === 'locked') {
+      const timeDiff = now - sys.lock_timestamp;
+      if (timeDiff < LOCK_TIMEOUT_MS) {
+        console.warn(`Sync is locked by another client. Locked for ${timeDiff}ms`);
+        return false;
+      }
+      console.warn(`Lock timeout exceeded (${timeDiff}ms). Breaking lock.`);
+    }
+
+    const newSys: SyncSys = {
+      version: 1,
+      sync_version: sys?.sync_version || nanoid(),
+      last_sync_time: sys?.last_sync_time || 0,
+      lock_status: 'locked',
+      lock_timestamp: now,
+      lock_owner: token,
+    };
+    await webdavClientAdapter.putJSON(SYS_JSON, newSys);
+
+    const confirmed = await this.readSys();
+    // Older clients do not write lock_owner; nothing to compare against in that case.
+    if (confirmed?.lock_owner && confirmed.lock_owner !== token) {
+      console.warn('Another client acquired the sync lock at the same time. Backing off.');
+      return false;
+    }
+    return true;
+  }
+
+  /**
    * Release lock and update sync version
    */
-  private async releaseLock(): Promise<void> {
+  private async releaseLock(token: string): Promise<void> {
     try {
-      const sys = await webdavClientAdapter.getJSON<SyncSys>(SYS_JSON);
+      const sys = await this.readSys();
       if (sys) {
-        sys.lock_status = 'unlocked';
-        sys.sync_version = nanoid();
-        sys.last_sync_time = Date.now();
-        await webdavClientAdapter.putJSON(SYS_JSON, sys);
-        
+        if (sys.lock_owner && sys.lock_owner !== token) {
+          // Our lock expired and another client took over: do not unlock on its behalf.
+          console.warn('Sync lock was taken over by another client before release.');
+        } else {
+          sys.lock_status = 'unlocked';
+          sys.lock_owner = undefined;
+          sys.sync_version = nanoid();
+          sys.last_sync_time = Date.now();
+          await webdavClientAdapter.putJSON(SYS_JSON, sys);
+        }
+
         await syncConfigStorage.setStatus({
           status: 'idle',
           lastSyncTime: sys.last_sync_time,
@@ -188,6 +216,7 @@ export class SyncEngine {
       }
     } catch (err) {
       console.error('Failed to release lock', err);
+      throw err;
     }
   }
 
@@ -200,16 +229,11 @@ export class SyncEngine {
       return;
     }
 
-    const config = await syncConfigStorage.getConfig();
-    if (!config.enabled || !config.url) {
-      console.log('WebDAV sync is disabled or not configured');
-      return;
-    }
-
     this.isSyncing = true;
-    await syncConfigStorage.setStatus({ status: 'syncing', errorCode: undefined, errorMessage: '' });
-
     try {
+      const config = await syncConfigStorage.getConfig();
+      if (!config.enabled || !config.url) return;
+      await syncConfigStorage.setStatus({ status: 'syncing', errorCode: undefined, errorMessage: '' });
       // Always re-init: the adapter reuses the client unless the credentials changed,
       // otherwise an updated password would never reach the server.
       webdavClientAdapter.init(config);
@@ -218,29 +242,37 @@ export class SyncEngine {
       await webdavClientAdapter.checkAuth(SYS_JSON);
 
       // Recursive, so it also creates SYNC_ROOT and SYNC_ROOT/bookmarks
-      await webdavClientAdapter.ensureDirectory(CHUNKS_DIR);
+      await webdavClientAdapter.ensureDirectory(SYNC_ROOT);
 
-      const locked = await this.acquireLock();
-      if (!locked) {
-        await syncConfigStorage.setStatus({ status: 'idle' });
-        return;
-      }
+      await webdavClientAdapter.withExclusiveLock(SYNC_ROOT, async () => {
+        await webdavClientAdapter.ensureDirectory(CHUNKS_DIR);
 
-      try {
-        console.log('WebDAV Lock acquired, starting sync...');
-        await this.syncSettings();
-        await this.syncCategories();
-        await this.syncWorkspaces();
-        await this.syncTabGroupConfig();
-        await this.syncTabLifecycleConfig();
-        await this.syncBookmarks();
-        await this.syncBookmarkClips();
-        // Must run after bookmarks: read later state is aligned with the synced bookmarks and tombstones
-        await this.syncReadLater();
-        console.log('WebDAV Sync complete.');
-      } finally {
-        await this.releaseLock();
-      }
+        const lockToken = nanoid();
+        const locked = await this.acquireLock(lockToken);
+        if (!locked) {
+          await syncConfigStorage.setStatus({ status: 'idle' });
+          return;
+        }
+
+        try {
+          console.log('WebDAV Lock acquired, starting sync...');
+          // Deletions first: if the run stops halfway, other devices still learn about them
+          // before any module file that no longer contains the deleted items.
+          const run = await this.syncDeletions();
+          await this.syncSettings();
+          await this.syncCategories(run);
+          await this.syncWorkspaces(run);
+          await this.syncTabGroupConfig(run);
+          await this.syncTabLifecycleConfig();
+          const deletedBookmarkIds = await this.syncBookmarks();
+          await this.syncBookmarkClips(deletedBookmarkIds);
+          await this.syncReadLater();
+          await this.finishDeletions(run);
+          console.log('WebDAV Sync complete.');
+        } finally {
+          await this.releaseLock(lockToken);
+        }
+      });
 
     } catch (err: any) {
       const error = toSyncError(err);
@@ -256,6 +288,57 @@ export class SyncEngine {
       });
     } finally {
       this.isSyncing = false;
+    }
+  }
+
+  // ============ Deletions of categories / workspaces / rules ============
+
+  /**
+   * Merges the local and remote deletion records and publishes the result.
+   */
+  private async syncDeletions(): Promise<SyncRun> {
+    const raw = await webdavClientAdapter.getJSON<unknown>(DELETIONS_JSON);
+    let remote: Partial<SyncTombstones> = {};
+    let extra: Record<string, unknown> = {};
+    if (raw !== null) {
+      const parsed = RemoteDeletionsFileSchema.loose().safeParse(raw);
+      if (!parsed.success) {
+        throw new SyncError('invalidRemoteData', 'Unexpected structure in remote file deletions.json');
+      }
+      const { categories, workspaces, workspaceCategories, tabGroupRules, ...rest } = parsed.data;
+      remote = { categories, workspaces, workspaceCategories, tabGroupRules };
+      // Keys written by newer versions survive our rewrite.
+      extra = rest;
+    }
+
+    const local = await syncTombstoneStorage.getAll();
+    const merged = mergeSyncTombstones(local, remote);
+    await syncTombstoneStorage.replaceAll(merged);
+
+    const hasAny = SYNC_TOMBSTONE_KINDS.some((kind) => merged[kind].length > 0);
+    if ((raw === null && hasAny) || (raw !== null && !sameTombstoneSets(merged, remote))) {
+      await webdavClientAdapter.putJSON(DELETIONS_JSON, { ...extra, version: 1, ...merged });
+    }
+
+    const run = this.emptyRun();
+    run.tombstones = merged;
+    return run;
+  }
+
+  /**
+   * Drops deletion records of items that were edited after the delete, and records the
+   * descendants removed while applying remote deletions.
+   */
+  private async finishDeletions(run: SyncRun): Promise<void> {
+    // Re-read: deletions recorded while this run applied remote changes must not be lost.
+    const latest = mergeSyncTombstones(await syncTombstoneStorage.getAll(), run.tombstones);
+    for (const kind of SYNC_TOMBSTONE_KINDS) {
+      const revived = run.revived[kind];
+      if (revived.size > 0) latest[kind] = latest[kind].filter(({ id }) => !revived.has(id));
+    }
+    await syncTombstoneStorage.replaceAll(latest);
+    if (!sameTombstoneSets(latest, run.tombstones)) {
+      await webdavClientAdapter.putJSON(DELETIONS_JSON, { version: 1, ...latest });
     }
   }
 
@@ -291,21 +374,22 @@ export class SyncEngine {
   private async syncSettings() {
     console.log('Syncing settings...');
     const localSettings = await configStorage.getSettings();
-    let remoteSettingsRaw = await webdavClientAdapter.getJSON<any>(SETTINGS_JSON);
-    
-    let remoteSettings: RemoteSettings | null = null;
-    if (remoteSettingsRaw) {
-      const parsed = RemoteSettingsSchema.safeParse(remoteSettingsRaw);
-      if (parsed.success) {
-        remoteSettings = parsed.data;
-      }
-    }
+    const remoteSettingsRaw = await webdavClientAdapter.getJSON<unknown>(SETTINGS_JSON);
 
-    if (!remoteSettings) {
+    if (remoteSettingsRaw === null) {
       // Remote empty, push local
       await webdavClientAdapter.putJSON(SETTINGS_JSON, localSettings);
       return;
     }
+
+    const parsed = RemoteSettingsSchema.safeParse(remoteSettingsRaw);
+    if (!parsed.success) {
+      // Most likely written by a newer version (new enum values). Overwriting it would
+      // throw that version's settings away, so leave both sides untouched.
+      console.warn('Remote settings.json is not readable by this version; skipping settings sync', parsed.error);
+      return;
+    }
+    const remoteSettings = parsed.data;
 
     if (localSettings.updatedAt > remoteSettings.updatedAt) {
       await webdavClientAdapter.putJSON(SETTINGS_JSON, localSettings);
@@ -322,102 +406,128 @@ export class SyncEngine {
     }
   }
 
-  private async syncCategories() {
+  /**
+   * Bookmark categories.
+   *
+   * Last-Write-Wins by updatedAt (createdAt for older data), deletion records applied on
+   * both sides, and local-only categories folded into a remote one with the same name and
+   * parent (categories created independently on two devices).
+   */
+  private async syncCategories(run: SyncRun = this.emptyRun()) {
     console.log('Syncing categories...');
     const localCategories = await bookmarkStorage.getCategories();
-    let remoteCatsRaw = await webdavClientAdapter.getJSON<any>(CATEGORIES_JSON);
-    
-    let remoteCategories: RemoteCategory[] = [];
-    if (remoteCatsRaw && Array.isArray(remoteCatsRaw)) {
-      const parsed = z.array(RemoteCategorySchema).safeParse(remoteCatsRaw);
-      if (parsed.success) {
-        remoteCategories = parsed.data;
+    const remoteRaw = await webdavClientAdapter.getJSON<unknown>(CATEGORIES_JSON);
+    const { valid: remoteCategories, invalid } =
+      remoteRaw === null
+        ? { valid: [], invalid: [] }
+        : parseRemoteItems(remoteRaw, RemoteCategorySchema, 'categories.json');
+
+    const deletions = tombstoneMap(run.tombstones.categories);
+    const localSide = applyDeletions(localCategories, deletions, categoryStamp);
+    localSide.revivedIds.forEach((id) => run.revived.categories.add(id));
+
+    // Removing a category also removes its sub-categories; treat those as deleted too so
+    // their remote copies are not imported straight back.
+    let localKept = localSide.kept;
+    if (localSide.deleted.length > 0) {
+      const removed = new Set<string>();
+      for (const category of localSide.deleted) {
+        if (removed.has(category.id)) continue;
+        (await bookmarkStorage.deleteCategory(category.id)).forEach((id) => removed.add(id));
       }
+      const now = Date.now();
+      for (const id of removed) if (!deletions.has(id)) deletions.set(id, now);
+      localKept = localKept.filter((category) => !removed.has(category.id));
     }
 
-    const localMap = new Map(localCategories.map(c => [c.id, c]));
-    const remoteMap = new Map(remoteCategories.map(c => [c.id, c]));
+    const remoteSide = applyDeletions(remoteCategories as LocalCategory[], deletions, categoryStamp);
+    remoteSide.revivedIds.forEach((id) => run.revived.categories.add(id));
 
-    const remoteSignatureMap = new Map(remoteCategories.map(c => [`${c.name}_${c.parentId || ''}`, c]));
+    const { merged, applyToLocal, localOnly, remoteChanged } = mergeByIdLww(
+      localKept,
+      remoteSide.kept,
+      categoryStamp,
+      sameCategory,
+    );
+
+    const signature = (c: LocalCategory) => `${c.name}_${c.parentId || ''}`;
+    const remoteBySignature = new Map(remoteSide.kept.map((c) => [signature(c), c]));
     const categoryMapping: Record<string, string> = {}; // local ID -> remote ID
+    let hasChanges = remoteChanged || remoteSide.deleted.length > 0 || remoteRaw === null;
 
-    const mergedCategories: LocalCategory[] = [];
-    let hasChanges = false;
-
-    // Last-Write-Wins (createdAt acts like updatedAt if category doesn't update, or simpler: just Remote wins conflicts on categories)
-    // Actually categories don't have updatedAt currently. We simply merge by union.
-    for (const [id, localCat] of localMap) {
-      if (!remoteMap.has(id)) {
-        const signature = `${localCat.name}_${localCat.parentId || ''}`;
-        if (remoteSignatureMap.has(signature)) {
-          // Found duplicate with same name and parent but different id
-          const matchingRemote = remoteSignatureMap.get(signature)!;
-          categoryMapping[id] = matchingRemote.id;
-          hasChanges = true; // Use the remote structure instead
-        } else {
-          mergedCategories.push(localCat);
-          hasChanges = true;
-        }
+    for (const localCat of localOnly) {
+      const matchingRemote = remoteBySignature.get(signature(localCat));
+      if (matchingRemote) {
+        // Same name and parent created independently on another device: keep the remote one
+        categoryMapping[localCat.id] = matchingRemote.id;
       } else {
-        const remoteCat = remoteMap.get(id)!;
-        // Merge rule: we can pick remote as Truth
-        mergedCategories.push(remoteCat as LocalCategory);
+        merged.push(localCat);
+        hasChanges = true;
       }
     }
 
-    // Process mapped duplicates locally
     if (Object.keys(categoryMapping).length > 0) {
       await bookmarkStorage.mergeCategories(categoryMapping);
     }
 
-    for (const [id, remoteCat] of remoteMap) {
-      if (!localMap.has(id) && !categoryMapping[id]) {
-        mergedCategories.push(remoteCat as LocalCategory);
-        // Needs to apply to local
-        try {
-          await bookmarkStorage.importRawCategory(remoteCat as LocalCategory);
-        } catch (e) {
-             // Handle exist error
-        }
-      }
+    for (const remoteCat of applyToLocal) {
+      await bookmarkStorage.importRawCategory(remoteCat);
     }
 
-    if (hasChanges || !remoteCatsRaw) {
-      await webdavClientAdapter.putJSON(CATEGORIES_JSON, mergedCategories);
+    if (hasChanges) {
+      await webdavClientAdapter.putJSON(CATEGORIES_JSON, withPreservedItems(merged, invalid));
     }
   }
 
-  private async syncWorkspaces() {
+  private async syncWorkspaces(run: SyncRun = this.emptyRun()) {
     console.log('Syncing workspaces...');
-    const [localWorkspaces, localCategories] = await Promise.all([
+    const [localWorkspacesAll, localCategories] = await Promise.all([
       workspaceStorage.getWorkspaces(),
       workspaceStorage.getCategories(),
     ]);
-    const remoteRaw = await webdavClientAdapter.getJSON<any>(WORKSPACES_JSON);
+    const remoteRaw = await webdavClientAdapter.getJSON<unknown>(WORKSPACES_JSON);
 
-    let remoteWorkspaces: RemoteWorkspace[] = [];
-    let remoteCategories: RemoteWorkspaceCategory[] = [];
-    if (remoteRaw) {
-      const parsed = RemoteWorkspacesFileSchema.safeParse(remoteRaw);
-      if (parsed.success) {
-        remoteWorkspaces = parsed.data.workspaces;
-        remoteCategories = parsed.data.categories;
-      } else {
-        console.warn('Failed to parse remote workspaces.json', parsed.error);
-      }
+    let remoteWorkspacesAll: Workspace[] = [];
+    let remoteCategories: WorkspaceCategory[] = [];
+    let invalidWorkspaces: unknown[] = [];
+    let invalidCategories: unknown[] = [];
+    if (remoteRaw !== null) {
+      const workspaces = parseRemoteItems(
+        requireListField(remoteRaw, 'workspaces', 'workspaces.json'),
+        RemoteWorkspaceSchema,
+        'workspaces.json',
+      );
+      const categories = parseRemoteItems(
+        requireListField(remoteRaw, 'categories', 'workspaces.json'),
+        RemoteWorkspaceCategorySchema,
+        'workspaces.json',
+      );
+      remoteWorkspacesAll = workspaces.valid as Workspace[];
+      remoteCategories = categories.valid as WorkspaceCategory[];
+      invalidWorkspaces = workspaces.invalid;
+      invalidCategories = categories.invalid;
     }
 
     const {
       merged: mergedCategories,
       mapping: workspaceCategoryMapping,
       changed: categoriesChanged,
-    } =
-      await this.mergeWorkspaceCategories(localCategories, remoteCategories);
+    } = await this.mergeWorkspaceCategories(localCategories, remoteCategories, run);
 
-    const localMap = new Map(localWorkspaces.map((workspace) => [workspace.id, workspace]));
-    const remoteMap = new Map(remoteWorkspaces.map((workspace) => [workspace.id, workspace]));
+    // Deleted workspaces
+    const deletions = tombstoneMap(run.tombstones.workspaces);
+    const stamp = (workspace: Workspace) => workspace.updatedAt;
+    const localSide = applyDeletions(localWorkspacesAll, deletions, stamp);
+    const remoteSide = applyDeletions(remoteWorkspacesAll, deletions, stamp);
+    [...localSide.revivedIds, ...remoteSide.revivedIds].forEach((id) => run.revived.workspaces.add(id));
+    for (const workspace of localSide.deleted) {
+      await workspaceStorage.deleteWorkspace(workspace.id);
+    }
+
+    const localMap = new Map(localSide.kept.map((workspace) => [workspace.id, workspace]));
+    const remoteMap = new Map(remoteSide.kept.map((workspace) => [workspace.id, workspace]));
     const mergedWorkspaces: Workspace[] = [];
-    let workspacesChanged = !remoteRaw;
+    let workspacesChanged = remoteRaw === null || remoteSide.deleted.length > 0;
 
     for (const [id, localWorkspace] of localMap) {
       const remoteWorkspace = remoteMap.get(id);
@@ -439,69 +549,69 @@ export class SyncEngine {
         }
         workspacesChanged = true;
       } else {
-        const normalizedRemote = remoteWorkspace as Workspace;
-        mergedWorkspaces.push(normalizedRemote);
+        mergedWorkspaces.push(remoteWorkspace);
         if (localWorkspace.updatedAt < remoteWorkspace.updatedAt) {
-          await workspaceStorage.importRawWorkspace(normalizedRemote);
+          await workspaceStorage.importRawWorkspace(remoteWorkspace);
         }
       }
     }
 
     for (const [id, remoteWorkspace] of remoteMap) {
       if (!localMap.has(id)) {
-        const normalizedRemote = remoteWorkspace as Workspace;
-        mergedWorkspaces.push(normalizedRemote);
-        await workspaceStorage.importRawWorkspace(normalizedRemote);
+        mergedWorkspaces.push(remoteWorkspace);
+        await workspaceStorage.importRawWorkspace(remoteWorkspace);
       }
     }
 
     if (categoriesChanged || workspacesChanged) {
       await webdavClientAdapter.putJSON(WORKSPACES_JSON, {
-        workspaces: mergedWorkspaces,
-        categories: mergedCategories,
+        workspaces: withPreservedItems(mergedWorkspaces, invalidWorkspaces),
+        categories: withPreservedItems(mergedCategories, invalidCategories),
       });
     }
   }
 
   private async mergeWorkspaceCategories(
-    localCategories: WorkspaceCategory[],
-    remoteCategories: RemoteWorkspaceCategory[],
+    localCategoriesAll: WorkspaceCategory[],
+    remoteCategoriesAll: WorkspaceCategory[],
+    run: SyncRun,
   ): Promise<{ merged: WorkspaceCategory[]; mapping: Record<string, string>; changed: boolean }> {
-    const localMap = new Map(localCategories.map((category) => [category.id, category]));
-    const remoteMap = new Map(remoteCategories.map((category) => [category.id, category]));
-    const remoteSignatureMap = new Map(
-      remoteCategories.map((category) => [`${category.name}_${category.parentId || ''}`, category]),
+    const deletions = tombstoneMap(run.tombstones.workspaceCategories);
+    const localSide = applyDeletions(localCategoriesAll, deletions, categoryStamp);
+    const remoteSide = applyDeletions(remoteCategoriesAll, deletions, categoryStamp);
+    [...localSide.revivedIds, ...remoteSide.revivedIds].forEach((id) => run.revived.workspaceCategories.add(id));
+    for (const category of localSide.deleted) {
+      await workspaceStorage.deleteCategory(category.id);
+    }
+
+    const { merged, applyToLocal, localOnly, remoteChanged } = mergeByIdLww(
+      localSide.kept,
+      remoteSide.kept,
+      categoryStamp,
+      sameCategory,
     );
 
-    const merged: WorkspaceCategory[] = [];
+    const signature = (c: WorkspaceCategory) => `${c.name}_${c.parentId || ''}`;
+    const remoteBySignature = new Map(remoteSide.kept.map((c) => [signature(c), c]));
     const mapping: Record<string, string> = {};
-    let changed = remoteCategories.length === 0 && localCategories.length > 0;
+    let changed =
+      remoteChanged ||
+      remoteSide.deleted.length > 0 ||
+      (remoteCategoriesAll.length === 0 && localCategoriesAll.length > 0);
 
-    for (const [id, localCategory] of localMap) {
-      const remoteCategory = remoteMap.get(id);
-      if (remoteCategory) {
-        merged.push(remoteCategory as WorkspaceCategory);
-        continue;
-      }
-
-      const signature = `${localCategory.name}_${localCategory.parentId || ''}`;
-      const matchingRemote = remoteSignatureMap.get(signature);
+    for (const localCategory of localOnly) {
+      const matchingRemote = remoteBySignature.get(signature(localCategory));
       if (matchingRemote) {
-        mapping[id] = matchingRemote.id;
+        mapping[localCategory.id] = matchingRemote.id;
         changed = true;
         continue;
       }
-
       merged.push(localCategory);
       changed = true;
     }
 
-    for (const [id, remoteCategory] of remoteMap) {
-      if (!localMap.has(id)) {
-        const normalizedRemote = remoteCategory as WorkspaceCategory;
-        merged.push(normalizedRemote);
-        await workspaceStorage.importRawCategory(normalizedRemote);
-      }
+    for (const remoteCategory of applyToLocal) {
+      await workspaceStorage.importRawCategory(remoteCategory);
     }
 
     return { merged, mapping, changed };
@@ -522,30 +632,55 @@ export class SyncEngine {
     };
   }
 
-  private async syncTabGroupConfig() {
+  private async syncTabGroupConfig(run: SyncRun = this.emptyRun()) {
     console.log('Syncing tab group config...');
-    const [localRules, localAutoGroupSettings] = await Promise.all([
+    const [localRulesAll, localAutoGroupSettings] = await Promise.all([
       tabGroupRulesStorage.getRules(),
       tabGroupRulesStorage.getAutoGroupSettings(),
     ]);
-    const remoteRaw = await webdavClientAdapter.getJSON<any>(TAB_GROUP_CONFIG_JSON);
+    const remoteRaw = await webdavClientAdapter.getJSON<unknown>(TAB_GROUP_CONFIG_JSON);
 
-    let remoteRules: RemoteTabGroupRule[] = [];
+    let remoteRulesAll: TabGroupRule[] = [];
+    let invalidRules: unknown[] = [];
     let remoteAutoGroupSettings = localAutoGroupSettings;
-    if (remoteRaw) {
-      const parsed = RemoteTabGroupConfigFileSchema.safeParse(remoteRaw);
-      if (parsed.success) {
-        remoteRules = parsed.data.rules;
-        remoteAutoGroupSettings = parsed.data.autoGroupSettings;
+    // Settings written by a newer version that this one cannot read are written back untouched.
+    let unreadableAutoGroupSettings: unknown = undefined;
+    let remoteExtra: Record<string, unknown> = {};
+    if (remoteRaw !== null) {
+      const rules = parseRemoteItems(
+        requireListField(remoteRaw, 'rules', 'tab-group-config.json'),
+        RemoteTabGroupRuleSchema,
+        'tab-group-config.json',
+      );
+      remoteRulesAll = rules.valid as TabGroupRule[];
+      invalidRules = rules.invalid;
+      const settings = RemoteTabGroupConfigFileSchema.shape.autoGroupSettings.safeParse(
+        (remoteRaw as Record<string, unknown>).autoGroupSettings,
+      );
+      if (settings.success) {
+        remoteAutoGroupSettings = settings.data;
       } else {
-        console.warn('Failed to parse remote tab-group-config.json', parsed.error);
+        console.warn('Remote auto group settings are not readable by this version', settings.error);
+        unreadableAutoGroupSettings = (remoteRaw as Record<string, unknown>).autoGroupSettings;
       }
+      remoteExtra = Object.fromEntries(
+        Object.entries(remoteRaw as Record<string, unknown>).filter(([key]) => key !== 'rules' && key !== 'autoGroupSettings'),
+      );
     }
 
-    const localMap = new Map(localRules.map((rule) => [rule.id, rule]));
-    const remoteMap = new Map(remoteRules.map((rule) => [rule.id, rule]));
+    const deletions = tombstoneMap(run.tombstones.tabGroupRules);
+    const stamp = (rule: TabGroupRule) => rule.updatedAt;
+    const localSide = applyDeletions(localRulesAll, deletions, stamp);
+    const remoteSide = applyDeletions(remoteRulesAll, deletions, stamp);
+    [...localSide.revivedIds, ...remoteSide.revivedIds].forEach((id) => run.revived.tabGroupRules.add(id));
+    for (const rule of localSide.deleted) {
+      await tabGroupRulesStorage.deleteRule(rule.id);
+    }
+
+    const localMap = new Map(localSide.kept.map((rule) => [rule.id, rule]));
+    const remoteMap = new Map(remoteSide.kept.map((rule) => [rule.id, rule]));
     const mergedRules: TabGroupRule[] = [];
-    let changed = !remoteRaw;
+    let changed = remoteRaw === null || remoteSide.deleted.length > 0;
 
     for (const [id, localRule] of localMap) {
       const remoteRule = remoteMap.get(id);
@@ -559,39 +694,42 @@ export class SyncEngine {
         mergedRules.push(localRule);
         changed = true;
       } else {
-        const normalizedRemote = remoteRule as TabGroupRule;
-        mergedRules.push(normalizedRemote);
+        mergedRules.push(remoteRule);
         if (localRule.updatedAt < remoteRule.updatedAt) {
-          await tabGroupRulesStorage.importRawRule(normalizedRemote);
+          await tabGroupRulesStorage.importRawRule(remoteRule);
         }
       }
     }
 
     for (const [id, remoteRule] of remoteMap) {
       if (!localMap.has(id)) {
-        const normalizedRemote = remoteRule as TabGroupRule;
-        mergedRules.push(normalizedRemote);
-        await tabGroupRulesStorage.importRawRule(normalizedRemote);
+        mergedRules.push(remoteRule);
+        await tabGroupRulesStorage.importRawRule(remoteRule);
       }
     }
 
     const autoGroupSettingsChanged =
+      unreadableAutoGroupSettings === undefined && (
       localAutoGroupSettings.updatedAt > remoteAutoGroupSettings.updatedAt ||
       (
         localAutoGroupSettings.updatedAt === remoteAutoGroupSettings.updatedAt &&
         !this.areAutoGroupSettingsEqual(localAutoGroupSettings, remoteAutoGroupSettings)
-      );
+      ));
 
-    if (localAutoGroupSettings.updatedAt < remoteAutoGroupSettings.updatedAt) {
+    if (unreadableAutoGroupSettings === undefined && localAutoGroupSettings.updatedAt < remoteAutoGroupSettings.updatedAt) {
       await tabGroupRulesStorage.importRawAutoGroupSettings(remoteAutoGroupSettings);
     }
 
     if (changed || autoGroupSettingsChanged) {
       await webdavClientAdapter.putJSON(TAB_GROUP_CONFIG_JSON, {
-        rules: mergedRules,
-        autoGroupSettings: autoGroupSettingsChanged
-          ? localAutoGroupSettings
-          : remoteAutoGroupSettings,
+        ...remoteExtra,
+        rules: withPreservedItems(mergedRules, invalidRules),
+        autoGroupSettings:
+          unreadableAutoGroupSettings !== undefined
+            ? unreadableAutoGroupSettings
+            : autoGroupSettingsChanged
+              ? localAutoGroupSettings
+              : remoteAutoGroupSettings,
       });
     }
   }
@@ -603,24 +741,36 @@ export class SyncEngine {
    * 1. 按 ID 做 Last-Write-Wins，合并同一条书签在各设备上的不同版本
    * 2. 按规范化 URL 收敛：各设备独立收藏同一网址时会生成不同的 ID，
    *    只按 ID 合并会让每台设备的书签数成倍增长（issue #17）
+   *
+   * Content travels in per-bookmark chunks. The meta carries a content fingerprint so a
+   * device downloads a chunk only when it differs from its local copy, and uploads one
+   * only when the remote copy is out of date.
+   *
+   * @returns IDs of bookmarks deleted for good (their clips must not be re-imported)
    */
-  private async syncBookmarks() {
+  private async syncBookmarks(): Promise<Set<string>> {
     console.log('Syncing bookmarks...');
     // 含软删除墓碑，否则本地删除永远不会传播到其他设备
     const localBookmarks = await bookmarkStorage.getBookmarksForSync();
-    const remoteMetaFile = await webdavClientAdapter.getJSON<any>(META_JSON);
+    const remoteMetaFile = await webdavClientAdapter.getJSON<unknown>(META_JSON);
 
     let remoteMeta: RemoteBookmarkMeta[] = [];
     let remoteDeletions: RemoteBookmarkDeletion[] = [];
-    if (remoteMetaFile) {
-      const parsed = RemoteBookmarksFileSchema.safeParse(remoteMetaFile);
-      if (parsed.success) {
-        remoteMeta = parsed.data.bookmarks;
-        remoteDeletions = parsed.data.deletions;
-      } else {
-        console.warn('Failed to parse remote meta.json', parsed.error);
-        // Disaster threshold protection check might go here
-      }
+    let invalidMeta: unknown[] = [];
+    if (remoteMetaFile !== null) {
+      const bookmarks = parseRemoteItems(
+        requireListField(remoteMetaFile, 'bookmarks', 'bookmarks/meta.json'),
+        RemoteBookmarkMetaSchema,
+        'bookmarks/meta.json',
+      );
+      remoteMeta = bookmarks.valid;
+      invalidMeta = bookmarks.invalid;
+      // Unreadable deletion records carry no data worth keeping.
+      remoteDeletions = parseRemoteItems(
+        requireListField(remoteMetaFile, 'deletions', 'bookmarks/meta.json'),
+        RemoteBookmarkDeletionSchema,
+        'bookmarks/meta.json',
+      ).valid;
     }
 
     const localMap = new Map(localBookmarks.map(b => [b.id, b]));
@@ -636,51 +786,178 @@ export class SyncEngine {
       console.log(`Merged ${mergedDuplicates} duplicated bookmark(s) by URL`);
     }
 
+    const contents = await bookmarkStorage.getContentsMap();
+
+    // ---- Pull phase: metadata and content chunks that are newer remotely ----
+    const repairState = await syncConfigStorage.getContentRepairState();
+    const { toDownload, repairBatch, repairRemaining } = this.planContentDownloads(
+      entries,
+      localMap,
+      remoteMap,
+      contents,
+      repairState,
+    );
+    const downloads = await this.downloadChunks(toDownload);
+
+    const toImport: LocalBookmark[] = [];
+    const contentUpdates: Record<string, string> = {};
+    for (const [id, result] of downloads) {
+      if (result.status === 'ok') {
+        contentUpdates[id] = result.content;
+        contents[id] = result.content;
+      }
+    }
+    for (const entry of entries.values()) {
+      if (!entry.applyToLocal) continue;
+      const existing = localMap.get(entry.meta.id);
+      // 本地从未存在的墓碑不必落盘，避免回收站里凭空多出别的设备删掉的书签
+      if (!existing && entry.meta.isDeleted) continue;
+      toImport.push(this.toLocalBookmark(entry.meta, existing));
+    }
+    await bookmarkStorage.importRawBookmarks(
+      toImport,
+      contentUpdates,
+      Object.fromEntries([...new Set([...localMap.keys(), ...entries.keys()])].map(id => [id, localMap.get(id) ?? null])),
+    );
+    await this.updateContentRepairState(repairState, repairBatch, repairRemaining, downloads);
+
+    // ---- Push phase ----
     const finalMeta: RemoteBookmarkMeta[] = [];
     const chunksToUpload: Array<{ id: string, content: string }> = [];
     let metaChanged =
-      !remoteMetaFile ||
+      remoteMetaFile === null ||
       entries.size !== remoteMap.size ||
       deletions.length !== remoteDeletions.length;
 
     for (const entry of entries.values()) {
-      finalMeta.push(entry.meta);
-
-      if (entry.uploadMeta) {
-        metaChanged = true;
-      }
-
-      if (entry.applyToLocal) {
-        await this.applyRemoteToLocal(entry.meta);
-      }
-
       if (entry.uploadContent && !entry.meta.isDeleted) {
-        const content = await bookmarkStorage.getBookmarkContent(entry.meta.id);
-        if (content) {
+        const remote = remoteMap.get(entry.meta.id);
+        const content = contents[entry.meta.id];
+        const hash = contentFingerprint(content);
+        // Without local content (e.g. never downloaded) keep pointing at the remote chunk.
+        entry.meta = { ...entry.meta, contentHash: hash ?? remote?.contentHash };
+        if (content && hash !== remote?.contentHash) {
           chunksToUpload.push({ id: entry.meta.id, content });
         }
       }
+
+      finalMeta.push(entry.meta);
+      if (entry.uploadMeta) {
+        metaChanged = true;
+      }
     }
 
-    // Push phase
     if (chunksToUpload.length > 0) {
       console.log(`Uploading ${chunksToUpload.length} chunks...`);
-      // Concurrency control using p-limit
-      const limit = pLimit(5); // max 5 concurrent uploads
-
-      const uploadTasks = chunksToUpload.map(item => limit(async () => {
-        const chunkPath = `${CHUNKS_DIR}/${item.id}.gz.txt`; // compressed chunk
-        const compressed = this.compressStr(JSON.stringify({ content: item.content }));
-        await webdavClientAdapter.putJSON(chunkPath, { data: compressed });
-      }));
-
-      await Promise.all(uploadTasks);
+      const limit = pLimit(TRANSFER_CONCURRENCY);
+      const uploads = await Promise.allSettled(chunksToUpload.map(item => limit(async () => {
+        await webdavClientAdapter.putJSON(`${CHUNKS_DIR}/${item.id}.gz.txt`, encodeContentChunk(item.content));
+      })));
+      const failed = uploads.find((result): result is PromiseRejectedResult => result.status === 'rejected');
+      if (failed) throw failed.reason;
     }
 
     // Write meta.json last safely
     if (metaChanged || chunksToUpload.length > 0) {
       console.log('Updating remote meta.json...');
-      await webdavClientAdapter.putJSON(META_JSON, { bookmarks: finalMeta, deletions });
+      await webdavClientAdapter.putJSON(META_JSON, {
+        bookmarks: withPreservedItems(finalMeta, invalidMeta),
+        deletions,
+      });
+    }
+
+    return new Set(deletions.map(({ id }) => id));
+  }
+
+  /**
+   * Decides which content chunks to download in this run:
+   * - bookmarks new to this device;
+   * - bookmarks whose remote content fingerprint differs from the local content;
+   * - one batch of the one-time repair of content lost to the old chunk decoding bug.
+   */
+  private planContentDownloads(
+    entries: Map<string, BookmarkSyncEntry>,
+    localMap: Map<string, LocalBookmark>,
+    remoteMap: Map<string, RemoteBookmarkMeta>,
+    contents: Record<string, string>,
+    repairState: SyncContentRepairState,
+  ): { toDownload: string[]; repairBatch: string[]; repairRemaining: number } {
+    const toDownload = new Set<string>();
+    for (const entry of entries.values()) {
+      const remote = remoteMap.get(entry.meta.id);
+      if (!entry.applyToLocal || entry.meta.isDeleted || !remote || remote.isDeleted) continue;
+      const local = localMap.get(entry.meta.id);
+      if (!local) {
+        toDownload.add(entry.meta.id);
+      } else if (remote.contentHash && remote.contentHash !== contentFingerprint(contents[entry.meta.id])) {
+        toDownload.add(entry.meta.id);
+      }
+    }
+
+    if (repairState.done) return { toDownload: [...toDownload], repairBatch: [], repairRemaining: 0 };
+
+    const attempted = new Set(repairState.attempted);
+    const candidates: string[] = [];
+    for (const [id, local] of localMap) {
+      const remote = remoteMap.get(id);
+      if (local.isDeleted || contents[id] || !remote || remote.isDeleted) continue;
+      if (toDownload.has(id) || attempted.has(id)) continue;
+      candidates.push(id);
+    }
+    const repairBatch = candidates.slice(0, CONTENT_REPAIR_BATCH);
+    repairBatch.forEach((id) => toDownload.add(id));
+    return { toDownload: [...toDownload], repairBatch, repairRemaining: candidates.length - repairBatch.length };
+  }
+
+  private async updateContentRepairState(
+    state: SyncContentRepairState,
+    batch: string[],
+    remaining: number,
+    downloads: Map<string, ChunkDownload>,
+  ): Promise<void> {
+    if (state.done) return;
+    // Network failures are retried next time; found or missing chunks are settled.
+    const settled = batch.filter((id) => downloads.get(id)?.status !== 'failed');
+    const failed = batch.length - settled.length;
+    if (remaining === 0 && failed === 0) {
+      await syncConfigStorage.setContentRepairState({ done: true, attempted: [] });
+      return;
+    }
+    if (settled.length > 0) {
+      await syncConfigStorage.setContentRepairState({ done: false, attempted: [...state.attempted, ...settled] });
+    }
+  }
+
+  private async downloadChunks(ids: string[]): Promise<Map<string, ChunkDownload>> {
+    const results = new Map<string, ChunkDownload>();
+    if (ids.length === 0) return results;
+    console.log(`Downloading ${ids.length} chunks...`);
+    const limit = pLimit(TRANSFER_CONCURRENCY);
+    await Promise.all(ids.map((id) => limit(async () => {
+      results.set(id, await this.downloadChunk(id));
+    })));
+    return results;
+  }
+
+  /**
+   * Downloads one content chunk. A missing or corrupt chunk is final ('missing'); a
+   * transport error is 'failed' and leaves the local content untouched.
+   */
+  private async downloadChunk(id: string): Promise<ChunkDownload> {
+    let raw: unknown;
+    try {
+      raw = await webdavClientAdapter.getJSON<unknown>(`${CHUNKS_DIR}/${id}.gz.txt`);
+    } catch (err) {
+      if (toSyncError(err).code === 'invalidRemoteData') return { status: 'missing' };
+      console.warn(`Failed to fetch chunk for ${id}`, err);
+      return { status: 'failed' };
+    }
+    if (raw === null) return { status: 'missing' };
+    try {
+      return { status: 'ok', content: decodeContentChunk(raw) };
+    } catch (err) {
+      console.warn(`Unreadable chunk for ${id}`, err);
+      return { status: 'missing' };
     }
   }
 
@@ -744,7 +1021,7 @@ export class SyncEngine {
     const newIds = deletions.filter(({ id }) => !known.has(id)).map(({ id }) => id);
     if (newIds.length === 0) return;
 
-    const limit = pLimit(5);
+    const limit = pLimit(TRANSFER_CONCURRENCY);
     await Promise.all(
       newIds.map((id) =>
         limit(async () => {
@@ -888,17 +1165,36 @@ export class SyncEngine {
     return mergedCount;
   }
 
-  private async syncBookmarkClips(): Promise<void> {
+  /**
+   * Clips (Last-Write-Wins by id).
+   *
+   * @param deletedBookmarkIds Bookmarks deleted for good. Purging a bookmark hard-deletes its
+   *   clips locally, so their remote copies must be dropped instead of re-imported.
+   */
+  private async syncBookmarkClips(deletedBookmarkIds: Set<string> = new Set()): Promise<void> {
     const localClips = await bookmarkClipStorage.getAllClips();
-    const remoteRaw = await webdavClientAdapter.getJSON<any>(CLIPS_JSON);
-    const parsed = remoteRaw
-      ? RemoteBookmarkClipsFileSchema.safeParse(remoteRaw)
-      : null;
-    const remoteClips = parsed?.success ? parsed.data.clips : [];
-    const localMap = new Map(localClips.map((clip) => [clip.id, clip]));
+    const remoteRaw = await webdavClientAdapter.getJSON<unknown>(CLIPS_JSON);
+    const parsed =
+      remoteRaw === null
+        ? { valid: [], invalid: [] }
+        : parseRemoteItems(
+            requireListField(remoteRaw, 'clips', 'bookmarks/clips.json'),
+            RemoteBookmarkClipSchema,
+            'bookmarks/clips.json',
+          );
+    const remoteClips = (parsed.valid as BookmarkClip[]).filter(
+      (clip) => !deletedBookmarkIds.has(clip.bookmarkId),
+    );
+    const orphansDropped = parsed.valid.length - remoteClips.length;
+    const localMap = new Map(
+      localClips
+        .filter((clip) => !deletedBookmarkIds.has(clip.bookmarkId))
+        .map((clip) => [clip.id, clip]),
+    );
     const remoteMap = new Map(remoteClips.map((clip) => [clip.id, clip]));
     const merged: BookmarkClip[] = [];
-    let changed = !remoteRaw || (parsed !== null && !parsed.success);
+    const toImport: BookmarkClip[] = [];
+    let changed = remoteRaw === null || orphansDropped > 0;
 
     for (const [id, local] of localMap) {
       const remote = remoteMap.get(id);
@@ -912,21 +1208,21 @@ export class SyncEngine {
           changed = true;
         }
       } else {
-        const normalized = remote as BookmarkClip;
-        merged.push(normalized);
-        await bookmarkClipStorage.importRawClip(normalized);
+        merged.push(remote);
+        toImport.push(remote);
       }
     }
 
     for (const [id, remote] of remoteMap) {
       if (localMap.has(id)) continue;
-      const normalized = remote as BookmarkClip;
-      merged.push(normalized);
-      await bookmarkClipStorage.importRawClip(normalized);
+      merged.push(remote);
+      toImport.push(remote);
     }
 
+    await bookmarkClipStorage.upsertRawClips(toImport);
+
     if (changed || localMap.size !== remoteMap.size) {
-      await webdavClientAdapter.putJSON(CLIPS_JSON, { clips: merged });
+      await webdavClientAdapter.putJSON(CLIPS_JSON, { clips: withPreservedItems(merged, parsed.invalid) });
     }
   }
 
@@ -1028,53 +1324,40 @@ export class SyncEngine {
   }
 
   /**
-   * 以远端版本为准回写本地（保留远端时间戳，避免下次同步又被判定为本地更新）
+   * Builds the local record for a remote version (keeps the remote timestamps so the next
+   * sync does not see it as a local edit).
+   *
+   * Device-local state is never taken from the remote copy: snapshots are not synced, so
+   * `hasSnapshot` stays what this device knows (a remote `true` used to show a "view
+   * snapshot" action that could only fail). Remote-only fields such as `contentHash` are
+   * not stored locally.
    */
-  private async applyRemoteToLocal(remote: RemoteBookmarkMeta) {
-    const exists = await bookmarkStorage.getBookmarkById(remote.id);
+  private toLocalBookmark(remote: RemoteBookmarkMeta, existing: LocalBookmark | undefined): LocalBookmark {
+    const isDeleted = remote.isDeleted ?? false;
+    const base = {
+      id: remote.id,
+      url: remote.url,
+      title: remote.title,
+      description: remote.description,
+      categoryId: remote.categoryId,
+      tags: remote.tags,
+      favicon: remote.favicon,
+      createdAt: remote.createdAt,
+      updatedAt: remote.updatedAt,
+      isDeleted,
+    };
+    // Trash retention counts from the moment the bookmark entered the trash.
+    const deletedAt = !isDeleted
+      ? undefined
+      : existing?.isDeleted
+        ? existing.deletedAt ?? remote.updatedAt
+        : remote.updatedAt;
 
-    if (exists) {
-      await bookmarkStorage.importRawBookmark({
-         ...exists, // keeps existing content if any
-         ...remote, // overwrites meta, INCLUDING createdAt, updatedAt, id
-         isDeleted: remote.isDeleted ?? false,
-      });
-      // If remote has fresh chunks, we might want logic to redownload them if they changed,
-      // but typically updating the meta alone is fine unless the user completely redid content scraping.
-      return;
+    if (existing) {
+      const { content: _content, ...existingMeta } = existing;
+      return { ...existingMeta, ...base, hasSnapshot: existing.hasSnapshot, deletedAt };
     }
-
-    // 本地从未存在的墓碑不必落盘，避免回收站里凭空多出别的设备删掉的书签
-    if (remote.isDeleted) return;
-
-    // Fetch chunk
-    const chunkPath = `${CHUNKS_DIR}/${remote.id}.gz.txt`;
-    let contentStr = '';
-    try {
-      const chunkRaw = await webdavClientAdapter.getJSON<any>(chunkPath);
-      if (chunkRaw && chunkRaw.data) {
-         const decompressed = this.decompressStr(chunkRaw.data);
-         const chunkJson = JSON.parse(decompressed);
-         contentStr = chunkJson.content || '';
-      }
-    } catch (e) {
-       console.warn(`Failed to fetch chunk for ${remote.id}`, e);
-    }
-
-    await bookmarkStorage.importRawBookmark({
-       id: remote.id,
-       url: remote.url,
-       title: remote.title,
-       description: remote.description,
-       categoryId: remote.categoryId,
-       tags: remote.tags,
-       favicon: remote.favicon,
-       hasSnapshot: remote.hasSnapshot,
-       createdAt: remote.createdAt,
-       updatedAt: remote.updatedAt,
-       isDeleted: remote.isDeleted ?? false,
-       content: contentStr
-    });
+    return { ...base, hasSnapshot: false, deletedAt };
   }
 
   /**
@@ -1084,17 +1367,15 @@ export class SyncEngine {
     if (this.isSyncing) {
       throw new Error('Sync is currently in progress, cannot clear remote data');
     }
-    
-    const config = await syncConfigStorage.getConfig();
-    if (!config.enabled || !config.url) {
-      throw new Error('WebDAV is not configured');
-    }
-    
+
+    this.isSyncing = true;
     try {
-      this.isSyncing = true;
+      const config = await syncConfigStorage.getConfig();
+      if (!config.enabled || !config.url) throw new Error('WebDAV is not configured');
       webdavClientAdapter.init(config);
       await webdavClientAdapter.checkAuth(SYS_JSON);
-      await webdavClientAdapter.deleteFile(SYNC_ROOT);
+      await webdavClientAdapter.ensureDirectory(SYNC_ROOT);
+      await webdavClientAdapter.withExclusiveLock(SYNC_ROOT, () => webdavClientAdapter.deleteFile(SYNC_ROOT));
 
       // Reset local sync status
       await syncConfigStorage.setStatus({

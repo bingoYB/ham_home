@@ -9,12 +9,16 @@
  * - 分类 (sync:categories) - 跨设备同步（分类数量较少，不易超限）
  */
 import { nanoid } from 'nanoid';
+import { createProxyService, registerService, type ProxyServiceKey } from '@webext-core/proxy-service';
+import { serializeService } from '../services/serialized-service';
 import { normalizeBookmarkUrl } from '../bookmarks/bookmark-dedup';
 import { bookmarkClipStorage } from './bookmark-clip-storage';
 import { bookmarkHealthStorage } from './bookmark-health-storage';
 import { bookmarkScreenshotStorage } from './bookmark-screenshot-storage';
 import { bookmarkTombstoneStorage } from './bookmark-tombstone-storage';
 import { readLaterStorage } from './read-later-storage';
+
+import { syncTombstoneStorage } from './sync-tombstone-storage';
 import { snapshotStorage } from './snapshot-storage';
 import { vectorStore } from './vector-store';
 import type {
@@ -51,7 +55,7 @@ const categoriesItem = storage.defineItem<LocalCategory[]>('sync:categories', {
   fallback: [],
 });
 
-class BookmarkStorage {
+export class BookmarkStorage {
   // ============ 内部方法 ============
 
   /**
@@ -352,12 +356,14 @@ class BookmarkStorage {
       throw new Error('分类名称已存在');
     }
 
+    const now = Date.now();
     const category: LocalCategory = {
       id: nanoid(),
       name,
       parentId,
       order: categories.length,
-      createdAt: Date.now(),
+      createdAt: now,
+      updatedAt: now,
       icon,
     };
 
@@ -379,7 +385,7 @@ class BookmarkStorage {
       throw new Error('分类不存在');
     }
 
-    const updated = { ...categories[index], ...data };
+    const updated = { ...categories[index], ...data, updatedAt: Date.now() };
     await categoriesItem.setValue(
       categories.map((c: LocalCategory, i: number) => (i === index ? updated : c))
     );
@@ -388,8 +394,9 @@ class BookmarkStorage {
 
   /**
    * 删除分类（将该分类及子分类下的书签移至"未分类"）
+   * @returns IDs of the removed categories, sub-categories included
    */
-  async deleteCategory(id: string): Promise<void> {
+  async deleteCategory(id: string): Promise<string[]> {
     const [categories, metaList]: [LocalCategory[], BookmarkMeta[]] = await Promise.all([
       categoriesItem.getValue(),
       bookmarkMetaItem.getValue(),
@@ -414,10 +421,15 @@ class BookmarkStorage {
         : b
     );
 
+    // Leave deletion records, otherwise other devices' copies come back on the next sync.
+    await syncTombstoneStorage.add('categories', Array.from(idsToDelete));
+
     await Promise.all([
       categoriesItem.setValue(categories.filter((c: LocalCategory) => !idsToDelete.has(c.id))),
       bookmarkMetaItem.setValue(updatedMetaList),
     ]);
+
+    return Array.from(idsToDelete);
   }
 
   // ============ 标签操作 ============
@@ -693,7 +705,7 @@ class BookmarkStorage {
     categories = categories.map((c: LocalCategory) => {
       if (c.parentId && mapping[c.parentId]) {
         hasCategoryChanges = true;
-        return { ...c, parentId: mapping[c.parentId] };
+        return { ...c, parentId: mapping[c.parentId], updatedAt: now };
       }
       return c;
     });
@@ -746,6 +758,64 @@ class BookmarkStorage {
     }
   }
 
+  /**
+   * Imports raw bookmarks from sync in one read/write of the metadata and content maps,
+   * instead of rewriting the whole bookmark list (and firing a change event) per bookmark.
+   */
+  async importRawBookmarks(
+    bookmarks: LocalBookmark[],
+    contents: Record<string, string> = {},
+    expectedBookmarks?: Record<string, LocalBookmark | null>,
+  ): Promise<void> {
+    const metaList: BookmarkMeta[] = await bookmarkMetaItem.getValue();
+    if (expectedBookmarks) {
+      // Network IO happened outside the write queue. Do not overwrite an edit or
+      // resurrect a deletion made since the sync took its local snapshot.
+      const current = new Map(metaList.map(meta => [meta.id, meta]));
+      const tombstones = new Set((await bookmarkTombstoneStorage.getAll()).map(item => item.id));
+      const unchanged = (id: string) => !tombstones.has(id)
+        && Object.hasOwn(expectedBookmarks, id)
+        && JSON.stringify(current.get(id) ?? null) === JSON.stringify(expectedBookmarks[id]);
+      bookmarks = bookmarks.filter(bookmark => unchanged(bookmark.id));
+      contents = Object.fromEntries(Object.entries(contents).filter(([id]) => unchanged(id)));
+    }
+    if (bookmarks.length > 0) {
+      const indexById = new Map(metaList.map((b: BookmarkMeta, i: number) => [b.id, i]));
+      const next = [...metaList];
+      for (const bookmark of bookmarks) {
+        const { content: _content, ...meta } = bookmark;
+        const index = indexById.get(meta.id);
+        if (index === undefined) {
+          indexById.set(meta.id, next.length);
+          next.push(meta);
+        } else {
+          next[index] = { ...next[index], ...meta };
+        }
+      }
+      await bookmarkMetaItem.setValue(next);
+    }
+    await this.setBookmarkContents(contents);
+  }
+
+  /** A consistent export read, queued with all mutations in the background. */
+  async getExportSnapshot() {
+    const bookmarks = await this.getBookmarks(undefined, true);
+    const categories = await this.getCategories();
+    return { bookmarks, categories };
+  }
+
+  async clearBookmarkData(): Promise<void> {
+    await bookmarkMetaItem.setValue([]);
+    await bookmarkContentsItem.setValue({});
+    await categoriesItem.setValue([]);
+    await Promise.all([
+      bookmarkClipStorage.importRawClips([]),
+      bookmarkHealthStorage.clear(),
+      bookmarkScreenshotStorage.clear(),
+      readLaterStorage.clear(),
+    ]);
+  }
+
   // ============ 监听器 ============
 
   /**
@@ -783,6 +853,22 @@ class BookmarkStorage {
   }
 
   /**
+   * Reads all bookmark contents at once (used by sync to avoid reading the whole content map per bookmark).
+   */
+  async getContentsMap(): Promise<Record<string, string>> {
+    return { ...(await bookmarkContentsItem.getValue()) };
+  }
+
+  /**
+   * Writes several bookmark contents with a single read/write of the content map.
+   */
+  async setBookmarkContents(entries: Record<string, string>): Promise<void> {
+    if (Object.keys(entries).length === 0) return;
+    const contentsMap = await bookmarkContentsItem.getValue();
+    await bookmarkContentsItem.setValue({ ...contentsMap, ...entries });
+  }
+
+  /**
    * 设置书签内容
    */
   async setBookmarkContent(bookmarkId: string, content: string): Promise<void> {
@@ -810,4 +896,39 @@ class BookmarkStorage {
   }
 }
 
-export const bookmarkStorage = new BookmarkStorage();
+// Only these operations may touch mutable bookmark state. Local watches and pure
+// URL helpers stay in the caller; writes from every extension context go to one queue.
+const queuedMethods = [
+  'createBookmark', 'updateBookmark', 'deleteBookmark', 'restoreBookmark',
+  'purgeBookmarks', 'createCategory', 'updateCategory', 'deleteCategory',
+  'createBookmarks', 'batchDeleteBookmarks', 'batchRestoreBookmarks',
+  'batchAddTags', 'batchRemoveTags', 'batchChangeCategory', 'batchOperate',
+  'mergeCategories', 'importRawCategory', 'importRawBookmark', 'importRawBookmarks',
+  'setBookmarkContents', 'setBookmarkContent', 'deleteBookmarkContent',
+  'clearBookmarkData', 'getExportSnapshot',
+] as const satisfies readonly (keyof BookmarkStorage)[];
+type BookmarkCommands = Pick<BookmarkStorage, typeof queuedMethods[number]>;
+const BOOKMARK_SERVICE_KEY = 'BookmarkCommands' as ProxyServiceKey<BookmarkCommands>;
+const localStorage = new BookmarkStorage();
+let backgroundCommands: BookmarkCommands | undefined;
+let remoteCommands: BookmarkCommands | undefined;
+
+/** Called synchronously before registering background event handlers. */
+export function registerBookmarkStorageService(): void {
+  backgroundCommands = serializeService(localStorage, queuedMethods);
+  registerService(BOOKMARK_SERVICE_KEY, backgroundCommands);
+}
+
+export const bookmarkStorage = new Proxy(localStorage, {
+  get(target, property, receiver) {
+    if (queuedMethods.includes(property as typeof queuedMethods[number])) {
+      return (...args: unknown[]) => {
+        const commands = backgroundCommands ?? (remoteCommands ??= createProxyService<BookmarkCommands>(BOOKMARK_SERVICE_KEY));
+        const method = Reflect.get(commands, property) as (...values: unknown[]) => unknown;
+        return method(...args);
+      };
+    }
+    const value = Reflect.get(target, property, receiver);
+    return typeof value === 'function' ? value.bind(target) : value;
+  },
+});

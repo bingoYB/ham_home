@@ -26,6 +26,26 @@ test.describe("IMPORT 导入导出", () => {
     await resetExtensionData(extensionWorker, { settings: e2eVariant.settings });
   });
 
+  test('IMPORT-CONCURRENT 两个页面同时导入保留全部书签和正文', async ({ context, extensionId, extensionWorker }) => {
+    const first = await openAppPage(context, extensionId, 'import-export');
+    const second = await openAppPage(context, extensionId, 'import-export');
+    await Promise.all([first, second].map((page, device) => setHiddenFileInput(page, 'input[type="file"]', {
+      name: `batch-${device}.json`, mimeType: 'application/json',
+      buffer: Buffer.from(JSON.stringify({
+        version: '1.0.0', categories: [],
+        bookmarks: Array.from({ length: 20 }, (_, index) => ({
+          url: `https://concurrent-${device}.test/${index}`, title: `${device}-${index}`,
+          content: `body-${device}-${index}`, tags: [],
+        })),
+      })),
+    })));
+    await expect.poll(async () => (await getBookmarks(extensionWorker)).length).toBe(40);
+    await expect.poll(async () => {
+      const state = await getStorageState(extensionWorker);
+      return Object.keys((state.local.bookmarkContents ?? {}) as object).length;
+    }).toBe(40);
+  });
+
   test("IMPORT-001 JSON 导入", async ({
     context,
     extensionId,
@@ -43,6 +63,7 @@ test.describe("IMPORT 导入导出", () => {
           url: "https://import.example.com",
           title: "Imported Bookmark",
           description: "from json",
+          content: "# Imported article\n\n完整正文",
           categoryId: "imp-cat",
           tags: ["imported"],
           favicon: "",
@@ -101,6 +122,7 @@ test.describe("IMPORT 导入导出", () => {
       ]),
     );
     const bookmarks = await getBookmarks(extensionWorker);
+    expect((state.local.bookmarkContents as Record<string, string>)[bookmarks[0].id]).toBe("# Imported article\n\n完整正文");
     expect(bookmarks).toEqual(
       expect.arrayContaining([
         expect.objectContaining({ title: "Imported Bookmark" }),
@@ -118,6 +140,9 @@ test.describe("IMPORT 导入导出", () => {
     const { bookmarks, categories } = createLibraryFixtures();
     await seedCategories(extensionWorker, categories);
     await seedBookmarks(extensionWorker, bookmarks.slice(0, 2));
+    await extensionWorker.evaluate(async (id) => {
+      await chrome.storage.local.set({ bookmarkContents: { [id]: "# Exported article\n\n完整正文" } });
+    }, bookmarks[0].id);
     await seedWorkspaces(extensionWorker, [createWorkspaceFixture()]);
     await seedTabGroupRules(extensionWorker, [createTabGroupRuleFixture()]);
 
@@ -131,6 +156,7 @@ test.describe("IMPORT 导入导出", () => {
     const jsonText = await readDownloadText(jsonDownload);
     const json = JSON.parse(jsonText);
     expect(json.bookmarks).toHaveLength(2);
+    expect(json.bookmarks.find((bookmark: { id: string }) => bookmark.id === bookmarks[0].id).content).toBe("# Exported article\n\n完整正文");
     expect(json.categories).toHaveLength(2);
     expect(json.workspaces).toHaveLength(1);
     expect(json.tabGroupRules).toHaveLength(1);

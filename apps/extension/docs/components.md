@@ -1,5 +1,27 @@
 # Extension 组件文档
 
+## AIStatus
+
+保存面板的 AI 分析状态提示。错误提示最大宽度为 280px，并随容器收缩；长错误单行省略，图标和重试按钮保持可见。悬停或键盘聚焦错误文字可查看完整信息，浮层保留换行、长词自动换行，超长内容可滚动。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| status | `AIStatusType` | ✓ | - | `idle`、`loading`、`success`、`error` 或 `disabled` |
+| error | `string \| null` | - | - | 完整错误信息 |
+| onRetry | `() => void` | - | - | 重试 AI 分析 |
+| onConfigure | `() => void` | - | - | 打开 AI 设置 |
+| className | `string` | - | - | 自定义样式 |
+| portalContainer | `HTMLElement` | - | - | Tooltip portal 容器，页内 Shadow DOM 浮窗必传 |
+
+```tsx
+<AIStatus
+  status="error"
+  error={aiError}
+  onRetry={retryAnalysis}
+  portalContainer={portalContainer}
+/>
+```
+
 ## SavePanel
 
 保存当前页面为 HamHome 书签的弹出面板，负责书签表单、AI 推荐入口和页面快照/Obsidian 保存开关。
@@ -4207,13 +4229,14 @@ const unwatch = bookmarkStorage.watchBookmarks((newBookmarks) => {
 
 ### config-storage
 
-AI 配置和用户设置存储，基于 **WXT Storage (sync)** 实现，支持跨设备同步。
+当前 AI 配置和用户设置基于 **WXT Storage (sync)** 实现；切换时保留的各服务商连接信息使用本机存储。
 
 #### 存储项
 
 | Key                  | Type             | Description                |
 | -------------------- | ---------------- | -------------------------- |
 | `sync:aiConfig`      | `AIConfig`       | AI 配置（跨设备同步）      |
+| `local:aiProviderConnections` | 服务商连接信息映射 | 非当前服务商的 API Key、Base URL、模型及请求版本（仅本机） |
 | `sync:settings`      | `LocalSettings`  | 用户设置（跨设备同步）     |
 | `sync:customFilters` | `CustomFilter[]` | 自定义筛选器（跨设备同步） |
 
@@ -4252,7 +4275,8 @@ AI 配置和用户设置存储，基于 **WXT Storage (sync)** 实现，支持�
 - 大多数提供商兼容 OpenAI API，使用统一的 OpenAI SDK 调用
 - `azure` 和 `custom` 需要用户手动配置 Base URL
 - `ollama` 不需要 API Key，使用本地服务
-- 切换提供商时自动选择第一个模型作为默认值
+- 首次切换到某个提供商时使用该提供商的默认地址和模型，API Key 为空；再次切换时恢复该服务商上次的连接信息
+- 切换前自动保留当前输入，当前配置仍保存在浏览器同步存储中，其他服务商的连接信息仅保存在本机
 - 模型选择器支持从预设列表选择，也支持输入自定义模型名称
 - 设置页支持通过当前 provider 的官方 `/models` 接口拉取可用模型列表，并与预设推荐一起展示
 
@@ -4409,7 +4433,7 @@ const result = await globalAgentService.runTurn({
 
 #### bookmarkAnalysisService.analyzeBookmark
 
-一次性分析书签内容，生成标题、摘要、分类、标签。
+分析书签内容，生成标题、摘要、分类、标签。
 
 **参数（EnhancedAnalyzeInput）：**
 
@@ -4418,11 +4442,14 @@ const result = await globalAgentService.runTurn({
 | pageContent    | `PageContent`     | ✓        | 页面内容对象                               |
 | userCategories | `LocalCategory[]` | -        | 用户已有分类（用于优先复用分类）           |
 | existingTags   | `string[]`        | -        | 用户已有标签（避免生成语义相近的重复标签） |
+| signal         | `AbortSignal`     | -        | 中断模型请求及后续字段分析                 |
 
 **行为说明：**
 
 - 使用统一 agent 配置工厂初始化模型
 - 输出固定结构：`title`、`summary`、`category`、`tags`
+- 开启小模型兼容模式时逐字段请求；字段格式无效会单独重试一次，全部校验通过后才返回结果
+- 批量 AI 整理在小模型模式下逐条分析，避免同时向本地模型发送多组请求
 - AI 失败时直接抛出错误，由调用方决定 UI 提示
 
 **用法示例：**
@@ -5998,7 +6025,7 @@ Locale-aware time labels for the tab center, built on `Intl`.
 
 ### 导出功能
 
-- **JSON 格式**：导出完整数据（书签、分类、工作空间、工作空间分类、Tab 分组规则、Tab 自动分组设置），适合插件间迁移
+- **JSON 格式**：从持久化存储读取书签（包含 Markdown 正文）、分类、工作空间、工作空间分类、Tab 分组规则、Tab 自动分组设置和剪藏。书签与分类通过后台写入队列读取一致快照，不使用页面列表缓存；包含稍后读队列与标签页生命周期设置；标签页归档仅在用户勾选后导出。不包含本地截图、快照二进制及回收站条目。
 - **HTML 格式**：导出标准浏览器书签格式，可导入到其他浏览器
 
 ### 导入功能
@@ -6028,6 +6055,7 @@ Locale-aware time labels for the tab center, built on `Intl`.
 **行为说明：**
 
 - JSON 导入时，分类 ID 会被重新生成，通过映射表维护书签与分类的关联关系
+- JSON 导入保留 `content` 正文，兼容不含该字段的旧备份；已有 URL 仍按原规则跳过。
 - JSON 导入时，工作空间、工作空间分类和 Tab 分组配置会随备份一起恢复
 - 同名同父级的分类不会重复创建，直接复用已有分类
 - HTML 导入时会基于书签域名通过 Cravatar favicon API 补全站点图标
@@ -6038,6 +6066,22 @@ Locale-aware time labels for the tab center, built on `Intl`.
 - JSON exports include queue-only read later items, every bookmark's read later state and the lifecycle settings; HTML exports only contain library bookmarks.
 - The tab archive is left out by default. An "Include tab archive" checkbox adds it, with a warning that it may contain sign-in links or one-time tokens.
 - JSON imports restore read later state, lifecycle settings and, when present, archive entries (`importLifecycleData`). Imported settings never turn on auto archive or making room on this device without consent.
+
+```tsx
+<ImportExportPage />
+```
+
+## BookmarkProvider
+
+提供书签列表与配置状态。书签/分类写入及清理通过后台串行服务执行；导出通过 `exportService` 读取持久化数据，包含正文。列表查询仍默认不加载正文。
+
+| Prop | Type | Required | Description |
+| ---- | ---- | -------- | ----------- |
+| children | ReactNode | 是 | 需要访问书签上下文的子树 |
+
+```tsx
+<BookmarkProvider><ImportExportPage /></BookmarkProvider>
+```
 
 ---
 
@@ -6132,17 +6176,59 @@ AI 配置标签页，负责大模型服务商配置、模型选择、高级参�
 | --- | --- | --- | --- | --- |
 | aiConfig | `AIConfig` | ✓ | - | AI 基础配置 |
 | embeddingConfig | `EmbeddingConfig` | ✓ | - | 语义搜索配置 |
+| isSwitchingProvider | `boolean` | ✓ | - | 是否正在保存并切换服务商 |
+| onProviderChange | `(provider: AIProvider) => void` | ✓ | - | 保存当前输入并切换服务商 |
+| onSaveModel | `(provider: AIProvider, model: string) => void` | ✓ | - | 保存当前服务商的模型，并忽略切换后的延迟失焦事件 |
 | ... | ... | ... | ... | 详见源代码 props 定义 |
 
 **行为说明：**
 
 - 支持多种 AI 提供商（OpenAI, Anthropic, Google 等）及其自定义镜像。
+- 各服务商独立保留 API Key、Base URL、模型及请求版本；切换过程中暂时禁用表单，避免不同服务商的输入互相覆盖。
 - 提供模型拉取（Fetch Models）功能，自动发现可用模型。
 - 包含语义搜索开关及向量索引统计信息展示。
 - 支持增量/全量索引重建及向量数据清理。
 - Incremental rebuild re-embeds bookmarks whose text changed or whose vector came from another embedding model or dimensions, so switching models does not need a full rebuild.
 - The embedding card shows `EmbeddingDimensionsField` only for models that accept a custom vector size; switching to a fixed-size model clears the stored size.
 - 高级设置中提供 temperature、请求版本（仅 OpenAI）以及「图片剪藏 AI 分析」开关（默认开启）：关闭后保存图片剪藏不会把图片发送给模型；隐私页面无论开关状态都不会发送。
+- 高级设置可开启「小模型兼容模式」（默认关闭）：整页书签的标题、摘要、分类和标签逐项生成，图片及划词剪藏保持原有流程；多次请求可能需要更长时间。
+
+```tsx
+<AITab {...aiTabProps} />
+```
+
+---
+
+### ProviderSelect
+
+AI 服务商选择器，切换时显示各服务商连接信息的保存范围。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| value | `AIProvider` | ✓ | - | 当前服务商 |
+| onChange | `(provider: AIProvider) => void` | ✓ | - | 选择服务商时调用 |
+| disabled | `boolean` | - | `false` | 禁用服务商选择 |
+
+```tsx
+<ProviderSelect value={aiConfig.provider} onChange={onProviderChange} disabled={isSwitchingProvider} />
+```
+
+---
+
+### AdvancedSettings
+
+AI 高级参数设置，包括 temperature、请求版本和分析模式开关。小模型兼容模式仅用于整页书签分析。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| aiConfig | `AIConfig` | ✓ | - | 当前 AI 配置 |
+| isOpen | `boolean` | ✓ | - | 高级设置是否展开 |
+| onOpenChange | `(open: boolean) => void` | ✓ | - | 展开状态变化回调 |
+| onUpdate | `(updates: Partial<AIConfig>) => void` | ✓ | - | 保存配置变更 |
+
+```tsx
+<AdvancedSettings aiConfig={aiConfig} isOpen={isOpen} onOpenChange={setIsOpen} onUpdate={updateAIConfig} />
+```
 
 ---
 
@@ -6363,6 +6449,8 @@ WebDAV 自动同步策略表单，复用三个 `SyncStrategyRow`，按当前配�
 ## CategoryTreePanel
 
 收藏页（「我的收藏」）左侧的传统分类树。顶部固定「全部书签」和「未分类」两项，其下为可展开的嵌套分类，每个节点右侧显示书签数量（父分类的数量包含全部子分类）。组件只负责展示，选中与展开状态由父组件通过 `useCategoryNavigation` 管理。
+
+树内容右侧保留 20px 内边距，为滚动条留出空间，避免节点数量和选中背景紧贴滚动条。
 
 | Prop | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |

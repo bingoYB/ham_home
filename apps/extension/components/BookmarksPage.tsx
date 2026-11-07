@@ -15,7 +15,6 @@ import {
   FolderX,
   Filter,
   FolderOpen,
-  Sparkles,
   Loader2,
   Download,
   Cloud,
@@ -66,6 +65,7 @@ import { useScrollToTopOnChange } from "@/hooks/useScrollToTopOnChange";
 import { useBookmarkSelection } from "@/hooks/useBookmarkSelection";
 import { useMasonryLayout } from "@/hooks/useMasonryLayout";
 import { useVirtualBookmarkList } from "@/hooks/useVirtualBookmarkList";
+import { BatchAIOrganizeButton } from "@/components/bookmarkListMng/BatchAIOrganizeButton";
 import { useBatchAITask } from "@/hooks/useBatchAITask";
 import { getCategoryPath, formatDate } from "@/utils/bookmark-utils";
 import { configStorage } from "@/lib/storage/config-storage";
@@ -888,19 +888,10 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
                     <Download className="h-4 w-4 mr-1" />
                     {t("bookmark:bookmark.snapshot.syncSelectedToObsidian")}
                   </Button>
-                  <Button
-                    variant="secondary"
-                    size="sm"
-                    onClick={() => startBatchAITask(Array.from(selectedIds))}
-                    disabled={isBatchAIProcessing}
-                  >
-                    {isBatchAIProcessing ? (
-                      <Loader2 className="h-4 w-4 mr-1 animate-spin" />
-                    ) : (
-                      <Sparkles className="h-4 w-4 mr-1" />
-                    )}
-                    {t("ai:batchOrganize")}
-                  </Button>
+                  <BatchAIOrganizeButton
+                    isProcessing={isBatchAIProcessing}
+                    onOrganize={(mode) => startBatchAITask(Array.from(selectedIds), mode)}
+                  />
                   <Button
                     variant="destructive"
                     size="sm"

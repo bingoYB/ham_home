@@ -5,7 +5,7 @@
 import { browser, type Browser } from "wxt/browser";
 import { registerBackgroundService } from "@/lib/services/background-service-server";
 import { configStorage } from "@/lib/storage";
-import { bookmarkStorage } from "@/lib/storage/bookmark-storage";
+import { bookmarkStorage, registerBookmarkStorageService } from "@/lib/storage/bookmark-storage";
 import { SyncScheduler } from "@/lib/sync/sync-scheduler";
 import { workspaceStorage } from "@/lib/storage/workspace-storage";
 import { workspaceRestoreSuppressionStorage } from "@/lib/storage/workspace-restore-suppression-storage";
@@ -476,6 +476,7 @@ export default defineBackground(() => {
   console.log("[HamHome Background] Service Worker 启动");
 
   // 注册 proxy service（必须在最顶部同步执行）
+  registerBookmarkStorageService();
   registerBackgroundService();
 
   // Tab lifecycle: activity, auto archive, tab budget, read later expiry (listeners must register synchronously)

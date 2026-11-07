@@ -83,6 +83,23 @@ const syncStatusItem = storage.defineItem<SyncStatus>('local:syncStatus', {
   fallback: DEFAULT_SYNC_STATUS,
 });
 
+/**
+ * Progress of the one-time content repair.
+ *
+ * Earlier versions could never decode remote content chunks, so bookmarks pulled from other
+ * devices have no content. After upgrading, that content is downloaded again in batches (one
+ * batch per sync). `attempted` lists bookmarks already tried, so bookmarks that simply have
+ * no content (e.g. image clips) are not requested again; `done` is set once all are handled.
+ */
+export interface SyncContentRepairState {
+  done: boolean;
+  attempted: string[];
+}
+
+const contentRepairItem = storage.defineItem<SyncContentRepairState>('local:syncContentRepair', {
+  fallback: { done: false, attempted: [] },
+});
+
 class SyncConfigStorage {
   private configWrites: Promise<unknown> = Promise.resolve();
 
@@ -136,6 +153,14 @@ class SyncConfigStorage {
     const updated = { ...current, ...status };
     await syncStatusItem.setValue(updated);
     return updated;
+  }
+
+  async getContentRepairState(): Promise<SyncContentRepairState> {
+    return contentRepairItem.getValue();
+  }
+
+  async setContentRepairState(state: SyncContentRepairState): Promise<void> {
+    await contentRepairItem.setValue(state);
   }
 
   watchConfig(callback: (config: WebDAVConfig) => void): () => void {

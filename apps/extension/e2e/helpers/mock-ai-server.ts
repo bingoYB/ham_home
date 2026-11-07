@@ -8,6 +8,8 @@ export interface MockChatReply {
   chunks: string[];
   /** Delay before each streamed chunk, so tests can watch text arrive. */
   chunkDelayMs?: number;
+  /** Delay a non-streaming response, allowing cancellation to be observed. */
+  responseDelayMs?: number;
 }
 
 export interface MockChatRequest {
@@ -58,6 +60,11 @@ export async function startMockAiServer(): Promise<MockAiServer> {
     for await (const chunk of req) {
       raw += chunk;
     }
+    if (req.method === "GET" && req.url?.startsWith("/fixture/")) {
+      res.writeHead(200, { "content-type": "text/html" });
+      res.end("<html><body>A page about bookmark management.</body></html>");
+      return;
+    }
     if (req.method !== "POST" || !req.url?.endsWith("/chat/completions")) {
       res.writeHead(404).end();
       return;
@@ -73,6 +80,13 @@ export async function startMockAiServer(): Promise<MockAiServer> {
     if (request.body.stream) {
       await streamReply(res, reply, request);
     } else {
+      if (reply.responseDelayMs) {
+        await new Promise<void>((resolve) => {
+          const timer = setTimeout(resolve, reply.responseDelayMs);
+          res.once("close", () => { clearTimeout(timer); resolve(); });
+        });
+        if (res.destroyed) return;
+      }
       res.writeHead(200, { "content-type": "application/json" });
       request.completed = true;
       res.end(JSON.stringify(completion(reply.chunks.join(""))));
