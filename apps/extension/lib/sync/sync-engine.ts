@@ -138,9 +138,8 @@ export class SyncEngine {
   /**
    * Try acquire lock
    *
-   * WebDAV has no atomic compare-and-swap that every server supports, so two clients can
-   * both see an unlocked sys.json and write their lock. Each writer stores a random token
-   * and reads the file back: only the client whose token survived proceeds.
+   * Legacy marker for older clients. This is only read/written while holding the
+   * server-side exclusive collection LOCK; the marker is not a mutex.
    */
   private async acquireLock(token: string): Promise<boolean> {
     const sys = await this.readSys();
@@ -202,6 +201,7 @@ export class SyncEngine {
       }
     } catch (err) {
       console.error('Failed to release lock', err);
+      throw err;
     }
   }
 
@@ -214,16 +214,11 @@ export class SyncEngine {
       return;
     }
 
-    const config = await syncConfigStorage.getConfig();
-    if (!config.enabled || !config.url) {
-      console.log('WebDAV sync is disabled or not configured');
-      return;
-    }
-
     this.isSyncing = true;
-    await syncConfigStorage.setStatus({ status: 'syncing', errorCode: undefined, errorMessage: '' });
-
     try {
+      const config = await syncConfigStorage.getConfig();
+      if (!config.enabled || !config.url) return;
+      await syncConfigStorage.setStatus({ status: 'syncing', errorCode: undefined, errorMessage: '' });
       // Always re-init: the adapter reuses the client unless the credentials changed,
       // otherwise an updated password would never reach the server.
       webdavClientAdapter.init(config);
@@ -232,31 +227,35 @@ export class SyncEngine {
       await webdavClientAdapter.checkAuth(SYS_JSON);
 
       // Recursive, so it also creates SYNC_ROOT and SYNC_ROOT/bookmarks
-      await webdavClientAdapter.ensureDirectory(CHUNKS_DIR);
+      await webdavClientAdapter.ensureDirectory(SYNC_ROOT);
 
-      const lockToken = nanoid();
-      const locked = await this.acquireLock(lockToken);
-      if (!locked) {
-        await syncConfigStorage.setStatus({ status: 'idle' });
-        return;
-      }
+      await webdavClientAdapter.withExclusiveLock(SYNC_ROOT, async () => {
+        await webdavClientAdapter.ensureDirectory(CHUNKS_DIR);
 
-      try {
-        console.log('WebDAV Lock acquired, starting sync...');
-        // Deletions first: if the run stops halfway, other devices still learn about them
-        // before any module file that no longer contains the deleted items.
-        const run = await this.syncDeletions();
-        await this.syncSettings();
-        await this.syncCategories(run);
-        await this.syncWorkspaces(run);
-        await this.syncTabGroupConfig(run);
-        const deletedBookmarkIds = await this.syncBookmarks();
-        await this.syncBookmarkClips(deletedBookmarkIds);
-        await this.finishDeletions(run);
-        console.log('WebDAV Sync complete.');
-      } finally {
-        await this.releaseLock(lockToken);
-      }
+        const lockToken = nanoid();
+        const locked = await this.acquireLock(lockToken);
+        if (!locked) {
+          await syncConfigStorage.setStatus({ status: 'idle' });
+          return;
+        }
+
+        try {
+          console.log('WebDAV Lock acquired, starting sync...');
+          // Deletions first: if the run stops halfway, other devices still learn about them
+          // before any module file that no longer contains the deleted items.
+          const run = await this.syncDeletions();
+          await this.syncSettings();
+          await this.syncCategories(run);
+          await this.syncWorkspaces(run);
+          await this.syncTabGroupConfig(run);
+          const deletedBookmarkIds = await this.syncBookmarks();
+          await this.syncBookmarkClips(deletedBookmarkIds);
+          await this.finishDeletions(run);
+          console.log('WebDAV Sync complete.');
+        } finally {
+          await this.releaseLock(lockToken);
+        }
+      });
 
     } catch (err: any) {
       const error = toSyncError(err);
@@ -798,7 +797,11 @@ export class SyncEngine {
       if (!existing && entry.meta.isDeleted) continue;
       toImport.push(this.toLocalBookmark(entry.meta, existing));
     }
-    await bookmarkStorage.importRawBookmarks(toImport, contentUpdates);
+    await bookmarkStorage.importRawBookmarks(
+      toImport,
+      contentUpdates,
+      Object.fromEntries([...new Set([...localMap.keys(), ...entries.keys()])].map(id => [id, localMap.get(id) ?? null])),
+    );
     await this.updateContentRepairState(repairState, repairBatch, repairRemaining, downloads);
 
     // ---- Push phase ----
@@ -830,9 +833,11 @@ export class SyncEngine {
     if (chunksToUpload.length > 0) {
       console.log(`Uploading ${chunksToUpload.length} chunks...`);
       const limit = pLimit(TRANSFER_CONCURRENCY);
-      await Promise.all(chunksToUpload.map(item => limit(async () => {
+      const uploads = await Promise.allSettled(chunksToUpload.map(item => limit(async () => {
         await webdavClientAdapter.putJSON(`${CHUNKS_DIR}/${item.id}.gz.txt`, encodeContentChunk(item.content));
       })));
+      const failed = uploads.find((result): result is PromiseRejectedResult => result.status === 'rejected');
+      if (failed) throw failed.reason;
     }
 
     // Write meta.json last safely
@@ -1266,16 +1271,14 @@ export class SyncEngine {
       throw new Error('Sync is currently in progress, cannot clear remote data');
     }
 
-    const config = await syncConfigStorage.getConfig();
-    if (!config.enabled || !config.url) {
-      throw new Error('WebDAV is not configured');
-    }
-
+    this.isSyncing = true;
     try {
-      this.isSyncing = true;
+      const config = await syncConfigStorage.getConfig();
+      if (!config.enabled || !config.url) throw new Error('WebDAV is not configured');
       webdavClientAdapter.init(config);
       await webdavClientAdapter.checkAuth(SYS_JSON);
-      await webdavClientAdapter.deleteFile(SYNC_ROOT);
+      await webdavClientAdapter.ensureDirectory(SYNC_ROOT);
+      await webdavClientAdapter.withExclusiveLock(SYNC_ROOT, () => webdavClientAdapter.deleteFile(SYNC_ROOT));
 
       // Reset local sync status
       await syncConfigStorage.setStatus({

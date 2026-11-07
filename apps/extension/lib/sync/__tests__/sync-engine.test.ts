@@ -28,6 +28,7 @@ vi.mock("../webdav-client", async () => {
   return {
     ...actual,
     webdavClientAdapter: {
+      withExclusiveLock: vi.fn(async (_path: string, operation: () => Promise<unknown>) => operation()),
       getJSON: mocks.getJSON,
       putJSON: mocks.putJSON,
       isInitialized: true,

@@ -588,6 +588,8 @@
           "server": "The server returned an error (5xx): try again later or check the server logs.",
           "invalidUrl": "Invalid server URL: the address must start with http:// or https://.",
           "notInitialized": "Sync is not initialized: please re-enter the server URL and credentials.",
+          "conflict": "Another device is syncing or this sync lock expired. Writes stopped; please retry later.",
+          "lockingUnsupported": "This WebDAV server does not support exclusive LOCK. Sync stopped to protect remote data. Use a server with WebDAV locking support.",
           "invalidRemoteData": "Unreadable remote data: sync stopped to avoid overwriting it. A remote file may be corrupted or written by a newer HamHome version; update the extension and retry, or clear the remote data and sync again.",
           "unknown": "Sync failed: see the error details below."
         }

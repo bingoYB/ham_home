@@ -5,6 +5,9 @@ const mocks = vi.hoisted(() => ({
   getFileContents: vi.fn(),
   createDirectory: vi.fn(),
   deleteFile: vi.fn(),
+  putFileContents: vi.fn(),
+  lock: vi.fn(),
+  unlock: vi.fn(),
 }));
 
 vi.mock("webdav", () => ({
@@ -26,9 +29,87 @@ beforeEach(() => {
     getFileContents: mocks.getFileContents,
     createDirectory: mocks.createDirectory,
     deleteFile: mocks.deleteFile,
-    putFileContents: vi.fn(),
+    putFileContents: mocks.putFileContents,
+    lock: mocks.lock,
+    unlock: mocks.unlock,
     getDirectoryContents: vi.fn(),
   }));
+});
+
+describe('server-enforced sync lock', () => {
+  const config = { enabled: true, url: 'https://dav.test/dav', username: 'u', password: 'p' };
+  const root = '/HamHomeSync';
+
+  it('rejects a second device and fences an expired writer after another device takes over', async () => {
+    let owner: string | null = null;
+    let sequence = 0;
+    const remote = new Map<string, string>();
+    mocks.lock.mockImplementation(async () => {
+      if (owner) throw httpError(423);
+      owner = `urn:uuid:${++sequence}`;
+      return { token: owner, serverTimeout: 'Second-600' };
+    });
+    mocks.unlock.mockImplementation(async (_path, token) => {
+      if (`<${owner}>` !== token) throw httpError(409);
+      owner = null;
+    });
+    mocks.putFileContents.mockImplementation(async (path, value, options) => {
+      if (!owner || options.headers.If !== `<https://dav.test/dav/HamHomeSync> (<${owner}>)`) throw httpError(412);
+      remote.set(path, value);
+      return true;
+    });
+    mocks.createDirectory.mockResolvedValue(undefined);
+    const a = new WebDAVAdapter();
+    const b = new WebDAVAdapter();
+    a.init(config);
+    b.init(config);
+    await a.withExclusiveLock(root, async () => {
+      const secondRun = vi.fn();
+      await expect(b.withExclusiveLock(root, secondRun)).rejects.toMatchObject({ code: 'conflict' });
+      expect(secondRun).not.toHaveBeenCalled();
+      // The first worker was suspended long enough for its server lease to expire.
+      owner = null;
+      await b.withExclusiveLock(root, async () => {
+        await b.putJSON(`${root}/meta.json`, { title: 'new' });
+        await expect(a.putJSON(`${root}/meta.json`, { title: 'stale' })).rejects.toMatchObject({ code: 'conflict' });
+        expect(owner).toBe('urn:uuid:2');
+      });
+      expect(JSON.parse(remote.get(`${root}/meta.json`)!)).toEqual({ title: 'new' });
+    });
+    expect(mocks.lock).toHaveBeenCalledWith(root, { timeout: 'Second-600', headers: { Depth: 'infinity' } });
+  });
+
+  it('fails closed for unsupported LOCK and remains reusable', async () => {
+    const adapter = new WebDAVAdapter();
+    adapter.init(config);
+    mocks.lock.mockRejectedValueOnce(httpError(405));
+    const operation = vi.fn();
+    await expect(adapter.withExclusiveLock(root, operation)).rejects.toMatchObject({ code: 'lockingUnsupported' });
+    expect(operation).not.toHaveBeenCalled();
+    mocks.lock.mockResolvedValue({ token: 'urn:uuid:ok', serverTimeout: 'Second-600' });
+    mocks.unlock.mockResolvedValue(undefined);
+    await adapter.withExclusiveLock(root, operation);
+    expect(operation).toHaveBeenCalledOnce();
+  });
+
+  it('includes the token on directory creation and deletion, and releases on failure', async () => {
+    const adapter = new WebDAVAdapter();
+    adapter.init(config);
+    mocks.lock.mockResolvedValue({ token: 'urn:uuid:ok', serverTimeout: 'Second-600' });
+    mocks.unlock.mockResolvedValue(undefined);
+    mocks.createDirectory.mockResolvedValue(undefined);
+    mocks.deleteFile.mockResolvedValue(undefined);
+    await expect(adapter.withExclusiveLock(root, async () => {
+      expect(() => adapter.init({ ...config, password: 'changed' })).toThrow(SyncError);
+      await adapter.ensureDirectory(`${root}/bookmarks`);
+      await adapter.deleteFile(`${root}/old.json`);
+      throw new Error('operation failed');
+    })).rejects.toThrow('operation failed');
+    const headers = { If: '<https://dav.test/dav/HamHomeSync> (<urn:uuid:ok>)' };
+    expect(mocks.createDirectory).toHaveBeenCalledWith(`${root}/bookmarks`, { recursive: true, headers });
+    expect(mocks.deleteFile).toHaveBeenCalledWith(`${root}/old.json`, { headers });
+    expect(mocks.unlock).toHaveBeenCalledWith(root, '<urn:uuid:ok>');
+  });
 });
 
 describe("WebDAVAdapter.init", () => {

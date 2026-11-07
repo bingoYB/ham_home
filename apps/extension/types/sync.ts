@@ -26,6 +26,8 @@ export type SyncErrorCode =
   | 'invalidUrl'
   | 'notInitialized'
   | 'invalidRemoteData'
+  | 'conflict'
+  | 'lockingUnsupported'
   | 'unknown';
 
 export interface SyncStatus {

@@ -13,10 +13,6 @@ import React, {
 } from "react";
 import { bookmarkStorage } from "@/lib/storage/bookmark-storage";
 import { workspaceStorage } from "@/lib/storage/workspace-storage";
-import { tabGroupRulesStorage } from "@/lib/storage/tab-group-rules-storage";
-import { bookmarkClipStorage } from "@/lib/storage/bookmark-clip-storage";
-import { bookmarkHealthStorage } from "@/lib/storage/bookmark-health-storage";
-import { bookmarkScreenshotStorage } from "@/lib/storage/bookmark-screenshot-storage";
 import {
   configStorage,
   DEFAULT_AI_CONFIG,
@@ -32,7 +28,7 @@ import type {
   SyncStatus,
 } from "@/types";
 import { syncConfigStorage } from "@/lib/sync/sync-config-storage";
-import { syncEngine } from "@/lib/sync/sync-engine";
+import { exportService } from "@/lib/services/export-service";
 
 // 存储信息类型
 export interface StorageInfo {
@@ -385,14 +381,7 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
 
   // 清除书签和分类数据（保留配置类数据）
   const clearBookmarkData = async () => {
-    await Promise.all([
-      storage.removeItem("local:bookmarks"),
-      storage.removeItem("local:bookmarkContents"),
-      storage.removeItem("sync:categories"),
-      bookmarkClipStorage.importRawClips([]),
-      bookmarkHealthStorage.clear(),
-      bookmarkScreenshotStorage.clear(),
-    ]);
+    await bookmarkStorage.clearBookmarkData();
     setBookmarks([]);
     setCategories([]);
     setAllTags([]);
@@ -412,31 +401,8 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
 
   // 导出数据
   const exportData = async (format: "json" | "html") => {
-    const [
-      workspaces,
-      workspaceCategories,
-      tabGroupRules,
-      tabGroupAutoGroupSettings,
-      clips,
-    ] = await Promise.all([
-      workspaceStorage.getWorkspaces(),
-      workspaceStorage.getCategories(),
-      tabGroupRulesStorage.getRules(),
-      tabGroupRulesStorage.getAutoGroupSettings(),
-      bookmarkClipStorage.getAllClips(),
-    ]);
-
-    const data = {
-      version: "1.0.0",
-      exportedAt: Date.now(),
-      bookmarks,
-      categories,
-      workspaces,
-      workspaceCategories,
-      tabGroupRules,
-      tabGroupAutoGroupSettings,
-      clips,
-    };
+    const data = await exportService.createExport();
+    const { bookmarks, categories } = data;
 
     if (format === "json") {
       const dataStr = JSON.stringify(data, null, 2);

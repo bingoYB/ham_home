@@ -5,7 +5,7 @@
 import { browser } from "wxt/browser";
 import { registerBackgroundService } from "@/lib/services/background-service-server";
 import { configStorage } from "@/lib/storage";
-import { bookmarkStorage } from "@/lib/storage/bookmark-storage";
+import { bookmarkStorage, registerBookmarkStorageService } from "@/lib/storage/bookmark-storage";
 import { SyncScheduler } from "@/lib/sync/sync-scheduler";
 import { workspaceStorage } from "@/lib/storage/workspace-storage";
 import { workspaceRestoreSuppressionStorage } from "@/lib/storage/workspace-restore-suppression-storage";
@@ -404,6 +404,7 @@ export default defineBackground(() => {
   console.log("[HamHome Background] Service Worker 启动");
 
   // 注册 proxy service（必须在最顶部同步执行）
+  registerBookmarkStorageService();
   registerBackgroundService();
 
   // 开发态：把 .env.local 里的 AI / Embedding / 同步配置写入存储（生产构建会被移除）

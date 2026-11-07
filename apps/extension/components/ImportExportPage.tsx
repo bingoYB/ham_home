@@ -1,3 +1,4 @@
+import { toImportedBookmark, type ImportedBookmark } from "@/utils/bookmark-import.utils";
 /**
  * ImportExportPage 导入导出页面
  */
@@ -435,29 +436,8 @@ export function ImportExportPage() {
     const importedBookmarkIds: string[] = [];
 
     if (data.bookmarks && Array.isArray(data.bookmarks)) {
-      const bookmarkInputs = data.bookmarks.map(
-        (bm: {
-          url: string;
-          title: string;
-          description?: string;
-          summary?: string;
-          categoryId?: string;
-          tags?: string[];
-          favicon?: string;
-        }) => {
-          const newCategoryId = bm.categoryId
-            ? (categoryIdMap.get(bm.categoryId) ?? null)
-            : null;
-          return {
-            url: bm.url,
-            title: bm.title,
-            description: bm.description || bm.summary || "",
-            categoryId: newCategoryId,
-            tags: bm.tags || [],
-            favicon: bm.favicon || "",
-            hasSnapshot: false,
-          };
-        },
+      const bookmarkInputs = data.bookmarks.map((bookmark: ImportedBookmark) =>
+        toImportedBookmark(bookmark, categoryIdMap),
       );
 
       const created = await bookmarkStorage.createBookmarks(bookmarkInputs);
