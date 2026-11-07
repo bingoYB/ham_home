@@ -5,6 +5,8 @@
 import { useState } from 'react';
 import { browser } from 'wxt/browser';
 import type { LocalBookmark, LocalCategory } from '@/types';
+import { resolveBookmarkTreeNodes, type BrowserBookmarkTreeNode as ChromeBookmarkNode } from '@/utils/browser-bookmark-tree';
+export type { BrowserBookmarkTreeNode as ChromeBookmarkNode } from '@/utils/browser-bookmark-tree';
 
 /** 可识别错误类型，供上层组件做 i18n 映射 */
 export type ChromeBookmarkErrorCode =
@@ -19,36 +21,6 @@ export class ChromeBookmarkError extends Error {
     super(message ?? code);
     this.name = 'ChromeBookmarkError';
   }
-}
-
-export interface ChromeBookmarkNode {
-  id: string;
-  title: string;
-  url?: string;
-  children?: ChromeBookmarkNode[];
-  dateAdded?: number;
-  parentId?: string;
-}
-
-const BOOKMARK_BAR_IDS = new Set(['1', 'toolbar_____']);
-
-function resolveBookmarkTreeNodes(tree: ChromeBookmarkNode[]): {
-  rootNode: ChromeBookmarkNode;
-  bookmarkBarNode: ChromeBookmarkNode;
-} {
-  const [rootNode] = tree;
-  if (!rootNode) {
-    throw new Error('bookmark tree root not found');
-  }
-
-  const bookmarkBarNode = rootNode.children?.find((node) =>
-    BOOKMARK_BAR_IDS.has(node.id)
-  );
-  if (!bookmarkBarNode) {
-    throw new Error('bookmark bar node not found');
-  }
-
-  return { rootNode, bookmarkBarNode };
 }
 
 export function useChromeBookmarks() {
