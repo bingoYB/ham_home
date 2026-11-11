@@ -51,10 +51,13 @@ agent.tools.register({
 
 const result = await agent.run("帮我总结当前页面", {
   tools: ["getCurrentPage"],
+  maxOutputTokens: 512,
 });
 
 console.log(result.text);
 ```
+
+`run()`、`runStream()` 和 `commands.run()` 的执行选项支持可选的 `maxOutputTokens`，限制本次执行中每次模型调用的生成 token 数；不设置时使用 Provider 默认值。该限制同时传递给普通生成、流式生成和普通生成转流式的兼容回退。
 
 ## 核心特性 (Core Features)
 

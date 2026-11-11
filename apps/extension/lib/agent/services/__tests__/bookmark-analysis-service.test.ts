@@ -80,6 +80,7 @@ describe("bookmark analysis compatibility mode", () => {
       expect(command.tools).toEqual([]);
       expect(command.prompt(input, {})).toContain("This page explains TypeScript.");
       expect(options.temperature).toBe(0.2);
+      expect(options.maxOutputTokens).toBe({ title: 128, summary: 256, category: 96, tags: 96 }[input.field as "title" | "summary" | "category" | "tags"]);
     }
     expect(result).toEqual({
       title: "TypeScript 入门",
@@ -107,6 +108,8 @@ describe("bookmark analysis compatibility mode", () => {
 
     expect(attempts).toEqual({ title: 1, summary: 1, category: 2, tags: 1 });
     expect(mocks.run.mock.calls[3][1]).toMatchObject({ field: "category", retry: true });
+    expect(mocks.run.mock.calls[3][1].retryReason).toBe("包含不支持的字符“。”");
+    expect(mocks.run.mock.calls[3][0].prompt(mocks.run.mock.calls[3][1], {})).toContain("包含不支持的字符“。”");
     expect(result.category).toBe("开发");
     expect(result.tags).toEqual(["TypeScript", "前端"]);
   });
@@ -122,7 +125,7 @@ describe("bookmark analysis compatibility mode", () => {
       url: pageContent.url,
       title: pageContent.title,
       currentCategories: [],
-    })).rejects.toThrow("分类生成失败");
+    })).rejects.toThrow("分类校验失败：包含不支持的字符“。”");
     expect(mocks.run.mock.calls.map((call) => call[1].field)).toEqual([
       "title", "summary", "category", "category",
     ]);
@@ -174,7 +177,8 @@ describe("bookmark analysis compatibility mode", () => {
     expect(command.outputSchema).toBeUndefined();
     expect(command.ignoreBaseSystemPrompt).toBe(true);
     expect(input.field).toBe(mode);
-    expect(command.prompt(input, {})).toContain(mode === "category" ? "只输出一个最合适的分类" : "只输出一至五个");
+    expect(command.prompt(input, {})).toContain(mode === "category" ? "只输出一个最合适的分类" : "提取一个关键词");
+    expect(options.maxOutputTokens).toBe(smallModelMode ? 96 : undefined);
     expect(options.systemPrompt).not.toContain("结构化");
     expect(result.summary).toBe("");
     expect(result.title).toBe("");
@@ -193,7 +197,7 @@ describe("bookmark analysis compatibility mode", () => {
     const { bookmarkAnalysisService } = await import("../bookmark-analysis-service");
     await expect(bookmarkAnalysisService.analyzeBookmarkForLibrary({
       url: pageContent.url, title: pageContent.title, currentCategories: [], mode,
-    })).rejects.toThrow("生成失败");
+    })).rejects.toThrow("校验失败：模型未返回内容");
     expect(mocks.run.mock.calls.map((call) => call[1].field)).toEqual([mode, mode]);
     expect(mocks.createCategory).not.toHaveBeenCalled();
   });
@@ -205,6 +209,47 @@ describe("bookmark analysis compatibility mode", () => {
 
     await expect(bookmarkAnalysisService.analyzeBookmark({ pageContent })).rejects.toThrow("connection refused");
     expect(mocks.run).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports the actual Ollama category rejection and its response", async () => {
+    mocks.config.rawConfig.smallModelMode = true;
+    mocks.run.mockImplementation(async (_command, input) => ({
+      output: input.field === "category" ? "开发：前端" : "有效内容",
+    }));
+    const { bookmarkAnalysisService } = await import("../bookmark-analysis-service");
+    await expect(bookmarkAnalysisService.analyzeBookmark({ pageContent })).rejects.toThrow(
+      '分类校验失败：包含不支持的字符“：”。模型返回："开发：前端"',
+    );
+    expect(mocks.run.mock.calls.map(call => call[1].field)).toEqual(["title", "summary", "category", "category"]);
+  });
+
+  it("reports the final retry's rejection and bounds the response preview", async () => {
+    mocks.config.rawConfig.smallModelMode = true;
+    mocks.run.mockResolvedValueOnce({ output: "" }).mockResolvedValueOnce({ output: "长".repeat(1000) });
+    const { bookmarkAnalysisService } = await import("../bookmark-analysis-service");
+    const error = await bookmarkAnalysisService.analyzeBookmark({ pageContent }).catch(error => error as Error);
+    expect(error.message).toContain("标题校验失败：长度为 1000 字符，超过 240 字符上限");
+    expect(error.message).toContain(`${"长".repeat(200)}…`);
+    expect(error.message.length).toBeLessThan(300);
+  });
+
+  it("keeps provider details and HTTP status when a field request fails", async () => {
+    mocks.config.rawConfig.smallModelMode = true;
+    mocks.run.mockRejectedValue(Object.assign(new Error("Model qwen-test was not found"), { statusCode: 404 }));
+    const { bookmarkAnalysisService } = await import("../bookmark-analysis-service");
+    await expect(bookmarkAnalysisService.analyzeBookmark({ pageContent })).rejects.toThrow(
+      "标题请求失败：HTTP 404: Model qwen-test was not found",
+    );
+    expect(mocks.run).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports localized validation details in English", async () => {
+    mocks.config.language = "en";
+    mocks.run.mockResolvedValue({ output: "dev:frontend" });
+    const { bookmarkAnalysisService } = await import("../bookmark-analysis-service");
+    await expect(bookmarkAnalysisService.analyzeBookmark({ pageContent, mode: "category" })).rejects.toThrow(
+      'Invalid category: Contains the unsupported character “:”. Model response: "dev:frontend"',
+    );
   });
 
   it("stops issuing fields when an import is cancelled", async () => {

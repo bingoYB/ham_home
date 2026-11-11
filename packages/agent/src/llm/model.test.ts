@@ -44,6 +44,18 @@ describe("AiSdkModelClient", () => {
     expect(messages[0]).toEqual({ role: "user", content: "hello" });
   });
 
+  it("preserves the token budget when a provider falls back from generate to streaming", async () => {
+    const client = new AiSdkModelClient({ model: {} as any });
+    aiMocks.generateText.mockRejectedValue(Object.assign(new Error("stream response"), { statusCode: 200, responseBody: "data: {}" }));
+    aiMocks.streamText.mockReturnValue({
+      fullStream: streamParts([{ type: "text-delta", id: "t1", text: "React" }]),
+      text: Promise.resolve("React"), toolCalls: Promise.resolve([]), usage: Promise.resolve({}),
+    });
+    await client.generate({ ...createRequest([]), maxOutputTokens: 96 });
+    expect(aiMocks.generateText).toHaveBeenCalledWith(expect.objectContaining({ maxOutputTokens: 96 }));
+    expect(aiMocks.streamText).toHaveBeenCalledWith(expect.objectContaining({ maxOutputTokens: 96 }));
+  });
+
   it("converts user attachments to multimodal content parts", async () => {
     const client = new AiSdkModelClient({ model: {} as any });
     const messages: AgentMessage[] = [

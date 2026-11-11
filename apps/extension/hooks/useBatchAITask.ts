@@ -1,27 +1,31 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { aiTaskStorage } from '@/lib/storage/ai-task-storage';
 import { bookmarkStorage } from '@/lib/storage/bookmark-storage';
 import { configStorage } from '@/lib/storage/config-storage';
 import { bookmarkAnalysisService } from '@/lib/agent';
+import { getAgentErrorMessage } from '@/lib/agent/errors';
 import type { BatchAITask, BatchAITaskProgress } from '@/lib/storage/ai-task-storage';
 import type { BookmarkOrganizeMode } from '@/lib/agent/services/bookmark-analysis-service';
 import type { LocalBookmark } from '@/types';
 import { useBookmarks } from '@/contexts/BookmarkContext';
 
 export function useBatchAITask() {
+  const { t } = useTranslation();
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState<BatchAITaskProgress | null>(null);
-  const [lastResult, setLastResult] = useState<{ success: number; failed: number } | null>(null);
+  const [lastResult, setLastResult] = useState<{ success: number; failed: number; error?: string } | null>(null);
   const { bookmarks, refreshBookmarks, refreshCategories, pauseWatchers, resumeWatchers } = useBookmarks();
   const isResuming = useRef(false);
 
   const runTask = useCallback(async (task: BatchAITask) => {
     setIsProcessing(true);
+    setLastResult(null);
     setProgress(task.progress);
     pauseWatchers();
 
+    let { currentIndex, processed, success, failed, error: firstError } = task.progress;
     try {
-      let { currentIndex, processed, success, failed } = task.progress;
       const total = task.payload.total;
       const bookmarkIds = task.payload.bookmarkIds;
 
@@ -47,7 +51,7 @@ export function useBatchAITask() {
         );
 
         const promises = batchBookmarks.map(async (bm) => {
-          if (!bm) return { status: 'failed' };
+          if (!bm) return { status: 'failed', error: t('ai:error.bookmarkNotFound') };
           try {
             const aiResult = await bookmarkAnalysisService.analyzeBookmarkForLibrary({
               url: bm.url,
@@ -62,7 +66,7 @@ export function useBatchAITask() {
             // 检测 AI 是否真正返回了有效结果（空结果表示失败）
             const hasValidResult = aiResult.description || aiResult.categoryId || (aiResult.tags && aiResult.tags.length > 0);
             if (!hasValidResult) {
-              return { status: 'failed' };
+              return { status: 'failed', error: `${bm.title || bm.url}: ${t('ai:error.emptyResult')}` };
             }
 
             // Build updates safely
@@ -86,7 +90,7 @@ export function useBatchAITask() {
             return { status: 'success' };
           } catch (error) {
             console.error(`[BatchAITask] Failed to process ${bm?.id}`, error);
-            return { status: 'failed' };
+            return { status: 'failed', error: `${bm.title || bm.url}: ${getAgentErrorMessage(error, t('ai:status.failed'))}` };
           }
         });
 
@@ -94,6 +98,7 @@ export function useBatchAITask() {
         
         const successCount = results.filter(r => r.status === 'success').length;
         const failedCount = results.filter(r => r.status === 'failed').length;
+        firstError ||= results.find(result => result.error)?.error;
 
         processed += batchIds.length;
         success += successCount;
@@ -106,6 +111,7 @@ export function useBatchAITask() {
           processed,
           success,
           failed,
+          error: firstError,
         }));
         
         if (updatedProgress) {
@@ -115,19 +121,20 @@ export function useBatchAITask() {
 
       await aiTaskStorage.clearTask();
       setProgress(null);
-      setLastResult({ success, failed });
+      setLastResult({ success, failed, error: firstError });
     } catch (error) {
       console.error('[BatchAITask] error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const errorMessage = getAgentErrorMessage(error, t('ai:status.failed'));
       await aiTaskStorage.markTaskFailed(errorMessage);
       setProgress(prev => prev ? { ...prev, status: 'failed', error: errorMessage } : null);
+      setLastResult({ success, failed, error: errorMessage });
     } finally {
       resumeWatchers();
       await refreshBookmarks();
       await refreshCategories();
       setIsProcessing(false);
     }
-  }, [pauseWatchers, resumeWatchers, refreshBookmarks, refreshCategories]);
+  }, [pauseWatchers, resumeWatchers, refreshBookmarks, refreshCategories, t]);
 
   useEffect(() => {
     const resumePendingTask = async () => {
@@ -138,6 +145,7 @@ export function useBatchAITask() {
       if (!task) return;
 
       if (task.progress.status === 'failed') {
+        setLastResult({ success: task.progress.success, failed: task.progress.failed, error: task.progress.error });
         await aiTaskStorage.clearTask();
         return;
       }

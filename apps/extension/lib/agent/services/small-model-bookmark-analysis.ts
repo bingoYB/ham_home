@@ -13,9 +13,10 @@ export async function analyzeBookmarkWithSmallModel(
   temperature: number,
   signal?: AbortSignal,
 ): Promise<BookmarkAnalysisOutput> {
-  const title = await analyzeBookmarkField(agent, input, "title", temperature, signal);
-  const summary = await analyzeBookmarkField(agent, input, "summary", temperature, signal);
-  const category = await analyzeBookmarkField(agent, input, "category", temperature, signal);
-  const tags = await analyzeBookmarkField(agent, input, "tags", temperature, signal);
+  const options = { smallModelMode: true };
+  const title = await analyzeBookmarkField(agent, input, "title", temperature, signal, options);
+  const summary = await analyzeBookmarkField(agent, input, "summary", temperature, signal, options);
+  const category = await analyzeBookmarkField(agent, input, "category", temperature, signal, options);
+  const tags = await analyzeBookmarkField(agent, input, "tags", temperature, signal, options);
   return bookmarkAnalysisResultSchema.parse({ title, summary, category, tags });
 }

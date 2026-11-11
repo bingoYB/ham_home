@@ -110,7 +110,9 @@
     "networkError": "Network error, please check your connection",
     "modelNotFound": "Model not found",
     "rateLimited": "Too many requests, please try again later",
-    "timeout": "Request timeout"
+    "timeout": "Request timeout",
+    "bookmarkNotFound": "The bookmark no longer exists or has been deleted",
+    "emptyResult": "The model returned no usable summary, category, or tags"
   },
   "success": {
     "configSaved": "Configuration saved",
@@ -128,7 +130,7 @@
   "batchOrganizeAll": "Organize All",
   "batchOrganizeMenu": "Choose AI organization mode",
   "batchOrganizeProgress": "AI is organizing bookmarks...",
-  "batchOrganizeFailed": "AI organization completed: {{success}} succeeded, {{failed}} failed. Some bookmarks could not be processed. Please check your network and retry.",
+  "batchOrganizeFailed": "AI organization completed: {{success}} succeeded, {{failed}} failed.",
   "reanalyze": "AI Re-analyze",
   "clipAnalysis": {
     "errors": {

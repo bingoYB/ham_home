@@ -48,6 +48,7 @@ export class AiSdkModelClient implements ModelClient {
         output: toAiSdkOutput(request.outputSchema),
         activeTools: request.activeToolNames as Array<keyof typeof tools> | undefined,
         temperature: request.temperature,
+        maxOutputTokens: request.maxOutputTokens,
         abortSignal: request.signal,
         experimental_context: request.toolContext,
       });
@@ -85,6 +86,7 @@ export class AiSdkModelClient implements ModelClient {
       output: toAiSdkOutput(request.outputSchema),
       activeTools: request.activeToolNames as Array<keyof typeof tools> | undefined,
       temperature: request.temperature,
+      maxOutputTokens: request.maxOutputTokens,
       abortSignal: request.signal,
       experimental_context: request.toolContext,
     });

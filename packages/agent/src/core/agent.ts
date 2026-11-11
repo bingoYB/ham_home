@@ -489,6 +489,7 @@ export class Agent {
           activeToolNames: runTools.activeToolNames,
           maxIterations: 1,
           temperature: options.temperature ?? this.defaultTemperature,
+          maxOutputTokens: options.maxOutputTokens,
           signal: options.signal,
           toolContext,
           outputSchema: options.outputSchema,

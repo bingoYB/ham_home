@@ -14,6 +14,7 @@ import {
 } from "@/lib/agent";
 // 直接引用错误码模块，避免把 background 专用的剪藏分析服务打进 content script
 import { resolveClipAnalysisErrorCode } from "@/lib/agent/clip-analysis-errors";
+import { getAgentErrorMessage } from "@/lib/agent/errors";
 import { getBackgroundService } from "@/lib/services";
 import { obsidianSyncService } from "@/lib/services/obsidian-sync-service";
 import { createMarkdownContent } from "defuddle/full";
@@ -879,7 +880,7 @@ function resolveAnalysisErrorMessage(
     return t(`ai:clipAnalysis.errors.${code}`);
   }
 
-  return error instanceof Error ? error.message : "分析失败";
+  return getAgentErrorMessage(error, t("ai:status.failed"));
 }
 
 function shouldUseMarkdownSnapshot(

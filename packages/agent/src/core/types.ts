@@ -188,6 +188,8 @@ export interface AgentRunOptions {
   attachments?: AgentContentPart[];
   maxIterations?: number;
   temperature?: number;
+  /** Maximum generated tokens per model call in this run; unset uses the provider default. */
+  maxOutputTokens?: number;
   tools?: string[];
   systemPrompt?: string;
   metadata?: Record<string, unknown>;
@@ -219,6 +221,7 @@ export interface ModelGenerateRequest {
   activeToolNames?: string[];
   maxIterations: number;
   temperature?: number;
+  maxOutputTokens?: number;
   signal?: AbortSignal;
   toolContext: ToolExecutionContext;
   outputSchema?: JsonSchema;

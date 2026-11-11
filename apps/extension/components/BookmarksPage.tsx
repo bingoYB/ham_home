@@ -261,15 +261,16 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
 
   // 批量 AI 任务完成时显示错误提示
   useEffect(() => {
-    if (!isBatchAIProcessing && batchAIResult && batchAIResult.failed > 0) {
+    if (!isBatchAIProcessing && batchAIResult && (batchAIResult.failed > 0 || batchAIResult.error)) {
       toast.error(
-        t("ai:batchOrganizeFailed", {
+        batchAIResult.failed > 0 ? t("ai:batchOrganizeFailed", {
           failed: batchAIResult.failed,
           success: batchAIResult.success,
-        }),
+        }) : t("ai:status.failed"),
         {
+          description: batchAIResult.error,
           position: "top-center",
-          duration: 5000,
+          duration: 10000,
         },
       );
     }

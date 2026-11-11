@@ -110,7 +110,9 @@
     "networkError": "网络错误，请检查连接",
     "modelNotFound": "模型不存在",
     "rateLimited": "请求过于频繁，请稍后再试",
-    "timeout": "请求超时"
+    "timeout": "请求超时",
+    "bookmarkNotFound": "书签不存在或已被删除",
+    "emptyResult": "模型未返回可用的摘要、分类或标签"
   },
   "success": {
     "configSaved": "配置已保存",
@@ -128,7 +130,7 @@
   "batchOrganizeAll": "整理所有",
   "batchOrganizeMenu": "选择 AI 整理方式",
   "batchOrganizeProgress": "AI 正在重新整理书签...",
-  "batchOrganizeFailed": "AI 整理完成：成功 {{success}} 个，失败 {{failed}} 个。部分书签未能成功处理，请检查网络后重试。",
+  "batchOrganizeFailed": "AI 整理完成：成功 {{success}} 个，失败 {{failed}} 个。",
   "reanalyze": "AI 重新分析",
   "clipAnalysis": {
     "errors": {

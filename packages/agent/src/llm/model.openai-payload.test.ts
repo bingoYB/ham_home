@@ -3,6 +3,26 @@ import { allProviders } from "./provider-definitions";
 import { createAgent } from "../core/agent";
 
 describe("OpenAI strict structured-output payload", () => {
+  it("sends the per-command token budget to an Ollama-compatible chat endpoint", async () => {
+    const requests: Record<string, any>[] = [];
+    const agent = createAgent({
+      provider: "openai-compatible", providers: allProviders, model: "qwen2.5:0.5b-instruct",
+      baseUrl: "http://localhost:11434/v1",
+      providerOptions: { fetch: vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+        requests.push(JSON.parse(String(init?.body ?? "{}")));
+        return new Response(JSON.stringify({ error: { message: "request captured" } }), {
+          status: 400, headers: { "content-type": "application/json" },
+        });
+      }) },
+    });
+    await expect(agent.commands.run({ name: "keywords", prompt: "Extract keywords", tools: [], maxIterations: 1 }, {}, {
+      invocationMode: "chat", maxOutputTokens: 96,
+    })).rejects.toThrow("request captured");
+    expect(requests).toHaveLength(1);
+    expect(requests[0].max_tokens).toBe(96);
+    expect(requests[0].response_format).toBeUndefined();
+  });
+
   it.each([
     ["chat", "/chat/completions"],
     ["response", "/responses"],

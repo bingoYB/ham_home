@@ -77,6 +77,7 @@ class BookmarkAnalysisService {
         };
         const value = await analyzeBookmarkField(
           agent, fieldInput, input.mode, temperature, input.signal,
+          { smallModelMode: config.rawConfig.smallModelMode === true },
         );
         output = {
           title: "",

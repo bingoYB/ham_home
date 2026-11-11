@@ -19,7 +19,7 @@ interface AIStatusProps {
 
 export function AIStatus({ status, error, onRetry, onConfigure, className, portalContainer }: AIStatusProps) {
   const { t } = useTranslation();
-  const errorMessage = `${t('ai:status.failed')}${error ? `: ${error}` : ''}`;
+  const errorMessage = error?.trim() || t('ai:status.failed');
   
   if (status === 'idle') {
     return null;
@@ -48,16 +48,16 @@ export function AIStatus({ status, error, onRetry, onConfigure, className, porta
       )}
 
       {status === 'error' && (
-        <div className="rounded-lg flex items-center justify-between py-1.5 px-2 bg-destructive/10 text-destructive">
+        <div className="rounded-lg flex items-start justify-between py-1.5 px-2 bg-destructive/10 text-destructive">
           <Tooltip>
             <TooltipTrigger asChild>
               <span
                 tabIndex={0}
                 aria-label={errorMessage}
-                className="flex min-w-0 flex-1 items-center gap-1.5 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="flex min-w-0 flex-1 items-start gap-1.5 rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               >
-                <AlertCircle className="h-3.5 w-3.5 shrink-0" />
-                <span className="min-w-0 truncate">{errorMessage}</span>
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                <span className="min-w-0 whitespace-pre-wrap [overflow-wrap:anywhere]">{errorMessage}</span>
               </span>
             </TooltipTrigger>
             <TooltipContent
