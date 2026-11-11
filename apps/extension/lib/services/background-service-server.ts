@@ -4,6 +4,7 @@
  */
 import { registerService } from "@webext-core/proxy-service";
 import { browser } from "wxt/browser";
+import { syncEngine } from "@/lib/sync/sync-engine";
 import {
   BACKGROUND_SERVICE_KEY,
   type ArchiveActionResult,
@@ -68,6 +69,11 @@ import type {
 } from "@/lib/search/semantic-retriever";
 
 class BackgroundServiceImpl implements IBackgroundService {
+  async syncWebDAV() { return syncEngine.doSync(); }
+  async clearRemoteWebDAVData() { return syncEngine.clearRemoteData(); }
+  async inspectWebDAVLocks() { return syncEngine.inspectRemoteLocks(); }
+  async unlockWebDAVLocks(tokens: string[]) { return syncEngine.unlockRemoteLocks(tokens); }
+
   /** Library bookmarks: queue-only read later items stay out of library views */
   async getBookmarks() {
     const [bookmarks, entries] = await Promise.all([

@@ -75,6 +75,9 @@ importers:
       defuddle:
         specifier: ^0.14.0
         version: 0.14.0
+      fast-xml-parser:
+        specifier: ^5.3.4
+        version: 5.4.2
       fflate:
         specifier: ^0.8.2
         version: 0.8.2

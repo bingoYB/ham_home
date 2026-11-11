@@ -44,6 +44,7 @@
     "@tanstack/react-virtual": "^3.13.18",
     "@webext-core/proxy-service": "^2.0.0",
     "defuddle": "^0.14.0",
+    "fast-xml-parser": "^5.3.4",
     "fflate": "^0.8.2",
     "i18next": "^24.0.0",
     "i18next-browser-languagedetector": "^7.0.0",

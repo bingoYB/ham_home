@@ -28,7 +28,20 @@ export type SyncErrorCode =
   | 'invalidRemoteData'
   | 'conflict'
   | 'lockingUnsupported'
+  | 'lockReleaseFailed'
+  | 'lockRecoveryUnavailable'
   | 'unknown';
+
+export interface WebDAVLockInfo {
+  token: string;
+  ownedByThisDevice: boolean;
+  timeout?: string;
+}
+
+export interface WebDAVLockInspection {
+  locks: WebDAVLockInfo[];
+  discoverySupported: boolean;
+}
 
 export interface SyncStatus {
   lastSyncTime: number; // 0 means never synced

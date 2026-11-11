@@ -162,11 +162,11 @@ export class SyncEngine {
     const now = Date.now();
     if (sys && sys.lock_status === 'locked') {
       const timeDiff = now - sys.lock_timestamp;
-      if (timeDiff < LOCK_TIMEOUT_MS) {
+      if (timeDiff < LOCK_TIMEOUT_MS && !sys.lock_owner?.startsWith('urn:hamhome:')) {
         console.warn(`Sync is locked by another client. Locked for ${timeDiff}ms`);
         return false;
       }
-      console.warn(`Lock timeout exceeded (${timeDiff}ms). Breaking lock.`);
+      console.warn(`Replacing an abandoned sync marker (${timeDiff}ms).`);
     }
 
     const newSys: SyncSys = {
@@ -191,29 +191,24 @@ export class SyncEngine {
   /**
    * Release lock and update sync version
    */
-  private async releaseLock(token: string): Promise<void> {
+  private async releaseLock(token: string, completed: boolean): Promise<SyncSys | null> {
     try {
       const sys = await this.readSys();
       if (sys) {
         if (sys.lock_owner && sys.lock_owner !== token) {
           // Our lock expired and another client took over: do not unlock on its behalf.
-          console.warn('Sync lock was taken over by another client before release.');
+          throw new SyncError('conflict', 'Sync marker was taken over by another client');
         } else {
           sys.lock_status = 'unlocked';
           sys.lock_owner = undefined;
-          sys.sync_version = nanoid();
-          sys.last_sync_time = Date.now();
+          if (completed) {
+            sys.sync_version = nanoid();
+            sys.last_sync_time = Date.now();
+          }
           await webdavClientAdapter.putJSON(SYS_JSON, sys);
         }
-
-        await syncConfigStorage.setStatus({
-          status: 'idle',
-          lastSyncTime: sys.last_sync_time,
-          syncVersion: sys.sync_version,
-          errorCode: undefined,
-          errorMessage: ''
-        });
       }
+      return sys;
     } catch (err) {
       console.error('Failed to release lock', err);
       throw err;
@@ -241,19 +236,21 @@ export class SyncEngine {
       // Verify credentials before writing anything remote
       await webdavClientAdapter.checkAuth(SYS_JSON);
 
-      // Recursive, so it also creates SYNC_ROOT and SYNC_ROOT/bookmarks
+      // Create the root before acquiring its server lock.
       await webdavClientAdapter.ensureDirectory(SYNC_ROOT);
 
+      let synced: SyncSys | null = null;
       await webdavClientAdapter.withExclusiveLock(SYNC_ROOT, async () => {
         await webdavClientAdapter.ensureDirectory(CHUNKS_DIR);
 
-        const lockToken = nanoid();
+        const lockToken = webdavClientAdapter.lockOwner || nanoid();
         const locked = await this.acquireLock(lockToken);
         if (!locked) {
-          await syncConfigStorage.setStatus({ status: 'idle' });
-          return;
+          throw new SyncError('conflict', 'An older client is holding the sync marker');
         }
 
+        let completed = false;
+        let failure: unknown;
         try {
           console.log('WebDAV Lock acquired, starting sync...');
           // Deletions first: if the run stops halfway, other devices still learn about them
@@ -269,10 +266,22 @@ export class SyncEngine {
           await this.syncReadLater();
           await this.finishDeletions(run);
           console.log('WebDAV Sync complete.');
+          completed = true;
+        } catch (err) {
+          failure = err;
+          throw err;
         } finally {
-          await this.releaseLock(lockToken);
+          try { synced = await this.releaseLock(lockToken, completed); }
+          catch (err) {
+            if (!failure) throw err;
+            console.error('Failed to clear the sync marker after a sync failure', err);
+          }
         }
       });
+      // Publish success only after the server has acknowledged UNLOCK as well.
+      const result = synced as SyncSys | null;
+      await syncConfigStorage.setStatus({ status: 'idle', errorCode: undefined, errorMessage: '',
+        ...(result ? { lastSyncTime: result.last_sync_time, syncVersion: result.sync_version } : {}) });
 
     } catch (err: any) {
       const error = toSyncError(err);
@@ -1360,9 +1369,40 @@ export class SyncEngine {
     return { ...base, hasSnapshot: false, deletedAt };
   }
 
-  /**
-   * Clear all remote sync data
-   */
+  /** Inspect/recover locks in the background, serialized with all sync mutations. */
+  async inspectRemoteLocks() {
+    if (this.isSyncing) throw new SyncError('conflict', 'A WebDAV operation is still running');
+    this.isSyncing = true;
+    try {
+      const config = await syncConfigStorage.getConfig();
+      webdavClientAdapter.init(config);
+      return await webdavClientAdapter.inspectLocks(SYNC_ROOT);
+    } finally { this.isSyncing = false; }
+  }
+
+  async unlockRemoteLocks(tokens: string[]): Promise<void> {
+    if (this.isSyncing) throw new SyncError('conflict', 'A WebDAV operation is still running');
+    this.isSyncing = true;
+    try {
+      const config = await syncConfigStorage.getConfig();
+      webdavClientAdapter.init(config);
+      await webdavClientAdapter.unlockLocks(SYNC_ROOT, tokens);
+      await webdavClientAdapter.ensureDirectory(SYNC_ROOT);
+      // Reset the legacy marker only while holding a NEW exclusive lock. If another
+      // device has taken over, LOCK fails and its marker is never touched.
+      await webdavClientAdapter.withExclusiveLock(SYNC_ROOT, async () => {
+        const sys = await this.readSys();
+        if (sys) await webdavClientAdapter.putJSON(SYS_JSON, { ...sys, lock_status: 'unlocked', lock_owner: undefined });
+      });
+      await syncConfigStorage.setStatus({ status: 'idle', errorCode: undefined, errorMessage: '' });
+    } catch (err) {
+      const error = toSyncError(err);
+      await syncConfigStorage.setStatus({ status: 'error', errorCode: error.code, errorMessage: error.message });
+      throw error;
+    } finally { this.isSyncing = false; }
+  }
+
+  /** Clear all remote sync data. */
   async clearRemoteData(): Promise<void> {
     if (this.isSyncing) {
       throw new Error('Sync is currently in progress, cannot clear remote data');

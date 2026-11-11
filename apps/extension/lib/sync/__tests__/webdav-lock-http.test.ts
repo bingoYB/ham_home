@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { expect, it } from 'vitest';
 import { WebDAVAdapter } from '../webdav-client';
+import { memoryLockStore } from './lock-test-helpers';
 
 it('sends LOCK/If/UNLOCK through the real WebDAV SDK and rejects an expired writer over HTTP', async () => {
   let owner: string | null = null;
@@ -41,8 +42,8 @@ it('sends LOCK/If/UNLOCK through the real WebDAV SDK and rejects an expired writ
   await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
   const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   rootUrl = `${url}/HamHomeSync`;
-  const first = new WebDAVAdapter();
-  const second = new WebDAVAdapter();
+  const first = new WebDAVAdapter(memoryLockStore());
+  const second = new WebDAVAdapter(memoryLockStore());
   first.init({ enabled: true, url, username: 'test', password: 'test' });
   second.init({ enabled: true, url, username: 'test', password: 'test' });
   try {

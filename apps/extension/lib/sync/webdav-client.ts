@@ -1,45 +1,11 @@
 import { createClient, AuthType, WebDAVClient } from 'webdav';
-import type { WebDAVConfig, SyncErrorCode } from '@/types';
+import type { WebDAVConfig } from '@/types';
 
-/**
- * Error carrying a machine readable reason of a WebDAV failure.
- * The UI maps the code to an actionable hint, the raw server message is kept for debugging.
- */
-export class SyncError extends Error {
-  readonly code: SyncErrorCode;
-  readonly status?: number;
-
-  constructor(code: SyncErrorCode, message: string, status?: number) {
-    super(message);
-    this.name = 'SyncError';
-    this.code = code;
-    this.status = status;
-  }
-}
-
-/**
- * Normalize any thrown value into a SyncError.
- * The `webdav` package attaches the HTTP status to its errors, while `fetch` rejects
- * with a TypeError when the request never reached the server (DNS, TLS, firewall...).
- */
-export function toSyncError(err: unknown): SyncError {
-  if (err instanceof SyncError) return err;
-
-  const status = (err as { status?: unknown } | undefined)?.status;
-  const message = (err as { message?: string } | undefined)?.message || String(err);
-
-  if (typeof status === 'number') {
-    if (status === 401) return new SyncError('auth', message, status);
-    if (status === 403) return new SyncError('forbidden', message, status);
-    if (status === 412 || status === 423) return new SyncError('conflict', message, status);
-    if (status === 404) return new SyncError('notFound', message, status);
-    if (status >= 500) return new SyncError('server', message, status);
-    return new SyncError('unknown', message, status);
-  }
-
-  if (err instanceof TypeError) return new SyncError('network', message);
-  return new SyncError('unknown', message);
-}
+import { SyncError, toSyncError } from './webdav-errors';
+import { WebDAVLockManager } from './webdav-lock';
+import { webdavLockStorage, type WebDAVLockStore } from './webdav-lock-storage';
+import { withWebDAVTimeout } from './webdav-request';
+export { SyncError, toSyncError } from './webdav-errors';
 
 /**
  * Trim the URL and drop trailing slashes so that the client signature stays stable.
@@ -58,9 +24,9 @@ export class WebDAVAdapter {
   private client: WebDAVClient | null = null;
   /** Signature of the config the current client was built from. */
   private signature = '';
-  private lockHeader: string | null = null;
-  private baseUrl = '';
-  private locking = false;
+  private locks?: WebDAVLockManager;
+
+  constructor(private lockStore: WebDAVLockStore = webdavLockStorage) {}
 
   /**
    * Create (or re-create) the underlying client.
@@ -71,7 +37,7 @@ export class WebDAVAdapter {
     const { url, username, password } = normalizeConfig(config);
 
     const nextSignature = JSON.stringify([url, username, password]);
-    if (this.locking && nextSignature !== this.signature) {
+    if (this.locks?.isBusy && nextSignature !== this.signature) {
       throw new SyncError('conflict', 'Cannot change WebDAV connection during a sync');
     }
     if (!url) {
@@ -92,7 +58,6 @@ export class WebDAVAdapter {
       throw new SyncError('invalidUrl', `WebDAV URL must start with http:// or https:// (got "${url}")`);
     }
 
-    this.baseUrl = url;
     this.client = createClient(url, {
       username,
       password,
@@ -101,6 +66,7 @@ export class WebDAVAdapter {
       authType: AuthType.Auto,
       maxContentLength: 50 * 1024 * 1024, // 50MB
     });
+    this.locks = new WebDAVLockManager(this.client, url, username, this.lockStore);
     this.signature = signature;
   }
 
@@ -124,7 +90,7 @@ export class WebDAVAdapter {
   async testConnection(): Promise<boolean> {
     const client = this.requireClient();
     try {
-      await client.getDirectoryContents('/');
+      await this.request(options => client.getDirectoryContents('/', options));
       return true;
     } catch (err) {
       console.error('WebDAV connection failed', toSyncError(err));
@@ -142,7 +108,7 @@ export class WebDAVAdapter {
   async checkAuth(probePath: string): Promise<void> {
     const client = this.requireClient();
     try {
-      const res: any = await client.getFileContents(probePath, { format: 'text', details: true });
+      const res: any = await this.request(options => client.getFileContents(probePath, { ...options, format: 'text', details: true }));
       this.assertOkStatus(res?.status, probePath);
     } catch (err) {
       const error = toSyncError(err);
@@ -155,7 +121,7 @@ export class WebDAVAdapter {
   async getFileContents(filename: string): Promise<string | null> {
     const client = this.requireClient();
     try {
-      const res: any = await client.getFileContents(filename, { format: 'text', details: true });
+      const res: any = await this.request(options => client.getFileContents(filename, { ...options, format: 'text', details: true }));
       this.assertOkStatus(res?.status, filename);
       return res?.data as string;
     } catch (err) {
@@ -173,59 +139,38 @@ export class WebDAVAdapter {
     }
   }
 
-  /** Server-enforced depth-infinity lock. Every mutation is fenced by its token.
-   * No client-side timeout/steal fallback: unsupported servers fail before data writes.
-   */
   async withExclusiveLock<T>(path: string, operation: () => Promise<T>): Promise<T> {
-    if (this.locking) throw new SyncError('conflict', 'Another WebDAV operation is running');
-    const client = this.requireClient();
-    this.locking = true;
-    let token: string | undefined;
-    try {
-      let lock;
-      try {
-        lock = await client.lock(path, { timeout: 'Second-600', headers: { Depth: 'infinity' } });
-      } catch (err) {
-        const status = (err as { status?: number }).status;
-        if (status === 405 || status === 501) {
-          throw new SyncError('lockingUnsupported', 'This WebDAV server does not support exclusive LOCK; sync stopped to protect remote data.', status);
-        }
-        throw toSyncError(err);
-      }
-      token = lock.token?.replace(/^<|>$/g, '');
-      if (!token) throw new SyncError('lockingUnsupported', 'WebDAV server did not return a lock token');
-      const rootUrl = `${this.baseUrl}/${path.replace(/^\//, '')}`;
-      this.lockHeader = `<${rootUrl}> (<${token}>)`;
-      return await operation();
-    } finally {
-      // Clear local state even when the lock expired or the remote root was deleted.
-      this.lockHeader = null;
-      try {
-        if (token) await client.unlock(path, `<${token}>`);
-      } catch (err) {
-        // A lease also expires server-side if the worker disappears. Do not hide
-        // the original operation failure with a secondary unlock failure.
-        console.warn('Failed to release WebDAV lock', err);
-      } finally {
-        this.locking = false;
-      }
-    }
+    this.requireClient();
+    return this.locks!.withLock(path, operation);
   }
 
-  private mutationHeaders(): Record<string, string> {
-    return this.lockHeader ? { If: this.lockHeader } : {};
+  get lockOwner() { return this.locks?.owner; }
+
+  async inspectLocks(path: string) {
+    this.requireClient();
+    return this.locks!.inspect(path);
+  }
+
+  async unlockLocks(path: string, tokens: string[]) {
+    this.requireClient();
+    return this.locks!.unlock(path, tokens);
+  }
+
+  /** Bound every request so a hung transfer cannot prevent finally/UNLOCK forever. */
+  private async request<T>(operation: (options: { headers: Record<string, string>; signal: AbortSignal }) => Promise<T>, mutation = false): Promise<T> {
+    const lease = this.locks?.mutationOptions() ?? { headers: {} };
+    return withWebDAVTimeout(signal => operation({ headers: mutation ? lease.headers : {}, signal }), 30_000, lease.signal);
   }
 
   async putJSON(filename: string, data: any): Promise<boolean> {
     const client = this.requireClient();
-    const headers = this.mutationHeaders();
     try {
       const content = JSON.stringify(data);
       const dirPath = filename.substring(0, filename.lastIndexOf('/'));
       if (dirPath && dirPath !== '') {
         await this.ensureDirectory(dirPath);
       }
-      const written = await client.putFileContents(filename, content, { headers });
+      const written = await this.request(options => client.putFileContents(filename, content, options), true);
       if (written === false) throw new SyncError('conflict', `Conditional write rejected: ${filename}`);
       return true;
     } catch (err) {
@@ -257,20 +202,32 @@ export class WebDAVAdapter {
 
   async ensureDirectory(dirPath: string): Promise<void> {
     const client = this.requireClient();
-    try {
-      await client.createDirectory(dirPath, { recursive: true, headers: this.mutationHeaders() });
-    } catch (err) {
-      const error = toSyncError(err);
-      // 405 / 409 mean the collection already exists (or was created concurrently)
-      if (error.status === 405 || error.status === 409) return;
-      throw error;
+    let current = '';
+    for (const segment of dirPath.split('/').filter(Boolean)) {
+      current += `/${segment}`;
+      const path = current;
+      try {
+        const result = await this.request(options => client.stat(path, options));
+        const stat = 'data' in result ? result.data : result;
+        if (stat.type !== 'directory') throw new SyncError('invalidRemoteData', `Expected a WebDAV directory: ${path}`);
+        continue;
+      } catch (err) {
+        if (toSyncError(err).status !== 404) throw err;
+      }
+      try {
+        // The SDK's recursive MKCOL does not pass AbortSignal to its PROPFINDs.
+        // Walk explicitly so every request is bounded and can reach UNLOCK on failure.
+        await this.request(options => client.createDirectory(path, { ...options, recursive: false }), true);
+      } catch (err) {
+        if (toSyncError(err).status !== 405) throw err;
+      }
     }
   }
 
   async deleteFile(filename: string): Promise<boolean> {
     const client = this.requireClient();
     try {
-      await client.deleteFile(filename, { headers: this.mutationHeaders() });
+      await this.request(options => client.deleteFile(filename, options), true);
       return true;
     } catch (err) {
       const error = toSyncError(err);

@@ -41,8 +41,87 @@ vi.mock("../webdav-client", async () => {
       checkAuth: vi.fn(),
       ensureDirectory: vi.fn(),
       deleteFile: mocks.deleteFile,
+      inspectLocks: vi.fn(),
+      unlockLocks: vi.fn(),
     },
   };
+});
+
+describe('SyncEngine lock cleanup and recovery status', () => {
+  async function setupEngine() {
+    const { SyncEngine } = await import('../sync-engine');
+    const { syncConfigStorage } = await import('../sync-config-storage');
+    const { webdavClientAdapter, SyncError } = await import('../webdav-client');
+    const engine = new SyncEngine();
+    vi.mocked(syncConfigStorage.getConfig).mockResolvedValue({ enabled: true, url: 'https://dav.test', username: 'u', password: 'p' });
+    vi.mocked(webdavClientAdapter.withExclusiveLock).mockImplementation(async (_path, operation) => operation());
+    let sys = { version: 1, sync_version: 'previous', last_sync_time: 123, lock_status: 'unlocked', lock_timestamp: 0 } as Record<string, unknown>;
+    mocks.getJSON.mockImplementation(async (path: string) => path.endsWith('/sys.json') ? structuredClone(sys) : null);
+    mocks.putJSON.mockImplementation(async (path: string, value: Record<string, unknown>) => {
+      if (path.endsWith('/sys.json')) sys = structuredClone(value);
+      return true;
+    });
+    for (const method of ['syncDeletions', 'syncSettings', 'syncCategories', 'syncWorkspaces', 'syncTabGroupConfig', 'syncTabLifecycleConfig', 'syncBookmarks', 'syncBookmarkClips', 'syncReadLater', 'finishDeletions']) {
+      vi.spyOn(engine as unknown as Record<string, () => Promise<unknown>>, method).mockResolvedValue(undefined);
+    }
+    return { engine, adapter: webdavClientAdapter, status: vi.mocked(syncConfigStorage.setStatus), SyncError, getSys: () => sys };
+  }
+
+  beforeEach(() => vi.clearAllMocks());
+
+  it('publishes success only after UNLOCK is acknowledged', async () => {
+    const { engine, adapter, status } = await setupEngine();
+    vi.mocked(adapter.withExclusiveLock).mockImplementation(async (_path, operation) => {
+      await operation();
+      expect(status.mock.calls.some(([value]) => value.status === 'idle')).toBe(false);
+    });
+    await engine.doSync();
+    expect(status).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'idle', lastSyncTime: expect.any(Number) }));
+  });
+
+  it('does not publish success or a new lastSyncTime when remote UNLOCK failed', async () => {
+    const { engine, adapter, status, SyncError } = await setupEngine();
+    vi.mocked(adapter.withExclusiveLock).mockImplementation(async (_path, operation) => {
+      await operation();
+      throw new SyncError('lockReleaseFailed', 'unlock failed');
+    });
+    await engine.doSync();
+    expect(status.mock.calls.some(([value]) => value.status === 'idle')).toBe(false);
+    expect(status).toHaveBeenLastCalledWith({ status: 'error', errorCode: 'lockReleaseFailed', errorMessage: 'unlock failed' });
+  });
+
+  it('clears the legacy marker after a failed sync without changing its last successful time or version', async () => {
+    const { engine, getSys, status } = await setupEngine();
+    vi.mocked((engine as unknown as { syncSettings: () => Promise<void> }).syncSettings).mockRejectedValue(new Error('remote data failed'));
+    await engine.doSync();
+    expect(getSys()).toMatchObject({ lock_status: 'unlocked', sync_version: 'previous', last_sync_time: 123 });
+    expect(status.mock.calls.some(([value]) => value.status === 'idle')).toBe(false);
+  });
+
+  it('resets the legacy marker under a fresh exclusive lock without advancing sync time', async () => {
+    const { engine, adapter, getSys, status } = await setupEngine();
+    await engine.unlockRemoteLocks(['reviewed-token']);
+    expect(adapter.unlockLocks).toHaveBeenCalledWith('/HamHomeSync', ['reviewed-token']);
+    expect(adapter.withExclusiveLock).toHaveBeenCalledOnce();
+    expect(getSys()).toMatchObject({ lock_status: 'unlocked', last_sync_time: 123, sync_version: 'previous' });
+    expect(mocks.putJSON.mock.calls.every(([path]) => path.endsWith('/sys.json'))).toBe(true);
+    expect(status).toHaveBeenLastCalledWith({ status: 'idle', errorCode: undefined, errorMessage: '' });
+  });
+
+  it('does not change the marker when another device acquires the lock during manual recovery', async () => {
+    const { engine, adapter, SyncError } = await setupEngine();
+    vi.mocked(adapter.withExclusiveLock).mockRejectedValueOnce(new SyncError('conflict', 'another device'));
+    await expect(engine.unlockRemoteLocks(['reviewed-token'])).rejects.toMatchObject({ code: 'conflict' });
+    expect(mocks.putJSON).not.toHaveBeenCalled();
+    expect(engine.isBusy).toBe(false);
+  });
+
+  it('refuses lock inspection and manual recovery while the local engine is busy', async () => {
+    const { engine } = await setupEngine();
+    (engine as unknown as { isSyncing: boolean }).isSyncing = true;
+    await expect(engine.inspectRemoteLocks()).rejects.toMatchObject({ code: 'conflict' });
+    await expect(engine.unlockRemoteLocks([])).rejects.toMatchObject({ code: 'conflict' });
+  });
 });
 
 vi.mock("../sync-config-storage", () => ({

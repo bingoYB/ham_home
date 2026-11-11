@@ -1,5 +1,5 @@
 import { useTranslation } from "react-i18next";
-import { Download, Trash2, Loader2, RefreshCw, AlertTriangle } from "lucide-react";
+import { Download, Trash2, Loader2, AlertTriangle } from "lucide-react";
 import {
   Button,
   Input,
@@ -11,9 +11,9 @@ import {
   CardHeader,
   CardTitle,
 } from "@hamhome/ui";
-import { syncEngine } from "@/lib/sync/sync-engine";
 import { StorageStatCard } from "./StorageStatCard";
 import { SyncStrategySettings } from "./SyncStrategySettings";
+import { WebDAVSyncActions } from "./WebDAVSyncActions";
 import type { WebDAVConfig, SyncStatus, EmbeddingConfig } from "@/types";
 import type { VectorStoreStats } from "@/lib/storage/vector-store";
 
@@ -313,65 +313,14 @@ export function StorageTab({
 
               <SyncStrategySettings config={syncConfig} onChange={updateSyncConfig} />
 
-              <div className="flex gap-2 pt-2">
-                <Button
-                  onClick={async () => {
-                    setIsSyncing(true);
-                    try {
-                      await syncEngine.doSync();
-                    } catch (err) {
-                      console.error("Manual sync failed", err);
-                    } finally {
-                      setIsSyncing(false);
-                    }
-                  }}
-                  disabled={
-                    isSyncing ||
-                    syncStatus.status === "syncing" ||
-                    !syncConfig.url ||
-                    !syncConfig.username ||
-                    !syncConfig.password
-                  }
-                  className="bg-primary hover:bg-primary/90"
-                >
-                  {isSyncing || syncStatus.status === "syncing" ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {t("settings:settings.sync.config.syncingBtn")}
-                    </>
-                  ) : (
-                    <>
-                      <RefreshCw className="mr-2 h-4 w-4" />
-                      {t("settings:settings.sync.config.syncBtn")}
-                    </>
-                  )}
-                </Button>
-
-                <Button
-                  onClick={onClearRemoteData}
-                  variant="destructive"
-                  disabled={
-                    isClearingRemote ||
-                    isSyncing ||
-                    syncStatus.status === "syncing" ||
-                    !syncConfig.url ||
-                    !syncConfig.username ||
-                    !syncConfig.password
-                  }
-                >
-                  {isClearingRemote ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      {t("settings:settings.sync.config.clearingRemoteBtn", "清除中...")}
-                    </>
-                  ) : (
-                    <>
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      {t("settings:settings.sync.config.clearRemoteBtn", "清除远端数据")}
-                    </>
-                  )}
-                </Button>
-              </div>
+              <WebDAVSyncActions
+                config={syncConfig}
+                status={syncStatus}
+                isSyncing={isSyncing}
+                isClearingRemote={isClearingRemote}
+                onSyncStateChange={setIsSyncing}
+                onClearRemoteData={onClearRemoteData}
+              />
 
               {/* 同步状态展示 */}
               <div className="mt-4 p-4 rounded-lg bg-muted text-sm space-y-2">

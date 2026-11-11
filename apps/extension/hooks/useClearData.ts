@@ -2,7 +2,6 @@ import { useState, useCallback } from "react";
 import { useBookmarks } from "@/contexts/BookmarkContext";
 import { snapshotStorage } from "@/lib/storage/snapshot-storage";
 import { getBackgroundService } from "@/lib/services";
-import { syncEngine } from "@/lib/sync/sync-engine";
 import { workspaceStorage } from "@/lib/storage/workspace-storage";
 import type { QueueProgress } from "@/lib/embedding/embedding-queue";
 import type { VectorStoreStats } from "@/lib/storage/vector-store";
@@ -110,7 +109,7 @@ export function useClearData(): UseClearDataReturn {
     setShowClearRemoteDialog(false);
     setIsClearingRemote(true);
     try {
-      await syncEngine.clearRemoteData();
+      await getBackgroundService().clearRemoteWebDAVData();
     } catch (error) {
       console.error("[useClearData] Failed to clear remote data:", error);
     } finally {

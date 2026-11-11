@@ -61,7 +61,63 @@ Scheduling accounts for [browser alarm timing and persistence limits](https://de
 2. `deletions.json` is merged and written **first**, so an interrupted run never leaves module files without
    the items while other devices still lack the deletion.
 3. Settings, categories, workspaces, tab-group config, lifecycle settings, bookmarks (pull, then push), clips, and read-later state.
-4. Deletion records cancelled during the run (item edited after the delete) are removed; lock released.
+4. Deletion records cancelled during the run (item edited after the delete) are removed; the legacy marker is cleared and the server lock is released. Local success is published only after UNLOCK is acknowledged. A failed sync clears the marker without advancing its successful sync time/version.
+
+## Lock lifecycle and recovery
+
+All manual sync, automatic sync, remote clearing, lock inspection and recovery run through the same
+background `SyncEngine`. The settings page no longer runs its own engine; closing it does not cancel
+the background transfer. In-memory busy guards serialize these operations on this device.
+
+`webdav-lock.ts` owns the server lock. Before LOCK, it saves a unique owner in the device-local
+`local:webdavLockJournal`, scoped by URL, username and sync root; after the grant it saves the token.
+Passwords are not included. A header token is saved before parsing the response body, so malformed
+XML or a failed body read can still be cleaned up. If the LOCK response is lost entirely, recovery
+queries `DAV:lockdiscovery` and only matches the saved unique owner. An unresolved acquisition retains
+its recovery record. The next sync attempts to release its own recorded leftover lock before acquiring
+a new one. Ordinary contention never causes another device's lock to be released automatically.
+
+LOCK requests ask for 600 seconds, but the returned server timeout determines the local lease.
+Bodyless LOCK refreshes run at half the lease duration, capped at 60-second intervals. Renewal failure
+aborts active transfer requests and prevents later writes; the local deadline also rejects writes after
+device sleep before a delayed timer runs. Requests carry AbortSignal and have bounded timeouts (20s
+for lock operations, 30s for transfers). Directory creation walks explicitly because the SDK's recursive
+MKCOL does not forward the signal to its internal PROPFIND requests.
+
+UNLOCK is attempted from `finally`, including operation/parse/storage failures. Temporary network and
+5xx failures are retried once. 404/409 mean the old token is already gone; other failures keep the
+journal and surface `lockReleaseFailed` instead of silently reporting success. The original sync error
+is preserved if cleanup fails as well. Worker/browser termination can prevent `finally` from running;
+the durable journal allows recovery on the next run rather than relying only on server expiration.
+
+**Settings → Storage → WebDAV → Check & unlock** queries root `DAV:lockdiscovery`, falling back to a
+saved local token when discovery is unsupported. After the user confirms other clients have stopped,
+the background rechecks and releases only the exact reviewed tokens. A replacement lock is not
+released. The legacy `sys.json` marker is reset under a newly acquired exclusive lock, preserving
+bookmarks, content, last successful sync time and version. If another device acquired the lock during
+recovery, the new LOCK fails and its marker is untouched. A stale persisted `syncing` status does not
+disable inspection; a genuinely busy background engine rejects it.
+
+Servers may hide lock tokens or reject discovery. An old lock without a locally saved token can then
+require provider support (including existing Koofr locks created before this recovery journal). No
+token-free force-unlock endpoint is assumed. The marker's `lock_owner` is not a WebDAV token. New
+markers use the `urn:hamhome:` owner namespace; holding a new server lock proves such an old marker
+is abandoned. Markers from older clients retain the 10-minute grace period.
+
+References: [UNLOCK](https://www.rfc-editor.org/rfc/rfc4918.html#section-9.11),
+[LOCK refresh](https://www.rfc-editor.org/rfc/rfc4918.html#section-9.10.2),
+[lockdiscovery](https://www.rfc-editor.org/rfc/rfc4918.html#section-15.8).
+
+### Recovery verification
+
+- `pnpm exec vitest run lib/sync` covers token persistence, lost/malformed LOCK responses, failed
+  cleanup, restart recovery, renewal/expiration, stalled requests, manual recovery races and success timestamps.
+- Chrome / Firefox / Edge: use a dedicated WebDAV test directory. Create a leftover lock, open
+  Check & unlock, confirm the button stays disabled until the checkbox is selected, recover it and sync.
+  Verify remote bookmarks/content survive and the last sync time does not advance merely by unlocking.
+- Close the settings tab during manual sync and verify background completion/UNLOCK. Simulate a failed
+  UNLOCK or terminate/restart the worker, then sync again and verify journal recovery. Check unsupported
+  discovery, changed credentials/accounts, Chinese/English, light/dark themes and a narrow viewport.
 
 ## Merge rules
 

@@ -6296,11 +6296,48 @@ Vector size picker in the embedding settings card. It renders nothing when the s
 - 提供分项清理（书签、快照、远端同步数据）及全量数据重置入口。
 - WebDAV 同步用户设置和 AI 自动分组设置时按 `updatedAt` 合并；本地刚修改的配置会优先上传，远端更新时才下载覆盖本地。
 - WebDAV 启用后展示 `SyncStrategySettings`，独立配置实时、启动、定时同步开关及时间；全部关闭后仅手动同步。策略仅对当前设备生效。
+- 手动同步、远端清理和解锁统一交给后台服务；关闭设置页不会中断后台操作。「检查与解锁」可以查询服务器锁或读取本设备的恢复记录，确认停止其他端同步后释放已检查的锁并重置旧同步标记，保留云端数据。历史状态停留在 `syncing` 时仍可检查，后台实际忙碌时拒绝操作。
 
 **使用示例：**
 
 ```tsx
 <StorageTab {...storageTabProps} syncConfig={syncConfig} updateSyncConfig={updateSyncConfig} />
+```
+
+### WebDAVSyncActions
+
+WebDAV 的同步、锁恢复及远端清理按钮，调用 `useWebDAVSyncActions` 连接后台服务并展示操作错误。
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| config | `WebDAVConfig` | ✓ | 当前连接配置 |
+| status | `SyncStatus` | ✓ | 持久化的同步状态 |
+| isSyncing | `boolean` | ✓ | 当前页面正在提交手动同步 |
+| isClearingRemote | `boolean` | ✓ | 当前页面正在清理远端 |
+| onSyncStateChange | `(syncing: boolean) => void` | ✓ | 手动同步调用状态变化 |
+| onClearRemoteData | `() => void` | ✓ | 打开既有的远端清理确认流程 |
+
+```tsx
+<WebDAVSyncActions config={syncConfig} status={syncStatus} isSyncing={isSyncing}
+  isClearingRemote={false} onSyncStateChange={setIsSyncing} onClearRemoteData={openClearDialog} />
+```
+
+### WebDAVLockDialog
+
+锁检查与手动恢复弹窗。展示锁数量、本设备恢复记录及服务器查询能力；每次重新检查均重置确认状态，解锁前需确认停止其他端同步。令牌仅用于后台请求，不显示在界面。
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| open / pending / unlocked / confirmed | `boolean` | ✓ | 打开、操作中、恢复成功、停止其他端的确认状态 |
+| inspection | `WebDAVLockInspection` | - | 锁列表及服务器查询能力 |
+| error | `string` | ✓ | 操作错误详情 |
+| onOpenChange / setConfirmed | `(value: boolean) => void` | ✓ | 修改弹窗及确认状态 |
+| onCheck / onUnlock | `() => void` | ✓ | 重新查询或释放已检查的锁 |
+
+```tsx
+<WebDAVLockDialog open={open} pending={pending} inspection={inspection} error={error}
+  unlocked={unlocked} confirmed={confirmed} setConfirmed={setConfirmed}
+  onOpenChange={setOpen} onCheck={check} onUnlock={unlock} />
 ```
 
 ### SyncStrategySettings

@@ -40,6 +40,7 @@ import type {
   QuickBookmarkResult,
 } from "@/types";
 import type { ShortcutCommand } from "@/utils/browser-api";
+import type { WebDAVLockInspection } from "@/types/sync";
 
 export interface ArchiveActionResult extends TabArchiveResult {
   /** For the in-page "Undo" button */
@@ -47,6 +48,10 @@ export interface ArchiveActionResult extends TabArchiveResult {
 }
 
 export interface IBackgroundService {
+  syncWebDAV(): Promise<void>;
+  clearRemoteWebDAVData(): Promise<void>;
+  inspectWebDAVLocks(): Promise<WebDAVLockInspection>;
+  unlockWebDAVLocks(tokens: string[]): Promise<void>;
   getBookmarks(): Promise<LocalBookmark[]>;
   getCategories(): Promise<LocalCategory[]>;
   getAllTags(): Promise<string[]>;

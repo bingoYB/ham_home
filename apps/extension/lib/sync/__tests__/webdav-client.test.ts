@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const mocks = vi.hoisted(() => ({
   createClient: vi.fn(),
@@ -8,6 +8,8 @@ const mocks = vi.hoisted(() => ({
   putFileContents: vi.fn(),
   lock: vi.fn(),
   unlock: vi.fn(),
+  customRequest: vi.fn(),
+  stat: vi.fn(),
 }));
 
 vi.mock("webdav", () => ({
@@ -16,6 +18,7 @@ vi.mock("webdav", () => ({
 }));
 
 import { WebDAVAdapter, SyncError, toSyncError } from "../webdav-client";
+import { memoryLockStore, lockXML } from "./lock-test-helpers";
 
 function httpError(status: number) {
   const err: any = new Error(`Invalid response: ${status}`);
@@ -23,8 +26,21 @@ function httpError(status: number) {
   return err;
 }
 
+afterEach(() => vi.useRealTimers());
+
 beforeEach(() => {
   vi.clearAllMocks();
+  mocks.customRequest.mockImplementation(async (path, options) => {
+    if (options.method === 'LOCK') {
+      const lock = await mocks.lock(path, { timeout: options.headers.Timeout, headers: { Depth: options.headers.Depth } });
+      return new Response(lockXML(lock.token, '', lock.serverTimeout), { status: 200 });
+    }
+    if (options.method === 'UNLOCK') {
+      await mocks.unlock(path, options.headers['Lock-Token']);
+      return new Response(null, { status: 204 });
+    }
+    throw httpError(404);
+  });
   mocks.createClient.mockImplementation(() => ({
     getFileContents: mocks.getFileContents,
     createDirectory: mocks.createDirectory,
@@ -32,8 +48,11 @@ beforeEach(() => {
     putFileContents: mocks.putFileContents,
     lock: mocks.lock,
     unlock: mocks.unlock,
+    customRequest: mocks.customRequest,
+    stat: mocks.stat,
     getDirectoryContents: vi.fn(),
   }));
+  mocks.stat.mockRejectedValue(httpError(404));
 });
 
 describe('server-enforced sync lock', () => {
@@ -59,8 +78,8 @@ describe('server-enforced sync lock', () => {
       return true;
     });
     mocks.createDirectory.mockResolvedValue(undefined);
-    const a = new WebDAVAdapter();
-    const b = new WebDAVAdapter();
+    const a = new WebDAVAdapter(memoryLockStore());
+    const b = new WebDAVAdapter(memoryLockStore());
     a.init(config);
     b.init(config);
     await a.withExclusiveLock(root, async () => {
@@ -80,7 +99,7 @@ describe('server-enforced sync lock', () => {
   });
 
   it('fails closed for unsupported LOCK and remains reusable', async () => {
-    const adapter = new WebDAVAdapter();
+    const adapter = new WebDAVAdapter(memoryLockStore());
     adapter.init(config);
     mocks.lock.mockRejectedValueOnce(httpError(405));
     const operation = vi.fn();
@@ -93,7 +112,7 @@ describe('server-enforced sync lock', () => {
   });
 
   it('includes the token on directory creation and deletion, and releases on failure', async () => {
-    const adapter = new WebDAVAdapter();
+    const adapter = new WebDAVAdapter(memoryLockStore());
     adapter.init(config);
     mocks.lock.mockResolvedValue({ token: 'urn:uuid:ok', serverTimeout: 'Second-600' });
     mocks.unlock.mockResolvedValue(undefined);
@@ -106,8 +125,8 @@ describe('server-enforced sync lock', () => {
       throw new Error('operation failed');
     })).rejects.toThrow('operation failed');
     const headers = { If: '<https://dav.test/dav/HamHomeSync> (<urn:uuid:ok>)' };
-    expect(mocks.createDirectory).toHaveBeenCalledWith(`${root}/bookmarks`, { recursive: true, headers });
-    expect(mocks.deleteFile).toHaveBeenCalledWith(`${root}/old.json`, { headers });
+    expect(mocks.createDirectory).toHaveBeenCalledWith(`${root}/bookmarks`, expect.objectContaining({ recursive: false, headers }));
+    expect(mocks.deleteFile).toHaveBeenCalledWith(`${root}/old.json`, expect.objectContaining({ headers }));
     expect(mocks.unlock).toHaveBeenCalledWith(root, '<urn:uuid:ok>');
   });
 });
@@ -121,14 +140,14 @@ describe("WebDAVAdapter.init", () => {
   };
 
   it("reuses the client while credentials stay the same", () => {
-    const adapter = new WebDAVAdapter();
+    const adapter = new WebDAVAdapter(memoryLockStore());
     adapter.init(baseConfig);
     adapter.init(baseConfig);
     expect(mocks.createClient).toHaveBeenCalledTimes(1);
   });
 
   it("rebuilds the client when the password changes", () => {
-    const adapter = new WebDAVAdapter();
+    const adapter = new WebDAVAdapter(memoryLockStore());
     adapter.init(baseConfig);
     adapter.init({ ...baseConfig, password: "new-pwd" });
     expect(mocks.createClient).toHaveBeenCalledTimes(2);
@@ -136,7 +155,7 @@ describe("WebDAVAdapter.init", () => {
   });
 
   it("trims whitespace around url and credentials", () => {
-    const adapter = new WebDAVAdapter();
+    const adapter = new WebDAVAdapter(memoryLockStore());
     adapter.init({ ...baseConfig, url: " https://nas.example.com/dav/ ", username: " user ", password: "pwd\n" });
     expect(mocks.createClient).toHaveBeenCalledWith(
       "https://nas.example.com/dav",
@@ -145,7 +164,7 @@ describe("WebDAVAdapter.init", () => {
   });
 
   it("rejects a url without protocol", () => {
-    const adapter = new WebDAVAdapter();
+    const adapter = new WebDAVAdapter(memoryLockStore());
     expect(() => adapter.init({ ...baseConfig, url: "nas.example.com/dav" })).toThrowError(SyncError);
     expect(adapter.isInitialized).toBe(false);
   });
@@ -159,8 +178,23 @@ describe("WebDAVAdapter operations", () => {
     password: "pwd",
   };
 
+  it('aborts a stalled directory probe and still releases the sync lock', async () => {
+    vi.useFakeTimers();
+    const adapter = new WebDAVAdapter(memoryLockStore());
+    adapter.init(config);
+    mocks.lock.mockResolvedValue({ token: 'urn:uuid:probe', serverTimeout: 'Second-600' });
+    mocks.unlock.mockResolvedValue(undefined);
+    mocks.stat.mockImplementationOnce((_path, { signal }) => new Promise((_resolve, reject) => {
+      signal.addEventListener('abort', () => reject(new DOMException('Request timed out', 'AbortError')));
+    }));
+    const result = expect(adapter.withExclusiveLock('/HamHomeSync', () => adapter.ensureDirectory('/HamHomeSync/bookmarks'))).rejects.toMatchObject({ code: 'network' });
+    await vi.advanceTimersByTimeAsync(30_000);
+    await result;
+    expect(mocks.unlock).toHaveBeenCalledWith('/HamHomeSync', '<urn:uuid:probe>');
+  });
+
   it("maps a 401 to an auth error instead of swallowing it", async () => {
-    const adapter = new WebDAVAdapter();
+    const adapter = new WebDAVAdapter(memoryLockStore());
     adapter.init(config);
     mocks.getFileContents.mockRejectedValue(httpError(401));
 
@@ -168,7 +202,7 @@ describe("WebDAVAdapter operations", () => {
   });
 
   it("detects a 401 that the webdav package swallowed in digest mode", async () => {
-    const adapter = new WebDAVAdapter();
+    const adapter = new WebDAVAdapter(memoryLockStore());
     adapter.init(config);
     mocks.getFileContents.mockResolvedValue({ status: 401, data: "<html>Unauthorized</html>" });
 
@@ -177,7 +211,7 @@ describe("WebDAVAdapter operations", () => {
   });
 
   it("returns null for a missing file", async () => {
-    const adapter = new WebDAVAdapter();
+    const adapter = new WebDAVAdapter(memoryLockStore());
     adapter.init(config);
     mocks.getFileContents.mockRejectedValue(httpError(404));
 
@@ -186,7 +220,7 @@ describe("WebDAVAdapter operations", () => {
   });
 
   it("returns the file body from a detailed response", async () => {
-    const adapter = new WebDAVAdapter();
+    const adapter = new WebDAVAdapter(memoryLockStore());
     adapter.init(config);
     mocks.getFileContents.mockResolvedValue({ status: 200, data: '{"a":1}' });
 
@@ -194,7 +228,7 @@ describe("WebDAVAdapter operations", () => {
   });
 
   it("treats an existing directory as success", async () => {
-    const adapter = new WebDAVAdapter();
+    const adapter = new WebDAVAdapter(memoryLockStore());
     adapter.init(config);
     mocks.createDirectory.mockRejectedValue(httpError(405));
 
@@ -202,7 +236,7 @@ describe("WebDAVAdapter operations", () => {
   });
 
   it("propagates auth failures when deleting", async () => {
-    const adapter = new WebDAVAdapter();
+    const adapter = new WebDAVAdapter(memoryLockStore());
     adapter.init(config);
     mocks.deleteFile.mockRejectedValue(httpError(401));
 
