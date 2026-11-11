@@ -1,8 +1,25 @@
 import { describe, expect, it } from 'vitest';
-import { resolveBookmarkTreeNodes, type BrowserBookmarkTreeNode } from '../browser-bookmark-tree';
+import { browserBookmarksToHtml, resolveBookmarkTreeNodes, type BrowserBookmarkTreeNode } from '../browser-bookmark-tree';
 
 const resolve = (children: BrowserBookmarkTreeNode[]) =>
   resolveBookmarkTreeNodes([{ id: 'root', title: '', children }]).bookmarkBarNode;
+
+describe('browserBookmarksToHtml', () => {
+  it('escapes quoted bookmarklet URLs as attributes and keeps folders and unnamed links', () => {
+    const html = browserBookmarksToHtml([{
+      id: 'folder', title: 'Tools & scripts', children: [
+        { id: 'unnamed', title: '', url: 'http://blog.bahraniapps.com/gifcam/#download' },
+        { id: 'internal', title: 'Settings', url: 'chrome://settings/importData' },
+        { id: 'script', title: '<Script>', url: 'javascript:alert("a&b<test>")' },
+      ],
+    }]);
+    expect(html).toContain('<H3>Tools &amp; scripts</H3>');
+    expect(html).toContain('HREF="http://blog.bahraniapps.com/gifcam/#download" ADD_DATE=""></A>');
+    expect(html).toContain('HREF="chrome://settings/importData"');
+    expect(html).toContain('HREF="javascript:alert(&quot;a&amp;b&lt;test&gt;&quot;)"');
+    expect(html).toContain('&lt;Script&gt;</A>');
+  });
+});
 
 describe('resolveBookmarkTreeNodes', () => {
   it.each(['1', 'toolbar_____'])('supports legacy bar %s', (id) => {

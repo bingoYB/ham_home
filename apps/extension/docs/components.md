@@ -6064,7 +6064,15 @@ Locale-aware time labels for the tab center, built on `Intl`.
 - JSON 导入时，工作空间、工作空间分类和 Tab 分组配置会随备份一起恢复
 - 同名同父级的分类不会重复创建，直接复用已有分类
 - HTML 导入时会基于书签域名通过 Cravatar favicon API 补全站点图标
+- 浏览器书签、HTML 与 JSON 导入均允许空白或缺失标题，自动用原始网址补齐名称。
+- 保留 `chrome://`、`edge://`、`about:`、`view-source:`、`javascript:` 等可解析的特殊链接；仅普通 HTTP/HTTPS 网页参与浏览器/HTML 导入时的 AI 分析、向量索引生成与站点图标补全。
+- 浏览器书签转 HTML 时同时转义属性中的引号与 HTML 字符，书签脚本不会被截断，也不会在导入时执行；特殊协议使用原始网址去重，不修改脚本查询参数或末尾斜杠。
 - 导入进度实时显示，支持大量书签的批量导入
+- 重复项统一计入“跳过重复项”，包括同批次内的重复书签，不再误报为错误。
+- 导入完成或停止后，如有异常，点击“查看失败清单（数量）”可打开明细弹窗。每项显示书签标题、网址、失败阶段和原因；部分失败的完成提示使用警告样式。
+- JSON 和 HTML 中的无效书签逐条报告，其他有效书签继续导入；存储写入异常会报告当前批次并停止后续写入。
+- AI 失败与导入失败分别标记。已保存但 AI 分析失败的书签，可在书签列表中重新分析，重新导入会跳过已有书签。
+- HTML 任务续跑保留已记录的失败明细；失败任务在重新打开页面时仍可查看，开始新任务后重置。
 
 **Tab lifecycle & read later:**
 
@@ -6074,6 +6082,20 @@ Locale-aware time labels for the tab center, built on `Intl`.
 
 ```tsx
 <ImportExportPage />
+```
+
+## ImportFailuresDialog
+
+导入异常明细的可点击入口与弹窗，沿用应用的 Dialog 样式，支持键盘关闭、长网址换行和长列表滚动。失败原因以纯文本展示。
+
+| Prop | Type | Required | Default | Description |
+| ---- | ---- | -------- | ------- | ----------- |
+| failures | `readonly ImportFailure[]` | 是 | - | 失败清单，包含标题、网址、阶段、原因代码及可选的原始错误信息；为空时隐藏入口 |
+
+```tsx
+<ImportFailuresDialog failures={[
+  { title: 'Example', url: 'https://example.com', stage: 'ai', code: 'aiFailed', message: 'Request timed out' },
+]} />
 ```
 
 ## BookmarkProvider

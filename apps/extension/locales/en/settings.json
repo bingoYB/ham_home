@@ -319,11 +319,34 @@
       "description": "Backup or migrate your bookmark data",
       "importSuccess": "Import completed",
       "importFailed": "Import failed",
+      "importCompletedWithFailures": "Import completed with failures",
       "importDetails": "Successfully imported {{imported}} bookmarks, skipped {{skipped}} duplicates",
       "importDetailsWithCategories": "Successfully imported {{imported}} bookmarks, created {{categoriesCreated}} categories, skipped {{skipped}} duplicates",
       "importDetailsWithAI": "Successfully imported {{imported}} bookmarks, AI processed {{aiProcessed}}, skipped {{skipped}} duplicates",
       "importDetailsWithAIAndCategories": "Successfully imported {{imported}} bookmarks, AI processed {{aiProcessed}}, created {{categoriesCreated}} categories, skipped {{skipped}} duplicates",
-      "importErrorSkipped": "{{count}} skipped due to errors",
+      "failures": {
+        "view": "View failure list ({{count}})",
+        "title": "Import failure list",
+        "description": "{{importCount}} import failures, {{aiCount}} AI analysis failures. Duplicates are excluded.",
+        "untitled": "Untitled bookmark",
+        "noUrl": "No URL provided",
+        "reason": "Reason: {{reason}}",
+        "aiSaved": "The bookmark was saved without AI analysis. Retry AI analysis from the bookmark list.",
+        "close": "Close",
+        "stages": {
+          "import": "Import failed",
+          "ai": "AI analysis failed"
+        },
+        "reasons": {
+          "invalidBookmark": "Invalid bookmark data",
+          "missingUrl": "Bookmark URL is missing",
+          "invalidUrl": "Invalid URL format",
+          "unsupportedUrl": "HTML imports only support http and https URLs",
+          "missingTitle": "Bookmark title is missing",
+          "writeFailed": "Failed to save the bookmark. Check browser storage and import again.",
+          "aiFailed": "AI analysis failed. Check your AI configuration or network connection."
+        }
+      },
       "aiErrorTitle": "AI Analysis Failed for Some Bookmarks",
       "aiErrorDesc": "AI API calls failed. Bookmarks were imported as 'Uncategorized' without summaries. Please check your AI config or network status.",
       "export": {

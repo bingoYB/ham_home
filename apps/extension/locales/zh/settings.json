@@ -319,11 +319,34 @@
       "description": "备份或迁移你的书签数据",
       "importSuccess": "导入完成",
       "importFailed": "导入失败",
+      "importCompletedWithFailures": "导入完成，存在失败项",
       "importDetails": "成功导入 {{imported}} 个书签，跳过 {{skipped}} 个重复项",
       "importDetailsWithCategories": "成功导入 {{imported}} 个书签，创建 {{categoriesCreated}} 个分类，跳过 {{skipped}} 个重复项",
       "importDetailsWithAI": "成功导入 {{imported}} 个书签，AI 处理 {{aiProcessed}} 个，跳过 {{skipped}} 个重复项",
       "importDetailsWithAIAndCategories": "成功导入 {{imported}} 个书签，AI 处理 {{aiProcessed}} 个，创建 {{categoriesCreated}} 个分类，跳过 {{skipped}} 个重复项",
-      "importErrorSkipped": "{{count}} 个因错误跳过",
+      "failures": {
+        "view": "查看失败清单（{{count}}）",
+        "title": "导入失败清单",
+        "description": "导入失败 {{importCount}} 项，AI 分析失败 {{aiCount}} 项。重复书签不计入失败。",
+        "untitled": "未命名书签",
+        "noUrl": "未提供网址",
+        "reason": "失败原因：{{reason}}",
+        "aiSaved": "书签已保存，本次未完成 AI 分析。可在书签列表中重新进行 AI 分析。",
+        "close": "关闭",
+        "stages": {
+          "import": "导入失败",
+          "ai": "AI 分析失败"
+        },
+        "reasons": {
+          "invalidBookmark": "书签数据格式不正确",
+          "missingUrl": "缺少书签网址",
+          "invalidUrl": "网址格式不正确",
+          "unsupportedUrl": "HTML 导入仅支持 http 和 https 网址",
+          "missingTitle": "缺少书签标题",
+          "writeFailed": "书签保存失败，请检查浏览器存储状态后重新导入",
+          "aiFailed": "AI 分析失败，请检查 AI 配置或网络状态"
+        }
+      },
       "aiErrorTitle": "部分书签 AI 分析出错",
       "aiErrorDesc": "AI 接口调用失败，书签已作为「未分类」导入，且未生成摘要。请检查 AI 配置或网络状态后再试。",
       "export": {

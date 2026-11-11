@@ -1,4 +1,3 @@
-import { toImportedBookmark, type ImportedBookmark } from "@/utils/bookmark-import.utils";
 /**
  * ImportExportPage 导入导出页面
  */
@@ -44,6 +43,15 @@ import { importTaskStorage } from "@/lib/storage/import-task-storage";
 import { getBackgroundService } from "@/lib/services";
 import { importLifecycleData } from "@/lib/services/read-later-import-service";
 import { bookmarkAnalysisService } from "@/lib/agent";
+import { ImportFailuresDialog } from "@/components/import-export/ImportFailuresDialog";
+import { useImportReport } from "@/hooks/useImportReport";
+import {
+  canAnalyzeImportedBookmark,
+  getBookmarkImportFailure,
+  getImportErrorMessage,
+  getImportedBookmarkTitle,
+} from "@/utils/bookmark-import.utils";
+import type { ImportFailure } from "@/types/bookmark-import";
 import {
   useChromeBookmarks,
   ChromeBookmarkError,
@@ -85,6 +93,7 @@ export function ImportExportPage() {
   } = useChromeBookmarks();
 
   const [importing, setImporting] = useState(false);
+  const { failures, resetFailures, recordFailures, getFailures, importBookmarks } = useImportReport();
   // The tab archive is left out by default: it may hold sign-in links or one-time tokens
   const [includeTabArchive, setIncludeTabArchive] = useState(false);
   const [preserveFolders, setPreserveFolders] = useState(true);
@@ -221,10 +230,16 @@ export function ImportExportPage() {
         return;
       }
 
-      if (
-        task.progress.status === "failed" ||
-        task.progress.status === "cancelled"
-      ) {
+      if (task.progress.status === "failed") {
+        resetFailures(task.progress.failures);
+        setImportResult({
+          success: false,
+          message: t("settings.importExport.importFailed", { ns: "settings" }),
+          details: task.progress.error,
+        });
+        return;
+      }
+      if (task.progress.status === "cancelled") {
         await importTaskStorage.clearHtmlTask();
         return;
       }
@@ -252,7 +267,7 @@ export function ImportExportPage() {
             ? error.message
             : t("settings.importExport.errors.unknown", { ns: "settings" });
 
-        await importTaskStorage.markHtmlTaskFailed(errorMessage);
+        await importTaskStorage.markHtmlTaskFailed(errorMessage, getFailures());
         setImportResult({
           success: false,
           message: t("settings.importExport.importFailed", { ns: "settings" }),
@@ -282,6 +297,7 @@ export function ImportExportPage() {
     if (!file) return;
 
     cancelledRef.current = false;
+    resetFailures();
     setImporting(true);
     setImportResult(null);
 
@@ -289,6 +305,7 @@ export function ImportExportPage() {
     pauseWatchers();
 
     try {
+      await importTaskStorage.clearHtmlTask();
       const content = await file.text();
 
       if (file.name.endsWith(".json")) {
@@ -325,6 +342,7 @@ export function ImportExportPage() {
   // 从浏览器导入
   const handleBrowserImport = async () => {
     cancelledRef.current = false;
+    resetFailures();
     setImporting(true);
     setImportResult(null);
 
@@ -332,6 +350,7 @@ export function ImportExportPage() {
     pauseWatchers();
 
     try {
+      await importTaskStorage.clearHtmlTask();
       const { html } = await getChromeBookmarks();
 
       // 使用现有的 HTML 导入逻辑
@@ -439,20 +458,17 @@ export function ImportExportPage() {
     const importedBookmarkIds: string[] = [];
 
     if (data.bookmarks && Array.isArray(data.bookmarks)) {
-      const bookmarkInputs = data.bookmarks.map((bookmark: ImportedBookmark) =>
-        toImportedBookmark(bookmark, categoryIdMap),
-      );
-
-      const created = await bookmarkStorage.createBookmarks(bookmarkInputs);
+      const { created, duplicateSkipped } = await importBookmarks(data.bookmarks, categoryIdMap);
       imported = created.length;
-      skipped = data.bookmarks.length - created.length;
+      skipped = duplicateSkipped;
       importedBookmarkIds.push(...created.map((b) => b.id));
     }
 
     // 剪藏是结构化文本，可随 JSON 迁移；页面截图二进制不进入 JSON 导出。
     if (Array.isArray(data.clips) && Array.isArray(data.bookmarks)) {
       const sourceBookmarkUrls = new Map<string, string>(
-        data.bookmarks.map((bookmark: { id: string; url: string }) => [
+        data.bookmarks.filter((bookmark: unknown) => bookmark && typeof bookmark === "object")
+          .map((bookmark: { id: string; url: string }) => [
           bookmark.id,
           bookmark.url,
         ]),
@@ -510,7 +526,12 @@ export function ImportExportPage() {
     }
 
     // Read later state, lifecycle settings and, optionally, the tab archive
-    const lifecycleImport = await importLifecycleData(data, new Set(importedBookmarkIds));
+    const lifecycleImport = await importLifecycleData({
+      ...data,
+      bookmarks: Array.isArray(data.bookmarks)
+        ? data.bookmarks.filter((bookmark: unknown) => bookmark && typeof bookmark === "object")
+        : undefined,
+    }, new Set(importedBookmarkIds));
 
     let workspaceCategoriesCreated = 0;
     let workspacesImported = 0;
@@ -709,7 +730,7 @@ export function ImportExportPage() {
     },
     options: ImportTaskOptions,
   ) => {
-    const totalSkipped = stats.skipped + stats.duplicateSkipped;
+    const totalSkipped = stats.duplicateSkipped;
 
     let details: string;
     if (options.preserveFolders && stats.categoriesCreated > 0) {
@@ -742,10 +763,6 @@ export function ImportExportPage() {
         skipped: totalSkipped,
         ns: "settings",
       });
-    }
-
-    if (stats.skipped > 0) {
-      details += ` (${t("settings.importExport.importErrorSkipped", { count: stats.skipped, ns: "settings" })})`;
     }
 
     return details;
@@ -823,15 +840,11 @@ export function ImportExportPage() {
           const url = link.getAttribute("href");
           const title = link.textContent?.trim();
 
-          if (url && title && url.startsWith("http")) {
-            bookmarksToImport.push({
-              url,
-              title,
-              parentCategoryId: options.preserveFolders
-                ? parentCategoryId
-                : null,
-            });
-          }
+          bookmarksToImport.push({
+            url: url || "",
+            title: getImportedBookmarkTitle(url || "", title),
+            parentCategoryId: options.preserveFolders ? parentCategoryId : null,
+          });
         }
 
         if (!options.preserveFolders && nestedDl) {
@@ -849,6 +862,7 @@ export function ImportExportPage() {
   };
 
   const runHtmlImportTask = async (task: HtmlImportTask) => {
+    resetFailures(task.progress.failures);
     const abortController = new AbortController();
     importAbortControllerRef.current = abortController;
     if (cancelledRef.current) abortController.abort();
@@ -863,12 +877,13 @@ export function ImportExportPage() {
 
     let currentIndex = task.progress.currentIndex;
     let imported = task.progress.imported;
-    let skipped = task.progress.skipped;
-    let duplicateSkipped = task.progress.duplicateSkipped;
+    // Older task snapshots used `skipped` for duplicates found during writes.
+    let skipped = task.progress.failures ? task.progress.skipped : 0;
+    let duplicateSkipped = task.progress.duplicateSkipped + (task.progress.failures ? 0 : task.progress.skipped);
     let categoriesCreated = task.progress.categoriesCreated;
     let aiProcessed = task.progress.aiProcessed;
     const importedBookmarkIds = [...task.progress.importedBookmarkIds];
-    let firstAiError: string | null = null;
+    let firstAiError: string | null = task.progress.aiError || null;
 
     let tInit = performance.now();
     let allCategories = await bookmarkStorage.getCategories();
@@ -907,6 +922,7 @@ export function ImportExportPage() {
           aiProcessed,
           importedBookmarkIds: [...importedBookmarkIds],
           aiError: firstAiError || undefined,
+          failures: getFailures(),
         }));
       } catch (error) {
         console.warn(
@@ -934,19 +950,25 @@ export function ImportExportPage() {
       const batch = task.payload.bookmarksToImport.slice(
         batchStart,
         batchStart + BATCH_SIZE,
-      );
+      ).map((bookmark) => ({
+        ...bookmark,
+        title: getImportedBookmarkTitle(bookmark.url, bookmark.title),
+      }));
       const tagsSnapshot = [...existingTags];
+      const batchNormalizedUrls = new Set(existingNormalizedUrls);
 
       // 第一步：预处理每条书签
       type PreprocessedBookmark = {
         bm: BookmarkToImport;
-        status: "ready" | "duplicate";
+        status: "ready" | "duplicate" | "invalid";
         description: string;
         categoryId: string | null;
         tags: string[];
         aiProcessed: number;
         newCategories: LocalCategory[];
         error?: unknown;
+        aiFailed?: boolean;
+        failure?: ImportFailure;
       };
 
       // AI 模式下串行预处理：每处理一条书签后立即将新分类合并回 allCategories，
@@ -958,9 +980,17 @@ export function ImportExportPage() {
         preprocessed = [];
         for (const bm of batch) {
           if (cancelledRef.current) break;
+          const failure = getBookmarkImportFailure(bm);
+          if (failure) {
+            preprocessed.push({
+              bm, status: "invalid", description: "", categoryId: null,
+              tags: [], aiProcessed: 0, newCategories: [], failure,
+            });
+            continue;
+          }
           // 用 normalized URL 去重
           const normalizedUrl = bookmarkStorage.normalizeUrlPublic(bm.url);
-          if (existingNormalizedUrls.has(normalizedUrl)) {
+          if (batchNormalizedUrls.has(normalizedUrl)) {
             preprocessed.push({
               bm,
               status: "duplicate",
@@ -972,12 +1002,23 @@ export function ImportExportPage() {
             });
             continue;
           }
+          batchNormalizedUrls.add(normalizedUrl);
+
+          if (!canAnalyzeImportedBookmark(bm.url)) {
+            preprocessed.push({
+              bm, status: "ready", description: "", categoryId: bm.parentCategoryId,
+              tags: [], aiProcessed: 0, newCategories: [],
+            });
+            continue;
+          }
 
           let description = "";
           let categoryId: string | null = bm.parentCategoryId;
           let tags: string[] = [];
           let aiProcessedCount = 0;
           let newCategories: LocalCategory[] = [];
+          let aiError: unknown;
+          let aiFailed = false;
 
           try {
             // 传入当前最新的 allCategories，确保能感知到本批次已创建的分类
@@ -1006,6 +1047,8 @@ export function ImportExportPage() {
             }
           } catch (err) {
             if (cancelledRef.current) break;
+            aiError = err;
+            aiFailed = true;
             // AI 分析失败记录一次错误原因，但不阻断导入
             if (!firstAiError) {
               firstAiError = err instanceof Error ? err.message : String(err);
@@ -1020,12 +1063,19 @@ export function ImportExportPage() {
             tags,
             aiProcessed: aiProcessedCount,
             newCategories,
+            error: aiError,
+            aiFailed,
           });
         }
       } else {
         preprocessed = batch.map((bm) => {
+          const failure = getBookmarkImportFailure(bm);
+          if (failure) return {
+            bm, status: "invalid" as const, description: "", categoryId: null,
+            tags: [], aiProcessed: 0, newCategories: [], failure,
+          };
           const normalizedUrl = bookmarkStorage.normalizeUrlPublic(bm.url);
-          if (existingNormalizedUrls.has(normalizedUrl)) {
+          if (batchNormalizedUrls.has(normalizedUrl)) {
             return {
               bm,
               status: "duplicate" as const,
@@ -1036,6 +1086,7 @@ export function ImportExportPage() {
               newCategories: [],
             };
           }
+          batchNormalizedUrls.add(normalizedUrl);
           return {
             bm,
             status: "ready" as const,
@@ -1059,9 +1110,12 @@ export function ImportExportPage() {
       );
 
       // 第二步：收集需要写入的书签，一次性批量创建
+      const invalidFailures = preprocessed.flatMap((p) => p.failure ? [p.failure] : []);
+      recordFailures(invalidFailures);
+      skipped += invalidFailures.length;
       const readyItems = preprocessed.filter((p) => p.status === "ready");
       const bookmarkInputs = readyItems.map((p) => {
-        const hostname = safeGetHostname(p.bm.url);
+        const hostname = canAnalyzeImportedBookmark(p.bm.url) ? safeGetHostname(p.bm.url) : "";
         const favicon = hostname ? getFavicon(hostname) : "";
         return {
           url: p.bm.url,
@@ -1075,7 +1129,8 @@ export function ImportExportPage() {
       });
 
       const tWrite = performance.now();
-      const created = await bookmarkStorage.createBookmarks(bookmarkInputs);
+      const result = await importBookmarks(bookmarkInputs);
+      const { created } = result;
       console.log(
         `[ImportExport][Perf] Batch#${batchIndex} createBookmarks: ${(performance.now() - tWrite).toFixed(1)}ms, input=${bookmarkInputs.length}, created=${created.length}`,
       );
@@ -1087,13 +1142,21 @@ export function ImportExportPage() {
       // 将已创建的 URL 加入去重集合（使用 normalized URL）
       for (const bm of created) {
         existingNormalizedUrls.add(bookmarkStorage.normalizeUrlPublic(bm.url));
-        importedBookmarkIds.push(bm.id);
+        // This list is only used to queue page embeddings after HTML/browser imports.
+        if (canAnalyzeImportedBookmark(bm.url)) importedBookmarkIds.push(bm.id);
       }
       imported += created.length;
-      // readyItems 中未成功创建的（被 createBookmarks 的内部去重跳过）
-      skipped += readyItems.length - created.length;
+      duplicateSkipped += result.duplicateSkipped;
+      skipped += result.failures.length;
+      const createdUrls = new Set(created.map((bookmark) => bookmarkStorage.normalizeUrlPublic(bookmark.url)));
 
       for (const p of preprocessed) {
+        if (p.aiFailed && createdUrls.has(bookmarkStorage.normalizeUrlPublic(p.bm.url))) {
+          recordFailures([{
+            title: p.bm.title, url: p.bm.url, stage: "ai", code: "aiFailed",
+            message: getImportErrorMessage(p.error),
+          }]);
+        }
         aiProcessed += p.aiProcessed;
 
         if (p.status === "duplicate") {
@@ -1220,7 +1283,7 @@ export function ImportExportPage() {
         error instanceof Error
           ? error.message
           : t("settings.importExport.errors.unknown", { ns: "settings" });
-      await importTaskStorage.markHtmlTaskFailed(errorMessage);
+      await importTaskStorage.markHtmlTaskFailed(errorMessage, getFailures());
       throw error;
     }
   };
@@ -1561,17 +1624,23 @@ export function ImportExportPage() {
             <div
               className={`mt-4 p-4 rounded-lg flex items-start gap-3 ${
                 importResult.success
-                  ? "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-200"
+                  ? failures.length
+                    ? "bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-200"
+                    : "bg-emerald-50 dark:bg-emerald-950/20 text-emerald-800 dark:text-emerald-200"
                   : "bg-red-50 dark:bg-red-950/20 text-red-800 dark:text-red-200"
               }`}
             >
-              {importResult.success ? (
+              {importResult.success && !failures.length ? (
                 <Check className="h-5 w-5 mt-0.5" />
               ) : (
                 <AlertCircle className="h-5 w-5 mt-0.5" />
               )}
               <div>
-                <p className="font-medium">{importResult.message}</p>
+                <p className="font-medium">
+                  {importResult.success && failures.length
+                    ? t("settings.importExport.importCompletedWithFailures", { ns: "settings" })
+                    : importResult.message}
+                </p>
                 {importResult.details && (
                   <p className="text-sm opacity-80 mt-1">
                     {importResult.details}
@@ -1581,7 +1650,13 @@ export function ImportExportPage() {
             </div>
           )}
 
-          {/* AI 错误提示 */}
+          {/* 导入及 AI 失败明细 */}
+          {importResult && failures.length > 0 && (
+            <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-3">
+              <ImportFailuresDialog failures={failures} />
+            </div>
+          )}
+
           {importResult && importResult.aiError && (
             <div className="mt-4 p-4 rounded-lg flex items-start gap-3 bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-200 border border-amber-200 dark:border-amber-900/50">
               <Sparkles className="h-5 w-5 mt-0.5 text-amber-500" />

@@ -5,7 +5,7 @@
 import { useState } from 'react';
 import { browser } from 'wxt/browser';
 import type { LocalBookmark, LocalCategory } from '@/types';
-import { resolveBookmarkTreeNodes, type BrowserBookmarkTreeNode as ChromeBookmarkNode } from '@/utils/browser-bookmark-tree';
+import { browserBookmarksToHtml, resolveBookmarkTreeNodes, type BrowserBookmarkTreeNode as ChromeBookmarkNode } from '@/utils/browser-bookmark-tree';
 export type { BrowserBookmarkTreeNode as ChromeBookmarkNode } from '@/utils/browser-bookmark-tree';
 
 /** 可识别错误类型，供上层组件做 i18n 映射 */
@@ -26,46 +26,6 @@ export class ChromeBookmarkError extends Error {
 export function useChromeBookmarks() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  /**
-   * 将书签树转换为 HTML 格式（与浏览器导出的格式兼容）
-   */
-  const convertToHTML = (nodes: ChromeBookmarkNode[]): string => {
-    const buildDL = (bookmarkNodes: ChromeBookmarkNode[]): string => {
-      if (!bookmarkNodes.length) return '';
-      
-      const items = bookmarkNodes.map(node => {
-        if (node.children && node.children.length > 0) {
-          // 这是一个文件夹
-          return `<DT><H3>${escapeHTML(node.title)}</H3>\n<DL><p>\n${buildDL(node.children)}</DL><p>`;
-        } else if (node.url) {
-          // 这是一个书签
-          const date = node.dateAdded ? Math.floor(node.dateAdded / 1000) : '';
-          return `<DT><A HREF="${escapeHTML(node.url)}" ADD_DATE="${date}">${escapeHTML(node.title)}</A>`;
-        }
-        return '';
-      }).filter(Boolean).join('\n');
-
-      return items;
-    };
-
-    const escapeHTML = (text: string): string => {
-      const div = document.createElement('div');
-      div.textContent = text;
-      return div.innerHTML;
-    };
-
-    const html = `<!DOCTYPE NETSCAPE-Bookmark-file-1>
-<!-- This is an automatically generated file. -->
-<META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8">
-<TITLE>Bookmarks</TITLE>
-<H1>Bookmarks</H1>
-<DL><p>
-${buildDL(nodes)}
-</DL><p>`;
-
-    return html;
-  };
 
   /**
    * 获取所有浏览器书签
@@ -100,7 +60,7 @@ ${buildDL(nodes)}
       const count = countBookmarks(tree);
       
       // 转换为 HTML 格式
-      const html = convertToHTML(tree);
+      const html = browserBookmarksToHtml(tree);
 
       return { html, count };
     } catch (err) {

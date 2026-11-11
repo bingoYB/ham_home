@@ -35,6 +35,20 @@ describe("normalizeBookmarkUrl", () => {
   it("returns unparsable URLs untouched", () => {
     expect(normalizeBookmarkUrl("not a url")).toBe("not a url");
   });
+
+  it.each([
+    'chrome://newtab/',
+    'view-source:https://example.com/?utm_source=keep',
+    'javascript:alert("hello?utm_source=keep&ref=source")//',
+  ])('preserves non-web URL %s exactly', (url) => {
+    expect(normalizeBookmarkUrl(url)).toBe(url);
+  });
+
+  it('does not collapse bookmarklets with different source code', () => {
+    expect(normalizeBookmarkUrl('javascript:void(0)//')).not.toBe(
+      normalizeBookmarkUrl('javascript:void(0)/'),
+    );
+  });
 });
 
 describe("buildDuplicateGroups", () => {

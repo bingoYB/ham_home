@@ -1,5 +1,6 @@
 import type { Download } from "@playwright/test";
 import { test, expect } from "../fixtures";
+import { resolveBookmarkTreeNodes } from "../../utils/browser-bookmark-tree";
 import {
   createLibraryFixtures,
   createTabGroupRuleFixture,
@@ -201,6 +202,68 @@ test.describe("IMPORT 导入导出", () => {
     );
     const bookmarks = await getBookmarks(extensionWorker);
     expect(bookmarks.filter((item) => item.url.includes("html-import"))).toHaveLength(1);
+  });
+
+  test("BROWSERIMPORT-001 保留无标题书签、内部链接和带引号的书签脚本", async ({
+    context, extensionId, extensionWorker, e2eVariant,
+  }) => {
+    const t = e2eVariant.text;
+    const tree = await extensionWorker.evaluate(() => chrome.bookmarks.getTree());
+    const { bookmarkBarNode } = resolveBookmarkTreeNodes(tree);
+    const source = await extensionWorker.evaluate(async (parentId) => {
+      const folder = await chrome.bookmarks.create({ parentId, title: 'Tools & scripts' });
+      const bookmarks = [
+        { title: '', url: 'http://blog.bahraniapps.com/gifcam/#download' },
+        { title: '新标签页', url: 'chrome://newtab/' },
+        { title: '导入设置', url: 'chrome://settings/importData' },
+        { title: '源码', url: 'view-source:https://browser-import.example.com/source' },
+        { title: 'Script <tool>', url: 'javascript:globalThis.__bookmarkImportExecuted=true;void("a&b<test>")//' },
+      ];
+      return Promise.all(bookmarks.map((bookmark) => chrome.bookmarks.create({ ...bookmark, parentId: folder.id })));
+    }, bookmarkBarNode.id);
+
+    const page = await openAppPage(context, extensionId, 'import-export');
+    await page.getByRole('button', { name: new RegExp(t('从浏览器导入', 'Import from Browser')) }).click();
+    await expect(page.getByText(t('导入完成', 'Import completed'), { exact: true })).toBeVisible();
+    const imported = await getBookmarks(extensionWorker);
+    for (const bookmark of source) {
+      expect(imported).toContainEqual(expect.objectContaining({
+        url: bookmark.url, title: bookmark.title || bookmark.url,
+      }));
+    }
+    await expect(page.getByRole('button', { name: /查看失败清单|View failure list/ })).toHaveCount(0);
+    expect(await page.evaluate(() => (window as any).__bookmarkImportExecuted)).toBeUndefined();
+  });
+
+  test("HTMLIMPORT-SPECIAL 特殊链接在 AI 导入模式中原样保存且不触发 AI", async ({
+    context, extensionId, extensionWorker, e2eVariant,
+  }) => {
+    const t = e2eVariant.text;
+    await extensionWorker.evaluate(async () => {
+      const { aiConfig = {} } = await chrome.storage.sync.get('aiConfig');
+      await chrome.storage.sync.set({ aiConfig: { ...aiConfig, apiKey: '' } });
+    });
+    const page = await openAppPage(context, extensionId, 'import-export');
+    await page.getByRole('checkbox', { name: t('使用 AI 自动分类打标', 'Use AI for auto categorization') }).check();
+    await setHiddenFileInput(page, 'input[type="file"]', {
+      name: 'special-bookmarks.html', mimeType: 'text/html',
+      buffer: Buffer.from(`<DL>
+        <DT><A HREF="chrome://newtab/"></A>
+        <DT><A HREF="chrome://kill/">内部页面</A>
+        <DT><A HREF="view-source:https://html-special.example.com/source">源码</A>
+        <DT><A HREF="javascript:globalThis.__bookmarkImportExecuted=true;void(&quot;a&amp;b&lt;test&gt;&quot;)//">脚本</A>
+        <DT><A HREF="about:blank">空白页</A>
+      </DL>`),
+    });
+    await expect(page.getByText(t('导入完成', 'Import completed'), { exact: true })).toBeVisible();
+    const imported = await getBookmarks(extensionWorker);
+    expect(imported).toHaveLength(5);
+    expect(imported).toContainEqual(expect.objectContaining({ title: 'chrome://newtab/', url: 'chrome://newtab/' }));
+    expect(imported).toContainEqual(expect.objectContaining({
+      url: 'javascript:globalThis.__bookmarkImportExecuted=true;void("a&b<test>")//',
+    }));
+    await expect(page.getByRole('button', { name: /查看失败清单|View failure list/ })).toHaveCount(0);
+    expect(await page.evaluate(() => (window as any).__bookmarkImportExecuted)).toBeUndefined();
   });
 
   test("HTMLIMPORT-002 HTML 导入取消和恢复", async ({

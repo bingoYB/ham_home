@@ -1,4 +1,5 @@
 import { nanoid } from "nanoid";
+import type { ImportFailure } from '@/types/bookmark-import';
 
 export interface ImportTaskOptions {
   preserveFolders: boolean;
@@ -32,6 +33,7 @@ export interface HtmlImportTaskProgress {
   aiProcessed: number;
   importedBookmarkIds: string[];
   aiError?: string;
+  failures?: ImportFailure[];
   error?: string;
   updatedAt: number;
 }
@@ -86,6 +88,7 @@ class ImportTaskStorage {
       categoriesCreated: input.categoriesCreated,
       aiProcessed: 0,
       importedBookmarkIds: [],
+      failures: [],
       updatedAt: now,
     };
 
@@ -137,11 +140,12 @@ class ImportTaskStorage {
     }));
   }
 
-  async markHtmlTaskFailed(error: string): Promise<void> {
+  async markHtmlTaskFailed(error: string, failures?: ImportFailure[]): Promise<void> {
     await this.updateHtmlProgress((progress) => ({
       ...progress,
       status: "failed",
       error,
+      ...(failures ? { failures } : {}),
     }));
   }
 

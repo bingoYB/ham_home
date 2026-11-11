@@ -21,12 +21,14 @@ const TRACKING_PARAMS = [
 ];
 
 /**
- * 规范化 URL（移除 tracking 参数，统一格式）
+ * 规范化网页 URL（移除 tracking 参数，统一格式）；其他协议按原文去重。
  * 无法解析的 URL 原样返回，保证不会把两个非法 URL 误判为同一条
  */
 export function normalizeBookmarkUrl(url: string): string {
   try {
     const parsed = new URL(url);
+    // A bookmarklet's query string and trailing slash can be executable source code.
+    if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') return url;
     TRACKING_PARAMS.forEach((param) => parsed.searchParams.delete(param));
     // 移除末尾斜杠
     return parsed.toString().replace(/\/$/, '');
