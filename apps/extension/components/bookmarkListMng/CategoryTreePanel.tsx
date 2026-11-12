@@ -58,10 +58,10 @@ function TreeRow({
   return (
     <div
       className={cn(
-        "flex items-center rounded-md pr-1 text-sm transition-colors",
+        "group/category-row flex items-center rounded-md pr-1 text-sm transition-colors duration-150 motion-reduce:transition-none",
         selected
-          ? "bg-primary/10 font-medium text-primary"
-          : "text-foreground hover:bg-accent",
+          ? "bg-primary/10 font-medium text-[color-mix(in_oklab,var(--primary)_75%,var(--foreground))] hover:bg-primary/15 focus-within:bg-primary/15 dark:text-primary"
+          : "text-foreground hover:bg-foreground/5 focus-within:bg-foreground/5",
       )}
       style={{ paddingLeft: 4 + level * 14 }}
     >
@@ -94,7 +94,12 @@ function TreeRow({
       >
         <span className="shrink-0">{icon}</span>
         <span className="truncate">{label}</span>
-        <span className="ml-auto shrink-0 pl-2 text-xs tabular-nums text-muted-foreground">
+        <span className={cn(
+          "ml-auto shrink-0 pl-2 text-xs tabular-nums transition-colors duration-150 motion-reduce:transition-none",
+          selected
+            ? "text-current"
+            : "text-muted-foreground group-hover/category-row:text-foreground/80 group-focus-within/category-row:text-foreground/80",
+        )}>
           {count}
         </span>
       </button>

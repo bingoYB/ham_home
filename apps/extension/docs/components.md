@@ -6597,6 +6597,7 @@ const nav = useCategoryNavigation({ bookmarks, categories, selectedCategory });
 **行为说明：**
 
 - 选中父分类时，右侧列表包含其全部子分类下的书签（`useBookmarkSearch` 的 `includeSubCategories`）。
+- 目录行悬停和键盘焦点使用中性的正文色低透明度背景，避免深色主题的亮黄色 `accent` 与白色文字叠加；名称保持正文色，数量在交互时同步提高对比度。选中行保留主色提示，悬停时只加深同色背景，数量随选中状态使用主色。
 - 选中状态变化时（树、面包屑、子分类按钮均会触发），`useCategoryNavigation` 会自动展开其祖先节点。
 - 分类栏隐藏后，筛选栏会退回 `CategoryFilterDropdown`，并显示「显示分类栏」按钮。
 - 切换分类（以及搜索词、标签、时间等任何筛选条件变化）后列表滚回顶部（`useScrollToTopOnChange`），避免新列表较短时停在被夹紧的中下部。
