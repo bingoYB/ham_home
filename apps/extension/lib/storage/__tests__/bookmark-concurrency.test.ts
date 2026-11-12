@@ -37,12 +37,38 @@ beforeEach(() => {
         if (state.failKey === key) { state.failKey = ''; throw new Error('write failed'); }
         state.items.set(key, structuredClone(value));
       },
+      removeValue: async () => { state.items.delete(key); },
       watch: () => () => {},
     }),
   });
 });
 
 describe('background bookmark writer', () => {
+  it('preserves legacy category IDs and supports lists larger than the sync item quota', async () => {
+    const legacyCategories = Array.from({ length: 56 }, (_, index) => ({
+      id: `existing-${index}`, name: `已有分类 ${index}`, parentId: null,
+      order: index, createdAt: 1, updatedAt: 1,
+    }));
+    state.items.set('sync:categories', legacyCategories);
+    const background = await newContext();
+    background.registerBookmarkStorageService();
+    const client = (await newContext()).bookmarkStorage;
+    const created = await Promise.all(Array.from({ length: 30 }, (_, index) =>
+      client.createCategory(`投资与财经 ${index}`),
+    ));
+    const categories = await client.getCategories();
+    expect(categories).toHaveLength(86);
+    expect(categories.slice(0, 56)).toEqual(legacyCategories);
+    expect(new TextEncoder().encode(JSON.stringify(categories)).byteLength).toBeGreaterThan(8192);
+    expect(state.items.get('local:categories')).toEqual(categories);
+    await client.createBookmark({ ...input('https://category.test'), categoryId: created[0].id });
+    expect((await client.getExportSnapshot()).categories).toEqual(categories);
+    expect((await client.getBookmarks())[0].categoryId).toBe(created[0].id);
+    await client.clearBookmarkData();
+    expect(await client.getCategories()).toEqual([]);
+    expect(state.items.has('sync:categories')).toBe(false);
+  });
+
   it('preserves concurrent creates and field edits from separate contexts and the background', async () => {
     const background = await newContext();
     background.registerBookmarkStorageService();

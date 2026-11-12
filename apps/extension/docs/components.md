@@ -40,6 +40,8 @@
 | allTags | `string[]` | ✓ | - | 标签建议列表 |
 | existingBookmark | `LocalBookmark \| null` | ✓ | - | 当前 URL 已存在的书签 |
 | aiRecommendedCategory | `string \| null` | ✓ | - | AI 推荐但未创建的分类 |
+| applyingCategory | `boolean` | - | `false` | 推荐分类正在应用，期间禁用保存 |
+| categoryError | `string \| null` | - | - | 应用推荐分类失败时在分类下方显示的错误 |
 | aiStatus | `AIStatusType` | ✓ | - | AI 推荐状态 |
 | aiError | `string \| null` | ✓ | - | AI 错误信息 |
 | saving | `boolean` | ✓ | - | 是否正在保存 |
@@ -77,6 +79,8 @@
   allTags={allTags}
   existingBookmark={existingBookmark}
   aiRecommendedCategory={aiRecommendedCategory}
+  applyingCategory={applyingCategory}
+  categoryError={categoryError}
   aiStatus={aiStatus}
   aiError={aiError}
   saving={saving}
@@ -101,6 +105,8 @@
 
 **行为说明：**
 
+- AI 命中已有分类时自动选中；新分类保留为推荐项，点击「应用」后创建并选中。应用期间展示进度并阻止重复提交，失败时保留推荐和重试入口，错误显示在分类下方。
+- 应用完成后重新加载完整分类列表，包括由其他页面先行创建的分类，确保选中的 ID 能正确回显。
 - 剪藏（图片 / 选中文字）的 AI 分析主体是剪藏内容本身，不是来源页：图片以多模态附件形式发送给模型，由模型描述画面并给出分类与标签；选中文字以选段为主体，只产出分类与标签。整页书签仍走原有的页面分析提示词，三者的提示词相互独立。
 - 图片剪藏不做文本降级：模型不支持图片输入、图片下载失败或体积超限时，面板直接在 `AIStatus` 上展示可操作的错误提示，并提供重试入口。
 - 图片剪藏的标题由模型对图片的描述填充，可在保存前手动修改。
@@ -1007,6 +1013,8 @@ const { container: portalContainer } = useContentUI();
 | categories            | `LocalCategory[]`            | ✓        | -       | 分类列表                         |
 | aiRecommendedCategory | `string \| null`             | -        | -       | AI 推荐分类路径或名称            |
 | onApplyAICategory     | `() => void`                 | -        | -       | 应用 AI 推荐分类回调             |
+| applyingCategory     | `boolean`                    | -        | `false` | 是否正在应用推荐分类             |
+| categoryError        | `string \| null`             | -        | -       | 应用失败的错误提示               |
 | placeholder           | `string`                     | -        | -       | 自定义占位文案                   |
 | className             | `string`                     | -        | -       | 自定义容器样式类                 |
 
@@ -1019,6 +1027,41 @@ const { container: portalContainer } = useContentUI();
 - 打开下拉后会自动聚焦搜索框，输入字符可直接过滤分类结果
 - 已选中项使用低饱和主色提示，悬停和键盘高亮使用中性底色，避免深色主题下出现大面积高亮色
 - 组件只展示 AI 推荐分类状态；已有分类的自动匹配与选中由上层业务 hook 在 AI 结果处理阶段完成
+- 推荐仍存在且未选分类时始终显示应用入口，避免使用旧选项列表再次匹配并隐藏操作。
+
+**用法示例：**
+
+```tsx
+<CategorySelect
+  value={categoryId}
+  onChange={setCategoryId}
+  categories={categories}
+  aiRecommendedCategory={aiRecommendedCategory}
+  applyingCategory={applyingCategory}
+  categoryError={categoryError}
+  onApplyAICategory={applyAIRecommendedCategory}
+/>
+```
+
+### CategoryRecommendation
+
+保存和编辑表单共用的推荐分类提示条，展示推荐路径、应用进度以及可访问的内联错误提示。组件只负责展示，创建和重试由上层 hook 处理。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| category | `string` | ✓ | - | 推荐分类名称或路径 |
+| applying | `boolean` | - | `false` | 显示应用进度并禁用应用按钮 |
+| error | `string \| null` | - | - | 应用失败信息，使用 `role="alert"` 展示 |
+| onApply | `() => void` | - | - | 应用或重试回调 |
+
+```tsx
+<CategoryRecommendation
+  category="投资与财经"
+  applying={applyingCategory}
+  error={categoryError}
+  onApply={applyAIRecommendedCategory}
+/>
+```
 
 ---
 
@@ -4166,19 +4209,22 @@ keepShadowRootDocumentStyles(ctx);
 
 ### bookmark-storage
 
-书签和分类的 CRUD 操作，支持跨设备同步。
+书签和分类的 CRUD 操作，跨设备数据同步由 WebDAV 提供。
 
 **存储策略（分离存储）：**
 
-- 书签元数据存储在 `sync`（跨设备同步，不含 content）
+- 书签元数据和分类存储在 `local`，避免浏览器 `sync` 存储单条约 8 KB 的限制
 - 书签内容存储在 `local`（本地存储，大体积数据）
+- 旧版 `sync:categories` 在本地尚无分类数据时兼容读取；首次修改完整转存到 `local:categories`，保留分类 ID、层级和旧副本。后续以本地列表为准，空数组也不会回退复活旧数据。清空分类时同时清理旧副本。
+- 分类新增和修改不再使用浏览器原生 `storage.sync` 同步；与书签一起通过 WebDAV 同步。实时同步监听 `local:categories`，并兼容旧 `sync:categories` 的变更事件。
 
 #### 存储项
 
 | Key                      | Type                     | Description                            |
 | ------------------------ | ------------------------ | -------------------------------------- |
-| `sync:bookmarks`         | `BookmarkMeta[]`         | 书签元数据（不含 content，跨设备同步） |
-| `sync:categories`        | `LocalCategory[]`        | 分类列表（跨设备同步）                 |
+| `local:bookmarks`        | `BookmarkMeta[]`         | 书签元数据（不含 content）             |
+| `local:categories`       | `LocalCategory[] \| null` | 分类列表，`null` 表示尚未转存旧数据    |
+| `sync:categories`        | `LocalCategory[]`        | 旧版分类兼容读取副本                   |
 | `local:bookmarkContents` | `Record<string, string>` | 书签内容映射（本地存储）               |
 
 #### BookmarkStorage 方法

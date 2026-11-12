@@ -109,7 +109,7 @@ test.describe("IMPORT 导入导出", () => {
     await attachStepScreenshot(page, testInfo, "IMPORT-001-JSON导入成功");
 
     const state = await getStorageState(extensionWorker);
-    expect(state.sync.categories).toEqual(
+    expect(state.local.categories).toEqual(
       expect.arrayContaining([expect.objectContaining({ name: "导入分类" })]),
     );
     expect(state.local.workspaces).toEqual(
@@ -197,7 +197,7 @@ test.describe("IMPORT 导入导出", () => {
     await expect(page.getByText(/导入成功|成功|Import completed/).first()).toBeVisible();
     await attachStepScreenshot(page, testInfo, "HTMLIMPORT-001-HTML导入成功");
     const state = await getStorageState(extensionWorker);
-    expect(state.sync.categories).toEqual(
+    expect(state.local.categories).toEqual(
       expect.arrayContaining([expect.objectContaining({ name: "资料夹" })]),
     );
     const bookmarks = await getBookmarks(extensionWorker);

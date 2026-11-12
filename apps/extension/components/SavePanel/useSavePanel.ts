@@ -10,8 +10,9 @@ import {
   configStorage,
 } from "@/lib/storage";
 import {
+  createAIRecommendedCategory,
   matchCategoryByName,
-} from "@/lib/agent";
+} from "@/lib/agent/category-utils";
 // 直接引用错误码模块，避免把 background 专用的剪藏分析服务打进 content script
 import { resolveClipAnalysisErrorCode } from "@/lib/agent/clip-analysis-errors";
 import { getAgentErrorMessage } from "@/lib/agent/errors";
@@ -37,7 +38,6 @@ import {
   buildCategoryTree,
   flattenTree,
   matchCategoryByPath,
-  parseCategoryPath,
 } from "../common/CategoryTree";
 
 export type SavePanelSnapshotStatus =
@@ -100,6 +100,8 @@ interface UseSavePanelResult {
 
   // AI 推荐的新分类（不在用户已有分类中）
   aiRecommendedCategory: string | null;
+  applyingCategory: boolean;
+  categoryError: string | null;
 
   // 操作状态
   saving: boolean;
@@ -279,6 +281,10 @@ export function useSavePanel({
     string | null
   >(null);
 
+  const [applyingCategory, setApplyingCategory] = useState(false);
+  const [categoryError, setCategoryError] = useState<string | null>(null);
+  const applyingCategoryRef = useRef(false);
+
   // 操作状态
   const [saving, setSaving] = useState(false);
   const [saveSnapshot, setSaveSnapshotState] = useState(false);
@@ -343,6 +349,7 @@ export function useSavePanel({
 
       setAIStatus("loading");
       setAIError(null);
+      setCategoryError(null);
 
       try {
         // 执行分析（传递已有标签避免生成语义相近的重复标签）
@@ -502,56 +509,24 @@ export function useSavePanel({
    * 支持多层级格式：如 "设计 > 灵感素材 > 图片资源"
    */
   const applyAIRecommendedCategory = useCallback(async () => {
-    if (!aiRecommendedCategory) return;
+    if (!aiRecommendedCategory || applyingCategoryRef.current) return;
+
+    applyingCategoryRef.current = true;
+    setApplyingCategory(true);
+    setCategoryError(null);
 
     try {
-      // 解析层级路径（支持 " > " 分隔符）
-      const parts = parseCategoryPath(aiRecommendedCategory);
+      const currentCategories = await bookmarkStorage.getCategories();
+      const result = await createAIRecommendedCategory(
+        aiRecommendedCategory,
+        currentCategories,
+      );
+      const latestCategories = await bookmarkStorage.getCategories();
+      categoriesRef.current = latestCategories;
+      setCategories(latestCategories);
 
-      // 获取最新分类列表
-      let allCategories = await bookmarkStorage.getCategories();
-      let parentId: string | null = null;
-      let finalCategory: LocalCategory | null = null;
-      const newCategories: LocalCategory[] = [];
-
-      // 逐层查找或创建分类
-      for (const partName of parts) {
-        const trimmedName = partName.trim();
-        if (!trimmedName) continue;
-
-        // 在当前层级查找是否已存在
-        const existing = allCategories.find(
-          (c) =>
-            c.name.toLowerCase() === trimmedName.toLowerCase() &&
-            c.parentId === parentId,
-        );
-
-        if (existing) {
-          parentId = existing.id;
-          finalCategory = existing;
-        } else {
-          // 创建新分类
-          const newCat = await bookmarkStorage.createCategory(
-            trimmedName,
-            parentId,
-          );
-          newCategories.push(newCat);
-          parentId = newCat.id;
-          finalCategory = newCat;
-          // 更新分类列表
-          allCategories = [...allCategories, newCat];
-        }
-      }
-
-      if (finalCategory) {
-        setCategoryId(finalCategory.id);
-        if (newCategories.length > 0) {
-          setCategories((prev) => {
-            const next = [...prev, ...newCategories];
-            categoriesRef.current = next;
-            return next;
-          });
-        }
+      if (result.categoryId) {
+        setCategoryId(result.categoryId);
         setAiRecommendedCategory(null);
       }
     } catch (err) {
@@ -559,14 +534,20 @@ export function useSavePanel({
         "[useSavePanel] Failed to apply AI recommended category:",
         err,
       );
+      setCategoryError(t("bookmark:savePanel.applyCategoryFailed", {
+        message: getAgentErrorMessage(err, t("ai:status.failed")),
+      }));
+    } finally {
+      applyingCategoryRef.current = false;
+      setApplyingCategory(false);
     }
-  }, [aiRecommendedCategory]);
+  }, [aiRecommendedCategory, t]);
 
   /**
    * 保存书签
    */
   const save = useCallback(async () => {
-    if (!title?.trim() || !url.trim()) return;
+    if (!title?.trim() || !url.trim() || applyingCategoryRef.current) return;
 
     setSaving(true);
     setSnapshotStatus("savingBookmark");
@@ -861,6 +842,8 @@ export function useSavePanel({
     retryAnalysis,
     applyAIRecommendedCategory,
     aiRecommendedCategory,
+    applyingCategory,
+    categoryError,
     save,
     deleteBookmark,
     clearActionError,

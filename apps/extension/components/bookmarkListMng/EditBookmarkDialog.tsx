@@ -63,6 +63,8 @@ export function EditBookmarkDialog({ bookmark, onSaved, onClose }: EditBookmarkD
     categories,
     allTags,
     aiRecommendedCategory,
+    applyingCategory,
+    categoryError,
     saving,
     setUrl,
     setTitle,
@@ -150,6 +152,8 @@ export function EditBookmarkDialog({ bookmark, onSaved, onClose }: EditBookmarkD
               onChange={setCategoryId}
               categories={categories}
               aiRecommendedCategory={aiRecommendedCategory}
+              applyingCategory={applyingCategory}
+              categoryError={categoryError}
               onApplyAICategory={applyAIRecommendedCategory}
               className="[&_button]:shadow-none"
             />
@@ -176,7 +180,7 @@ export function EditBookmarkDialog({ bookmark, onSaved, onClose }: EditBookmarkD
           <Button variant="outline" onClick={onClose} disabled={saving}>
             {t('bookmark:savePanel.cancel')}
           </Button>
-          <Button onClick={save} disabled={saving || !title.trim() || !url.trim()}>
+          <Button onClick={save} disabled={saving || applyingCategory || !title.trim() || !url.trim()}>
             {saving ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />

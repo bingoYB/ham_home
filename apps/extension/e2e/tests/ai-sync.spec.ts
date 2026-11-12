@@ -220,7 +220,7 @@ test.describe("AI 与同步核心流程", () => {
 
     await extensionWorker.evaluate(async () => {
       await chrome.storage.local.set({ bookmarks: [], bookmarkContents: {} });
-      await chrome.storage.sync.set({ categories: [] });
+      await chrome.storage.local.set({ categories: [] });
     });
     await page.getByRole("button", { name: /立即同步|Sync Now/ }).click();
     await expect

@@ -113,7 +113,7 @@ export async function seedCategories(
   categories: LocalCategory[],
 ): Promise<void> {
   await worker.evaluate(
-    async (items) => chrome.storage.sync.set({ categories: items }),
+    async (items) => chrome.storage.local.set({ categories: items }),
     categories,
   );
 }

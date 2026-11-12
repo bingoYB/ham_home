@@ -16,7 +16,7 @@ type EffectiveConfig = WebDAVConfig & ReturnType<typeof normalizeSyncStrategy>;
 // Only data included in the WebDAV protocol may trigger a sync. Status / credentials /
 // caches must not, otherwise a completed sync would schedule itself indefinitely.
 const SYNCED_KEYS: Record<string, ReadonlySet<string>> = {
-  local: new Set(['bookmarks', 'bookmarkContents', 'bookmarkClips', 'bookmarkTombstones',
+  local: new Set(['bookmarks', 'categories', 'bookmarkContents', 'bookmarkClips', 'bookmarkTombstones',
     'syncTombstones', 'workspaces', 'workspaceCategories', 'readLaterEntries']),
   sync: new Set(['categories', 'settings', 'tabGroupRules', 'tabGroupAutoGroupSettings', 'tabLifecycleSettings']),
 };

@@ -400,6 +400,8 @@
     "removeTag": "Remove tag {{tag}}",
     "aiRecommendedCategory": "AI Recommended Category:",
     "apply": "Apply",
+    "applyingCategory": "Applying…",
+    "applyCategoryFailed": "Could not apply category. Please retry: {{message}}",
     "cancel": "Cancel",
     "updateBookmark": "Update Bookmark",
     "saveBookmark": "Save Bookmark",

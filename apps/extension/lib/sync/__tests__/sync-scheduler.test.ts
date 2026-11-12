@@ -110,7 +110,7 @@ describe('WebDAV automatic sync scheduling', () => {
   });
 
   it.each([
-    ['categories', 'sync'], ['settings', 'sync'], ['workspaces', 'local'], ['workspaceCategories', 'local'],
+    ['categories', 'local'], ['categories', 'sync'], ['settings', 'sync'], ['workspaces', 'local'], ['workspaceCategories', 'local'],
     ['tabGroupRules', 'sync'], ['tabGroupAutoGroupSettings', 'sync'], ['bookmarkContents', 'local'],
     ['bookmarkClips', 'local'], ['bookmarkTombstones', 'local'], ['syncTombstones', 'local'],
     ['readLaterEntries', 'local'], ['tabLifecycleSettings', 'sync'],

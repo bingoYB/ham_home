@@ -6,11 +6,12 @@
  * - 书签元数据 (local:bookmarks) - 本地存储，不含 content 字段
  *   注意：不使用 sync 是因为 Chrome sync 存储有 8KB/项 的限制，书签数量多时会超限
  * - 书签内容 (local:bookmarkContents) - 本地存储，存储大体积的 content 字段
- * - 分类 (sync:categories) - 跨设备同步（分类数量较少，不易超限）
+ * - 分类 (local:categories) - 本地存储，通过 WebDAV 跨设备同步，兼容旧 sync 数据
  */
 import { nanoid } from 'nanoid';
 import { createProxyService, registerService, type ProxyServiceKey } from '@webext-core/proxy-service';
 import { serializeService } from '../services/serialized-service';
+import { categoryStorage as categoriesItem } from './category-storage';
 import { normalizeBookmarkUrl } from '../bookmarks/bookmark-dedup';
 import { bookmarkClipStorage } from './bookmark-clip-storage';
 import { bookmarkHealthStorage } from './bookmark-health-storage';
@@ -48,11 +49,6 @@ const bookmarkMetaItem = storage.defineItem<BookmarkMeta[]>('local:bookmarks', {
 // 书签内容 - local 本地存储（大体积数据）
 const bookmarkContentsItem = storage.defineItem<BookmarkContentsMap>('local:bookmarkContents', {
   fallback: {},
-});
-
-// 分类 - sync 跨设备同步
-const categoriesItem = storage.defineItem<LocalCategory[]>('sync:categories', {
-  fallback: [],
 });
 
 export class BookmarkStorage {

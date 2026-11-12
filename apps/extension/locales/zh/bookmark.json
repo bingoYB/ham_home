@@ -401,6 +401,8 @@
     "removeTag": "删除标签 {{tag}}",
     "aiRecommendedCategory": "AI 推荐分类：",
     "apply": "应用",
+    "applyingCategory": "应用中…",
+    "applyCategoryFailed": "应用分类失败，请重试：{{message}}",
     "cancel": "取消",
     "updateBookmark": "更新书签",
     "saveBookmark": "保存书签",

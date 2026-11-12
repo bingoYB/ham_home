@@ -67,7 +67,7 @@ test.describe("SETTINGS 与 PRIVACY", () => {
     const page = await openAppPage(context, extensionId, "settings?tab=storage");
     await page.evaluate(async () => {
       await chrome.storage.local.set({ bookmarks: [], bookmarkContents: {} });
-      await chrome.storage.sync.set({ categories: [] });
+      await chrome.storage.local.set({ categories: [] });
       await indexedDB.deleteDatabase("HamHomeVectors");
     });
 
@@ -77,7 +77,7 @@ test.describe("SETTINGS 与 PRIVACY", () => {
     await attachStepScreenshot(page, testInfo, "SETTINGS-002-清理后空态");
     const state = await getStorageState(extensionWorker);
     expect(state.local.bookmarks).toEqual([]);
-    expect(state.sync.categories).toEqual([]);
+    expect(state.local.categories).toEqual([]);
   });
 
   test("PRIVACY-001 隐私域名增删", async ({

@@ -72,7 +72,7 @@ export async function createAIRecommendedCategory(
       allCategories = [...allCategories, newCategory];
       parentId = newCategory.id;
       finalCategory = newCategory;
-    } catch {
+    } catch (error) {
       const latestCategories = await bookmarkStorage.getCategories();
       const fallback = latestCategories.find(
         (category) =>
@@ -81,7 +81,7 @@ export async function createAIRecommendedCategory(
       );
 
       if (!fallback) {
-        throw new Error(`无法创建分类：${trimmedName}`);
+        throw error;
       }
 
       allCategories = latestCategories;

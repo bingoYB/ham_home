@@ -50,6 +50,8 @@ export interface SavePanelViewProps {
   allTags: string[];
   existingBookmark: LocalBookmark | null;
   aiRecommendedCategory: string | null;
+  applyingCategory?: boolean;
+  categoryError?: string | null;
   aiStatus: AIStatusType;
   aiError: string | null;
   saving: boolean;
@@ -97,6 +99,8 @@ export function SavePanelView({
   allTags,
   existingBookmark,
   aiRecommendedCategory,
+  applyingCategory,
+  categoryError,
   aiStatus,
   aiError,
   saving,
@@ -156,6 +160,8 @@ export function SavePanelView({
         existingBookmark={existingBookmark}
         isLoading={aiStatus === "loading"}
         aiRecommendedCategory={aiRecommendedCategory}
+        applyingCategory={applyingCategory}
+        categoryError={categoryError}
         aiStatus={aiStatus}
         aiError={aiError}
         onTitleChange={onTitleChange}
@@ -233,7 +239,7 @@ export function SavePanelView({
           size="sm"
           className="flex-1"
           onClick={onSave}
-          disabled={saving || !title?.trim()}
+          disabled={saving || applyingCategory || !title?.trim()}
         >
           {saving ? (
             <>
@@ -628,6 +634,8 @@ interface BookmarkFormProps {
   existingBookmark: LocalBookmark | null;
   isLoading: boolean;
   aiRecommendedCategory: string | null;
+  applyingCategory?: boolean;
+  categoryError?: string | null;
   aiStatus: AIStatusType;
   aiError: string | null;
   onTitleChange: (value: string) => void;
@@ -653,6 +661,8 @@ function BookmarkForm({
   existingBookmark,
   isLoading,
   aiRecommendedCategory,
+  applyingCategory,
+  categoryError,
   aiStatus,
   aiError,
   onTitleChange,
@@ -756,6 +766,8 @@ function BookmarkForm({
           onChange={onCategoryChange}
           categories={categories}
           aiRecommendedCategory={aiRecommendedCategory}
+          applyingCategory={applyingCategory}
+          categoryError={categoryError}
           onApplyAICategory={onApplyAICategory}
           className="[&_button]:shadow-none"
           portalContainer={portalContainer}

@@ -51,6 +51,8 @@ export function SavePanel({
     aiStatus,
     aiError,
     aiRecommendedCategory,
+    applyingCategory,
+    categoryError,
     saving,
     saveSnapshot,
     snapshotStatus,
@@ -107,6 +109,8 @@ export function SavePanel({
         allTags={allTags}
         existingBookmark={existingBookmark}
         aiRecommendedCategory={aiRecommendedCategory}
+        applyingCategory={applyingCategory}
+        categoryError={categoryError}
         aiStatus={aiStatus}
         aiError={aiError}
         saving={saving}
