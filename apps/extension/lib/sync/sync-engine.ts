@@ -62,7 +62,8 @@ import { nanoid } from 'nanoid';
 import pLimit from 'p-limit';
 import { contentFingerprint, decodeContentChunk, encodeContentChunk } from './sync-codec';
 import { parseRemoteItems, requireListField, withPreservedItems } from './remote-parse';
-import { applyDeletions, mergeByIdLww } from './lww-merge';
+import { applyDeletions } from './lww-merge';
+import { mergeCategoryHierarchy } from './category-merge';
 
 const SYNC_ROOT = '/HamHomeSync';
 const SYS_JSON = `${SYNC_ROOT}/sys.json`;
@@ -108,10 +109,6 @@ interface SyncRun {
 type ChunkDownload = { status: 'ok'; content: string } | { status: 'missing' } | { status: 'failed' };
 
 const categoryStamp = (c: { createdAt: number; updatedAt?: number }) => c.updatedAt ?? c.createdAt;
-
-function sameCategory(a: LocalCategory | WorkspaceCategory, b: LocalCategory | WorkspaceCategory): boolean {
-  return a.name === b.name && (a.icon ?? '') === (b.icon ?? '') && a.parentId === b.parentId && a.order === b.order;
-}
 
 function tombstoneMap(list: readonly BookmarkTombstone[]): Map<string, number> {
   return new Map(list.map(({ id, deletedAt }) => [id, deletedAt]));
@@ -452,38 +449,21 @@ export class SyncEngine {
     const remoteSide = applyDeletions(remoteCategories as LocalCategory[], deletions, categoryStamp);
     remoteSide.revivedIds.forEach((id) => run.revived.categories.add(id));
 
-    const { merged, applyToLocal, localOnly, remoteChanged } = mergeByIdLww(
+    const { merged, applyToLocal, mapping, changed } = mergeCategoryHierarchy(
       localKept,
       remoteSide.kept,
-      categoryStamp,
-      sameCategory,
+      Date.now(),
     );
-
-    const signature = (c: LocalCategory) => `${c.name}_${c.parentId || ''}`;
-    const remoteBySignature = new Map(remoteSide.kept.map((c) => [signature(c), c]));
-    const categoryMapping: Record<string, string> = {}; // local ID -> remote ID
-    let hasChanges = remoteChanged || remoteSide.deleted.length > 0 || remoteRaw === null;
-
-    for (const localCat of localOnly) {
-      const matchingRemote = remoteBySignature.get(signature(localCat));
-      if (matchingRemote) {
-        // Same name and parent created independently on another device: keep the remote one
-        categoryMapping[localCat.id] = matchingRemote.id;
-      } else {
-        merged.push(localCat);
-        hasChanges = true;
-      }
-    }
-
-    if (Object.keys(categoryMapping).length > 0) {
-      await bookmarkStorage.mergeCategories(categoryMapping);
-    }
 
     for (const remoteCat of applyToLocal) {
       await bookmarkStorage.importRawCategory(remoteCat);
     }
+    // Import targets before moving bookmark references away from the old IDs.
+    if (Object.keys(mapping).length > 0) {
+      await bookmarkStorage.mergeCategories(mapping);
+    }
 
-    if (hasChanges) {
+    if (changed || remoteSide.deleted.length > 0 || remoteRaw === null) {
       await webdavClientAdapter.putJSON(CATEGORIES_JSON, withPreservedItems(merged, invalid));
     }
   }
@@ -593,37 +573,20 @@ export class SyncEngine {
       await workspaceStorage.deleteCategory(category.id);
     }
 
-    const { merged, applyToLocal, localOnly, remoteChanged } = mergeByIdLww(
+    const { merged, applyToLocal, mapping, changed } = mergeCategoryHierarchy(
       localSide.kept,
       remoteSide.kept,
-      categoryStamp,
-      sameCategory,
+      Date.now(),
     );
-
-    const signature = (c: WorkspaceCategory) => `${c.name}_${c.parentId || ''}`;
-    const remoteBySignature = new Map(remoteSide.kept.map((c) => [signature(c), c]));
-    const mapping: Record<string, string> = {};
-    let changed =
-      remoteChanged ||
-      remoteSide.deleted.length > 0 ||
-      (remoteCategoriesAll.length === 0 && localCategoriesAll.length > 0);
-
-    for (const localCategory of localOnly) {
-      const matchingRemote = remoteBySignature.get(signature(localCategory));
-      if (matchingRemote) {
-        mapping[localCategory.id] = matchingRemote.id;
-        changed = true;
-        continue;
-      }
-      merged.push(localCategory);
-      changed = true;
-    }
 
     for (const remoteCategory of applyToLocal) {
       await workspaceStorage.importRawCategory(remoteCategory);
     }
+    if (Object.keys(mapping).length > 0) {
+      await workspaceStorage.mergeCategories(mapping);
+    }
 
-    return { merged, mapping, changed };
+    return { merged, mapping, changed: changed || remoteSide.deleted.length > 0 };
   }
 
   private remapWorkspaceCategory(

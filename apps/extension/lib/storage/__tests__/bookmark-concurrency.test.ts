@@ -44,6 +44,38 @@ beforeEach(() => {
 });
 
 describe('background bookmark writer', () => {
+  it('cleans a checked orphan list after moving its bookmark without losing any of 1358 bookmarks', async () => {
+    const normalCategories = Array.from({ length: 37 }, (_, i) => ({
+      id: `normal-${i}`, name: `Category ${i}`, parentId: null, order: i, createdAt: 1,
+    }));
+    const orphanCategories = Array.from({ length: 24 }, (_, i) => ({
+      id: `orphan-${i}`, name: `Old ${i}`, parentId: 'missing-root', order: i, createdAt: 1,
+    }));
+    const bookmarks = Array.from({ length: 1358 }, (_, i) => {
+      const { content: _content, ...meta } = input(`https://preserve.test/${i}`);
+      return { ...meta, id: `bookmark-${i}`, createdAt: 1, updatedAt: 1,
+        categoryId: i === 0 ? 'orphan-0' : i < 3 ? null : `normal-${i % 37}` };
+    });
+    state.items.set('sync:categories', [...normalCategories, ...orphanCategories]);
+    state.items.set('local:bookmarks', bookmarks);
+    const contents = Object.fromEntries(bookmarks.map((b) => [b.id, `# Full content ${b.id}`]));
+    state.items.set('local:bookmarkContents', contents);
+    const background = await newContext();
+    background.registerBookmarkStorageService();
+    const client = (await newContext()).bookmarkStorage;
+    await client.batchChangeCategory(['bookmark-0'], 'normal-0');
+    for (const orphan of orphanCategories) await client.deleteCategory(orphan.id);
+    const snapshot = await client.getExportSnapshot();
+    expect(snapshot.categories).toEqual(normalCategories);
+    expect(snapshot.bookmarks).toHaveLength(1358);
+    expect(snapshot.bookmarks.filter((b) => !b.categoryId)).toHaveLength(2);
+    expect(snapshot.bookmarks[0]).toMatchObject({ categoryId: 'normal-0', content: contents['bookmark-0'] });
+    expect(snapshot.bookmarks.slice(1).map(({ content: _content, ...meta }) => meta)).toEqual(bookmarks.slice(1));
+    expect(state.items.get('local:bookmarkContents')).toEqual(contents);
+    const tombstones = state.items.get('local:syncTombstones') as { categories: Array<{ id: string }> };
+    expect(tombstones.categories.map((c) => c.id).sort()).toEqual(orphanCategories.map((c) => c.id).sort());
+  });
+
   it('preserves legacy category IDs and supports lists larger than the sync item quota', async () => {
     const legacyCategories = Array.from({ length: 56 }, (_, index) => ({
       id: `existing-${index}`, name: `已有分类 ${index}`, parentId: null,

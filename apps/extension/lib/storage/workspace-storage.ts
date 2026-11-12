@@ -269,6 +269,24 @@ class WorkspaceStorage {
     );
   }
 
+  /** Replace category aliases after canonical targets have been imported by sync. */
+  async mergeCategories(mapping: Record<string, string>): Promise<void> {
+    const [categories, workspaces] = await Promise.all([
+      workspaceCategoriesItem.getValue(), workspacesItem.getValue(),
+    ]);
+    const now = Date.now();
+    await workspaceCategoriesItem.setValue(categories
+      .filter((category) => !Object.hasOwn(mapping, category.id))
+      .map((category) => category.parentId && Object.hasOwn(mapping, category.parentId)
+        ? { ...category, parentId: mapping[category.parentId], updatedAt: now } : category));
+    const remapped = workspaces.map((workspace) =>
+      workspace.categoryId && Object.hasOwn(mapping, workspace.categoryId)
+        ? { ...workspace, categoryId: mapping[workspace.categoryId], updatedAt: now } : workspace);
+    if (remapped.some((workspace, index) => workspace !== workspaces[index])) {
+      await workspacesItem.setValue(remapped);
+    }
+  }
+
   private matchesSearch(workspace: Workspace, search: string): boolean {
     if (!search) return true;
 

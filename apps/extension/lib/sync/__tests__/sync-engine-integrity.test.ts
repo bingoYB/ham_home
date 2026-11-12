@@ -211,7 +211,13 @@ vi.mock("../../storage/bookmark-storage", () => ({
       return [...ids];
     },
     async mergeCategories(mapping: Record<string, string>) {
-      state.device.categories = state.device.categories.filter((c) => !mapping[c.id]);
+      state.device.categories = state.device.categories.filter((c) => !mapping[c.id])
+        .map((c) => c.parentId && mapping[c.parentId] ? { ...c, parentId: mapping[c.parentId], updatedAt: Date.now() } : c);
+      for (const [id, bookmark] of state.device.bookmarks) {
+        if (bookmark.categoryId && mapping[bookmark.categoryId]) {
+          state.device.bookmarks.set(id, { ...bookmark, categoryId: mapping[bookmark.categoryId], updatedAt: Date.now() });
+        }
+      }
     },
     async importRawCategory(category: LocalCategory) {
       const index = state.device.categories.findIndex((c) => c.id === category.id);
@@ -239,6 +245,12 @@ vi.mock("../../storage/workspace-storage", () => ({
     },
     async importRawCategory(category: WorkspaceCategory) {
       state.device.workspaceCategories = [...state.device.workspaceCategories.filter((c) => c.id !== category.id), category];
+    },
+    async mergeCategories(mapping: Record<string, string>) {
+      state.device.workspaceCategories = state.device.workspaceCategories.filter((c) => !mapping[c.id])
+        .map((c) => c.parentId && mapping[c.parentId] ? { ...c, parentId: mapping[c.parentId] } : c);
+      state.device.workspaces = state.device.workspaces.map((w) => w.categoryId && mapping[w.categoryId]
+        ? { ...w, categoryId: mapping[w.categoryId], updatedAt: Date.now() } : w);
     },
     async deleteWorkspace(id: string) {
       state.device.workspaces = state.device.workspaces.filter((w) => w.id !== id);
@@ -480,6 +492,36 @@ describe("remote data that this version cannot fully read", () => {
 });
 
 describe("categories", () => {
+  it("maps independently-created parents and descendants consistently on both devices and the remote", async () => {
+    deviceA.categories = [category('a-root', { name: 'Work' }),
+      category('a-child', { name: 'Writing', parentId: 'a-root' }),
+      category('a-leaf', { name: 'Clips', parentId: 'a-child' })];
+    deviceB.categories = [category('b-leaf', { name: 'Clips', parentId: 'b-child' }),
+      category('unique', { name: 'New', parentId: 'b-child' }),
+      category('b-child', { name: 'Writing', parentId: 'b-root' }),
+      category('b-root', { name: 'Work' })];
+    deviceB.bookmarks.set('b1', bookmark('b1', { categoryId: 'b-leaf' }));
+    deviceB.contents.b1 = '# Preserved content';
+    await syncAs(deviceA);
+    await syncAs(deviceB);
+    const expected = ['a-root', 'a-child', 'a-leaf', 'unique'].sort();
+    const assertHierarchy = (categories: LocalCategory[]) => {
+      expect(categories.map((c) => c.id).sort()).toEqual(expected);
+      expect(categories.find((c) => c.id === 'unique')?.parentId).toBe('a-child');
+      expect(categories.every((c) => !c.parentId || categories.some((p) => p.id === c.parentId))).toBe(true);
+    };
+    assertHierarchy(remoteJSON('categories.json'));
+    assertHierarchy(deviceB.categories);
+    expect(deviceB.bookmarks.get('b1')?.categoryId).toBe('a-leaf');
+    await syncAs(deviceA);
+    await syncAs(deviceB);
+    assertHierarchy(deviceA.categories);
+    assertHierarchy(deviceB.categories);
+    assertHierarchy(remoteJSON('categories.json'));
+    expect(deviceA.bookmarks.get('b1')?.categoryId).toBe('a-leaf');
+    expect(deviceA.contents.b1).toBe('# Preserved content');
+  });
+
   it("keeps category icons", async () => {
     deviceA.categories.push(category("c1", { icon: "📚" }));
     await syncAs(deviceA);
@@ -525,6 +567,23 @@ describe("categories", () => {
 });
 
 describe("workspaces and tab-group rules", () => {
+  it("normalizes workspace category parents and workspace references before uploading", async () => {
+    deviceA.workspaceCategories = [category('a-root', { name: 'Work' }), category('a-child', { name: 'Writing', parentId: 'a-root' })];
+    deviceB.workspaceCategories = [category('b-child', { name: 'Writing', parentId: 'b-root' }),
+      category('unique', { name: 'New', parentId: 'b-child' }), category('b-root', { name: 'Work' })];
+    deviceB.workspaces = [{ id: 'w1', name: 'Workspace', description: '', categoryId: 'b-child',
+      tags: [], pages: [], isRestored: false, convertedToBookmarks: false, createdAt: 100, updatedAt: 100 } as Workspace];
+    await syncAs(deviceA);
+    await syncAs(deviceB);
+    const remote = remoteJSON<{ categories: WorkspaceCategory[]; workspaces: Workspace[] }>('workspaces.json');
+    expect(remote.categories.map((c) => c.id).sort()).toEqual(['a-child', 'a-root', 'unique']);
+    expect(remote.categories.find((c) => c.id === 'unique')?.parentId).toBe('a-child');
+    expect(remote.workspaces[0].categoryId).toBe('a-child');
+    expect(deviceB.workspaceCategories.map((c) => c.id).sort()).toEqual(['a-child', 'a-root', 'unique']);
+    await syncAs(deviceA);
+    expect(deviceA.workspaces[0].categoryId).toBe('a-child');
+  });
+
   it("propagates rule deletions", async () => {
     deviceA.rules.push(rule("r1"), rule("r2"));
     await syncAs(deviceA);
