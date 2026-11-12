@@ -10,6 +10,11 @@ import type {
   Suggestion,
 } from "@/types";
 import { getBackgroundService } from "@/lib/services";
+import {
+  isSessionSummary,
+  normalizeSessionMessages,
+  normalizeSessionSummaries,
+} from "@/utils/global-agent-session.utils";
 import { useAgentTurnProgress } from "./useAgentTurnProgress";
 
 export interface UseGlobalAgentReturn {
@@ -98,8 +103,8 @@ export function useGlobalAgent(): UseGlobalAgentReturn {
   const loadSession = useCallback(async (sessionId?: string) => {
     const backgroundService = getBackgroundService();
     const snapshot = await backgroundService.globalAgentGetSession(sessionId);
-    setCurrentSessionId(snapshot.id);
-    setMessages(snapshot.messages);
+    setCurrentSessionId(isSessionSummary(snapshot) ? snapshot.id : null);
+    setMessages(normalizeSessionMessages(snapshot));
     setSources([]);
     setSuggestions([]);
     setCurrentSteps([]);
@@ -112,7 +117,9 @@ export function useGlobalAgent(): UseGlobalAgentReturn {
     async function loadSessions() {
       try {
         const backgroundService = getBackgroundService();
-        const loadedSessions = await backgroundService.globalAgentListSessions();
+        const loadedSessions = normalizeSessionSummaries(
+          await backgroundService.globalAgentListSessions(),
+        );
         if (cancelled) return;
         setSessions(loadedSessions);
         await loadSession(loadedSessions[0]?.id);
@@ -243,9 +250,11 @@ export function useGlobalAgent(): UseGlobalAgentReturn {
       try {
         const backgroundService = getBackgroundService();
         const snapshot = await backgroundService.globalAgentClearSession(currentSessionId);
-        setSessions((prev) =>
-          prev.map((item) => (item.id === snapshot.id ? snapshot : item)),
-        );
+        if (isSessionSummary(snapshot)) {
+          setSessions((prev) =>
+            prev.map((item) => (item.id === snapshot.id ? snapshot : item)),
+          );
+        }
       } catch (err) {
         console.error("[useGlobalAgent] Failed to clear session:", err);
       }
@@ -275,6 +284,9 @@ export function useGlobalAgent(): UseGlobalAgentReturn {
   const createSession = useCallback(async () => {
     const backgroundService = getBackgroundService();
     const snapshot = await backgroundService.globalAgentCreateSession();
+    if (!isSessionSummary(snapshot)) {
+      throw new Error("Failed to create agent session");
+    }
     setSessions((prev) => [snapshot, ...prev]);
     setCurrentSessionId(snapshot.id);
     setMessages([]);
@@ -292,7 +304,9 @@ export function useGlobalAgent(): UseGlobalAgentReturn {
   const deleteSession = useCallback(
     async (sessionId: string) => {
       const backgroundService = getBackgroundService();
-      const updatedSessions = await backgroundService.globalAgentDeleteSession(sessionId);
+      const updatedSessions = normalizeSessionSummaries(
+        await backgroundService.globalAgentDeleteSession(sessionId),
+      );
       setSessions(updatedSessions);
       if (currentSessionId === sessionId) {
         await loadSession(updatedSessions[0]?.id);
