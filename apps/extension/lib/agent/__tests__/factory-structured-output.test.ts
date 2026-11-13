@@ -62,6 +62,7 @@ async function captureRequest(structured: boolean): Promise<Record<string, unkno
 describe("extension provider output settings", () => {
   beforeEach(() => {
     mocks.config.provider = "ollama";
+    mocks.config.baseUrl = "http://localhost:11434/v1";
     mocks.config.apiKey = "";
     mocks.config.smallModelMode = false;
   });
@@ -91,5 +92,31 @@ describe("extension provider output settings", () => {
     mocks.config.apiKey = "test-key";
     const request = await captureRequest(true);
     expect(request.response_format).toEqual({ type: "json_object" });
+  });
+
+  it("tests a custom endpoint with a plain-text request", async () => {
+    mocks.config.provider = "custom";
+    mocks.config.baseUrl = "http://localhost:1234/v1";
+    mocks.config.apiKey = "test-key";
+    const requests: Record<string, unknown>[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (_url, options) => {
+      requests.push(JSON.parse(String(options?.body)));
+      return new Response(JSON.stringify({
+        id: "test", object: "chat.completion", created: 0, model: "test-model",
+        choices: [{ index: 0, message: { role: "assistant", content: "OK" }, finish_reason: "stop" }],
+        usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+      }), { headers: { "content-type": "application/json" } });
+    }));
+
+    try {
+      const { agentConfigService } = await import("../services/agent-config-service");
+      await expect(agentConfigService.testConnection()).resolves.toEqual({
+        success: true, message: "连接成功",
+      });
+      expect(requests).toHaveLength(1);
+      expect(requests[0].response_format).toBeUndefined();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 });

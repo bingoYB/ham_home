@@ -89,28 +89,17 @@ class AgentConfigService {
   async testConnection(): Promise<{ success: boolean; message: string }> {
     try {
       const { agent, config } = await createExtensionAgent();
-      if (config.rawConfig.smallModelMode) {
-        const result = await agent.commands.run({
-          name: "testSmallModelConnection",
-          prompt: "Respond with the word OK.",
-          tools: [],
-          maxIterations: 1,
-          ignoreBaseSystemPrompt: true,
-        }, {}, { temperature: 0 });
-        if (typeof result.output !== "string" || !result.output.trim()) {
-          throw new Error(config.language === "zh" ? "模型未返回文本" : "The model returned no text.");
-        }
-        return { success: true, message: config.language === "zh" ? "连接成功" : "Connection successful" };
+      const result = await agent.commands.run({
+        name: "testPlainConnection",
+        prompt: "Respond with the word OK.",
+        tools: [],
+        maxIterations: 1,
+        ignoreBaseSystemPrompt: true,
+      }, {}, { temperature: 0 });
+      if (typeof result.output !== "string" || !result.output.trim()) {
+        throw new Error(config.language === "zh" ? "模型未返回文本" : "The model returned no text.");
       }
-      const result = await agent.commands.run<
-        Record<string, never>,
-        { success: boolean; message: string }
-      >("testConnection", {}, { temperature: 0, maxIterations: 1 });
-
-      return {
-        success: Boolean(result.output.success),
-        message: result.output.message?.trim() || "连接成功",
-      };
+      return { success: true, message: config.language === "zh" ? "连接成功" : "Connection successful" };
     } catch (error) {
       return {
         success: false,

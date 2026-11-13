@@ -1,4 +1,5 @@
-import type { EmbeddingModel, LanguageModel } from "ai";
+import { wrapLanguageModel, type EmbeddingModel, type LanguageModel } from "ai";
+import { compatibleStructuredOutputMiddleware } from "./openai-compatible-structured-output";
 import type {
   AiSdkProviderConfig,
   AiSdkProviderDefinition,
@@ -66,7 +67,16 @@ export async function resolveLanguageModel(
   if (!languageModel) {
     throw new Error(`Provider "${definition.name}" does not expose an AI SDK language model for mode "${invocationMode || 'default'}".`);
   }
-  return languageModel as LanguageModel;
+  const model = languageModel as LanguageModel;
+  if (
+    definition.name === "openai-compatible" &&
+    config.providerOptions?.supportsStructuredOutputs !== true &&
+    typeof model === "object" &&
+    model.specificationVersion === "v3"
+  ) {
+    return wrapLanguageModel({ model, middleware: compatibleStructuredOutputMiddleware });
+  }
+  return model;
 }
 
 /**

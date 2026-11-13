@@ -269,13 +269,23 @@ describe("bookmark analysis compatibility mode", () => {
     expect(mocks.run.mock.calls[0][2].signal).toBe(controller.signal);
   });
 
-  it("tests connectivity without requiring JSON in compatibility mode", async () => {
-    mocks.config.rawConfig.smallModelMode = true;
+  it.each([false, true])("tests connectivity without requiring JSON (small model mode: %s)", async (smallModelMode) => {
+    mocks.config.rawConfig.smallModelMode = smallModelMode;
     mocks.run.mockResolvedValue({ output: "OK" });
     const { agentConfigService } = await import("../agent-config-service");
 
     await expect(agentConfigService.testConnection()).resolves.toEqual({ success: true, message: "连接成功" });
-    expect(mocks.run.mock.calls[0][0]).toMatchObject({ name: "testSmallModelConnection", tools: [] });
+    expect(mocks.run.mock.calls[0][0]).toMatchObject({ name: "testPlainConnection", tools: [] });
     expect(mocks.run.mock.calls[0][0].outputSchema).toBeUndefined();
+  });
+
+  it("reports an empty connection-test response as a failure", async () => {
+    mocks.config.language = "en";
+    mocks.run.mockResolvedValue({ output: "  " });
+    const { agentConfigService } = await import("../agent-config-service");
+
+    await expect(agentConfigService.testConnection()).resolves.toEqual({
+      success: false, message: "The model returned no text.",
+    });
   });
 });
