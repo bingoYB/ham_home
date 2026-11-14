@@ -46,6 +46,21 @@ function setup() {
 afterEach(() => vi.useRealTimers());
 
 describe('WebDAV lock lifecycle recovery', () => {
+  it('releases a journaled server lock without acquiring a new one', async () => {
+    const { manager, setLock, store, calls } = setup();
+    setLock('urn:uuid:old', 'urn:hamhome:old');
+    await store.save({ scope: SCOPE, owner: 'urn:hamhome:old', token: 'urn:uuid:old' });
+    await manager.recoverPrevious(ROOT);
+    expect(calls).toEqual(['UNLOCK']);
+    expect(await store.get(SCOPE)).toBeUndefined();
+  });
+
+  it('does not make a server request when there is no previous lock journal', async () => {
+    const { manager, calls } = setup();
+    await manager.recoverPrevious(ROOT);
+    expect(calls).toEqual([]);
+  });
+
   it('persists intent before LOCK and clears the journal after an operation throws', async () => {
     const { manager, request, store, getToken } = setup();
     request.mockImplementationOnce(async () => {
@@ -168,6 +183,47 @@ describe('WebDAV lock lifecycle recovery', () => {
       expect(request.mock.calls.filter(([, options]) => options.method === 'LOCK')).toHaveLength(2);
     });
     expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('waits for a write before renewing the same lock token', async () => {
+    vi.useFakeTimers();
+    const { manager, request } = setup();
+    await manager.withLock(ROOT, async () => {
+      let finishWrite!: () => void;
+      const writing = manager.withMutation(() => new Promise<void>(resolve => { finishWrite = resolve; }));
+      await vi.advanceTimersByTimeAsync(60_000);
+      expect(request.mock.calls.filter(([, options]) => options.method === 'LOCK')).toHaveLength(1);
+      finishWrite();
+      await writing;
+      await vi.advanceTimersByTimeAsync(0);
+      expect(request.mock.calls.filter(([, options]) => options.method === 'LOCK')).toHaveLength(2);
+    });
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('does not poison the write queue after a rejected request', async () => {
+    const { manager } = setup();
+    await manager.withLock(ROOT, async () => {
+      await expect(manager.withMutation(async () => { throw httpError(503); })).rejects.toThrow('HTTP 503');
+      await expect(manager.withMutation(async () => 'next write')).resolves.toBe('next write');
+    });
+  });
+
+  it('checks the lease again before a queued write starts', async () => {
+    vi.useFakeTimers();
+    const { manager } = setup();
+    const queuedWrite = vi.fn(async () => {});
+    await expect(manager.withLock(ROOT, async () => {
+      let finishWrite!: () => void;
+      const writing = manager.withMutation(() => new Promise<void>(resolve => { finishWrite = resolve; }));
+      const queued = expect(manager.withMutation(queuedWrite)).rejects.toThrow('expired');
+      await Promise.resolve();
+      vi.setSystemTime(Date.now() + 601_000);
+      finishWrite();
+      await writing;
+      await queued;
+    })).rejects.toMatchObject({ code: 'conflict' });
+    expect(queuedWrite).not.toHaveBeenCalled();
   });
 
   it('stops writes after renewal fails and still attempts UNLOCK', async () => {

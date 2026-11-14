@@ -150,8 +150,8 @@ export class SyncEngine {
   /**
    * Try acquire lock
    *
-   * Legacy marker for older clients. This is only read/written while holding the
-   * server-side exclusive collection LOCK; the marker is not a mutex.
+   * Best-effort marker shared with older clients. The read/write sequence is not
+   * atomic, so it cannot guarantee mutual exclusion between simultaneous devices.
    */
   private async acquireLock(token: string): Promise<boolean> {
     const sys = await this.readSys();
@@ -159,7 +159,7 @@ export class SyncEngine {
     const now = Date.now();
     if (sys && sys.lock_status === 'locked') {
       const timeDiff = now - sys.lock_timestamp;
-      if (timeDiff < LOCK_TIMEOUT_MS && !sys.lock_owner?.startsWith('urn:hamhome:')) {
+      if (timeDiff < LOCK_TIMEOUT_MS) {
         console.warn(`Sync is locked by another client. Locked for ${timeDiff}ms`);
         return false;
       }
@@ -177,8 +177,7 @@ export class SyncEngine {
     await webdavClientAdapter.putJSON(SYS_JSON, newSys);
 
     const confirmed = await this.readSys();
-    // Older clients do not write lock_owner; nothing to compare against in that case.
-    if (confirmed?.lock_owner && confirmed.lock_owner !== token) {
+    if (!confirmed || confirmed.lock_status !== 'locked' || confirmed.lock_owner !== token) {
       console.warn('Another client acquired the sync lock at the same time. Backing off.');
       return false;
     }
@@ -191,20 +190,17 @@ export class SyncEngine {
   private async releaseLock(token: string, completed: boolean): Promise<SyncSys | null> {
     try {
       const sys = await this.readSys();
-      if (sys) {
-        if (sys.lock_owner && sys.lock_owner !== token) {
-          // Our lock expired and another client took over: do not unlock on its behalf.
-          throw new SyncError('conflict', 'Sync marker was taken over by another client');
-        } else {
-          sys.lock_status = 'unlocked';
-          sys.lock_owner = undefined;
-          if (completed) {
-            sys.sync_version = nanoid();
-            sys.last_sync_time = Date.now();
-          }
-          await webdavClientAdapter.putJSON(SYS_JSON, sys);
-        }
+      if (!sys || sys.lock_status !== 'locked' || sys.lock_owner !== token) {
+        // Another client may have taken over, including older clients without an owner.
+        throw new SyncError('conflict', 'Sync marker was taken over or removed by another client');
       }
+      sys.lock_status = 'unlocked';
+      sys.lock_owner = undefined;
+      if (completed) {
+        sys.sync_version = nanoid();
+        sys.last_sync_time = Date.now();
+      }
+      await webdavClientAdapter.putJSON(SYS_JSON, sys);
       return sys;
     } catch (err) {
       console.error('Failed to release lock', err);
@@ -233,49 +229,45 @@ export class SyncEngine {
       // Verify credentials before writing anything remote
       await webdavClientAdapter.checkAuth(SYS_JSON);
 
-      // Create the root before acquiring its server lock.
+      // Release any journaled server lock from an earlier version before using the marker protocol.
+      await webdavClientAdapter.recoverPreviousLock(SYNC_ROOT);
       await webdavClientAdapter.ensureDirectory(SYNC_ROOT);
 
       let synced: SyncSys | null = null;
-      await webdavClientAdapter.withExclusiveLock(SYNC_ROOT, async () => {
+      const lockToken = nanoid();
+      const locked = await this.acquireLock(lockToken);
+      if (!locked) throw new SyncError('conflict', 'Another client is holding the sync marker');
+
+      let completed = false;
+      let failure: unknown;
+      try {
         await webdavClientAdapter.ensureDirectory(CHUNKS_DIR);
-
-        const lockToken = webdavClientAdapter.lockOwner || nanoid();
-        const locked = await this.acquireLock(lockToken);
-        if (!locked) {
-          throw new SyncError('conflict', 'An older client is holding the sync marker');
+        console.log('WebDAV Lock acquired, starting sync...');
+        // Deletions first: if the run stops halfway, other devices still learn about them
+        // before any module file that no longer contains the deleted items.
+        const run = await this.syncDeletions();
+        await this.syncSettings();
+        await this.syncCategories(run);
+        await this.syncWorkspaces(run);
+        await this.syncTabGroupConfig(run);
+        await this.syncTabLifecycleConfig();
+        const deletedBookmarkIds = await this.syncBookmarks();
+        await this.syncBookmarkClips(deletedBookmarkIds);
+        await this.syncReadLater();
+        await this.finishDeletions(run);
+        console.log('WebDAV Sync complete.');
+        completed = true;
+      } catch (err) {
+        failure = err;
+        throw err;
+      } finally {
+        try { synced = await this.releaseLock(lockToken, completed); }
+        catch (err) {
+          if (!failure) throw err;
+          console.error('Failed to clear the sync marker after a sync failure', err);
         }
-
-        let completed = false;
-        let failure: unknown;
-        try {
-          console.log('WebDAV Lock acquired, starting sync...');
-          // Deletions first: if the run stops halfway, other devices still learn about them
-          // before any module file that no longer contains the deleted items.
-          const run = await this.syncDeletions();
-          await this.syncSettings();
-          await this.syncCategories(run);
-          await this.syncWorkspaces(run);
-          await this.syncTabGroupConfig(run);
-          await this.syncTabLifecycleConfig();
-          const deletedBookmarkIds = await this.syncBookmarks();
-          await this.syncBookmarkClips(deletedBookmarkIds);
-          await this.syncReadLater();
-          await this.finishDeletions(run);
-          console.log('WebDAV Sync complete.');
-          completed = true;
-        } catch (err) {
-          failure = err;
-          throw err;
-        } finally {
-          try { synced = await this.releaseLock(lockToken, completed); }
-          catch (err) {
-            if (!failure) throw err;
-            console.error('Failed to clear the sync marker after a sync failure', err);
-          }
-        }
-      });
-      // Publish success only after the server has acknowledged UNLOCK as well.
+      }
+      // Publish success only after the marker was released successfully.
       const result = synced as SyncSys | null;
       await syncConfigStorage.setStatus({ status: 'idle', errorCode: undefined, errorMessage: '',
         ...(result ? { lastSyncTime: result.last_sync_time, syncVersion: result.sync_version } : {}) });
@@ -1350,13 +1342,9 @@ export class SyncEngine {
       const config = await syncConfigStorage.getConfig();
       webdavClientAdapter.init(config);
       await webdavClientAdapter.unlockLocks(SYNC_ROOT, tokens);
-      await webdavClientAdapter.ensureDirectory(SYNC_ROOT);
-      // Reset the legacy marker only while holding a NEW exclusive lock. If another
-      // device has taken over, LOCK fails and its marker is never touched.
-      await webdavClientAdapter.withExclusiveLock(SYNC_ROOT, async () => {
-        const sys = await this.readSys();
-        if (sys) await webdavClientAdapter.putJSON(SYS_JSON, { ...sys, lock_status: 'unlocked', lock_owner: undefined });
-      });
+      // The dialog requires the user to stop other devices before resetting the marker.
+      const sys = await this.readSys();
+      if (sys) await webdavClientAdapter.putJSON(SYS_JSON, { ...sys, lock_status: 'unlocked', lock_owner: undefined });
       await syncConfigStorage.setStatus({ status: 'idle', errorCode: undefined, errorMessage: '' });
     } catch (err) {
       const error = toSyncError(err);
@@ -1377,8 +1365,17 @@ export class SyncEngine {
       if (!config.enabled || !config.url) throw new Error('WebDAV is not configured');
       webdavClientAdapter.init(config);
       await webdavClientAdapter.checkAuth(SYS_JSON);
+      await webdavClientAdapter.recoverPreviousLock(SYNC_ROOT);
       await webdavClientAdapter.ensureDirectory(SYNC_ROOT);
-      await webdavClientAdapter.withExclusiveLock(SYNC_ROOT, () => webdavClientAdapter.deleteFile(SYNC_ROOT));
+      const lockToken = nanoid();
+      if (!await this.acquireLock(lockToken)) throw new SyncError('conflict', 'Another client is holding the sync marker');
+      try {
+        await webdavClientAdapter.deleteFile(SYNC_ROOT);
+      } catch (err) {
+        try { await this.releaseLock(lockToken, false); }
+        catch (releaseError) { console.error('Failed to clear the sync marker after remote deletion failed', releaseError); }
+        throw err;
+      }
 
       // Reset local sync status
       await syncConfigStorage.setStatus({

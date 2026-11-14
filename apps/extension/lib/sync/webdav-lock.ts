@@ -22,12 +22,31 @@ interface Lease {
 export class WebDAVLockManager {
   private lease?: Lease;
   private running = false;
+  private mutationQueue: Promise<void> = Promise.resolve();
 
   constructor(private client: WebDAVClient, private baseUrl: string, private username: string,
     private store: WebDAVLockStore = webdavLockStorage) {}
 
   get isBusy() { return this.running; }
   get owner() { return this.lease?.record.owner; }
+
+  private serializeMutation<T>(operation: () => Promise<T>): Promise<T> {
+    const pending = this.mutationQueue.then(operation);
+    this.mutationQueue = pending.then(() => {}, () => {});
+    return pending;
+  }
+
+  /** Some servers hold a lock token for the duration of each write request. */
+  withMutation<T>(operation: () => Promise<T>): Promise<T> {
+    const lease = this.lease;
+    return this.serializeMutation(async () => {
+      if (lease && (lease.closed || this.lease !== lease)) {
+        throw new SyncError('conflict', 'WebDAV lock ended before the queued write started');
+      }
+      this.assertLease();
+      return operation();
+    });
+  }
   private scope(path: string) { return JSON.stringify([this.baseUrl, this.username, path]); }
   private url(path: string) { return `${this.baseUrl}/${path.replace(/^\//, '')}`; }
 
@@ -150,10 +169,21 @@ export class WebDAVLockManager {
     } finally { this.running = false; }
   }
 
+  /** Release a lock journaled by a previous version without acquiring a new lock. */
+  async recoverPrevious(path: string): Promise<void> {
+    if (this.running) throw new SyncError('conflict', 'A WebDAV operation is still running');
+    this.running = true;
+    try {
+      const previous = await this.store.get(this.scope(path));
+      if (previous) await this.release(path, previous);
+    } finally { this.running = false; }
+  }
+
   private scheduleRenewal(path: string, lease: Lease, lifetime: number): void {
     const delay = Math.min(60_000, lifetime / 2);
     lease.timer = setTimeout(() => {
-      lease.renewal = (async () => {
+      lease.renewal = this.serializeMutation(async () => {
+        if (lease.closed) return;
         try {
           this.assertLease();
           const requestedAt = Date.now();
@@ -169,7 +199,7 @@ export class WebDAVLockManager {
           lease.failure = new SyncError('conflict', `WebDAV lock renewal failed: ${toSyncError(err).message}`);
           lease.controller.abort();
         }
-      })();
+      });
     }, delay);
   }
 
@@ -222,6 +252,7 @@ export class WebDAVLockManager {
       if (this.lease) {
         this.lease.closed = true;
         clearTimeout(this.lease.timer);
+        await this.mutationQueue;
         await this.lease.renewal;
       }
       this.lease = undefined;

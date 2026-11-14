@@ -7,6 +7,10 @@ import { webdavLockStorage, type WebDAVLockStore } from './webdav-lock-storage';
 import { withWebDAVTimeout } from './webdav-request';
 export { SyncError, toSyncError } from './webdav-errors';
 
+// Cloud WebDAV metadata can take more than 30s to download even at modest sizes.
+// Lock requests keep their separate, shorter timeout in WebDAVLockManager.
+const TRANSFER_TIMEOUT_MS = 120_000;
+
 /**
  * Trim the URL and drop trailing slashes so that the client signature stays stable.
  * Credentials pasted from a password manager often carry stray whitespace/newlines,
@@ -90,7 +94,7 @@ export class WebDAVAdapter {
   async testConnection(): Promise<boolean> {
     const client = this.requireClient();
     try {
-      await this.request(options => client.getDirectoryContents('/', options));
+      await this.request('PROPFIND', '/', options => client.getDirectoryContents('/', options));
       return true;
     } catch (err) {
       console.error('WebDAV connection failed', toSyncError(err));
@@ -108,7 +112,7 @@ export class WebDAVAdapter {
   async checkAuth(probePath: string): Promise<void> {
     const client = this.requireClient();
     try {
-      const res: any = await this.request(options => client.getFileContents(probePath, { ...options, format: 'text', details: true }));
+      const res: any = await this.request('GET', probePath, options => client.getFileContents(probePath, { ...options, format: 'text', details: true }));
       this.assertOkStatus(res?.status, probePath);
     } catch (err) {
       const error = toSyncError(err);
@@ -121,7 +125,7 @@ export class WebDAVAdapter {
   async getFileContents(filename: string): Promise<string | null> {
     const client = this.requireClient();
     try {
-      const res: any = await this.request(options => client.getFileContents(filename, { ...options, format: 'text', details: true }));
+      const res: any = await this.request('GET', filename, options => client.getFileContents(filename, { ...options, format: 'text', details: true }));
       this.assertOkStatus(res?.status, filename);
       return res?.data as string;
     } catch (err) {
@@ -156,10 +160,25 @@ export class WebDAVAdapter {
     return this.locks!.unlock(path, tokens);
   }
 
+  async recoverPreviousLock(path: string): Promise<void> {
+    this.requireClient();
+    await this.locks!.recoverPrevious(path);
+  }
+
   /** Bound every request so a hung transfer cannot prevent finally/UNLOCK forever. */
-  private async request<T>(operation: (options: { headers: Record<string, string>; signal: AbortSignal }) => Promise<T>, mutation = false): Promise<T> {
-    const lease = this.locks?.mutationOptions() ?? { headers: {} };
-    return withWebDAVTimeout(signal => operation({ headers: mutation ? lease.headers : {}, signal }), 30_000, lease.signal);
+  private async request<T>(method: string, path: string, operation: (options: { headers: Record<string, string>; signal: AbortSignal }) => Promise<T>, mutation = false): Promise<T> {
+    try {
+      const execute = () => {
+        // Check the lease when the queued request starts, not when it is queued.
+        const lease = this.locks?.mutationOptions() ?? { headers: {} };
+        const headers = mutation ? lease.headers : method === 'GET' ? { 'Cache-Control': 'no-cache' } : {};
+        return withWebDAVTimeout(signal => operation({ headers, signal }), TRANSFER_TIMEOUT_MS, lease.signal);
+      };
+      return await (mutation && this.locks ? this.locks.withMutation(execute) : execute());
+    } catch (err) {
+      const error = toSyncError(err);
+      throw new SyncError(error.code, `${method} ${path}: ${error.message}`, error.status);
+    }
   }
 
   async putJSON(filename: string, data: any): Promise<boolean> {
@@ -170,7 +189,7 @@ export class WebDAVAdapter {
       if (dirPath && dirPath !== '') {
         await this.ensureDirectory(dirPath);
       }
-      const written = await this.request(options => client.putFileContents(filename, content, options), true);
+      const written = await this.request('PUT', filename, options => client.putFileContents(filename, content, options), true);
       if (written === false) throw new SyncError('conflict', `Conditional write rejected: ${filename}`);
       return true;
     } catch (err) {
@@ -207,7 +226,7 @@ export class WebDAVAdapter {
       current += `/${segment}`;
       const path = current;
       try {
-        const result = await this.request(options => client.stat(path, options));
+        const result = await this.request('PROPFIND', path, options => client.stat(path, options));
         const stat = 'data' in result ? result.data : result;
         if (stat.type !== 'directory') throw new SyncError('invalidRemoteData', `Expected a WebDAV directory: ${path}`);
         continue;
@@ -217,7 +236,7 @@ export class WebDAVAdapter {
       try {
         // The SDK's recursive MKCOL does not pass AbortSignal to its PROPFINDs.
         // Walk explicitly so every request is bounded and can reach UNLOCK on failure.
-        await this.request(options => client.createDirectory(path, { ...options, recursive: false }), true);
+        await this.request('MKCOL', path, options => client.createDirectory(path, { ...options, recursive: false }), true);
       } catch (err) {
         if (toSyncError(err).status !== 405) throw err;
       }
@@ -227,7 +246,7 @@ export class WebDAVAdapter {
   async deleteFile(filename: string): Promise<boolean> {
     const client = this.requireClient();
     try {
-      await this.request(options => client.deleteFile(filename, options), true);
+      await this.request('DELETE', filename, options => client.deleteFile(filename, options), true);
       return true;
     } catch (err) {
       const error = toSyncError(err);

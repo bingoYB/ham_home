@@ -188,9 +188,36 @@ describe("WebDAVAdapter operations", () => {
       signal.addEventListener('abort', () => reject(new DOMException('Request timed out', 'AbortError')));
     }));
     const result = expect(adapter.withExclusiveLock('/HamHomeSync', () => adapter.ensureDirectory('/HamHomeSync/bookmarks'))).rejects.toMatchObject({ code: 'network' });
-    await vi.advanceTimersByTimeAsync(30_000);
+    await vi.advanceTimersByTimeAsync(120_000);
     await result;
     expect(mocks.unlock).toHaveBeenCalledWith('/HamHomeSync', '<urn:uuid:probe>');
+  });
+
+  it('allows a slow metadata download to finish after the former 30 second cutoff', async () => {
+    vi.useFakeTimers();
+    const adapter = new WebDAVAdapter(memoryLockStore());
+    adapter.init(config);
+    mocks.getFileContents.mockImplementationOnce((_path, { signal }) => new Promise((resolve, reject) => {
+      signal.addEventListener('abort', () => reject(signal.reason));
+      setTimeout(() => resolve({ status: 200, data: '{"bookmarks":[]}' }), 45_000);
+    }));
+    const download = adapter.getJSON('/HamHomeSync/bookmarks/meta.json');
+    await vi.advanceTimersByTimeAsync(45_000);
+    await expect(download).resolves.toEqual({ bookmarks: [] });
+  });
+
+  it('reports the request path and elapsed timeout when a metadata download stalls', async () => {
+    vi.useFakeTimers();
+    const adapter = new WebDAVAdapter(memoryLockStore());
+    adapter.init(config);
+    mocks.getFileContents.mockImplementationOnce((_path, { signal }) => new Promise((_resolve, reject) => {
+      signal.addEventListener('abort', () => reject(signal.reason));
+    }));
+    const failed = expect(adapter.getJSON('/HamHomeSync/bookmarks/meta.json')).rejects.toMatchObject({
+      code: 'network', message: 'GET /HamHomeSync/bookmarks/meta.json: WebDAV request timed out after 120 seconds',
+    });
+    await vi.advanceTimersByTimeAsync(120_000);
+    await failed;
   });
 
   it("maps a 401 to an auth error instead of swallowing it", async () => {
@@ -225,6 +252,19 @@ describe("WebDAVAdapter operations", () => {
     mocks.getFileContents.mockResolvedValue({ status: 200, data: '{"a":1}' });
 
     await expect(adapter.getFileContents("/a.json")).resolves.toBe('{"a":1}');
+    expect(mocks.getFileContents).toHaveBeenCalledWith('/a.json', expect.objectContaining({
+      headers: { 'Cache-Control': 'no-cache' },
+    }));
+  });
+
+  it('includes the method and sync path when a write is rejected', async () => {
+    const adapter = new WebDAVAdapter(memoryLockStore());
+    adapter.init(config);
+    mocks.stat.mockResolvedValue({ type: 'directory' });
+    mocks.putFileContents.mockRejectedValueOnce(httpError(405));
+    await expect(adapter.putJSON('/HamHomeSync/sys.json', {})).rejects.toMatchObject({
+      code: 'unknown', status: 405, message: 'PUT /HamHomeSync/sys.json: Invalid response: 405',
+    });
   });
 
   it("treats an existing directory as success", async () => {
