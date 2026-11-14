@@ -63,7 +63,8 @@
       "moveCategoryDescription": "Move {{count}} selected bookmarks to category",
       "delete": "Delete Selected",
       "deleteTitle": "Confirm Batch Delete",
-      "deleteConfirm": "Delete the {{count}} selected bookmarks? They move to the trash and can be restored at any time."
+      "deleteConfirm": "Delete the {{count}} selected bookmarks? They move to the trash and can be restored at any time.",
+      "deleteUncertain": "Could not confirm the batch deletion. Check your bookmarks or trash."
     },
     "empty": "No bookmarks yet",
     "emptyFilter": "No bookmarks match your filters",

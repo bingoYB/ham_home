@@ -40,11 +40,12 @@ export function useBookmarkSelection() {
     setSelectedIds((prev) => retainVisibleSelection(prev, visibleIds));
   }, []);
 
-  const removeFromSelection = useCallback((id: string) => {
+  const removeFromSelection = useCallback((ids: string | readonly string[]) => {
+    const idsToRemove = typeof ids === 'string' ? [ids] : ids;
     setSelectedIds((prev) => {
       const newSet = new Set(prev);
-      newSet.delete(id);
-      return newSet;
+      idsToRemove.forEach((id) => newSet.delete(id));
+      return newSet.size === prev.size ? prev : newSet;
     });
   }, []);
 

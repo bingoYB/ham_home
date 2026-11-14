@@ -63,7 +63,8 @@
       "moveCategoryDescription": "将选中的 {{count}} 个书签迁移到分类",
       "delete": "批量删除",
       "deleteTitle": "批量删除确认",
-      "deleteConfirm": "确定删除选中的 {{count}} 个书签吗？删除后会移入回收站，可随时恢复。"
+      "deleteConfirm": "确定删除选中的 {{count}} 个书签吗？删除后会移入回收站，可随时恢复。",
+      "deleteUncertain": "无法确认批量删除结果，请检查书签列表或回收站"
     },
     "empty": "暂无书签",
     "emptyFilter": "没有符合筛选条件的书签",

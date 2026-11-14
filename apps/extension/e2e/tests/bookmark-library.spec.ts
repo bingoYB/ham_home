@@ -6,8 +6,10 @@ import {
   createLibraryFixtures,
 } from "../helpers/factories";
 import { attachStepScreenshot, openAppPage } from "../helpers/pages";
+import { pointAiConfigToMock, startMockAiServer } from "../helpers/mock-ai-server";
 import {
   getBookmarks,
+  getStorageState,
   resetExtensionData,
   seedBookmarks,
   seedCategories,
@@ -35,6 +37,35 @@ async function pickCalendarDate(page: Page, trigger: Locator, timestamp: number)
   }
   await day.first().click();
   await expect(calendar).toBeHidden();
+}
+
+async function injectBatchDeleteFailure(page: Page, mode: "before-write" | "after-write") {
+  await page.addInitScript((failureMode) => {
+    const runtime = chrome.runtime;
+    const sendMessage = runtime.sendMessage.bind(runtime) as (...args: unknown[]) => unknown;
+    let failNextDelete = true;
+    (runtime as unknown as { sendMessage: (...args: unknown[]) => unknown }).sendMessage = (...args) => {
+      const message = args[0] as { type?: string; data?: { path?: string[] } } | undefined;
+      if (message?.type !== "proxy-service.BookmarkCommands" || message.data?.path?.[0] !== "batchDeleteBookmarks") {
+        return sendMessage(...args);
+      }
+      if (failNextDelete) {
+        failNextDelete = false;
+        if (failureMode === "before-write") throw new Error("Synthetic storage write failure");
+        return Promise.resolve(sendMessage(...args)).then(() => { throw new Error("Synthetic response lost"); });
+      }
+      // Keep the retry pending long enough to verify that repeat submissions are disabled.
+      return new Promise((resolve, reject) => {
+        window.setTimeout(() => {
+          try {
+            Promise.resolve(sendMessage(...args)).then(resolve, reject);
+          } catch (error) {
+            reject(error);
+          }
+        }, 3_000);
+      });
+    };
+  }, mode);
 }
 
 test.describe("LIB 书签库核心流程", () => {
@@ -178,7 +209,7 @@ test.describe("LIB 书签库核心流程", () => {
     await attachStepScreenshot(page, testInfo, "LIB-004-删除后列表");
   });
 
-  test("LIB-005 批量打标签、移动分类、删除", async ({
+  test("LIB-005 存储批量变更后刷新列表", async ({
     context,
     extensionId,
     extensionWorker,
@@ -216,6 +247,186 @@ test.describe("LIB 书签库核心流程", () => {
     await attachStepScreenshot(page, testInfo, "LIB-005-批量删除后空态");
     const stored = await getBookmarks(extensionWorker);
     expect(stored).toHaveLength(0);
+  });
+
+  test("LIB-005B 通过界面批量删除 1000 条并从回收站恢复", async ({
+    context,
+    extensionId,
+    extensionWorker,
+    e2eVariant,
+  }) => {
+    const t = e2eVariant.text;
+    const targets = Array.from({ length: 1_000 }, (_, index) =>
+      createBookmarkFixture({
+        id: `batch-delete-${index}`,
+        title: `Batch Delete Target ${index}`,
+        url: `https://example.com/batch-delete/${index}`,
+        content: `Content ${index}`,
+      }),
+    );
+    const keep = createBookmarkFixture({
+      id: "batch-delete-keep",
+      title: "Keep This Bookmark",
+      url: "https://example.com/keep",
+    });
+    await seedBookmarks(extensionWorker, [...targets, keep]);
+
+    const page = await openAppPage(context, extensionId, "all");
+    const search = page.getByPlaceholder(t("搜索书签...", "Search bookmarks..."));
+    await search.fill("Batch Delete Target");
+    await page.getByRole("button", { name: t("全选", "Select All"), exact: true }).click();
+    await expect(page.getByText(t("已选择 1000 项", "1000 selected"), { exact: true })).toBeVisible();
+
+    // Count only changes made after the test data was loaded and selected.
+    await page.evaluate(() => {
+      document.documentElement.dataset.bookmarkWriteCount = "0";
+      chrome.storage.onChanged.addListener((changes, area) => {
+        if (area === "local" && changes.bookmarks) {
+          const root = document.documentElement;
+          root.dataset.bookmarkWriteCount = String(Number(root.dataset.bookmarkWriteCount) + 1);
+        }
+      });
+    });
+
+    const deleteButton = page.getByRole("button", { name: t("批量删除", "Delete Selected") });
+    await deleteButton.click();
+    const dialog = page.getByRole("alertdialog");
+    await expect(dialog).toContainText("1000");
+    await dialog.getByRole("button", { name: t("取消", "Cancel"), exact: true }).click();
+    await expect(page.getByText(t("已选择 1000 项", "1000 selected"), { exact: true })).toBeVisible();
+
+    await deleteButton.click();
+    await dialog.getByRole("button", { name: t("删除", "Delete"), exact: true }).click();
+    await expect(page.getByText(t("没有符合筛选条件的书签", "No bookmarks match your filters"))).toBeVisible();
+
+    expect(await page.evaluate(() => Number(document.documentElement.dataset.bookmarkWriteCount))).toBe(1);
+    const { local } = await getStorageState(extensionWorker);
+    const stored = local.bookmarks as Array<{
+      id: string;
+      isDeleted?: boolean;
+      deletedAt?: number;
+      updatedAt: number;
+    }>;
+    const deleted = stored.filter((bookmark) => bookmark.isDeleted);
+    expect(deleted).toHaveLength(1_000);
+    expect(deleted.every((bookmark) => bookmark.id.startsWith("batch-delete-") && bookmark.deletedAt === bookmark.updatedAt)).toBe(true);
+    expect(deleted.every((bookmark) => (bookmark.deletedAt ?? 0) > 0)).toBe(true);
+    expect(stored.find((bookmark) => bookmark.id === keep.id)?.isDeleted).not.toBe(true);
+    expect((local.bookmarkContents as Record<string, string>)[targets[0].id]).toBe(targets[0].content);
+
+    await page.goto(`chrome-extension://${extensionId}/app.html#trash`);
+    await page.getByPlaceholder(t("搜索标题或网址", "Search title or URL")).fill("Batch Delete Target 0");
+    await expect(page.getByText("Batch Delete Target 0", { exact: true })).toBeVisible();
+    await page.getByRole("checkbox", { name: t("全选", "Select All") }).check();
+    await page.getByTestId("trash-restore-selected").click();
+    await expect(page.getByText(t("回收站是空的", "Trash is empty"))).toBeVisible();
+    await expect.poll(async () => (await getBookmarks(extensionWorker)).some((bookmark) => bookmark.id === targets[0].id)).toBe(true);
+  });
+
+  test("LIB-005C 批量删除失败后保留选择并可重试", async ({
+    context,
+    extensionId,
+    extensionWorker,
+    e2eVariant,
+  }) => {
+    const t = e2eVariant.text;
+    await seedBookmarks(extensionWorker, [
+      createBookmarkFixture({ id: "delete-retry", title: "Retry Target", url: "https://example.com/retry" }),
+      createBookmarkFixture({ id: "new-selection", title: "New Selection", url: "https://example.com/new-selection" }),
+    ]);
+
+    const page = await context.newPage();
+    await injectBatchDeleteFailure(page, "before-write");
+    await page.goto(`chrome-extension://${extensionId}/app.html#all`);
+    const search = page.getByPlaceholder(t("搜索书签...", "Search bookmarks..."));
+    await search.fill("Retry Target");
+    await page.getByRole("button", { name: t("全选", "Select All"), exact: true }).click();
+
+    const deleteButton = page.getByRole("button", { name: t("批量删除", "Delete Selected") });
+    await deleteButton.click();
+    await page.getByRole("alertdialog").getByRole("button", { name: t("删除", "Delete"), exact: true }).click();
+    await expect(page.getByText(t("无法确认批量删除结果，请检查书签列表或回收站", "Could not confirm the batch deletion. Check your bookmarks or trash."))).toBeVisible();
+    await expect(page.getByText("Synthetic storage write failure")).toBeVisible();
+    await expect(page.getByText(t("已选择 1 项", "1 selected"), { exact: true })).toBeVisible();
+    expect((await getBookmarks(extensionWorker)).map((bookmark) => bookmark.id).sort()).toEqual(["delete-retry", "new-selection"]);
+
+    await deleteButton.click();
+    await page.getByRole("alertdialog").getByRole("button", { name: t("删除", "Delete"), exact: true }).click();
+    await expect(deleteButton).toBeDisabled();
+    await search.fill("New Selection");
+    await page.getByRole("button", { name: t("全选", "Select All"), exact: true }).click();
+    await expect.poll(async () => (await getBookmarks(extensionWorker)).map((bookmark) => bookmark.id)).toEqual(["new-selection"]);
+    await expect(page.getByText(t("已选择 1 项", "1 selected"), { exact: true })).toBeVisible();
+    await search.fill("Retry Target");
+    await expect(page.getByText(t("没有符合筛选条件的书签", "No bookmarks match your filters"))).toBeVisible();
+  });
+
+  test("LIB-005D AI 整理暂停监听时批量删除仍立即刷新", async ({
+    context,
+    extensionId,
+    extensionWorker,
+    e2eVariant,
+  }) => {
+    const t = e2eVariant.text;
+    const server = await startMockAiServer();
+    try {
+      server.enqueueReply({ chunks: ["AI response"], responseDelayMs: 20_000 });
+      await pointAiConfigToMock(extensionWorker, server.baseUrl);
+      await extensionWorker.evaluate(async () => {
+        const { aiConfig } = await chrome.storage.sync.get("aiConfig");
+        await chrome.storage.sync.set({ aiConfig: { ...aiConfig, smallModelMode: true } });
+      });
+      const fixtureUrl = server.baseUrl.replace(/\/v1$/, "/fixture");
+      await seedBookmarks(extensionWorker, [
+        createBookmarkFixture({ id: "ai-hold", title: "AI Hold Target", url: `${fixtureUrl}/hold` }),
+        createBookmarkFixture({ id: "delete-during-ai", title: "Delete During AI", url: `${fixtureUrl}/delete` }),
+      ]);
+
+      const page = await openAppPage(context, extensionId, "all");
+      const search = page.getByPlaceholder(t("搜索书签...", "Search bookmarks..."));
+      await search.fill("AI Hold Target");
+      await page.getByRole("button", { name: t("全选", "Select All"), exact: true }).click();
+      await page.getByRole("button", { name: /批量 AI 整理|Batch AI Organize/ }).click();
+      await expect.poll(() => server.requests.length).toBe(1);
+      expect(server.requests[0].completed).toBe(false);
+
+      await search.fill("Delete During AI");
+      await page.getByRole("button", { name: t("全选", "Select All"), exact: true }).click();
+      await page.getByRole("button", { name: t("批量删除", "Delete Selected") }).click();
+      await page.getByRole("alertdialog").getByRole("button", { name: t("删除", "Delete"), exact: true }).click();
+      await expect(page.getByText(t("没有符合筛选条件的书签", "No bookmarks match your filters"))).toBeVisible();
+      expect(server.requests[0].completed).toBe(false);
+      expect((await getBookmarks(extensionWorker)).map((bookmark) => bookmark.id)).toEqual(["ai-hold"]);
+    } finally {
+      await server.close();
+    }
+  });
+
+  test("LIB-005E 写入成功但响应失败时展示不确定结果", async ({
+    context,
+    extensionId,
+    extensionWorker,
+    e2eVariant,
+  }) => {
+    const t = e2eVariant.text;
+    await seedBookmarks(extensionWorker, [
+      createBookmarkFixture({ id: "delete-response-lost", title: "Response Lost Target", url: "https://example.com/response-lost" }),
+    ]);
+    const page = await context.newPage();
+    await injectBatchDeleteFailure(page, "after-write");
+    await page.goto(`chrome-extension://${extensionId}/app.html#all`);
+    await page.getByPlaceholder(t("搜索书签...", "Search bookmarks...")).fill("Response Lost Target");
+    await page.getByRole("button", { name: t("全选", "Select All"), exact: true }).click();
+    await page.getByRole("button", { name: t("批量删除", "Delete Selected") }).click();
+    await page.getByRole("alertdialog").getByRole("button", { name: t("删除", "Delete"), exact: true }).click();
+    await expect(page.getByText(t("无法确认批量删除结果，请检查书签列表或回收站", "Could not confirm the batch deletion. Check your bookmarks or trash."))).toBeVisible();
+    await expect(page.getByText("Synthetic response lost")).toBeVisible();
+    await expect(page.getByText(t("没有符合筛选条件的书签", "No bookmarks match your filters"))).toBeVisible();
+    const { local } = await getStorageState(extensionWorker);
+    expect((local.bookmarks as Array<{ id: string; isDeleted?: boolean }>)[0]).toMatchObject({
+      id: "delete-response-lost",
+      isDeleted: true,
+    });
   });
 
   test("LIB-006 新建自定义筛选器后列表中不应出现重复项", async ({

@@ -63,6 +63,7 @@ import { useBookmarkSearch } from "@/hooks/useBookmarkSearch";
 import { useCategoryNavigation } from "@/hooks/useCategoryNavigation";
 import { useScrollToTopOnChange } from "@/hooks/useScrollToTopOnChange";
 import { useBookmarkSelection } from "@/hooks/useBookmarkSelection";
+import { useBatchBookmarkDelete } from "@/hooks/useBatchBookmarkDelete";
 import { useMasonryLayout } from "@/hooks/useMasonryLayout";
 import { useVirtualBookmarkList } from "@/hooks/useVirtualBookmarkList";
 import { BatchAIOrganizeButton } from "@/components/bookmarkListMng/BatchAIOrganizeButton";
@@ -242,8 +243,8 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
     toggleSelectAll,
     retainOnly,
     removeFromSelection,
-    deselectAll,
   } = useBookmarkSelection();
+  const { deleteSelected, isDeleting: isBatchDeleting } = useBatchBookmarkDelete();
 
   // 勾选只对当前可见列表有意义：切换分类 / 搜索 / 标签 / 时间筛选后，
   // 被隐藏的书签要退出选中集合，否则批量删除、移动、打标签会作用到看不见的书签
@@ -522,24 +523,10 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
     }
   };
 
-  // 批量删除 - 命令式确认弹窗
+  // 提交时固定选择范围，删除完成后保留期间新选中的书签。
   const handleBatchDelete = async () => {
-    if (selectedIds.size === 0) return;
-    const confirmed = await confirm({
-      title: t("bookmark:bookmark.batch.deleteTitle"),
-      description: t("bookmark:bookmark.batch.deleteConfirm", {
-        count: selectedIds.size,
-      }),
-      confirmText: t("common:common.delete"),
-      cancelText: t("common:common.cancel"),
-      variant: "destructive",
-    });
-    if (confirmed) {
-      for (const id of selectedIds) {
-        await deleteBookmark(id);
-      }
-      deselectAll();
-    }
+    const ids = Array.from(selectedIds);
+    if (await deleteSelected(ids)) removeFromSelection(ids);
   };
 
   // 批量打标签
@@ -897,9 +884,13 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
                     variant="destructive"
                     size="sm"
                     onClick={handleBatchDelete}
+                    disabled={isBatchDeleting}
+                    aria-busy={isBatchDeleting}
                     className="bg-red-500 hover:bg-red-700 text-white dark:bg-red-500 dark:hover:bg-red-700 dark:text-white"
                   >
-                    <Trash2 className="h-4 w-4 mr-1" />
+                    {isBatchDeleting
+                      ? <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                      : <Trash2 className="h-4 w-4 mr-1" />}
                     {t("bookmark:bookmark.batch.delete")}
                   </Button>
                 </>

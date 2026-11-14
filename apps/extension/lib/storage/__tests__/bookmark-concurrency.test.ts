@@ -136,6 +136,32 @@ describe('background bookmark writer', () => {
     expect(await client.getBookmarks()).toHaveLength(1);
   });
 
+  it('preserves concurrent edits and creates when another context batch-deletes bookmarks', async () => {
+    const background = await newContext();
+    background.registerBookmarkStorageService();
+    const a = (await newContext()).bookmarkStorage;
+    const b = (await newContext()).bookmarkStorage;
+    const [first, second, keep] = await a.createBookmarks([
+      input('https://batch-delete.test/first'),
+      input('https://batch-delete.test/second'),
+      input('https://batch-delete.test/keep'),
+    ]);
+
+    await Promise.all([
+      a.batchDeleteBookmarks([first.id, second.id]),
+      b.updateBookmark(keep.id, { title: 'edited concurrently' }),
+      b.createBookmark(input('https://batch-delete.test/new')),
+    ]);
+
+    expect((await a.getDeletedBookmarks()).map((bookmark) => bookmark.id).sort()).toEqual([first.id, second.id].sort());
+    expect(await a.getBookmarkById(first.id)).toMatchObject({ isDeleted: true, content: '正文' });
+    expect(await b.getBookmarkById(keep.id)).toMatchObject({ title: 'edited concurrently', content: '正文' });
+    expect((await b.getBookmarks()).map((bookmark) => bookmark.url).sort()).toEqual([
+      'https://batch-delete.test/keep',
+      'https://batch-delete.test/new',
+    ]);
+  });
+
   it('exports persisted Markdown and restores it through the JSON import mapping', async () => {
     const background = await newContext();
     background.registerBookmarkStorageService();

@@ -65,6 +65,7 @@ interface BookmarkContextType {
   addBookmark: (data: CreateBookmarkInput) => Promise<LocalBookmark>;
   updateBookmark: (id: string, data: Partial<LocalBookmark>) => Promise<void>;
   deleteBookmark: (id: string, permanent?: boolean) => Promise<void>;
+  deleteBookmarks: (ids: string[]) => Promise<void>;
   refreshBookmarks: () => Promise<void>;
 
   // 分类操作
@@ -297,6 +298,12 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
     await refreshBookmarks();
   };
 
+  const deleteBookmarks = async (ids: string[]) => {
+    await bookmarkStorage.batchDeleteBookmarks(ids);
+    // 通常由 storage watcher 刷新；批量 AI 等操作暂停监听时仍需及时更新。
+    if (watcherPausedRef.current > 0) await refreshBookmarks();
+  };
+
   // 分类操作
   const addCategory = async (
     name: string,
@@ -475,6 +482,7 @@ export function BookmarkProvider({ children }: { children: ReactNode }) {
         addBookmark,
         updateBookmark,
         deleteBookmark,
+        deleteBookmarks,
         refreshBookmarks,
         addCategory,
         updateCategory,
