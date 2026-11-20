@@ -27,7 +27,7 @@ export function BookmarkListItem({
 
   return (
     <div
-      className={`group flex items-center gap-4 p-4 rounded-xl border transition-all hover:shadow-md ${
+      className={`group flex items-center gap-4 p-4 rounded-xl border transition-[box-shadow,background-color,border-color] duration-200 ease-out-strong hover:shadow-md ${
         isHighlighted
           ? "border-indigo-500 ring-2 ring-indigo-500/50 bg-indigo-50/50 dark:bg-indigo-950/20 animate-pulse"
           : isSelected

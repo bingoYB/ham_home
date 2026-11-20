@@ -185,6 +185,7 @@ import { BookmarkCard } from "@hamhome/ui-business/bookmark";
 
 - 组件只负责展示和派发回调，不直接访问存储、i18n 或扩展 API。
 - 快照、置顶和 AI 重新分析菜单项仅在对应回调存在时展示。
+- 悬停时上抬 2px 并加深阴影（200ms，`ease-out-strong`）；系统开启减弱动态效果时只保留阴影变化。
 
 ### BookmarkListItem
 
@@ -236,6 +237,7 @@ import { BookmarkListItem } from "@hamhome/ui-business/bookmark";
 
 - 标签区在大屏展示，多标签会限制高度避免撑开虚拟列表项。
 - 点击标题区域使用普通链接打开，菜单动作由父组件控制。
+- 悬停只过渡背景、边框和阴影，行本身不位移，密集列表里扫过时不会晃动。
 
 ### BookmarkActionsMenu
 

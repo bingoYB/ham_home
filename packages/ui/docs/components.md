@@ -1,5 +1,68 @@
 # UI Components API
 
+## Motion（动效体系）
+
+`globals.css` 定义了插件与官网共用的动效 token 和工具类。缓动曲线与官网（`apps/web`）一致，两边的动效手感统一。
+
+### Tokens
+
+| Token | Tailwind utility | Value | Use for |
+|-------|------------------|-------|---------|
+| `--ease-out-strong` | `ease-out-strong` | `cubic-bezier(0.23, 1, 0.32, 1)` | 默认曲线：弹层、卡片悬停、展开收起、入场 |
+| `--ease-in-out-strong` | `ease-in-out-strong` | `cubic-bezier(0.77, 0, 0.175, 1)` | 已在屏幕上的元素移动、主题切换圆形扩散 |
+| `--ease-drawer` | `ease-drawer` | `cubic-bezier(0.32, 0.72, 0, 1)` | 抽屉、侧滑面板（`Sheet`、页内书签面板） |
+| `--ease-spring` | `ease-spring` | `cubic-bezier(0.34, 1.56, 0.64, 1)` | 小图标的悬停放大、成功对勾，带轻微回弹 |
+
+### Animations
+
+| Utility | Effect | Use for |
+|---------|--------|---------|
+| `animate-rise` | 240ms，透明度 0 → 1 并上移 6px | 原地出现的内容：空状态、行内提示 |
+| `animate-page-enter` | 280ms，透明度 0 → 1 并上移 8px | app 主区域切换页面 |
+| `animate-pop` | 320ms，从 0.6 倍弹到原尺寸 | 保存成功等确认图标 |
+| `motion-stagger` | 直接子元素依次执行 `rise`，间隔 30ms，第 8 个起不再增加延迟 | 一屏内的短列表（Popup 分区、引导步骤） |
+
+位移量乘以 `--motion-travel`（默认 1）。这些动画的 fill mode 都是 `backwards`：结束后元素上不残留 transform，不会成为 `fixed` / `sticky` 后代的包含块。`motion-stagger` 的间隔可以用 `--motion-stagger-step` 覆盖。
+
+### Defaults for tw-animate-css
+
+`animate-in` 默认 180ms，`animate-out` 默认 140ms，两者都用 `--ease-out-strong`（库默认是 150ms `ease`）。组件上写的 `duration-*` / `ease-*` 仍然优先。
+
+### Primitive behavior
+
+- `Popover`、`DropdownMenu`、`Select`、`HoverCard`、`ContextMenu`、`Menubar`、`Tooltip` 从触发元素方向缩放展开，位移 4px。
+- `Tooltip` 在相邻提示间快速移动（Radix `instant-open`）时不再播放入场动画，工具栏上扫过不会闪。
+- `Dialog`、`AlertDialog` 从 0.96 倍加 8px 上移进入（200ms），关闭 150ms；遮罩同步淡入淡出。
+- `Sheet` 打开 300ms、关闭 200ms，使用 `ease-drawer`（原先打开 500ms）。
+- `Sidebar` 收起展开、菜单项尺寸变化使用 `ease-out-strong`（原先 `ease-linear`）。
+- `Button` 只过渡颜色、边框、阴影、透明度和缩放，按下时缩到 0.97（`motion-safe`）。
+- `Checkbox` 勾选标记缩放弹出；`Switch` 滑块使用 `ease-out-strong`；`TabsContent` 切换时淡入 200ms；`Progress` 进度变化 500ms 缓出。
+
+### Usage
+
+```tsx
+// Content that appears in place
+<div className="animate-rise">...</div>
+
+// Short static stack
+<div className="space-y-4 motion-stagger">
+  <header />
+  <section />
+  <section />
+</div>
+
+// Hover feedback on a card
+<div className="transition-[box-shadow,translate] duration-200 ease-out-strong hover:shadow-lg motion-safe:hover:-translate-y-0.5" />
+```
+
+### Notes
+
+- 只动 `opacity` 和 transform（`translate` / `scale`），不对 `width`、`height`、`top` 等布局属性做动画。测量后过渡高度的展开面板除外，例如插件的 `TabTidyGroupDisclosure`。
+- 入场 160–240ms，退场比入场快；抽屉和整页切换不超过 300ms。
+- 虚拟列表（瀑布流、`useScrollAreaVirtualList`）的行不要加入场动画：滚动时行会反复挂载，动画也会反复播放。
+- 高频且由键盘触发的操作不加动画，或只用纯透明度。
+- 系统开启「减弱动态效果」时保留淡入淡出、去掉位移和缩放：`--motion-travel` 变为 0，上面三个动画只剩透明度；所有 `animate-in` / `animate-out`（弹层、对话框、菜单）的 translate / scale / rotate 被归零。入场动画因此不需要加 `motion-safe:`；只有纯位移的效果（悬停上抬、按下缩放）才用 `motion-safe:` 包住。
+
 ## Toaster
 
 Sonner toast 容器组件，统一应用 HamHome 的圆角、主题变量和状态样式。

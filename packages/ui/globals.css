@@ -169,6 +169,117 @@
   --shadow-2xl: var(--shadow-2xl);
 }
 
+/* ========================================
+   Motion system
+   - One strong ease-out curve for almost everything: UI reacts at once and settles softly.
+   - Enter 160-240ms, exit faster (~140ms); drawers and page swaps stay at or under 300ms.
+   - Only animate opacity / transform (translate, scale); never layout properties.
+   - The curve matches the marketing site (apps/web) so both feel like one product.
+   ======================================== */
+@theme {
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out-strong: cubic-bezier(0.77, 0, 0.175, 1);
+  --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* Content appearing in place (empty states, inline notices, cards). */
+  --animate-rise: hh-rise 240ms var(--ease-out-strong) backwards;
+  /* Main page swap inside the app shell. */
+  --animate-page-enter: hh-page-enter 280ms var(--ease-out-strong) backwards;
+  /* Small confirmation glyphs (success check, saved badge). */
+  --animate-pop: hh-pop 320ms var(--ease-spring) backwards;
+
+  /* Fill mode is `backwards` on purpose: once finished, no transform is left on the
+     element, so it never becomes the containing block of fixed / sticky descendants. */
+  @keyframes hh-rise {
+    from {
+      opacity: 0;
+      translate: 0 calc(6px * var(--motion-travel, 1));
+    }
+  }
+
+  @keyframes hh-page-enter {
+    from {
+      opacity: 0;
+      translate: 0 calc(8px * var(--motion-travel, 1));
+    }
+  }
+
+  @keyframes hh-pop {
+    from {
+      opacity: 0;
+      scale: calc(1 - 0.4 * var(--motion-travel, 1));
+    }
+  }
+}
+
+/* Reduced motion keeps fades and drops movement: content still appears softly, but
+   nothing slides, scales or bounces. This covers the shared keyframes above and every
+   tw-animate-css enter / exit (dialogs, popovers, menus, toasts built on animate-in). */
+@media (prefers-reduced-motion: reduce) {
+  :root,
+  :host {
+    --motion-travel: 0;
+  }
+
+  [class*='animate-in'],
+  [class*='animate-out'] {
+    --tw-enter-scale: 1 !important;
+    --tw-enter-translate-x: 0 !important;
+    --tw-enter-translate-y: 0 !important;
+    --tw-enter-rotate: 0 !important;
+    --tw-exit-scale: 1 !important;
+    --tw-exit-translate-x: 0 !important;
+    --tw-exit-translate-y: 0 !important;
+    --tw-exit-rotate: 0 !important;
+  }
+}
+
+/* tw-animate-css defaults to 150ms `ease` for both directions. Enter with the shared
+   ease-out curve and leave a little faster, unless a component sets duration / ease. */
+@theme inline {
+  --animate-in: enter var(--tw-animation-duration, var(--tw-duration, 180ms)) var(--tw-ease, var(--ease-out-strong)) var(--tw-animation-delay, 0s) var(--tw-animation-iteration-count, 1) var(--tw-animation-direction, normal) var(--tw-animation-fill-mode, none);
+  --animate-out: exit var(--tw-animation-duration, var(--tw-duration, 140ms)) var(--tw-ease, var(--ease-out-strong)) var(--tw-animation-delay, 0s) var(--tw-animation-iteration-count, 1) var(--tw-animation-direction, normal) var(--tw-animation-fill-mode, none);
+}
+
+/* Staggered entrance for the direct children of a short, static stack (popup sections,
+   onboarding steps). Delays cap at the 8th child so long lists never feel slow.
+   Do not use on virtualized lists: rows remount while scrolling and would replay it. */
+@utility motion-stagger {
+  & > * {
+    animation: hh-rise 240ms var(--ease-out-strong) backwards;
+    animation-delay: calc(var(--motion-stagger-step, 30ms) * var(--motion-stagger-index, 0));
+  }
+
+  & > :nth-child(2) {
+    --motion-stagger-index: 1;
+  }
+
+  & > :nth-child(3) {
+    --motion-stagger-index: 2;
+  }
+
+  & > :nth-child(4) {
+    --motion-stagger-index: 3;
+  }
+
+  & > :nth-child(5) {
+    --motion-stagger-index: 4;
+  }
+
+  & > :nth-child(6) {
+    --motion-stagger-index: 5;
+  }
+
+  & > :nth-child(7) {
+    --motion-stagger-index: 6;
+  }
+
+  & > :nth-child(n + 8) {
+    --motion-stagger-index: 7;
+  }
+}
+
 body {
   letter-spacing: var(--tracking-normal);
 }

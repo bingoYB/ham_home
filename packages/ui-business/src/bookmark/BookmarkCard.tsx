@@ -35,7 +35,7 @@ export function BookmarkCard({
   return (
     <div
       style={columnSize ? { width: columnSize } : undefined}
-      className={`group bg-card overflow-hidden rounded-2xl border transition-all hover:shadow-lg ${
+      className={`group bg-card overflow-hidden rounded-2xl border transition-[box-shadow,border-color,translate] duration-200 ease-out-strong hover:shadow-lg motion-safe:hover:-translate-y-0.5 ${
         isHighlighted
           ? "border-indigo-500 ring-2 ring-indigo-500/50 animate-pulse"
           : isSelected
