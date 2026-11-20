@@ -18,7 +18,7 @@
 **借助 AI，让收藏有序，让标签页井然。**
 
 <p>
-  <a href="https://bingoyb.github.io/ham_home/zh/">产品介绍</a> · <a href="#下载">安装扩展</a> · <a href="./USAGE_zh.md">使用指南</a> · <a href="#功能特性">功能特性</a> · <a href="#开发">开发文档</a>
+  <a href="https://bingoyb.github.io/ham_home/zh/">产品介绍</a> · <a href="#下载">安装扩展</a> · <a href="./USAGE_zh.md">使用指南</a> · <a href="#功能特性">功能特性</a> · <a href="#开发">开发文档</a> · <a href="#社区交流与反馈">社区交流</a>
 </p>
 
 </div>
@@ -268,6 +268,19 @@ ham_home/
 │   └── i18n/               # 共享国际化包
 └── docs/                   # 产品文档、中文 README、截图、设计说明
 ```
+
+## 社区交流与反馈
+
+**HamHome 交流群**面向中文用户。用手机 QQ 扫描下方二维码，或直接搜索群号 **1060145278** 加入。
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../apps/web/public/community/qq-group-dark.jpg" />
+  <img src="../apps/web/public/community/qq-group-light.jpg" alt="HamHome 交流群二维码，群号 1060145278" width="256" />
+</picture>
+
+- [GitHub Discussions](https://github.com/bingoYB/ham_home/discussions) — 在 Q&A 提问，在 Ideas 讨论功能设想，也可以到 Show and tell 分享书签整理方法。
+- [Issues](https://github.com/bingoYB/ham_home/issues) — 反馈可复现的故障，请附上浏览器、HamHome 版本和复现步骤。
+- [Pull requests](https://github.com/bingoYB/ham_home/pulls) — 提交代码、翻译或文档改进，也可以参与评审。
 
 ## 贡献
 

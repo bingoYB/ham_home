@@ -20,6 +20,9 @@ export function Footer({ isEn }: FooterProps) {
           <span>Firefox</span>
           <span>WebDAV</span>
           <span>Obsidian</span>
+          <Link href={`${localizedPath(isEn ? 'en' : 'zh')}#community`} className="transition-colors hover:text-foreground">
+            {isEn ? 'Community' : '社区交流'}
+          </Link>
           <Link href={localizedPath(isEn ? 'en' : 'zh', 'privacy-policy')} className="transition-colors hover:text-foreground">
             {privacyLabel}
           </Link>

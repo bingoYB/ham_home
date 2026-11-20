@@ -329,3 +329,14 @@ Agent 不会读取或代填 API Key、Base URL、隐私域名、WebDAV 凭据、
 ### 误删了书签
 
 打开 `回收站` 恢复即可。删除的书签会连同正文、快照、截图和剪藏在回收站保留 30 天。
+
+## 社区交流与反馈
+
+如果这份指南没有解答你的问题，可以在 [GitHub Discussions](https://github.com/bingoYB/ham_home/discussions) 的 Q&A 提问。能稳定复现的问题请提交到 [Issues](https://github.com/bingoYB/ham_home/issues)，并附上浏览器、HamHome 版本和复现步骤。修正文档、翻译或代码，欢迎提交 [Pull Request](https://github.com/bingoYB/ham_home/pulls)。
+
+也可以用手机 QQ 扫码，或搜索群号 **1060145278** 加入 **HamHome 交流群**，和其他用户直接交流。
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../apps/web/public/community/qq-group-dark.jpg" />
+  <img src="../apps/web/public/community/qq-group-light.jpg" alt="HamHome 交流群二维码，群号 1060145278" width="256" />
+</picture>

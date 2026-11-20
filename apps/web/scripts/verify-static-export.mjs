@@ -101,6 +101,13 @@ for (const language of ['zh', 'en']) {
     assert.ok(visibleText.includes(phrase), `visible workflow/setup boundary ${phrase}: ${language}`);
   }
   const anchors = [...main.matchAll(/<a\b[^>]*>/g)].map((match) => attribute(match[0], 'href'));
+  const community = main.match(/<section\b[^>]*\bid="community"[^>]*>([\s\S]*?)<\/section>/)?.[1] || '';
+  for (const path of ['discussions', 'issues', 'pulls']) {
+    assert.ok(community.includes(`href="https://github.com/bingoYB/ham_home/${path}"`), `community link: ${language}/${path}`);
+  }
+  assert.equal(community.includes('1060145278'), language === 'zh', `QQ group number: ${language}`);
+  assert.equal(community.includes('/community/qq-group-'), language === 'zh', `QQ group image: ${language}`);
+  assert.ok(html.includes(`href="${basePath}/${language}/#community"`), `community footer link: ${language}`);
   for (const host of ['chromewebstore.google.com', 'microsoftedge.microsoft.com', 'addons.mozilla.org']) {
     assert.ok(anchors.some((href) => href?.startsWith(`https://${host}/`)), `crawlable store ${host}: ${language}`);
   }

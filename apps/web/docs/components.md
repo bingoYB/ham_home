@@ -20,6 +20,7 @@ app/components/
 ├── LandingCapabilities.tsx
 ├── LandingPrivacy.tsx
 ├── LandingFAQ.tsx
+├── LandingCommunity.tsx
 ├── LandingCta.tsx
 ├── FeatureHeroBanner.tsx
 ├── HeroBackdrop.tsx
@@ -342,6 +343,19 @@ app/components/
 
 ---
 
+## LandingCommunity
+
+首页的社区交流区（`#community`）提供 GitHub Discussions、Issues 和 Pull requests 入口，分别用于提问讨论、报告故障和提交改进。中文页面另显示 QQ 群号和二维码，点击二维码可打开原图。
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| isEn | boolean | 是 | — | 选择英文或中文内容 |
+| isDark | boolean | 是 | — | 为中文页面选择对应主题的 QQ 群二维码 |
+
+```tsx
+<LandingCommunity isEn={false} isDark={false} />
+```
+
 ## LandingCta
 
 首页底部行动区，承接安装扩展和查看 GitHub 的主要操作。
@@ -481,7 +495,7 @@ app/components/
 
 ## LandingPage
 
-客户端首页组合组件；渲染既有功能与截图、四类任务指南、Agent 示例、完整 FAQ。
+客户端首页组合组件，展示产品功能、截图、任务指南、Agent 示例、FAQ 和社区交流入口。
 
 | Prop | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |
@@ -618,7 +632,7 @@ app/components/
 
 ## Footer
 
-品牌定位、浏览器标识、对应语言隐私政策与 GitHub 链接。
+展示品牌定位、浏览器标识，并链接到对应语言的首页社区交流区、隐私政策和 GitHub 仓库。
 
 | Prop | Type | Required | Default | Description |
 | --- | --- | --- | --- | --- |

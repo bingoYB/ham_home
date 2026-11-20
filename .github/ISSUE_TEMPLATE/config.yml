@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Usage questions · 使用问答
+    url: https://github.com/bingoYB/ham_home/discussions/categories/q-a
+    about: Ask for help using HamHome. 在 Q&A 提问或查找已有答案。
+  - name: Feature ideas · 功能讨论
+    url: https://github.com/bingoYB/ham_home/discussions/categories/ideas
+    about: Discuss an idea for HamHome. 在 Ideas 讨论功能建议和使用场景。

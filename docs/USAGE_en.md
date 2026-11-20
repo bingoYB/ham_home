@@ -329,3 +329,7 @@ These statuses mean the site answered but did not let the check through, for exa
 ### I deleted a bookmark by mistake
 
 Open `Trash` and restore it. Deleted bookmarks stay there for 30 days with their content, snapshots, screenshots, and clips.
+
+## Community and support
+
+If this guide leaves a question unanswered, ask in Q&A on [GitHub Discussions](https://github.com/bingoYB/ham_home/discussions). If you can reproduce a bug, report it in [Issues](https://github.com/bingoYB/ham_home/issues) with your browser, HamHome version, and reproduction steps. To contribute a fix or improve this guide, open a [pull request](https://github.com/bingoYB/ham_home/pulls).

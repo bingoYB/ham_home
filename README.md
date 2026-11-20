@@ -18,7 +18,7 @@
 **Keep your collections organized and your tabs tidy, with help from AI.**
 
 <p>
-  <a href="https://bingoyb.github.io/ham_home/en/">Website</a> · <a href="#downloads">Install</a> · <a href="./docs/USAGE_en.md">Usage Guide</a> · <a href="#features">Features</a> · <a href="#development">Development</a>
+  <a href="https://bingoyb.github.io/ham_home/en/">Website</a> · <a href="#downloads">Install</a> · <a href="./docs/USAGE_en.md">Usage Guide</a> · <a href="#features">Features</a> · <a href="#development">Development</a> · <a href="#community-and-support">Community</a>
 </p>
 
 </div>
@@ -268,6 +268,12 @@ ham_home/
 │   └── i18n/               # Shared i18n package
 └── docs/                   # Product docs, Chinese README, screenshots, design notes
 ```
+
+## Community and support
+
+- [GitHub Discussions](https://github.com/bingoYB/ham_home/discussions) — Ask a question in Q&A, suggest a feature in Ideas, or share your bookmark workflow in Show and tell.
+- [Issues](https://github.com/bingoYB/ham_home/issues) — Report a reproducible bug. Include your browser, HamHome version, and steps to reproduce it.
+- [Pull requests](https://github.com/bingoYB/ham_home/pulls) — Submit a fix, translation, or documentation change, or review an open contribution.
 
 ## Contributing
 

@@ -7,6 +7,7 @@ import { FeatureHeroBanner } from './FeatureHeroBanner';
 import { FeatureShowcase } from './FeatureShowcase';
 import { LandingCapabilities } from './LandingCapabilities';
 import { LandingCta } from './LandingCta';
+import { LandingCommunity } from './LandingCommunity';
 import { LandingOverview } from './LandingOverview';
 import { LandingPrivacy } from './LandingPrivacy';
 import { LandingFAQ } from './LandingFAQ';
@@ -51,6 +52,7 @@ export function LandingPage({ language }: LandingPageProps) {
         <LandingCapabilities isEn={isEn} />
         <LandingPrivacy isEn={isEn} />
         <LandingFAQ isEn={isEn} />
+        <LandingCommunity isEn={isEn} isDark={isDark} />
         <LandingCta isEn={isEn} />
       </main>
 
