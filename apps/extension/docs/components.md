@@ -2021,6 +2021,7 @@ const onboarding = useTabLifecycleOnboarding(snapshot, lifecycle, onboardingOpen
 - Step 0: summary of open tabs, windows, stale tabs and duplicate groups (plus an "estimated" note when `summary.estimated`), and the Recommended / Custom plan as radio cards (internal `ChoiceCard`).
 - Step 1: how to treat existing tabs ("Start counting from today" / "Tidy up now"), the always-on protections and, when there are any, checkboxes for recommended protected domains (all checked on each opening).
 - "Turn on" on step 1 awaits `onboarding.finish()` (spinner while `saving`), keeps the outcome and moves to step 2; "Start" there closes the dialog and calls `onDone(outcome)`.
+- Step 2 animates only the check icon for 180 ms. With reduced motion enabled, the icon only fades in.
 - "Skip" (steps 0 and 1) awaits `onboarding.skip()`, which marks onboarding as completed, then closes.
 - Dismissing with the close button or Esc neither completes onboarding (it opens again on the next visit) nor, on step 2, calls `onDone`.
 
@@ -2320,6 +2321,7 @@ Rule-based (no AI) tidy-up suggestions grouped by destination, opened from "Tidy
 
 - Groups in order: close duplicates, archive low-value pages, move to Read later, archive idle tabs, then one "Fold into workspace" group per suggestion; empty groups are hidden, and "Nothing to tidy up right now" shows when there is no suggestion.
 - Each group (internal `TidyGroup`) has a tri-state checkbox and a hint and starts collapsed; expanding lists every tab with its own checkbox, title and domain.
+- Uses `TabTidyGroupDisclosure` for mouse, keyboard and reduced-motion handling.
 - "Apply selected (N)" is disabled while applying or when nothing is selected, shows a spinner while applying, and closes the dialog when `tidy.apply()` resolves `true`.
 - Applying creates a workspace per workspace group and archives those tabs, queues Read later tabs and closes them, and archives the rest; every archive uses the reason `triage`.
 
@@ -2386,6 +2388,23 @@ One destination of the AI tidy-up (in `aiTriage/`): a group checkbox and every t
 - The tri-state group checkbox toggles every visible tab of the group.
 - Each row (internal `TriageRow`) shows the title, "→ category" for bookmarks ("Uncategorized" when none) or "→ workspace", and "domain · reason"; tabs decided by local rules show the localized local reason instead of the AI reason.
 - Test ID: `ai-triage-group-<destination>`.
+
+### TabTidyGroupDisclosure
+
+Shared expansion header and details panel for rule-based and AI tab tidy-up. Mouse clicks transition the group's measured height and opacity over 160 ms. Keyboard activation and reduced-motion mode reveal or hide the details immediately. Collapsed details are inert.
+
+| Prop | Type | Required | Default | Description |
+| --- | --- | --- | --- | --- |
+| selection | `ReactNode` | ✓ | - | Group selection checkbox |
+| label | `ReactNode` | ✓ | - | Group title and hint |
+| children | `ReactNode` | ✓ | - | Rows shown when expanded |
+| defaultExpanded | `boolean` | - | `false` | Initial expanded state |
+
+```tsx
+<TabTidyGroupDisclosure selection={groupCheckbox} label={groupTitle}>
+  <ul>{tabRows}</ul>
+</TabTidyGroupDisclosure>
+```
 
 ### TabWeeklyOverviewDialog
 

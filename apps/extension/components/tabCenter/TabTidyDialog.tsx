@@ -2,9 +2,8 @@
  * TabTidyDialog - rule-based tidy-up suggestions grouped by destination; every
  * group and every tab can be unchecked before applying.
  */
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronDown, ChevronRight, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import {
   Button,
   Checkbox,
@@ -15,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@hamhome/ui";
+import { TabTidyGroupDisclosure } from "@/components/tabCenter/TabTidyGroupDisclosure";
 import type { UseTabTidyResult } from "@/hooks/useTabTidy";
 import { countTidySuggestions } from "@/lib/tabs/tab-tidy.utils";
 import type { OpenTabInfo } from "@/types";
@@ -96,26 +96,20 @@ interface TidyGroupProps {
 }
 
 function TidyGroup({ title, hint, ids, tabs, selected, onToggle }: TidyGroupProps) {
-  const [expanded, setExpanded] = useState(false);
   const selectedCount = ids.filter((id) => selected.has(id)).length;
   const checked = selectedCount === ids.length ? true : selectedCount === 0 ? false : "indeterminate";
 
   return (
     <div className="rounded-lg border">
-      <div className="flex items-center gap-2 px-3 py-2">
-        <Checkbox checked={checked} onCheckedChange={(value) => onToggle(ids, value === true)} aria-label={title} />
-        <button
-          type="button"
-          className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
-          onClick={() => setExpanded((value) => !value)}
-          aria-expanded={expanded}
-        >
-          {expanded ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
-          <span className="text-sm font-medium">{title}</span>
-          <span className="truncate text-xs text-muted-foreground">{hint}</span>
-        </button>
-      </div>
-      {expanded && (
+      <TabTidyGroupDisclosure
+        selection={<Checkbox checked={checked} onCheckedChange={(value) => onToggle(ids, value === true)} aria-label={title} />}
+        label={
+          <>
+            <span className="text-sm font-medium">{title}</span>
+            <span className="truncate text-xs text-muted-foreground">{hint}</span>
+          </>
+        }
+      >
         <ul className="space-y-1 border-t px-3 py-2">
           {ids.map((id) => {
             const tab = tabs.get(id);
@@ -129,7 +123,7 @@ function TidyGroup({ title, hint, ids, tabs, selected, onToggle }: TidyGroupProp
             );
           })}
         </ul>
-      )}
+      </TabTidyGroupDisclosure>
     </div>
   );
 }

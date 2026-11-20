@@ -2,10 +2,9 @@
  * TriageGroupSection - one destination of the AI tidy-up: a group checkbox and
  * every tab with its reason, or why local rules decided it.
  */
-import { useState } from "react";
 import { useTranslation } from "react-i18next";
-import { ChevronDown, ChevronRight } from "lucide-react";
 import { Checkbox } from "@hamhome/ui";
+import { TabTidyGroupDisclosure } from "@/components/tabCenter/TabTidyGroupDisclosure";
 import type { TriageGroup } from "@/lib/tabs/tab-triage.utils";
 import type { OpenTabInfo, TabTriageSuggestion } from "@/types";
 
@@ -18,7 +17,6 @@ interface TriageGroupSectionProps {
 
 export function TriageGroupSection({ group, tabs, selected, onToggle }: TriageGroupSectionProps) {
   const { t } = useTranslation("bookmark");
-  const [expanded, setExpanded] = useState(group.destination !== "keep");
   const visible = group.suggestions.filter((item) => tabs.has(item.tabId));
   if (visible.length === 0) return null;
 
@@ -33,20 +31,16 @@ export function TriageGroupSection({ group, tabs, selected, onToggle }: TriageGr
 
   return (
     <div className="rounded-lg border" data-testid={`ai-triage-group-${group.destination}`}>
-      <div className="flex items-center gap-2 px-3 py-2">
-        <Checkbox checked={checked} onCheckedChange={(value) => onToggle(ids, value === true)} aria-label={title} />
-        <button
-          type="button"
-          className="flex min-w-0 flex-1 items-center gap-1.5 text-left"
-          onClick={() => setExpanded((value) => !value)}
-          aria-expanded={expanded}
-        >
-          {expanded ? <ChevronDown className="h-4 w-4 shrink-0" /> : <ChevronRight className="h-4 w-4 shrink-0" />}
-          <span className="shrink-0 text-sm font-medium">{title}</span>
-          <span className="truncate text-xs text-muted-foreground">{hint}</span>
-        </button>
-      </div>
-      {expanded && (
+      <TabTidyGroupDisclosure
+        defaultExpanded={group.destination !== "keep"}
+        selection={<Checkbox checked={checked} onCheckedChange={(value) => onToggle(ids, value === true)} aria-label={title} />}
+        label={
+          <>
+            <span className="shrink-0 text-sm font-medium">{title}</span>
+            <span className="truncate text-xs text-muted-foreground">{hint}</span>
+          </>
+        }
+      >
         <ul className="space-y-1.5 border-t px-3 py-2">
           {visible.map((item) => (
             <TriageRow
@@ -58,7 +52,7 @@ export function TriageGroupSection({ group, tabs, selected, onToggle }: TriageGr
             />
           ))}
         </ul>
-      )}
+      </TabTidyGroupDisclosure>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-import type { BrowserContext, Page, Worker } from "@playwright/test";
+import type { BrowserContext, Locator, Page, Worker } from "@playwright/test";
 import { test, expect } from "../fixtures";
 import { createBookmarkFixture } from "../helpers/factories";
 import { pointAiConfigToMock, startMockAiServer } from "../helpers/mock-ai-server";
@@ -19,6 +19,45 @@ import {
 } from "../helpers/storage";
 
 const DAY = 24 * 60 * 60 * 1000;
+
+async function expectTidyGroupMotion(page: Page, trigger: Locator) {
+  await expect(trigger).toHaveAttribute("aria-expanded", "false");
+  const content = page.locator(`[id="${await trigger.getAttribute("aria-controls")}"]`);
+  await content.evaluate((element) => {
+    element.addEventListener("transitionrun", (event) => {
+      if (!(event instanceof TransitionEvent) || event.target !== element) return;
+      const attribute = `data-transition-${event.propertyName}`;
+      element.setAttribute(attribute, String(Number(element.getAttribute(attribute) ?? 0) + 1));
+      element.setAttribute("data-observed-duration", getComputedStyle(element).transitionDuration);
+    });
+  });
+
+  await trigger.click();
+  await expect(content).toHaveAttribute("data-transition-height", "1");
+  await expect(content).toHaveAttribute("data-transition-opacity", "1");
+  await expect(content).toHaveAttribute("data-observed-duration", "0.16s");
+  await expect(content).toHaveCSS("opacity", "1");
+  await trigger.click();
+  await expect(content).toHaveAttribute("data-transition-height", "2");
+  await expect(content).toHaveAttribute("data-transition-opacity", "2");
+  await expect(content).toHaveCSS("height", "0px");
+  await expect(content).toHaveAttribute("inert", "");
+
+  await trigger.press("Enter");
+  await expect(trigger).toHaveAttribute("aria-expanded", "true");
+  await expect(content).toHaveCSS("transition-duration", "0s");
+  await expect(content).toHaveCSS("opacity", "1");
+  await trigger.press("Space");
+  await expect(content).toHaveCSS("height", "0px");
+
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await trigger.click();
+  await expect(trigger).toHaveAttribute("aria-expanded", "true");
+  await expect(content).toHaveCSS("transition-duration", "0s");
+  await expect(content).toHaveCSS("opacity", "1");
+  await expect(content).toHaveAttribute("data-transition-height", "2");
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+}
 
 function articleHtml(title: string): string {
   const paragraph =
@@ -92,6 +131,52 @@ test.describe("TABLIFE 标签页减负", () => {
       settings: { ...e2eVariant.settings, autoSaveSnapshot: false },
     });
   });
+
+  test("规则整理分组支持鼠标过渡和即时键盘操作", async ({ context, extensionId }) => {
+    const url = "https://tidy-duplicate.e2e.test/doc";
+    await openSite(context, url, "Duplicate for tidy-up");
+    await openSite(context, url, "Duplicate for tidy-up");
+    const page = await openAppPage(context, extensionId, "tabs");
+    await page.emulateMedia({ reducedMotion: "no-preference" });
+    await page.getByTestId("tab-onboarding").getByRole("button", { name: /暂不开启|Not now/ }).click();
+    await page.getByTestId("tab-center-tidy").click();
+    const dialog = page.getByTestId("tab-tidy-dialog");
+    await expectTidyGroupMotion(page, dialog.getByRole("button", { name: /重复|duplicate/i }));
+    await expect(dialog.getByRole("listitem").filter({ hasText: "Duplicate for tidy-up" })).toBeVisible();
+  });
+
+  for (const reducedMotion of ["no-preference", "reduce"] as const) {
+    test(`首次设置完成只过渡勾图标 (${reducedMotion})`, async ({ context, extensionId }) => {
+      const page = await openAppPage(context, extensionId, "tabs");
+      await page.emulateMedia({ reducedMotion });
+      await page.evaluate(() => {
+        document.addEventListener("transitionrun", (event) => {
+          const target = event.target;
+          if (target instanceof SVGElement && target.dataset.testid === "tab-onboarding-complete-icon") {
+            target.setAttribute(`data-transition-${event.propertyName}`, "true");
+          }
+        });
+      });
+      const onboarding = page.getByTestId("tab-onboarding");
+      await onboarding.getByRole("button", { name: /下一步|^Next$/ }).click();
+      await onboarding.getByTestId("tab-onboarding-enable").click();
+      const icon = onboarding.getByTestId("tab-onboarding-complete-icon");
+      await expect(onboarding.getByText(/都能在“归档”中找回|can be found in Archive/)).toBeVisible();
+      const start = onboarding.getByRole("button", { name: /开始使用|Get started/ });
+      await expect(start).toBeEnabled();
+      await expect(icon).toHaveCSS("transition-duration", "0.18s");
+      await expect(icon).toHaveAttribute("data-transition-opacity", "true");
+      await expect(icon).toHaveCSS("opacity", "1");
+      if (reducedMotion === "reduce") {
+        await expect(icon).toHaveCSS("scale", "none");
+        expect(await icon.getAttribute("data-transition-scale")).toBeNull();
+      } else {
+        await expect(icon).toHaveAttribute("data-transition-scale", "true");
+      }
+      await start.click();
+      await expect(onboarding).toBeHidden();
+    });
+  }
 
   test("TABLIFE-001 稍后读并关闭，页内撤销恢复标签页", async ({
     context,
@@ -518,7 +603,8 @@ test.describe("TABLIFE 标签页减负", () => {
       await expect(dialog.getByTestId("ai-triage-group-readLater")).toContainText("一篇值得读的长文");
       // "Keep" starts collapsed
       const keepGroup = dialog.getByTestId("ai-triage-group-keep");
-      await keepGroup.getByRole("button", { name: /继续保留|Keep/ }).click();
+      await page.emulateMedia({ reducedMotion: "no-preference" });
+      await expectTidyGroupMotion(page, keepGroup.getByRole("button", { name: /继续保留|Keep/ }));
       await expect(keepGroup).toContainText("正在用的工具");
       await attachStepScreenshot(page, testInfo, "TABLIFE-009-AI整理建议");
 
