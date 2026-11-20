@@ -39,7 +39,7 @@ test.describe("CONTENT 页内保存流程", () => {
     const t = e2eVariant.text;
 
     const page = await context.newPage();
-    await page.route("**/*", (route) =>
+    await page.route(PAGE_URL, (route) =>
       route.fulfill({ contentType: "text/html; charset=utf-8", body: PAGE_HTML }),
     );
     await page.goto(PAGE_URL);
@@ -58,6 +58,7 @@ test.describe("CONTENT 页内保存流程", () => {
     const titleInput = page.getByLabel(t("标题", "Title"));
     await expect(titleInput).toBeVisible({ timeout: 20_000 });
     await expect(titleInput).toHaveValue(/页内保存测试页/);
+    await expect(page.getByText(t("已保存", "Saved"), { exact: true })).toHaveCount(0);
     await attachStepScreenshot(page, testInfo, "CONTENT-001-页内保存表单");
 
     await titleInput.fill("页内保存的书签");
@@ -87,7 +88,7 @@ test.describe("CONTENT 页内保存流程", () => {
     const t = e2eVariant.text;
 
     const page = await context.newPage();
-    await page.route("**/*", (route) =>
+    await page.route(PAGE_URL, (route) =>
       route.fulfill({ contentType: "text/html; charset=utf-8", body: PAGE_HTML }),
     );
     await page.goto(PAGE_URL);
@@ -114,6 +115,9 @@ test.describe("CONTENT 页内保存流程", () => {
       page.getByRole("button", { name: /更新书签|Update Bookmark/ }),
     ).toBeVisible({ timeout: 20_000 });
     await expect(page.getByLabel(t("标题", "Title"))).toHaveValue("首次保存");
+    const savedBadge = page.getByText(t("已保存", "Saved"), { exact: true });
+    await expect(savedBadge).toBeVisible();
+    await expect(savedBadge).toHaveCSS("white-space", "nowrap");
     await attachStepScreenshot(page, testInfo, "CONTENT-002-更新态");
   });
 

@@ -367,6 +367,7 @@
   "inPageSave": {
     "title": "保存到 HamHome",
     "updateTitle": "更新书签",
+    "savedBadge": "已保存",
     "preparing": "正在读取页面内容…",
     "analyzing": "AI 正在分析当前页面…",
     "editNow": "直接编辑",

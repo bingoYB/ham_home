@@ -366,6 +366,7 @@
   "inPageSave": {
     "title": "Save to HamHome",
     "updateTitle": "Update bookmark",
+    "savedBadge": "Saved",
     "preparing": "Reading page content…",
     "analyzing": "AI is analyzing this page…",
     "editNow": "Edit now",

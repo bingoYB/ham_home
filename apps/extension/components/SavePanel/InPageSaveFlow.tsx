@@ -6,8 +6,8 @@
  */
 import { useEffect } from "react";
 import { useTranslation } from "react-i18next";
-import { Bookmark, CheckCircle2, Loader2, X, AlertCircle } from "lucide-react";
-import { Button, cn } from "@hamhome/ui";
+import { Bookmark, Check, CheckCircle2, Loader2, X, AlertCircle } from "lucide-react";
+import { Badge, Button, cn } from "@hamhome/ui";
 import { SavePanel } from "./SavePanel";
 import { ReadLaterInsteadButton } from "./ReadLaterInsteadButton";
 import { useInPageSave } from "@/hooks/useInPageSave";
@@ -136,12 +136,23 @@ export function InPageSaveFlow() {
           )}
         >
           <div className="flex items-center gap-2 border-b px-4 py-2.5">
-            <Bookmark className="h-4 w-4 text-primary" />
-            <span className="flex-1 truncate text-sm font-medium text-foreground">
-              {existingBookmark
-                ? t("bookmark:inPageSave.updateTitle")
-                : t("bookmark:inPageSave.title")}
-            </span>
+            <Bookmark className="h-4 w-4 shrink-0 text-primary" />
+            <div className="flex min-w-0 flex-1 items-center gap-2">
+              <span className="truncate text-sm font-medium text-foreground">
+                {existingBookmark
+                  ? t("bookmark:inPageSave.updateTitle")
+                  : t("bookmark:inPageSave.title")}
+              </span>
+              {existingBookmark && (
+                <Badge
+                  variant="outline"
+                  className="rounded-full border-emerald-600/25 bg-emerald-50 px-1.5 py-0 text-xs text-emerald-800 dark:border-emerald-400/25 dark:bg-emerald-400/10 dark:text-emerald-300"
+                >
+                  <Check aria-hidden="true" />
+                  {t("bookmark:inPageSave.savedBadge")}
+                </Badge>
+              )}
+            </div>
             {!clipContext && <ReadLaterInsteadButton onClick={readLaterInstead} />}
             <CloseButton onClick={close} label={t("common:common.close")} />
           </div>

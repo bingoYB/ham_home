@@ -125,13 +125,22 @@
 
 页内保存浮窗。触发保存后先在页面右下角展示分析中的轻量浮窗，AI 分析完成后原地展开保存表单，整个过程不依赖 Popup，用户可以继续操作页面。
 
-只在 content script 中使用，无 props，状态由 `useInPageSave` 管理。
+只在 content script 中使用，状态由 `useInPageSave` 管理。
+
+| Prop | 说明 |
+| --- | --- |
+| 无 | 由当前页面的保存流程驱动 |
+
+```tsx
+<InPageSaveFlow />
+```
 
 **行为说明：**
 
 - 触发来源：快捷键 `save-bookmark`、右键菜单「收藏到 HamHome」、Popup 的「保存当前页面」，统一通过 `START_SAVE_FLOW` 消息进入。
 - 设置 `settings.usePopupSavePanel` 打开时不再挂载浮窗，content script 对 `START_SAVE_FLOW` 回执 `{ ok: false }`，保存流程回退到 `PopupSaveView`。
 - 分析阶段保存表单已挂载但隐藏，分析完成后直接展示结果，避免二次等待；分析较慢时可点「直接编辑」立即展开表单。
+- 当前网址已有书签记录时，「更新书签」标题右侧显示带勾的「已保存」标签。首次保存时隐藏标签。
 - 浏览器内部页、隐私页面等无法保存时展示提示浮窗并自动消失。
 - 保存成功后展示成功提示并自动关闭；Esc 可随时关闭浮窗。
 - 面板渲染在 shadow root 内，分类下拉等 Popover 需通过 `portalContainer` 指定 portal 容器。
