@@ -286,6 +286,7 @@ import { BookmarkListItem } from "@hamhome/ui-business/bookmark";
 | name | type | required | default | description |
 |---|---|---|---|---|
 | `src` | `string \| null` | - | - | favicon URL |
+| `imageSrc` | `string \| null` | - | - | 图片剪藏的主体图片 URL |
 | `size` | `"sm" \| "md"` | - | `"md"` | 图标尺寸 |
 
 #### Usage
@@ -296,6 +297,7 @@ import { BookmarkListItem } from "@hamhome/ui-business/bookmark";
 
 #### Behavior Notes
 
+- favicon 和剪藏图片都使用浏览器原生懒加载。
 - 图片加载失败时隐藏图片，保留统一容器尺寸。
 
 ### BookmarkCategoryBadge
@@ -364,7 +366,7 @@ import { TagInput } from "@hamhome/ui-business/common";
 | name | type | required | default | description |
 |---|---|---|---|---|
 | `bookmark` | `BookmarkPanelBookmarkData` | ✓ | - | 书签数据 |
-| `faviconSrc` | `string \| null` | - | `bookmark.favicon` | 外部解析后的 favicon URL |
+| `faviconSrc` | `string \| null` | - | `bookmark.favicon` | 外部解析后的 favicon URL。传 `null` 显示链接占位图标。 |
 | `isHighlighted` | `boolean` | - | `false` | 是否高亮当前书签 |
 | `portalContainer` | `HTMLElement` | - | - | HoverCard Portal 容器 |
 
@@ -375,6 +377,10 @@ import { BookmarkPanelItem } from "@hamhome/ui-business/bookmark-panel";
 
 <BookmarkPanelItem bookmark={bookmark} portalContainer={portalContainer} />
 ```
+
+#### Behavior Notes
+
+- favicon 使用浏览器原生懒加载。
 
 ### BookmarkCategoryTreeView
 

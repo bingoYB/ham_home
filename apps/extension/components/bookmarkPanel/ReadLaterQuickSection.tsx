@@ -105,7 +105,7 @@ function QuickRow({ item, onOpen }: QuickRowProps) {
     >
       <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-background">
         {favicon ? (
-          <img src={favicon} alt="" className="h-4 w-4 rounded" />
+          <img loading="lazy" src={favicon} alt="" className="h-4 w-4 rounded" />
         ) : (
           <BookOpen className="h-4 w-4 text-muted-foreground" />
         )}

@@ -1,9 +1,12 @@
-import { useMemo } from 'react';
+import { createContext, useContext, useMemo } from 'react';
 import { getSafeFaviconUrl } from '@/utils/bookmark-utils';
 
+export const FaviconLoadingContext = createContext(true);
+
 export function useSafeFavicon(url: string, fallbackFavicon?: string | null): string | null {
+  const canLoad = useContext(FaviconLoadingContext);
   return useMemo(
-    () => getSafeFaviconUrl(url, fallbackFavicon),
-    [url, fallbackFavicon],
+    () => (canLoad ? getSafeFaviconUrl(url, fallbackFavicon) : null),
+    [canLoad, url, fallbackFavicon],
   );
 }

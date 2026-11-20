@@ -32,6 +32,7 @@ export function BookmarkFavicon({
         />
       ) : src ? (
         <img
+          loading="lazy"
           src={src}
           alt=""
           className={imageClassName}

@@ -17,12 +17,10 @@ export interface BookmarkPanelItemProps<TBookmark extends BookmarkPanelBookmarkD
 
 export function BookmarkPanelItem<TBookmark extends BookmarkPanelBookmarkData>({
   bookmark,
-  faviconSrc,
+  faviconSrc = bookmark.favicon,
   isHighlighted = false,
   portalContainer,
 }: BookmarkPanelItemProps<TBookmark>) {
-  const resolvedFavicon = faviconSrc ?? bookmark.favicon;
-
   return (
     <HoverCard openDelay={300} closeDelay={100}>
       <HoverCardTrigger asChild>
@@ -38,9 +36,10 @@ export function BookmarkPanelItem<TBookmark extends BookmarkPanelBookmarkData>({
           )}
         >
           <div className="w-8 h-8 rounded-md flex items-center justify-center shrink-0">
-            {resolvedFavicon ? (
+            {faviconSrc ? (
               <img
-                src={resolvedFavicon}
+                loading="lazy"
+                src={faviconSrc}
                 alt=""
                 className="w-5 h-5 rounded"
                 onError={(event) => {

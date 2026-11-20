@@ -164,7 +164,7 @@ function PinnedRow({
       >
         <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-background">
           {isBookmark && safeFavicon ? (
-            <img src={safeFavicon} alt="" className="h-4 w-4 rounded" />
+            <img loading="lazy" src={safeFavicon} alt="" className="h-4 w-4 rounded" />
           ) : icon ? (
             <span className="text-sm leading-none">{icon}</span>
           ) : isBookmark ? (

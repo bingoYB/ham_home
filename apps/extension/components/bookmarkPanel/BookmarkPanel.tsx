@@ -13,6 +13,7 @@ import { GlobalAgentLauncher } from "@/components/agent/GlobalAgentLauncher";
 import { useBookmarkSearch } from "@/hooks/useBookmarkSearch";
 import { useGlobalAgent } from "@/hooks/useGlobalAgent";
 import { useReadLaterQuickList } from "@/hooks/useReadLaterQuickList";
+import { FaviconLoadingContext } from "@/hooks/useSafeFavicon";
 import { nanoid } from "nanoid";
 import { configStorage } from "@/lib/storage/config-storage";
 import type {
@@ -192,7 +193,7 @@ export function BookmarkPanel({
 
 
   return (
-    <>
+    <FaviconLoadingContext.Provider value={isOpen}>
       {/* 背景遮罩 - 覆盖整个屏幕 */}
       <div
         className={cn(
@@ -290,6 +291,6 @@ export function BookmarkPanel({
           <GlobalAgentLauncher inline />
         </div>
       </div>
-    </>
+    </FaviconLoadingContext.Provider>
   );
 }

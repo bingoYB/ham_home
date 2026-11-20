@@ -877,12 +877,25 @@ Tab 分组规则列表组件，按规则名称、目标分组、颜色和折叠�
 | onOpenBookmark | `(url: string) => void` | -        | -       | 打开书签回调           |
 | onOpenSettings | `() => void`            | -        | -       | 打开设置回调           |
 
+**用法示例**
+
+```tsx
+<BookmarkPanel
+  bookmarks={bookmarks}
+  categories={categories}
+  isOpen={isPanelOpen}
+  position="left"
+  onClose={closePanel}
+/>
+```
+
 **行为说明：**
 
 - 面板始终按当前视口左右边缘定位，不依赖挂载容器宽度
 - 监听 `settings.enableSidePanel` 变化，关闭后内容页不再渲染触发器与面板
 - 监听 `settings.panelPosition` 变化，内容页无需刷新即可在左/右侧间切换
 - 面板关闭时同时禁用 pointer events 和 `visibility`，避免隐藏态遮挡页面交互
+- 面板关闭时保留搜索和分类展开状态，并暂停书签、置顶项和稍后读的 favicon 加载。打开后，浏览器按图片与可视区域的距离加载图标。
 - 收起位移使用内联 `transform`，不使用 Tailwind 的 `translate-*` 工具类：这些工具类依赖
   `@property` 注册的 `--tw-translate-*`，而该注册只能存在于 document 级样式表中
   （见 `utils/shadow-root-style-guard.ts`），被页面移除后整条 `translate` 声明会失效
@@ -923,6 +936,7 @@ Tab 分组规则列表组件，按规则名称、目标分组、颜色和折叠�
 - 默认展示前 5 条置顶内容，超过 5 条时可展开。
 - 点击置顶分类会清空搜索关键词，并将列表筛选到该分类。
 - 点击置顶书签会直接打开网页。
+- 置顶书签的 favicon 在面板打开时按需加载。
 - 鼠标悬停置顶项时展示上移/下移按钮，排序结果写入 `pinStorage`。
 
 ---
@@ -1281,7 +1295,7 @@ const { container: portalContainer } = useContentUI();
 - 使用 `<a>` 标签打开链接，在新标签页中打开
 - 只显示书签标题，不显示链接地址
 - 鼠标悬停时显示 Tooltip，包含标题、描述和完整链接地址
-- 显示书签 favicon；除 `data:image` 外，图标地址基于书签 URL 通过 Cravatar favicon API 生成
+- 面板打开后按需加载 favicon。内嵌的 `data:image` 直接使用，其余图标地址基于书签 URL 通过 Cravatar favicon API 生成。
 
 **用法示例：**
 
@@ -3282,6 +3296,7 @@ Read later quick list in the in-page edge panel (`BookmarkPanel`), below the pin
 - Renders nothing when `items` is empty; `BookmarkPanel` also hides it while searching or filtering.
 - Header "Read later · N unread" (N counts all unread items) with "View all", which opens the Read later page and closes the panel.
 - Shows 3 rows, with a Show more / Show less toggle when there are more; the panel loads up to 8 items via `useReadLaterQuickList`, only while it is open.
+- Favicons are lazy-loaded while the panel is open.
 - Each row (internal `QuickRow`) shows the favicon (book icon fallback), the title and "Reading · ~N min · domain" (each part only when known); clicking opens the item in a new tab, marks it as reading and closes the panel.
 
 ### ReadLaterInsteadButton
