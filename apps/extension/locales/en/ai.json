@@ -67,6 +67,7 @@
     "sessionSelect": "Switch chat",
     "close": "Close",
     "empty": "Ask about extension features, bookmarks, data summaries, or safe settings changes.",
+    "launcherPlaceholder": "Ask the bookmark assistant…",
     "placeholder": "Ask about features, settings, or bookmarks...",
     "send": "Send",
     "stop": "Stop generating",

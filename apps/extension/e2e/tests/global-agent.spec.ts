@@ -56,12 +56,13 @@ test.describe("全局助手流式对话", () => {
     if (e2eVariant.name === "dark") {
       await expect(page.locator("html")).toHaveClass(/dark/);
     }
-    const input = await openAssistant(page, t);
-    await input.fill(question);
-    await input.press("Enter");
+    const launcher = page.getByRole("textbox", { name: t("问问书签助手…", "Ask the bookmark assistant…") });
+    await launcher.fill(question);
+    await page.getByRole("button", { name: t("发送", "Send"), exact: true }).click();
 
     const stopButton = page.getByRole("button", { name: t("停止生成", "Stop generating") });
     await expect(stopButton).toBeVisible();
+    await expect(page.locator('header img[src$="/agent/hammy-thinking.svg"]')).toBeVisible();
     // Part of the answer is shown while the rest is still being generated.
     // The stop button shows only while the turn runs, so seeing it together
     // with partial text proves live streaming rather than the typing
@@ -73,6 +74,7 @@ test.describe("全局助手流式对话", () => {
 
     await expect(page.getByText(endMarker)).toBeVisible({ timeout: 15_000 });
     await expect(stopButton).toHaveCount(0);
+    await expect(page.locator('header img[src$="/agent/hammy-idle.svg"]')).toBeVisible();
     await expect(page.getByRole("button", { name: t("发送", "Send") })).toBeVisible();
     await attachStepScreenshot(page, testInfo, "AGENT-001-回答完成");
 
@@ -102,8 +104,9 @@ test.describe("全局助手流式对话", () => {
     mockAi.enqueueReply({ chunks: [...chunks, ...chunks], chunkDelayMs: 300 });
 
     const page = await openAppPage(context, extensionId, "all");
+    await page.getByRole("textbox", { name: t("问问书签助手…", "Ask the bookmark assistant…") }).fill(question);
     const input = await openAssistant(page, t);
-    await input.fill(question);
+    await expect(input).toHaveValue(question);
     await input.press("Enter");
 
     await expect(page.getByText(firstPart).first()).toBeVisible();

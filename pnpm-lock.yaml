@@ -121,6 +121,9 @@ importers:
         specifier: ^4.3.6
         version: 4.3.6
     devDependencies:
+      '@aora-bot/engine':
+        specifier: 0.2.0
+        version: 0.2.0
       '@playwright/test':
         specifier: ^1.50.0
         version: 1.61.1
@@ -784,6 +787,10 @@ packages:
   '@antfu/ni@25.0.0':
     resolution: {integrity: sha512-9q/yCljni37pkMr4sPrI3G4jqdIk074+iukc5aFJl7kmDCCsiJrbZ6zKxnES1Gwg+i9RcDZwvktl23puGslmvA==}
     hasBin: true
+
+  '@aora-bot/engine@0.2.0':
+    resolution: {integrity: sha512-YyFThF8C2al4MBuXWDaFs23IYerv286vZkhznWKdVYKoQxryFHapttVmmEXPcFsgPdorxJrD1hCqJ43yO/TaQA==}
+    engines: {node: '>=20'}
 
   '@asamuzakjp/css-color@5.1.11':
     resolution: {integrity: sha512-KVw6qIiCTUQhByfTd78h2yD1/00waTmm9uy/R7Ck/ctUyAPj+AEDLkQIdJW0T8+qGgj3j5bpNKK7Q3G+LedJWg==}
@@ -7711,6 +7718,8 @@ snapshots:
       fzf: 0.5.2
       package-manager-detector: 1.6.0
       tinyexec: 1.0.2
+
+  '@aora-bot/engine@0.2.0': {}
 
   '@asamuzakjp/css-color@5.1.11':
     dependencies:

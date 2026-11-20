@@ -4,7 +4,6 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import {
   AlertCircle,
-  Bot,
   CheckCircle2,
   ChevronDown,
   ChevronRight,
@@ -18,6 +17,8 @@ import {
   X,
 } from "lucide-react";
 import { Button, ScrollArea, cn } from "@hamhome/ui";
+import { AgentAvatar } from "@/components/agent/AgentAvatar";
+import { AgentLauncherBar } from "@/components/agent/AgentLauncherBar";
 import { AgentApprovalCard } from "@/components/agent/AgentApprovalCard";
 import { useGlobalAgent } from "@/hooks/useGlobalAgent";
 import { getBackgroundService } from "@/lib/services/background-service-client";
@@ -251,62 +252,18 @@ export function GlobalAgentLauncher({ inline = false }: { inline?: boolean }) {
   };
 
   if (!agent.isOpen) {
-    const containerClass = inline 
-      ? "w-full" 
-      : "fixed bottom-6 right-6 z-50 animate-in fade-in zoom-in-95 duration-300";
-    
-    const formClass = cn(
-      "group flex items-center rounded-full border border-indigo-500/20 bg-background/80 shadow-xl shadow-black/5 backdrop-blur-xl transition-all duration-300 hover:border-indigo-500/30 hover:shadow-2xl focus-within:border-indigo-500/50 focus-within:bg-background/95 focus-within:shadow-indigo-500/20",
-      inline ? "h-12 w-full pl-4 pr-1" : "h-14 pl-5 pr-1.5"
-    );
-
-    const inputClass = cn(
-      "bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground/60 transition-all duration-300",
-      inline ? "flex-1 w-full mr-2" : "w-56 focus:w-80"
-    );
-
     return (
-      <div className={containerClass}>
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            const currentQuery = agent.query.trim();
-            if (currentQuery) {
-              void (async () => {
-                const newSessionId = await agent.createSession();
-                await agent.submit(currentQuery, newSessionId);
-              })();
-            } else {
-              agent.open();
-            }
-          }}
-          className={formClass}
-        >
-          <input
-            type="text"
-            value={agent.query}
-            onChange={(e) => agent.setQuery(e.target.value)}
-            placeholder={t("agent.placeholder") || "Ask AI anything..."}
-            className={inputClass}
-          />
-          <button
-            type="submit"
-            onClick={(e) => {
-              if (!agent.query.trim()) {
-                e.preventDefault();
-                agent.open();
-              }
-            }}
-            className={cn(
-              "flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-md shadow-indigo-500/25 transition-all duration-300 ease-out hover:scale-105 hover:shadow-lg hover:shadow-indigo-500/40 active:scale-95",
-              inline ? "h-10 w-10" : "h-11 w-11"
-            )}
-            aria-label={t("agent.open")}
-          >
-            <Sparkles className="h-5 w-5 transition-transform duration-300 group-hover:rotate-12 group-hover:scale-110" />
-          </button>
-        </form>
-      </div>
+      <AgentLauncherBar
+        inline={inline}
+        query={agent.query}
+        busy={isBusy}
+        onQueryChange={agent.setQuery}
+        onOpen={agent.open}
+        onSubmit={async (query) => {
+          const sessionId = await agent.createSession();
+          await agent.submit(query, sessionId);
+        }}
+      />
     );
   }
 
@@ -315,9 +272,7 @@ export function GlobalAgentLauncher({ inline = false }: { inline?: boolean }) {
       <div className="flex h-[min(660px,calc(100vh-2rem))] flex-col overflow-hidden rounded-2xl border border-white/20 bg-background/80 shadow-[0_0_40px_rgba(0,0,0,0.1)] backdrop-blur-xl ring-1 ring-black/5 animate-in fade-in slide-in-from-bottom-8 zoom-in-95 duration-300 ease-out dark:shadow-[0_0_40px_rgba(255,255,255,0.05)] dark:ring-white/10">
         <header className="border-b border-white/10 bg-transparent px-4 py-3 dark:border-white/5">
           <div className="flex items-center gap-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-md">
-              <Bot className="h-4 w-4" />
-            </div>
+            <AgentAvatar busy={isBusy} />
             <div className="min-w-0 flex-1">
               <div className="bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-sm font-bold text-transparent">
                 {t("agent.title")}

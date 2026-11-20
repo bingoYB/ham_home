@@ -1487,7 +1487,7 @@ UI 复用 `@hamhome/ui-business/ai-search` 的 `SearchInputArea`，Extension 侧
 
 ### GlobalAgentLauncher
 
-插件 app 页面右下角全局 Agent 入口。组件固定在视口右下角，折叠时显示圆形入口，展开后展示客服式对话窗口、session 切换、执行过程、书签来源与输入框。
+插件 app 页面右下角和页内书签面板底部的助手入口。收起时显示仓鼠头像和提问栏。点击头像可打开当前会话并保留草稿，在提问栏输入内容后按 Enter 或点击发送箭头会新建对话。展开后，同一头像位于标题左侧。
 
 | Prop   | Type      | Required | Default | Description |
 | ------ | --------- | -------- | ------- | ----------- |
@@ -1512,6 +1512,38 @@ import { GlobalAgentLauncher } from "@/components/agent/GlobalAgentLauncher";
 - While a turn runs, the answer streams in live and the busy indicator shows the tool step in progress; `useAgentTurnProgress()` polls the background every 300 ms
 - While a turn runs, the send button becomes a stop button: the turn is aborted, nothing of it is saved, and its message goes back into the input
 - Long conversations stay within a token budget: earlier turns are summarized, and an "整理较早的对话" step appears in the process steps when that happens
+
+---
+
+### AgentAvatar
+
+助手使用 [Aora Bot](https://github.com/sam70361/aora-bot) 提供的橘色仓鼠「囤囤」。WXT 构建时生成两张本地 SVG，供扩展页面和网页内的书签面板使用。头像是装饰图，交互名称由外层按钮提供。
+
+| Prop | 类型 | 默认值 | 说明 |
+| --- | --- | --- | --- |
+| busy | `boolean` | `false` | 助手处理提问期间显示思考表情 |
+
+```tsx
+<AgentAvatar busy={isBusy} />
+```
+
+### AgentLauncherBar
+
+收起状态的提问栏。左侧头像打开当前会话，输入有效文字时右侧显示发送按钮。输入为空时按 Enter 也可打开当前会话。
+
+| Prop | 类型 | 说明 |
+| --- | --- | --- |
+| inline | `boolean` | 在书签面板中占满可用宽度，或悬浮于页面右下角 |
+| query | `string` | 当前草稿 |
+| busy | `boolean` | 生成期间显示思考头像，仍可打开当前会话 |
+| onQueryChange | `(query: string) => void` | 更新草稿 |
+| onOpen | `() => void` | 打开当前会话 |
+| onSubmit | `(query: string) => void` | 提交已去除首尾空白的问题 |
+
+```tsx
+<AgentLauncherBar inline={inline} query={query} busy={isBusy}
+  onQueryChange={setQuery} onOpen={open} onSubmit={startNewConversation} />
+```
 
 ---
 
