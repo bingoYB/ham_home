@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
+import { FormEvent, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
@@ -19,15 +19,18 @@ import {
 import { Button, ScrollArea, cn } from "@hamhome/ui";
 import { AgentAvatar } from "@/components/agent/AgentAvatar";
 import { AgentLauncherBar } from "@/components/agent/AgentLauncherBar";
+import { AgentSessionPicker } from "@/components/agent/AgentSessionPicker";
 import { AgentApprovalCard } from "@/components/agent/AgentApprovalCard";
+import { useAgentInputActivity } from "@/hooks/useAgentInputActivity";
 import { useAgentScrollFollow } from "@/hooks/useAgentScrollFollow";
 import { useGlobalAgent } from "@/hooks/useGlobalAgent";
 import { getBackgroundService } from "@/lib/services/background-service-client";
 import { isContentScriptContext } from "@/utils/browser-api";
 import type { AgentProcessStep, ChatMessage, Source, Suggestion } from "@/types";
 
-function formatSessionTitle(title: string): string {
-  return title.length > 24 ? `${title.slice(0, 24)}...` : title;
+interface GlobalAgentLauncherProps {
+  inline?: boolean;
+  portalContainer?: HTMLElement;
 }
 
 function StepIcon({ step }: { step: AgentProcessStep }) {
@@ -215,22 +218,18 @@ function SuggestionChips({
 /**
  * 插件 app 页面右下角全局 Agent 入口，负责展示会话、过程步骤与输入框。
  */
-export function GlobalAgentLauncher({ inline = false }: { inline?: boolean }) {
+export function GlobalAgentLauncher({ inline = false, portalContainer }: GlobalAgentLauncherProps) {
   const { t } = useTranslation("ai");
   const agent = useGlobalAgent();
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
+  const inputActivity = useAgentInputActivity(agent.isOpen);
   const { viewportRef, contentRef } = useAgentScrollFollow(agent.isOpen, agent.currentSessionId);
   const isBusy = ["thinking", "searching", "writing"].includes(agent.status);
+  const avatarState = agent.status === "error" ? "alerting" : isBusy ? "working" : inputActivity.sleeping ? "sleeping" : undefined;
   // The turn is still running in the background (not just animating the answer).
   const isTurnRunning = agent.status === "thinking" || agent.status === "searching";
   const runningStepTitle = [...agent.currentSteps].reverse().find((step) => step.status === "running")?.title;
-  const activeSessionTitle = useMemo(
-    () =>
-      agent.sessions.find((session) => session.id === agent.currentSessionId)
-        ?.title || t("agent.newSession"),
-    [agent.currentSessionId, agent.sessions, t],
-  );
 
   // 输入框随内容自动撑开高度（受 CSS max-height 限制，超出后滚动）
   useEffect(() => {
@@ -267,67 +266,59 @@ export function GlobalAgentLauncher({ inline = false }: { inline?: boolean }) {
   return (
     <div className="fixed bottom-4 left-4 right-4 z-50 md:left-auto md:right-4 md:w-[420px] max-w-[calc(100%-2rem)]">
       <div className="flex h-[min(660px,calc(100vh-2rem))] flex-col overflow-hidden rounded-2xl border border-white/20 bg-background/80 shadow-[0_0_40px_rgba(0,0,0,0.1)] backdrop-blur-xl ring-1 ring-black/5 animate-in fade-in slide-in-from-bottom-8 zoom-in-95 duration-300 ease-out dark:shadow-[0_0_40px_rgba(255,255,255,0.05)] dark:ring-white/10">
-        <header className="border-b border-white/10 bg-transparent px-4 py-3 dark:border-white/5">
-          <div className="flex items-center gap-3">
-            <AgentAvatar busy={isBusy} />
-            <div className="min-w-0 flex-1">
-              <div className="bg-gradient-to-r from-foreground to-foreground/70 bg-clip-text text-sm font-bold text-transparent">
-                {t("agent.title")}
+        <header className="border-b border-white/10 bg-transparent px-4 py-2.5 dark:border-white/5">
+          <div className="flex items-center gap-2">
+            <AgentAvatar state={avatarState} />
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-2 gap-y-1">
+              <div className="min-w-0 flex-[1_1_7rem]">
+                <div className="truncate text-sm font-bold text-foreground">
+                  {t("agent.title")}
+                </div>
+                <AgentSessionPicker
+                  sessions={agent.sessions}
+                  currentId={agent.currentSessionId}
+                  onSelect={agent.switchSession}
+                  portalContainer={portalContainer}
+                />
               </div>
-              <div className="truncate text-xs font-medium text-muted-foreground/70">
-                {activeSessionTitle}
+              <div className="ml-auto flex shrink-0 items-center gap-0.5">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded-full hover:bg-foreground/5"
+                  onClick={agent.createSession}
+                  title={t("agent.newSession")}
+                >
+                  <Plus className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded-full hover:bg-foreground/5 hover:text-destructive"
+                  onClick={() => {
+                    if (agent.currentSessionId) {
+                      void agent.deleteSession(agent.currentSessionId);
+                    }
+                  }}
+                  disabled={!agent.currentSessionId || agent.sessions.length <= 1}
+                  title={t("agent.deleteSession")}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded-full hover:bg-foreground/5"
+                  onClick={agent.close}
+                  title={t("agent.close")}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
               </div>
             </div>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 rounded-full hover:bg-foreground/5"
-              onClick={agent.createSession}
-              title={t("agent.newSession")}
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 rounded-full hover:bg-foreground/5 hover:text-destructive"
-              onClick={() => {
-                if (agent.currentSessionId) {
-                  void agent.deleteSession(agent.currentSessionId);
-                }
-              }}
-              disabled={!agent.currentSessionId || agent.sessions.length <= 1}
-              title={t("agent.deleteSession")}
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 rounded-full hover:bg-foreground/5"
-              onClick={agent.close}
-              title={t("agent.close")}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-          <div className="relative mt-3">
-            <select
-              value={agent.currentSessionId || ""}
-              onChange={(event) => void agent.switchSession(event.target.value)}
-              className="h-8 w-full appearance-none rounded-lg border border-transparent bg-foreground/5 px-3 pr-8 text-xs font-medium text-foreground outline-none transition-colors hover:bg-foreground/10 focus:border-indigo-500/30 focus:bg-background focus:ring-2 focus:ring-indigo-500/20"
-              aria-label={t("agent.sessionSelect")}
-            >
-              {agent.sessions.map((session) => (
-                <option key={session.id} value={session.id}>
-                  {formatSessionTitle(session.title)}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-2.5 top-2 h-4 w-4 text-muted-foreground/70" />
           </div>
         </header>
 
@@ -335,9 +326,7 @@ export function GlobalAgentLauncher({ inline = false }: { inline?: boolean }) {
           <div ref={contentRef} className="space-y-4 px-4 py-5">
             {agent.messages.length === 0 && (
               <div className="flex flex-col items-center justify-center space-y-3 py-8 text-center">
-                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-indigo-500/10 text-indigo-500">
-                  <Sparkles className="h-6 w-6" />
-                </div>
+                <AgentAvatar state={avatarState} sizePx={72} />
                 <p className="max-w-[200px] text-sm leading-relaxed text-muted-foreground">
                   {t("agent.empty")}
                 </p>
@@ -433,6 +422,8 @@ export function GlobalAgentLauncher({ inline = false }: { inline?: boolean }) {
           <div className="flex items-end gap-2">
             <textarea
               ref={inputRef}
+              onFocus={inputActivity.onFocus}
+              onBlur={inputActivity.onBlur}
               value={agent.query}
               onChange={(event) => agent.setQuery(event.target.value)}
               onKeyDown={(event) => {
@@ -442,7 +433,7 @@ export function GlobalAgentLauncher({ inline = false }: { inline?: boolean }) {
                 }
               }}
               rows={1}
-              className="scrollbar-slim max-h-32 min-h-[44px] flex-1 resize-none overflow-y-auto whitespace-pre-wrap break-words rounded-xl border border-transparent bg-muted/50 px-4 py-3 text-sm leading-relaxed outline-none transition-all placeholder:text-muted-foreground/60 focus:border-indigo-500/30 focus:bg-background focus:ring-2 focus:ring-indigo-500/20"
+              className="scrollbar-slim max-h-32 min-h-[44px] flex-1 resize-none overflow-y-auto whitespace-pre-wrap break-words rounded-xl border border-foreground/30 bg-muted/50 px-4 py-3 text-sm leading-relaxed outline-none transition-[background-color,border-color,box-shadow] placeholder:text-muted-foreground/75 focus:border-ring focus:bg-background focus:ring-2 focus:ring-ring/20"
               placeholder={t("agent.placeholder")}
               disabled={isBusy}
             />

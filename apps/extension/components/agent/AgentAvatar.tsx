@@ -1,19 +1,22 @@
-import { browser } from "wxt/browser";
+import { CharacterMark } from "@aora-bot/react";
 
 interface AgentAvatarProps {
-  busy?: boolean;
+  sizePx?: number;
+  state?: "sleeping" | "alerting" | "working";
 }
 
-export function AgentAvatar({ busy = false }: AgentAvatarProps) {
+export function AgentAvatar({ state, sizePx = 48 }: AgentAvatarProps) {
   return (
-    <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-orange-50 dark:bg-orange-300/10">
-      <img
-        src={browser.runtime.getURL(busy ? "/agent/hammy-thinking.svg" : "/agent/hammy-idle.svg")}
-        alt=""
-        width={40}
-        height={40}
-        draggable={false}
-        className="size-10 select-none motion-safe:transition-transform motion-safe:group-hover/avatar:-rotate-6 motion-safe:group-focus-visible/avatar:-rotate-6"
+    <span aria-hidden="true" className="flex shrink-0">
+      <CharacterMark
+        shape="bot"
+        color="orange"
+        styleId="pixel"
+        state={state}
+        sizePx={sizePx}
+        followPointer
+        autoPause
+        className="relative inline-flex aspect-square select-none [--aora-bg:var(--background)] [&>svg]:size-full [&>svg]:overflow-visible"
       />
     </span>
   );

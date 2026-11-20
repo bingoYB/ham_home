@@ -13,10 +13,10 @@ import type {
   ConversationalSearchSession,
   Source,
 } from "@/types";
+import { DEFAULT_SESSION_TITLE } from "@/utils/global-agent-session.utils";
 
 const AGENT_DB_NAME = "hamhome-global-agent";
 const AGENT_STATE_KEY = "agentState";
-const DEFAULT_SESSION_TITLE = "New conversation";
 /** Marks stored tool calls and tool results, which the model sees but the chat UI hides. */
 const TRANSCRIPT_KEY = "agentTranscript";
 /**

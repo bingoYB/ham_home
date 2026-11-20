@@ -67,7 +67,7 @@
     "sessionSelect": "切换对话",
     "close": "关闭",
     "empty": "可以问我插件功能、书签内容、数据统计，也可以让我调整安全配置项。",
-    "launcherPlaceholder": "问问书签助手…",
+    "searchSessions": "搜索会话…",
     "placeholder": "问插件功能、配置项或书签...",
     "send": "发送",
     "stop": "停止生成",

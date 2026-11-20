@@ -32,6 +32,7 @@
     "test:e2e:install": "playwright install chromium"
   },
   "dependencies": {
+    "@aora-bot/react": "0.2.0",
     "@dnd-kit/core": "^6.3.1",
     "@dnd-kit/modifiers": "^9.0.0",
     "@dnd-kit/sortable": "^10.0.0",
@@ -61,7 +62,6 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "@aora-bot/engine": "0.2.0",
     "@playwright/test": "^1.50.0",
     "@tailwindcss/typography": "^0.5.19",
     "@types/chrome": "^0.0.260",

@@ -16,6 +16,7 @@ import { useReadLaterQuickList } from "@/hooks/useReadLaterQuickList";
 import { FaviconLoadingContext } from "@/hooks/useSafeFavicon";
 import { nanoid } from "nanoid";
 import { configStorage } from "@/lib/storage/config-storage";
+import { useContentUI } from "@/utils/ContentUIContext";
 import type {
   LocalBookmark,
   LocalCategory,
@@ -54,6 +55,7 @@ export function BookmarkPanel({
   const bookmarkRefs = useRef<Map<string, HTMLElement>>(new Map());
 
   const { t } = useTranslation(["bookmark", "ai"]);
+  const { container: portalContainer } = useContentUI();
 
   // 全局 AI Agent
   const { isOpen: isAIChatOpen, sources: aiSources } = useGlobalAgent();
@@ -291,7 +293,7 @@ export function BookmarkPanel({
 
         {/* 全局 AI Agent 入口 */}
         <div className="shrink-0 p-3 border-t bg-background/50 backdrop-blur-md">
-          <GlobalAgentLauncher inline />
+          <GlobalAgentLauncher inline portalContainer={portalContainer} />
         </div>
       </div>
     </FaviconLoadingContext.Provider>

@@ -1,5 +1,7 @@
 import type { ChatMessage, ChatSearchSessionSummary } from "@/types";
 
+export const DEFAULT_SESSION_TITLE = "New conversation";
+
 /**
  * Whether a value from the background is a usable session summary.
  * A background that does not answer the call (for example a stale service

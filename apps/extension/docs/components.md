@@ -1489,11 +1489,12 @@ UI 复用 `@hamhome/ui-business/ai-search` 的 `SearchInputArea`，Extension 侧
 
 ### GlobalAgentLauncher
 
-插件 app 页面右下角和页内书签面板底部的助手入口。收起时显示仓鼠头像和提问栏。点击头像可打开当前会话并保留草稿，在提问栏输入内容后按 Enter 或点击发送箭头会新建对话。展开后，同一头像位于标题左侧。
+插件 app 页面右下角和页内书签面板底部的助手入口。收起时显示胶囊提问栏和紫色星光按钮。空输入时点击按钮或按 Enter 打开当前会话，输入问题后提交会新建对话。展开后，标题左侧的像素机器人随当前会话状态变化。
 
 | Prop   | Type      | Required | Default | Description |
 | ------ | --------- | -------- | ------- | ----------- |
 | inline | `boolean` | -        | `false` | 折叠态以内联输入框渲染（用于书签面板），否则固定在视口右下角；状态由 `useGlobalAgent()` 管理 |
+| portalContainer | `HTMLElement` | - | 页面 body | 页内书签面板通过 `useContentUI()` 传入自己的容器，使会话列表沿用面板主题 |
 
 **用法示例：**
 
@@ -1506,7 +1507,7 @@ import { GlobalAgentLauncher } from "@/components/agent/GlobalAgentLauncher";
 **行为说明：**
 
 - 由 `entrypoints/app/App.tsx` 挂载，因此书签、设置、分类、标签、工作空间等 app 页面都会显示入口
-- 对话支持多 session 持久化、切换、新建和删除
+- 有多个会话时，点击助手名称下方的会话标题可打开列表并切换会话。右侧按钮用于新建、删除和关闭。
 - assistant 消息可渲染 `AgentProcessStep[]`，展示 skill 匹配、tool 调用、工具输出摘要和失败原因
 - 书签搜索结果以 `Source[]` 渲染，点击来源会在新标签页打开对应 URL
 - 敏感配置不会在 UI 或 tool 输出里展示明文
@@ -1520,25 +1521,41 @@ import { GlobalAgentLauncher } from "@/components/agent/GlobalAgentLauncher";
 
 ### AgentAvatar
 
-助手使用 [Aora Bot](https://github.com/sam70361/aora-bot) 提供的橘色仓鼠「囤囤」。WXT 构建时生成两张本地 SVG，供扩展页面和网页内的书签面板使用。头像是装饰图，交互名称由外层按钮提供。
+标题栏的橙色像素机器人为 48 px，空会话提示上方为 72 px，两者共享当前会话状态。助手思考、搜索和输出回答时显示工作动画，执行失败时显示警报，默认显示睡眠动画。聚焦对话输入框时使用默认表情，失焦满 10 秒后入睡，再次聚焦会取消计时。头像通过 `followPointer` 跟随鼠标视线。头像随对话一起挂载，使用 [Aora Bot 的 CharacterMark](https://github.com/sam70361/aora-bot)。
 
 | Prop | 类型 | 默认值 | 说明 |
 | --- | --- | --- | --- |
-| busy | `boolean` | `false` | 助手处理提问期间显示思考表情 |
+| sizePx | `number` | `48` | 头像尺寸（像素） |
+| state | `"sleeping" \| "alerting" \| "working"` | `undefined` | 当前会话对应的动画状态，省略时为默认表情 |
 
 ```tsx
-<AgentAvatar busy={isBusy} />
+<AgentAvatar state="alerting" />
+```
+
+### AgentSessionPicker
+
+在助手名称下显示当前会话。只有一个会话时显示标题，有多个会话时通过共享 `Popover` 和 `Command` 搜索会话标题、查看更新时间并选择会话。勾选标记表示当前会话。键盘可用方向键移动、Enter 选择、Esc 收起。
+
+| Prop | 类型 | 说明 |
+| --- | --- | --- |
+| sessions | `ChatSearchSessionSummary[]` | 按显示顺序排列的会话 |
+| currentId | `string \| null` | 当前会话 ID |
+| onSelect | `(id: string) => void` | 选择会话时调用 |
+| portalContainer | `HTMLElement`（可选） | 下拉列表挂载位置 |
+
+```tsx
+<AgentSessionPicker sessions={agent.sessions} currentId={agent.currentSessionId} onSelect={agent.switchSession} />
 ```
 
 ### AgentLauncherBar
 
-收起状态的提问栏。左侧头像打开当前会话，输入有效文字时右侧显示发送按钮。输入为空时按 Enter 也可打开当前会话。
+收起状态的胶囊提问栏。右侧常驻星光按钮，点击或按 Enter 均可提交。有问题时发起新对话，输入为空时打开当前会话。
 
 | Prop | 类型 | 说明 |
 | --- | --- | --- |
 | inline | `boolean` | 在书签面板中占满可用宽度，或悬浮于页面右下角 |
 | query | `string` | 当前草稿 |
-| busy | `boolean` | 生成期间显示思考头像，仍可打开当前会话 |
+| busy | `boolean` | 生成期间暂时禁用输入，星光按钮可重新打开当前会话 |
 | onQueryChange | `(query: string) => void` | 更新草稿 |
 | onOpen | `() => void` | 打开当前会话 |
 | onSubmit | `(query: string) => void` | 提交已去除首尾空白的问题 |

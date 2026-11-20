@@ -19,6 +19,10 @@ const test = base.extend<{ mockAi: MockAiServer }>({
 
 type Text = E2EVariant["text"];
 
+function botAvatar(page: Page) {
+  return page.locator('header [data-shape="bot"][data-color="orange"][data-style="pixel"]');
+}
+
 /** Opens the global assistant panel and returns its message input. */
 async function openAssistant(page: Page, t: Text) {
   await page.getByLabel(t("打开全局助手", "Open global assistant")).click();
@@ -91,13 +95,19 @@ test.describe("全局助手流式对话", () => {
     if (e2eVariant.name === "dark") {
       await expect(page.locator("html")).toHaveClass(/dark/);
     }
-    const launcher = page.getByRole("textbox", { name: t("问问书签助手…", "Ask the bookmark assistant…") });
+    const launcher = page.getByPlaceholder(t("问插件功能、配置项或书签...", "Ask about features, settings, or bookmarks..."));
+    await expect(page.locator(".aora-mark")).toHaveCount(0);
+    await expect(page.getByRole("button", { name: t("打开全局助手", "Open global assistant") })).toBeVisible();
+    await testInfo.attach("收起入口", {
+      body: await page.locator("form").filter({ has: launcher }).screenshot({ animations: "disabled" }),
+      contentType: "image/png",
+    });
     await launcher.fill(question);
     await page.getByRole("button", { name: t("发送", "Send"), exact: true }).click();
 
     const stopButton = page.getByRole("button", { name: t("停止生成", "Stop generating") });
     await expect(stopButton).toBeVisible();
-    await expect(page.locator('header img[src$="/agent/hammy-thinking.svg"]')).toBeVisible();
+    await expect(botAvatar(page)).toHaveAttribute("data-state", "working");
     // Part of the answer is shown while the rest is still being generated.
     // The stop button shows only while the turn runs, so seeing it together
     // with partial text proves live streaming rather than the typing
@@ -109,7 +119,7 @@ test.describe("全局助手流式对话", () => {
 
     await expect(page.getByText(endMarker)).toBeVisible({ timeout: 15_000 });
     await expect(stopButton).toHaveCount(0);
-    await expect(page.locator('header img[src$="/agent/hammy-idle.svg"]')).toBeVisible();
+    await expect(botAvatar(page)).toHaveAttribute("data-state", "sleeping");
     await expect(page.getByRole("button", { name: t("发送", "Send") })).toBeVisible();
     await attachStepScreenshot(page, testInfo, "AGENT-001-回答完成");
 
@@ -139,16 +149,22 @@ test.describe("全局助手流式对话", () => {
     mockAi.enqueueReply({ chunks: [...chunks, ...chunks], chunkDelayMs: 300 });
 
     const page = await openAppPage(context, extensionId, "all");
-    await page.getByRole("textbox", { name: t("问问书签助手…", "Ask the bookmark assistant…") }).fill(question);
     const input = await openAssistant(page, t);
-    await expect(input).toHaveValue(question);
+    await expect(botAvatar(page)).toHaveAttribute("data-state", "sleeping");
+    const emptyAvatar = page.getByText(emptyHint).locator("..").locator('[data-shape="bot"]');
+    await expect(emptyAvatar.locator("svg")).toBeVisible();
+    await expect(emptyAvatar).toHaveCSS("width", "72px");
+    await input.fill(question);
+    await expect(emptyAvatar).toHaveAttribute("data-state", "idle");
     await input.press("Enter");
+    await expect(emptyAvatar).toHaveCount(0);
 
     await expect(page.getByText(firstPart).first()).toBeVisible();
     await page.getByRole("button", { name: t("停止生成", "Stop generating") }).click();
 
     // The message goes back into the input and the chat returns to its empty state.
     await expect(input).toHaveValue(question);
+    await expect(botAvatar(page)).toHaveAttribute("data-state", "idle");
     await expect(page.getByText(emptyHint)).toBeVisible();
     await expect(page.getByText(firstPart)).toHaveCount(0);
     await expect(page.getByText("Error", { exact: true })).toHaveCount(0);
@@ -161,4 +177,136 @@ test.describe("全局助手流式对话", () => {
     await openAssistant(page, t);
     await expect(page.getByText(emptyHint)).toBeVisible();
   });
+
+  test("AGENT-004 报错时显示警报，修复配置后恢复", async ({
+    context, extensionId, extensionWorker, e2eVariant, mockAi,
+  }, testInfo) => {
+    const t = e2eVariant.text;
+    await extensionWorker.evaluate(async () => {
+      const { aiConfig } = await chrome.storage.sync.get("aiConfig");
+      await chrome.storage.sync.set({ aiConfig: { ...aiConfig, provider: "openai", apiKey: "" } });
+    });
+
+    const page = await openAppPage(context, extensionId);
+    const input = await openAssistant(page, t);
+    await input.fill(t("整理收藏", "Organize my bookmarks"));
+    await input.press("Enter");
+    await expect(page.getByText("请先配置 API Key")).toBeVisible();
+    await expect(botAvatar(page)).toHaveAttribute("data-state", "alerting");
+    await expect(botAvatar(page).locator("svg")).toBeVisible();
+    await attachStepScreenshot(page, testInfo, "AGENT-004-配置报错");
+
+    await input.fill("");
+    await page.locator("header").getByTitle(t("关闭", "Close"), { exact: true }).click();
+    await expect(page.locator(".aora-mark")).toHaveCount(0);
+    await openAssistant(page, t);
+    await expect(botAvatar(page)).toHaveAttribute("data-state", "alerting");
+
+    await pointAiConfigToMock(extensionWorker, mockAi.baseUrl);
+    await input.fill(t("重试", "Try again"));
+    await input.press("Enter");
+    await expect(page.getByText("OK", { exact: true })).toBeVisible();
+    await expect(botAvatar(page)).toHaveAttribute("data-state", "idle");
+  });
+
+  test("AGENT-005 聚焦唤醒，重新聚焦取消休眠计时", async ({ context, extensionId, e2eVariant }) => {
+    const page = await openAppPage(context, extensionId);
+    const input = await openAssistant(page, e2eVariant.text);
+    await page.clock.install();
+    await input.focus();
+    await expect(botAvatar(page)).toHaveAttribute("data-state", "idle");
+    await input.blur();
+    await page.clock.fastForward(9_000);
+    await expect(botAvatar(page)).toHaveAttribute("data-state", "idle");
+    await input.focus();
+    await page.clock.fastForward(10_000);
+    await expect(botAvatar(page)).toHaveAttribute("data-state", "idle");
+    await input.blur();
+    await page.clock.fastForward(10_000);
+    await expect(botAvatar(page)).toHaveAttribute("data-state", "sleeping");
+  });
+
+  for (const surface of ["扩展主页", "页内书签面板"] as const) {
+    test(`AGENT-003 ${surface}从标题切换会话`, async ({
+      context, extensionId, e2eVariant, mockAi,
+    }, testInfo) => {
+      const t = e2eVariant.text;
+      const inPanel = surface === "页内书签面板";
+      const page = inPanel ? await context.newPage() : await openAppPage(context, extensionId);
+      if (inPanel) {
+        await page.setViewportSize({ width: 390, height: 760 });
+        const url = "https://agent-sessions.e2e.test/";
+        await page.route(url, (route) => route.fulfill({ contentType: "text/html", body: "<main>Bookmarks</main>" }));
+        await page.goto(url);
+        const panelTrigger = page.getByTitle(t("打开书签面板", "Open Bookmark Panel"));
+        await expect(panelTrigger).toBeAttached();
+        await page.bringToFront();
+        await page.mouse.move(2, 380);
+        await panelTrigger.click();
+      }
+
+      const input = await openAssistant(page, t);
+      await expect(botAvatar(page).locator("svg")).toBeVisible();
+      await expect(botAvatar(page)).toHaveCSS("width", "48px");
+      const host = inPanel ? page.locator("hamhome-bookmark-panel") : page.locator("body");
+      const heading = host.getByText("HamHome Agent", { exact: true });
+      await expect(heading).toBeVisible();
+      expect(await heading.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
+      const picker = host.getByRole("button", { name: t("切换对话", "Switch chat") });
+      const newChat = t("新对话", "New chat");
+      await expect(host.locator("header").getByText(newChat, { exact: true })).toBeVisible();
+      await expect(picker).toHaveCount(0);
+
+      const question = t("帮我找出最近收藏的设计资料", "Find recently saved design references");
+      const answer = t("找到了最近收藏的设计资料。", "Here are your recent design references.");
+      mockAi.enqueueReply({ chunks: [answer] });
+      await input.fill(question);
+      await input.press("Enter");
+      await expect(host.getByText(answer, { exact: true })).toBeVisible();
+      await host.getByRole("button", { name: newChat, exact: true }).click();
+      await expect(picker).toHaveText(newChat);
+
+      await picker.press("Enter");
+      const list = host.getByRole("listbox");
+      const search = host.getByPlaceholder(t("搜索会话…", "Search chats…"));
+      await expect(search).toBeFocused();
+      await expect(list.getByRole("option", { name: newChat })).toHaveAttribute("aria-current", "true");
+      const headerBox = await host.locator("header").filter({ hasText: "HamHome Agent" }).boundingBox();
+      const listBox = await list.boundingBox();
+      if (headerBox && listBox) {
+        await testInfo.attach("会话切换", {
+          body: await page.screenshot({
+            animations: "disabled",
+            clip: {
+              ...headerBox,
+              width: Math.max(headerBox.width, listBox.x + listBox.width - headerBox.x) + 2,
+              height: listBox.y + listBox.height - headerBox.y + 24,
+            },
+          }),
+          contentType: "image/png",
+        });
+      }
+      await page.keyboard.press("Escape");
+      await expect(list).toHaveCount(0);
+      await expect(picker).toBeFocused();
+
+      await picker.press("Enter");
+      await expect(search).toBeFocused();
+      await page.keyboard.press("ArrowDown");
+      await expect(list.getByRole("option", { name: question })).toHaveAttribute("aria-selected", "true");
+      await search.fill(t("设计", "design"));
+      await expect(list.getByRole("option")).toHaveCount(1);
+      await page.keyboard.press("Enter");
+      await expect(picker).toHaveText(question);
+      await expect(host.getByText(answer, { exact: true })).toBeVisible();
+
+      await picker.click();
+      await search.fill("zzz");
+      await expect(host.getByText(t("未找到匹配结果", "No results found"), { exact: true })).toBeVisible();
+      await search.fill("");
+      await list.getByRole("option", { name: newChat }).click();
+      await expect(picker).toHaveText(newChat);
+      await expect(host.getByText(answer, { exact: true })).toHaveCount(0);
+    });
+  }
 });

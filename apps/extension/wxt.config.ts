@@ -1,41 +1,12 @@
 import { defineConfig } from "wxt";
 import path from "path";
-import { renderStaticSvg } from "@aora-bot/engine/static";
 import { visualizer } from "rollup-plugin-visualizer";
 import { escapeUnicodeNonCharacters } from "./scripts/escape-unicode-noncharacters";
-
-// Render Hammy at build time so the bookmark panel can display it on any page
-// without loading the character engine or running an animation loop in each tab.
-const agentAvatars = {
-  "agent/hammy-idle.svg": "idle",
-  "agent/hammy-thinking.svg": "thinking",
-} as const;
 
 // WXT 配置入口，用于管理浏览器扩展的构建、开发服务器以及 Manifest 清单配置
 export default defineConfig({
   // 引入 WXT 官方的 React 模块，以支持使用 React 开发扩展 UI（如 Options、Popup 等）
   modules: ["@wxt-dev/module-react"],
-
-  hooks: {
-    "prepare:publicPaths": (_wxt, paths) => {
-      paths.push(...Object.keys(agentAvatars));
-    },
-    "build:publicAssets": (_wxt, files) => {
-      for (const [relativeDest, state] of Object.entries(agentAvatars)) {
-        files.push({
-          relativeDest,
-          contents: renderStaticSvg({
-            shape: "hamster",
-            color: "orange",
-            state,
-            mouth: state === "idle" ? "cat" : "flat",
-            poseHome: { turn: 0, tilt: 0, roll: 0 },
-            sizePx: 64,
-          }),
-        });
-      }
-    },
-  },
 
   // Vite 构建配置，覆盖或补充 WXT 内置的 Vite 默认设定
   vite: ({ mode }) => ({
@@ -106,7 +77,7 @@ export default defineConfig({
     // SingleFile hooks-frames.js 需要注入到 MAIN world 以 Hook 原生 API
     web_accessible_resources: [
       {
-        resources: ["single-file-hooks-frames.js", ...Object.keys(agentAvatars)],
+        resources: ["single-file-hooks-frames.js"],
         matches: ["<all_urls>"],
       },
     ],
