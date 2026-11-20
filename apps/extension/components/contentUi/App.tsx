@@ -61,6 +61,7 @@ export function App() {
   const {
     isTriggerVisible,
     isPanelOpen,
+    animatePanel,
     position,
     openPanel,
     closePanel,
@@ -182,7 +183,7 @@ export function App() {
   // 监听来自 background 的消息（如快捷键触发）
   useEffect(() => {
     const handleMessage = (
-      message: { type: string },
+      message: { type: string; source?: string },
       _sender: unknown,
       sendResponse: (response?: unknown) => void,
     ) => {
@@ -194,7 +195,7 @@ export function App() {
         return true;
       }
 
-      togglePanel();
+      togglePanel(message.source !== 'shortcut');
       // 回执让 Popup 知道页面已接管，否则它无法区分「已切换」和「消息被丢弃」
       sendResponse({ ok: true });
       return true;
@@ -241,6 +242,7 @@ export function App() {
             bookmarks={bookmarks}
             categories={categories}
             isOpen={isPanelOpen}
+            animate={animatePanel}
             position={position}
             onClose={closePanel}
             onOpenBookmark={handleOpenBookmark}

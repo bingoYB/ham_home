@@ -28,6 +28,7 @@ export interface BookmarkPanelProps {
   bookmarks: LocalBookmark[];
   categories: LocalCategory[];
   isOpen: boolean;
+  animate?: boolean;
   position: PanelPosition;
   onClose: () => void;
   onOpenBookmark?: (url: string) => void;
@@ -38,6 +39,7 @@ export function BookmarkPanel({
   bookmarks,
   categories,
   isOpen,
+  animate = true,
   position,
   onClose,
   onOpenBookmark,
@@ -198,7 +200,7 @@ export function BookmarkPanel({
       <div
         className={cn(
           "absolute inset-0 z-1 bg-black/20 backdrop-blur-[2px] w-screen",
-          "transition-[opacity,visibility] duration-300",
+          animate && "transition-[opacity,visibility] duration-200",
           isOpen
             ? "visible pointer-events-auto opacity-100"
             : "invisible pointer-events-none opacity-0",
@@ -208,6 +210,7 @@ export function BookmarkPanel({
 
       {/* 面板 */}
       <div
+        data-slot="bookmark-panel"
         onClick={handlePanelClick}
         // 内联 transform + visibility：不依赖 Tailwind 的 --tw-translate-* 自定义属性。
         // 这些属性由 @property 注册在 document 级样式中，一旦被页面移除，
@@ -224,7 +227,7 @@ export function BookmarkPanel({
           "w-[360px] max-w-[90vw]",
           "bg-background border-border shadow-2xl",
           "flex flex-col overflow-hidden",
-          "transition-[transform,visibility] duration-300 ease-out",
+          animate && "transition-[transform,visibility] duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none",
           "rounded-lg",
           position === "left" ? "left-1 border-r" : "right-1 border-l",
           isOpen

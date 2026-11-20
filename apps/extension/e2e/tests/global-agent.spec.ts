@@ -39,6 +39,41 @@ test.describe("全局助手流式对话", () => {
     await pointAiConfigToMock(extensionWorker, mockAi.baseUrl);
   });
 
+  test("流式输出只跟随在底部阅读的用户", async ({ context, extensionId, e2eVariant, mockAi }) => {
+    const t = e2eVariant.text;
+    const chunks = Array.from({ length: 6 }, (_, index) =>
+      `\n\nStream section ${index + 1}\n\n${"Reading content. ".repeat(240)}`,
+    );
+    mockAi.enqueueReply({ chunks, chunkDelayMs: 900 });
+
+    const page = await openAppPage(context, extensionId, "all");
+    const input = await openAssistant(page, t);
+    const viewport = page.locator('[data-slot="scroll-area-viewport"]').filter({ hasText: "Stream section 1" });
+    const distanceFromBottom = () => viewport.evaluate(
+      (element) => element.scrollHeight - element.clientHeight - element.scrollTop,
+    );
+    const scrollTo = (end: boolean) => viewport.evaluate((element, toEnd) => new Promise<void>((resolve) => {
+      element.addEventListener("scroll", () => resolve(), { once: true });
+      element.scrollTop = toEnd ? element.scrollHeight : 0;
+    }), end);
+
+    await input.fill("Stream a long answer");
+    await page.getByRole("button", { name: t("发送", "Send"), exact: true }).click();
+    await expect(viewport.getByText("Stream section 1", { exact: true })).toBeVisible();
+    await expect.poll(() => viewport.evaluate((element) => element.scrollTop)).toBeGreaterThan(200);
+    await expect.poll(distanceFromBottom).toBeLessThanOrEqual(1);
+
+    await scrollTo(false);
+    await expect(viewport.getByText("Stream section 3", { exact: true })).toBeVisible();
+    await expect.poll(() => viewport.evaluate((element) => element.scrollTop)).toBe(0);
+    expect(await distanceFromBottom()).toBeGreaterThan(200);
+
+    await scrollTo(true);
+    await expect(viewport.getByText("Stream section 6", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: t("停止生成", "Stop generating") })).toHaveCount(0);
+    await expect.poll(distanceFromBottom).toBeLessThanOrEqual(1);
+  });
+
   test("AGENT-001 回答实时流式显示并保存到会话", async ({
     context,
     extensionId,

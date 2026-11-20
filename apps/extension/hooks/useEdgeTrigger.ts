@@ -24,10 +24,11 @@ export interface UseEdgeTriggerResult {
   isNearEdge: boolean; // 鼠标是否靠近边缘
   isTriggerVisible: boolean; // 触发区是否显示
   isPanelOpen: boolean; // 面板是否展开
+  animatePanel: boolean;
   position: PanelPosition;
   openPanel: () => void;
   closePanel: () => void;
-  togglePanel: () => void;
+  togglePanel: (animate?: boolean) => void;
 }
 
 const DEFAULT_TRIGGER_ZONE_WIDTH = 20;
@@ -44,7 +45,8 @@ export function useEdgeTrigger({
 
   const [isNearEdge, setIsNearEdge] = useState(false);
   const [isTriggerVisible, setIsTriggerVisible] = useState(false);
-  const [isPanelOpen, setIsPanelOpen] = useState(false);
+  const [panel, setPanel] = useState({ open: false, animate: true });
+  const isPanelOpen = panel.open;
 
   const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const leaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -82,7 +84,7 @@ export function useEdgeTrigger({
   // 侧边栏功能被关闭时重置面板状态
   useEffect(() => {
     if (!enabled) {
-      setIsPanelOpen(false);
+      setPanel({ open: false, animate: true });
     }
   }, [enabled]);
 
@@ -140,30 +142,27 @@ export function useEdgeTrigger({
   // 打开面板
   const openPanel = useCallback(() => {
     if (!enabled) return;
-    setIsPanelOpen(true);
+    setPanel({ open: true, animate: true });
     setIsTriggerVisible(false);
   }, [enabled]);
 
   // 关闭面板
   const closePanel = useCallback(() => {
-    setIsPanelOpen(false);
+    setPanel({ open: false, animate: true });
   }, []);
 
   // 切换面板
-  const togglePanel = useCallback(() => {
+  const togglePanel = useCallback((animate = true) => {
     if (!enabled) return;
-    setIsPanelOpen((prev) => {
-      if (!prev) {
-        setIsTriggerVisible(false);
-      }
-      return !prev;
-    });
+    setPanel((prev) => ({ open: !prev.open, animate }));
+    setIsTriggerVisible(false);
   }, [enabled]);
 
   return {
     isNearEdge,
     isTriggerVisible,
     isPanelOpen,
+    animatePanel: panel.animate,
     position,
     openPanel,
     closePanel,

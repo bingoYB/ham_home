@@ -20,6 +20,7 @@ import { Button, ScrollArea, cn } from "@hamhome/ui";
 import { AgentAvatar } from "@/components/agent/AgentAvatar";
 import { AgentLauncherBar } from "@/components/agent/AgentLauncherBar";
 import { AgentApprovalCard } from "@/components/agent/AgentApprovalCard";
+import { useAgentScrollFollow } from "@/hooks/useAgentScrollFollow";
 import { useGlobalAgent } from "@/hooks/useGlobalAgent";
 import { getBackgroundService } from "@/lib/services/background-service-client";
 import { isContentScriptContext } from "@/utils/browser-api";
@@ -217,9 +218,9 @@ function SuggestionChips({
 export function GlobalAgentLauncher({ inline = false }: { inline?: boolean }) {
   const { t } = useTranslation("ai");
   const agent = useGlobalAgent();
-  const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement | null>(null);
 
+  const { viewportRef, contentRef } = useAgentScrollFollow(agent.isOpen, agent.currentSessionId);
   const isBusy = ["thinking", "searching", "writing"].includes(agent.status);
   // The turn is still running in the background (not just animating the answer).
   const isTurnRunning = agent.status === "thinking" || agent.status === "searching";
@@ -230,10 +231,6 @@ export function GlobalAgentLauncher({ inline = false }: { inline?: boolean }) {
         ?.title || t("agent.newSession"),
     [agent.currentSessionId, agent.sessions, t],
   );
-
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [agent.messages, agent.currentAnswer, agent.currentSteps, agent.isOpen, agent.pendingApproval]);
 
   // 输入框随内容自动撑开高度（受 CSS max-height 限制，超出后滚动）
   useEffect(() => {
@@ -334,8 +331,8 @@ export function GlobalAgentLauncher({ inline = false }: { inline?: boolean }) {
           </div>
         </header>
 
-        <ScrollArea className="min-h-0 flex-1">
-          <div className="space-y-4 px-4 py-5">
+        <ScrollArea className="min-h-0 flex-1" viewportRef={viewportRef}>
+          <div ref={contentRef} className="space-y-4 px-4 py-5">
             {agent.messages.length === 0 && (
               <div className="flex flex-col items-center justify-center space-y-3 py-8 text-center">
                 <div className="flex h-12 w-12 items-center justify-center rounded-full bg-indigo-500/10 text-indigo-500">
@@ -392,7 +389,6 @@ export function GlobalAgentLauncher({ inline = false }: { inline?: boolean }) {
                 <div className="mt-1 opacity-90">{agent.error}</div>
               </div>
             )}
-            <div ref={messagesEndRef} />
           </div>
         </ScrollArea>
         <SuggestionChips

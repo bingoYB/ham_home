@@ -20,6 +20,7 @@ import { readLaterStorage } from "@/lib/storage/read-later-storage";
 import {
   safeOpenPopup,
   safeSendMessageToActiveTab,
+  safeSendMessageToTab,
   safeCreateTab,
   getExtensionURL,
   isFirefox,
@@ -567,8 +568,12 @@ export default defineBackground(() => {
     } else if (command === "save-workspace") {
       await saveCurrentWindowWorkspaceFromBackground();
     } else if (command === "toggle-bookmark-panel") {
-      // 仅切换当前活动 tab 的书签面板
-      await safeSendMessageToActiveTab({ type: "TOGGLE_BOOKMARK_PANEL" });
+      const message = { type: "TOGGLE_BOOKMARK_PANEL", source: "shortcut" };
+      if (tab?.id !== undefined) {
+        await safeSendMessageToTab(tab.id, message);
+      } else {
+        await safeSendMessageToActiveTab(message);
+      }
     }
   });
 

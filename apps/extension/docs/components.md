@@ -897,6 +897,7 @@ Tab 分组规则列表组件，按规则名称、目标分组、颜色和折叠�
 | bookmarks      | `LocalBookmark[]`       | ✓        | -       | 书签数据列表           |
 | categories     | `LocalCategory[]`       | ✓        | -       | 分类数据列表           |
 | isOpen         | `boolean`               | ✓        | -       | 面板是否打开           |
+| animate        | `boolean`               | -        | `true`  | 是否过渡面板与遮罩      |
 | position       | `PanelPosition`         | ✓        | -       | 面板位置（left/right） |
 | onClose        | `() => void`            | ✓        | -       | 关闭回调               |
 | onOpenBookmark | `(url: string) => void` | -        | -       | 打开书签回调           |
@@ -917,6 +918,7 @@ Tab 分组规则列表组件，按规则名称、目标分组、颜色和折叠�
 **行为说明：**
 
 - 面板始终按当前视口左右边缘定位，不依赖挂载容器宽度
+- 快捷键即时开关面板和遮罩。鼠标入口保留同侧滑入，系统要求减少动态效果时仅淡变遮罩。
 - 监听 `settings.enableSidePanel` 变化，关闭后内容页不再渲染触发器与面板
 - 监听 `settings.panelPosition` 变化，内容页无需刷新即可在左/右侧间切换
 - 面板关闭时同时禁用 pointer events 和 `visibility`，避免隐藏态遮挡页面交互
@@ -1510,6 +1512,7 @@ import { GlobalAgentLauncher } from "@/components/agent/GlobalAgentLauncher";
 - 敏感配置不会在 UI 或 tool 输出里展示明文
 - Deleting bookmarks, categories, custom filters, or tab group rules pauses the turn and shows an `AgentApprovalCard`; the turn continues after the user allows or rejects it, and unanswered requests are rejected after 2 minutes
 - While a turn runs, the answer streams in live and the busy indicator shows the tool step in progress; `useAgentTurnProgress()` polls the background every 300 ms
+- 对话视口停在底部时才即时跟随新增内容。向上滚动会暂停跟随，回到底部会继续。
 - While a turn runs, the send button becomes a stop button: the turn is aborted, nothing of it is saved, and its message goes back into the input
 - Long conversations stay within a token budget: earlier turns are summarized, and an "整理较早的对话" step appears in the process steps when that happens
 
@@ -6218,6 +6221,7 @@ Locale-aware time labels for the tab center, built on `Intl`.
 **行为说明：**
 
 - JSON 导入时，分类 ID 会被重新生成，通过映射表维护书签与分类的关联关系
+- 导入结果摘要以 160ms 淡入并上移 4px。系统要求减少动态效果时仅淡入，失败明细可立即打开。
 - JSON 导入保留 `content` 正文，兼容不含该字段的旧备份；已有 URL 仍按原规则跳过。
 - JSON 导入时，工作空间、工作空间分类和 Tab 分组配置会随备份一起恢复
 - 同名同父级的分类不会重复创建，直接复用已有分类

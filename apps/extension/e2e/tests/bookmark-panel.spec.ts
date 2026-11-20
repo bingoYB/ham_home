@@ -2,6 +2,46 @@ import { expect, test } from "../fixtures";
 import { createBookmarkFixture, createPinnedItemFixture } from "../helpers/factories";
 import { resetExtensionData, seedBookmarks } from "../helpers/storage";
 
+test("快捷键消息即时开关侧栏，边缘点击保留滑入", async ({ context, extensionWorker, e2eVariant }) => {
+  const page = await context.newPage();
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  const url = "https://panel-shortcut.e2e.test/";
+  await page.route(url, (route) =>
+    route.fulfill({ contentType: "text/html", body: "<h1>Panel shortcut test</h1>" }),
+  );
+  await page.goto(url);
+  await page.bringToFront();
+  const panel = page.locator('[data-slot="bookmark-panel"]');
+  const backdrop = panel.locator("xpath=preceding-sibling::*[1]");
+  await expect(panel).toBeAttached();
+
+  const toggleFromShortcut = async () => {
+    const result = await extensionWorker.evaluate(async (pageUrl) => {
+      const [tab] = await chrome.tabs.query({ url: pageUrl });
+      return chrome.tabs.sendMessage(tab.id!, { type: "TOGGLE_BOOKMARK_PANEL", source: "shortcut" });
+    }, url);
+    expect(result).toEqual({ ok: true });
+  };
+  await toggleFromShortcut();
+  await expect(panel).toHaveCSS("transition-property", "all");
+  await expect(panel).toHaveCSS("transition-duration", "0s");
+  await expect(panel).toHaveCSS("transform", "matrix(1, 0, 0, 1, 0, 0)");
+  await expect(backdrop).toHaveCSS("opacity", "1");
+  await toggleFromShortcut();
+  await expect(panel).toHaveCSS("visibility", "hidden");
+  await expect(panel).toHaveCSS("transition-duration", "0s");
+  await expect(backdrop).toHaveCSS("opacity", "0");
+
+  await page.mouse.move(2, 120);
+  await page.getByTitle(e2eVariant.text("打开书签面板", "Bookmark panel")).click();
+  await expect(panel).toHaveCSS("transition-property", "transform, visibility");
+  await expect(panel).toHaveCSS("transition-duration", "0.2s");
+  await expect(panel).toBeInViewport();
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(panel).toHaveCSS("transition-property", "none");
+  await expect(backdrop).toHaveCSS("transition-duration", "0.2s");
+});
+
 test("页内书签面板打开后才按需请求 favicon", async ({
   context,
   extensionWorker,

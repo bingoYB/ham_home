@@ -27,6 +27,43 @@ test.describe("IMPORT 导入导出", () => {
     await resetExtensionData(extensionWorker, { settings: e2eVariant.settings });
   });
 
+  for (const reducedMotion of ["no-preference", "reduce"] as const) {
+    test(`导入结果短过渡 (${reducedMotion})`, async ({ context, extensionId }) => {
+      const page = await openAppPage(context, extensionId, "import-export");
+      await page.emulateMedia({ reducedMotion });
+      await page.evaluate(() => {
+        document.addEventListener("transitionrun", (event) => {
+          const target = event.target;
+          if (target instanceof HTMLElement && target.dataset.testid === "import-result") {
+            target.setAttribute(`data-transition-${event.propertyName}`, "true");
+          }
+        });
+      });
+
+      await setHiddenFileInput(page, 'input[type="file"]', {
+        name: "motion-import.json",
+        mimeType: "application/json",
+        buffer: Buffer.from(JSON.stringify({
+          version: "1.0.0",
+          categories: [],
+          bookmarks: [{ title: "Motion import", url: "https://motion-import.test/", tags: [] }],
+        })),
+      });
+
+      const result = page.getByTestId("import-result");
+      await expect(result).toBeVisible();
+      await expect(result).toHaveCSS("transition-duration", "0.16s");
+      await expect(result).toHaveAttribute("data-transition-opacity", "true");
+      await expect(result).toHaveCSS("opacity", "1");
+      if (reducedMotion === "reduce") {
+        expect(await result.getAttribute("data-transition-translate")).toBeNull();
+        await expect(result).toHaveCSS("translate", "none");
+      } else {
+        await expect(result).toHaveAttribute("data-transition-translate", "true");
+      }
+    });
+  }
+
   test('IMPORT-CONCURRENT 两个页面同时导入保留全部书签和正文', async ({ context, extensionId, extensionWorker }) => {
     const first = await openAppPage(context, extensionId, 'import-export');
     const second = await openAppPage(context, extensionId, 'import-export');
