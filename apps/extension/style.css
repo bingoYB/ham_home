@@ -81,7 +81,7 @@
 /* 新视图（切换后的主题）使用 clip-path 圆形扩展动画 */
 ::view-transition-new(root) {
   z-index: 9999;
-  animation: theme-transition-expand 0.4s ease-out;
+  animation: theme-transition-expand 0.5s var(--ease-in-out-strong);
 }
 
 /* 圆形扩展动画 - 从点击位置向外扩展 */

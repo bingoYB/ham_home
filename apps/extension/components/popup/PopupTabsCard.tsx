@@ -69,7 +69,7 @@ export function PopupTabsCard({
           aria-valuenow={budget.count}
           aria-label={t("popup.tabs.budgetLabel")}
         >
-          <div className={cn("h-full rounded-full transition-all", LEVEL_COLORS[budget.level])} style={{ width: `${percent}%` }} />
+          <div className={cn("h-full rounded-full transition-[width] duration-500 ease-out-strong", LEVEL_COLORS[budget.level])} style={{ width: `${percent}%` }} />
         </div>
       )}
       <div className="flex items-center gap-2">
@@ -84,7 +84,7 @@ export function PopupTabsCard({
           data-testid="popup-tidy-up"
         >
           {t("popup.tabs.tidyUp")}
-          <ChevronRight className={cn("h-3 w-3 transition-transform", triageOpen && "rotate-90")} />
+          <ChevronRight className={cn("h-3 w-3 transition-transform duration-200 ease-out-strong", triageOpen && "rotate-90")} />
         </button>
       </div>
       {recent.count > 0 && (

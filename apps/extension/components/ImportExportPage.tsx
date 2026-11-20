@@ -1623,7 +1623,7 @@ export function ImportExportPage() {
           {importResult && !importResult.cancelled && (
             <div
               data-testid="import-result"
-              className={`mt-4 p-4 rounded-lg flex items-start gap-3 transition-[opacity,translate] duration-160 ease-[cubic-bezier(0.23,1,0.32,1)] starting:opacity-0 motion-safe:starting:translate-y-[4px] ${
+              className={`mt-4 p-4 rounded-lg flex items-start gap-3 transition-[opacity,translate] duration-160 ease-out-strong starting:opacity-0 motion-safe:starting:translate-y-[4px] ${
                 importResult.success
                   ? failures.length
                     ? "bg-amber-50 dark:bg-amber-950/20 text-amber-800 dark:text-amber-200"

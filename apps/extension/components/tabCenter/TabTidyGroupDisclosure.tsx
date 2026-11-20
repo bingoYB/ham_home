@@ -62,7 +62,7 @@ export function TabTidyGroupDisclosure({
         className={cn(
           "overflow-hidden",
           expanded ? "opacity-100" : "opacity-0",
-          animate && "motion-safe:transition-[height,opacity] motion-safe:duration-160 motion-safe:ease-[cubic-bezier(0.23,1,0.32,1)]",
+          animate && "motion-safe:transition-[height,opacity] motion-safe:duration-160 motion-safe:ease-out-strong",
         )}
         onTransitionEnd={(event) => {
           if (event.target === event.currentTarget && event.propertyName === "height") {

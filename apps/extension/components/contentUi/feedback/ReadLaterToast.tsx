@@ -62,7 +62,7 @@ export function ReadLaterToast({
   return (
     <div className="space-y-2">
       <div className="flex items-start gap-2">
-        <BookOpenCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" />
+        <BookOpenCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500 animate-pop" />
         <div className="min-w-0">
           <p className="text-sm font-medium text-foreground">{headline}</p>
           <p className="truncate text-xs text-muted-foreground" title={title}>

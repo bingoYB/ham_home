@@ -24,7 +24,10 @@ export function PopupTriagePanel({ tabs, onReadLater, onBookmark, onArchive, onV
   const visible = tabs.slice(0, PANEL_LIMIT);
 
   return (
-    <section className="space-y-1 rounded-xl border bg-card p-1" data-testid="popup-triage-panel">
+    <section
+      className="space-y-1 rounded-xl border bg-card p-1 animate-in fade-in-0 slide-in-from-top-1 duration-200"
+      data-testid="popup-triage-panel"
+    >
       {visible.length === 0 ? (
         <p className="px-2 py-3 text-center text-xs text-muted-foreground">{t("popup.triage.empty")}</p>
       ) : (

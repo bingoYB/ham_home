@@ -704,7 +704,7 @@ export function TreeSelect<T extends BaseTreeNode>({
       </span>
       <ChevronDown
         className={cn(
-          "h-4 w-4 shrink-0 ml-2 opacity-50 transition-transform duration-200",
+          "h-4 w-4 shrink-0 ml-2 opacity-50 transition-transform duration-200 ease-out-strong",
           open && "rotate-180"
         )}
       />

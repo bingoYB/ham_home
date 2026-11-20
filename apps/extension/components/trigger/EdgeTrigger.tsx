@@ -40,7 +40,7 @@ export function EdgeTrigger({ position, visible, onClick }: EdgeTriggerProps) {
       }}
       className={cn(
         'hamhome-edge-trigger fixed top-1/2 z-[99998] flex h-[64px] w-[44px] cursor-pointer items-center border-0 bg-transparent p-0',
-        'transition-[transform,opacity,visibility] duration-200 ease-out motion-reduce:transition-none',
+        'transition-[transform,opacity,visibility] duration-200 ease-out-strong motion-reduce:transition-none',
         position === 'left' ? 'left-0 justify-start' : 'right-0 justify-end',
         visible
           ? 'visible pointer-events-auto opacity-100'

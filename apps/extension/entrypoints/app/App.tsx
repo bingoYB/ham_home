@@ -456,7 +456,10 @@ function AppContent() {
   );
 
   // 获取当前页面标题
-  const pageConfig = PAGE_TITLES[currentViewBase] || PAGE_TITLES.all;
+  const pageKey = Object.prototype.hasOwnProperty.call(PAGE_TITLES, currentViewBase)
+    ? currentViewBase
+    : "all";
+  const pageConfig = PAGE_TITLES[pageKey];
   const pageTitle = t(pageConfig.title);
 
   // 渲染内容区
@@ -670,7 +673,13 @@ function AppContent() {
                 谁也用不到的空带，内容和滚动条都被截断在空带上沿。
                 Agent 入口是悬浮层，末尾留白由各页面自己的滚动内容负责（pb-24） */}
             <div className="flex h-full min-h-0 flex-col">
-              <div className="flex min-h-0 flex-1 flex-col">
+              {/* Keyed by page, not by full view: query changes inside a page
+                  (e.g. settings?tab=storage) must not remount or replay it */}
+              <div
+                key={pageKey}
+                data-testid="app-page"
+                className="flex min-h-0 flex-1 flex-col animate-page-enter"
+              >
                 {renderContent()}
               </div>
             </div>

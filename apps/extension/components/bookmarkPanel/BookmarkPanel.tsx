@@ -229,7 +229,7 @@ export function BookmarkPanel({
           "w-[360px] max-w-[90vw]",
           "bg-background border-border shadow-2xl",
           "flex flex-col overflow-hidden",
-          animate && "transition-[transform,visibility] duration-200 ease-[cubic-bezier(0.32,0.72,0,1)] motion-reduce:transition-none",
+          animate && "transition-[transform,visibility] duration-200 ease-drawer motion-reduce:transition-none",
           "rounded-lg",
           position === "left" ? "left-1 border-r" : "right-1 border-l",
           isOpen

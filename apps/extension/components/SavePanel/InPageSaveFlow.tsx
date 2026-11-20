@@ -84,7 +84,7 @@ export function InPageSaveFlow() {
     return (
       <FloatingCard testId="saved" className="max-w-[320px]">
         <div className="flex items-center gap-2.5 p-3">
-          <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500" />
+          <CheckCircle2 className="h-4 w-4 shrink-0 text-emerald-500 animate-pop" />
           <div className="flex-1 text-sm font-medium text-foreground">
             {t("bookmark:inPageSave.saved")}
           </div>

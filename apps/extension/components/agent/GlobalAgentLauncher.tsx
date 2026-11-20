@@ -136,7 +136,7 @@ function Sources({
             key={source.bookmarkId}
             type="button"
             onClick={() => window.open(source.url, "_blank")}
-            className="group block w-full rounded-xl border border-border/50 bg-background/50 px-3 py-2 text-left text-xs transition-all hover:border-indigo-500/30 hover:bg-indigo-50/50 hover:shadow-sm dark:hover:bg-indigo-500/10"
+            className="group block w-full rounded-xl border border-border/50 bg-background/50 px-3 py-2 text-left text-xs transition-[background-color,border-color,box-shadow] duration-200 ease-out-strong hover:border-indigo-500/30 hover:bg-indigo-50/50 hover:shadow-sm dark:hover:bg-indigo-500/10"
           >
             <span className="line-clamp-1 font-medium text-foreground/90 group-hover:text-indigo-600 dark:group-hover:text-indigo-400">
               {source.index}. {source.title}
@@ -155,10 +155,13 @@ function MessageBubble({
   message,
   processTitle,
   sourcesTitle,
+  animateIn = false,
 }: {
   message: ChatMessage;
   processTitle: string;
   sourcesTitle: string;
+  /** Rise in on mount. Only for messages that just appeared, never for history */
+  animateIn?: boolean;
 }) {
   const isUser = message.role === "user";
 
@@ -166,7 +169,11 @@ function MessageBubble({
     <div className={cn("flex", isUser ? "justify-end" : "justify-start")}>
       <div
         className={cn(
-          "max-w-[88%] px-4 py-2.5 text-sm leading-relaxed shadow-sm transition-all",
+          "max-w-[88%] px-4 py-2.5 text-sm leading-relaxed shadow-sm",
+          animateIn &&
+            (isUser
+              ? "animate-in fade-in-0 zoom-in-[0.97] slide-in-from-bottom-2 duration-200 origin-bottom-right"
+              : "animate-in fade-in-0 slide-in-from-bottom-1 duration-200"),
           isUser
             ? "rounded-2xl rounded-tr-sm bg-gradient-to-br from-indigo-500 to-blue-600 text-white shadow-indigo-500/20"
             : "rounded-2xl rounded-tl-sm border border-indigo-100 dark:border-indigo-900/50 bg-gradient-to-br from-indigo-50/80 to-blue-50/80 dark:from-indigo-950/40 dark:to-blue-950/40 text-foreground shadow-sm backdrop-blur-md",
@@ -206,7 +213,7 @@ function SuggestionChips({
           key={`${suggestion.action}-${suggestion.label}`}
           type="button"
           onClick={() => onClick(suggestion)}
-          className="rounded-full border border-border/60 bg-background/50 px-3 py-1.5 text-[11px] font-medium text-muted-foreground/80 shadow-sm backdrop-blur-sm transition-all hover:-translate-y-0.5 hover:border-indigo-500/30 hover:text-indigo-600 hover:shadow dark:hover:text-indigo-400"
+          className="rounded-full border border-border/60 bg-background/50 px-3 py-1.5 text-[11px] font-medium text-muted-foreground/80 shadow-sm backdrop-blur-sm transition-[translate,border-color,color,box-shadow] duration-200 ease-out-strong hover:-translate-y-0.5 hover:border-indigo-500/30 hover:text-indigo-600 hover:shadow dark:hover:text-indigo-400"
         >
           {suggestion.label}
         </button>
@@ -265,7 +272,7 @@ export function GlobalAgentLauncher({ inline = false, portalContainer }: GlobalA
 
   return (
     <div className="fixed bottom-4 left-4 right-4 z-50 md:left-auto md:right-4 md:w-[420px] max-w-[calc(100%-2rem)]">
-      <div className="flex h-[min(660px,calc(100vh-2rem))] flex-col overflow-hidden rounded-2xl border border-white/20 bg-background/80 shadow-[0_0_40px_rgba(0,0,0,0.1)] backdrop-blur-xl ring-1 ring-black/5 animate-in fade-in slide-in-from-bottom-8 zoom-in-95 duration-300 ease-out dark:shadow-[0_0_40px_rgba(255,255,255,0.05)] dark:ring-white/10">
+      <div className="flex h-[min(660px,calc(100vh-2rem))] flex-col overflow-hidden rounded-2xl border border-white/20 bg-background/80 shadow-[0_0_40px_rgba(0,0,0,0.1)] backdrop-blur-xl ring-1 ring-black/5 origin-bottom-right animate-in fade-in-0 slide-in-from-bottom-4 zoom-in-[0.96] duration-250 dark:shadow-[0_0_40px_rgba(255,255,255,0.05)] dark:ring-white/10">
         <header className="border-b border-white/10 bg-transparent px-4 py-2.5 dark:border-white/5">
           <div className="flex items-center gap-2">
             <AgentAvatar state={avatarState} />
@@ -336,6 +343,11 @@ export function GlobalAgentLauncher({ inline = false, portalContainer }: GlobalA
               <MessageBubble
                 key={`${message.timestamp}-${index}`}
                 message={message}
+                // A just-sent question is the last message; finished answers arrive here
+                // from the streaming bubble below, which already animated
+                animateIn={
+                  message.role === "user" && index === agent.messages.length - 1
+                }
                 processTitle={t("agent.process")}
                 sourcesTitle={t("agent.sources")}
               />
@@ -351,6 +363,7 @@ export function GlobalAgentLauncher({ inline = false, portalContainer }: GlobalA
                 }}
                 processTitle={t("agent.process")}
                 sourcesTitle={t("agent.sources")}
+                animateIn
               />
             )}
             {agent.pendingApproval && (
@@ -362,7 +375,7 @@ export function GlobalAgentLauncher({ inline = false, portalContainer }: GlobalA
               />
             )}
             {isBusy && !agent.currentAnswer && !agent.pendingApproval && (
-              <div className="flex justify-start animate-in fade-in duration-300">
+              <div className="flex justify-start animate-in fade-in-0 slide-in-from-bottom-1 duration-200">
                 <div className="flex items-center gap-2 rounded-2xl rounded-tl-sm border border-border/40 bg-muted/40 px-4 py-2.5 text-sm text-muted-foreground backdrop-blur-sm">
                   <Loader2 className="h-4 w-4 animate-spin text-indigo-500" />
                   <span>{runningStepTitle ?? t(`agent.status.${agent.status}`)}</span>
@@ -370,7 +383,7 @@ export function GlobalAgentLauncher({ inline = false, portalContainer }: GlobalA
               </div>
             )}
             {agent.error && (
-              <div className="animate-in fade-in slide-in-from-bottom-2 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive shadow-sm">
+              <div className="animate-in fade-in-0 slide-in-from-bottom-2 duration-200 rounded-xl border border-destructive/20 bg-destructive/5 px-4 py-3 text-sm text-destructive shadow-sm">
                 <div className="flex items-center gap-2 font-medium">
                   <AlertCircle className="h-4 w-4" />
                   Error
@@ -442,7 +455,7 @@ export function GlobalAgentLauncher({ inline = false, portalContainer }: GlobalA
                 type="button"
                 size="icon"
                 onClick={() => void agent.cancel()}
-                className="h-11 w-11 shrink-0 rounded-xl border border-indigo-500/30 bg-background text-indigo-600 shadow-md transition-all hover:scale-105 hover:bg-indigo-50 hover:shadow-lg dark:text-indigo-400 dark:hover:bg-indigo-500/10"
+                className="h-11 w-11 shrink-0 rounded-xl border border-indigo-500/30 bg-background text-indigo-600 shadow-md transition-[scale,background-color,box-shadow] duration-200 ease-out-strong hover:scale-105 active:scale-95 hover:bg-indigo-50 hover:shadow-lg dark:text-indigo-400 dark:hover:bg-indigo-500/10"
                 title={t("agent.stop")}
                 aria-label={t("agent.stop")}
               >
@@ -452,7 +465,7 @@ export function GlobalAgentLauncher({ inline = false, portalContainer }: GlobalA
               <Button
                 type="submit"
                 size="icon"
-                className="h-11 w-11 shrink-0 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 text-white shadow-md transition-all hover:scale-105 hover:shadow-lg disabled:opacity-50 disabled:hover:scale-100"
+                className="h-11 w-11 shrink-0 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 text-white shadow-md transition-[scale,box-shadow,opacity] duration-200 ease-out-strong hover:scale-105 hover:shadow-lg active:scale-95 disabled:opacity-50 disabled:hover:scale-100"
                 disabled={isBusy || !agent.query.trim()}
                 title={t("agent.send")}
               >

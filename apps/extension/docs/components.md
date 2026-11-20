@@ -142,7 +142,7 @@
 - 分析阶段保存表单已挂载但隐藏，分析完成后直接展示结果，避免二次等待；分析较慢时可点「直接编辑」立即展开表单。
 - 当前网址已有书签记录时，「更新书签」标题右侧显示带勾的「已保存」标签。首次保存时隐藏标签。
 - 浏览器内部页、隐私页面等无法保存时展示提示浮窗并自动消失。
-- 保存成功后展示成功提示并自动关闭；Esc 可随时关闭浮窗。
+- 保存成功后展示成功提示并自动关闭；Esc 可随时关闭浮窗。成功图标以 `animate-pop` 轻微弹出。
 - 面板渲染在 shadow root 内，分类下拉等 Popover 需通过 `portalContainer` 指定 portal 容器。
 - While the overlay is open, `useTabBusySignal` marks the tab as busy (renewed every 7.5 minutes), so auto archive and making room never close it mid-save.
 - Unless a clip (selection / image) is being saved, the header shows a **Read later** button (`ReadLaterInsteadButton`). It closes the overlay and sends `HAMHOME_READ_LATER_THIS_TAB`; the background queues the tab, closes it as configured and shows the usual undo toast.
@@ -182,6 +182,13 @@ Popup 快捷面板，扩展图标点击后的默认视图。保存书签的 AI �
 - `PopupTabsCard` shows budget usage, stale / duplicate tabs, today's automatic archiving (view / restore all) and pending confirmations; "Tidy up" expands `PopupTriagePanel` in place (most idle first, with read later / bookmark / archive buttons per tab).
 - `PopupRecentSection` switches between recent saves and the Read later queue (unread items, newest first); opening a queue item calls `readLaterOpen`, which marks it as reading.
 - Recent saves only list library bookmarks; queue-only read later items stay out.
+
+**Motion:**
+
+- On open, the header and each section rise in one after another (`motion-stagger`, 30 ms apart, about 360 ms in total).
+- `PopupTabsCard` and `PopupTriagePanel` share one wrapper, so "Tidy up" opens the panel at once with its own 200 ms fade-and-slide instead of waiting for a stagger step.
+- Action tiles press down to 0.97, their icon grows on hover with `ease-spring`, and the chevron slides right.
+- Switching to `PopupSaveView` slides it in from the right (200 ms). Going back remounts the quick panel and replays its entrance.
 
 ## BookmarkSubjectDialog / ImageClipMetadata
 
@@ -233,6 +240,13 @@ Popup 快捷面板，扩展图标点击后的默认视图。保存书签的 AI �
 ```tsx
 <BookmarksPage currentView="all" onViewChange={setCurrentView} />
 ```
+
+**Motion:**
+
+- 主区域切换页面时由 app 外壳（`entrypoints/app/App.tsx`）播放 `animate-page-enter`（280 ms 上移淡入）。外壳按页面而不是完整路由做 key，`settings?tab=storage` 这类页内参数变化不会重新挂载或重播。
+- 网格卡片悬停上抬 2px 并加深阴影，列表行只变背景和阴影不位移；视觉画廊卡片同样上抬，截图缓慢放大到 1.03 倍。
+- 卡片和行本身不加入场动画：瀑布流和列表都是虚拟渲染，滚动时会反复挂载。
+- 筛选后无结果的空状态以 `animate-rise` 出现。
 
 **行为说明：**
 
@@ -1516,6 +1530,8 @@ import { GlobalAgentLauncher } from "@/components/agent/GlobalAgentLauncher";
 - 对话视口停在底部时才即时跟随新增内容。向上滚动会暂停跟随，回到底部会继续。
 - While a turn runs, the send button becomes a stop button: the turn is aborted, nothing of it is saved, and its message goes back into the input
 - Long conversations stay within a token budget: earlier turns are summarized, and an "整理较早的对话" step appears in the process steps when that happens
+- 展开的对话面板从右下角（收起时提问栏的位置）缩放上移进入，250 ms；收起后提问栏同样从右下角出现
+- 刚发送的问题从右下角弹入；流式回答在第一个字到达时上移淡入。回答完成后转入历史列表不再重复动画，切换会话加载的历史消息也不播放入场动画
 
 ---
 

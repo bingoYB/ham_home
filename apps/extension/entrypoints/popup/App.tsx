@@ -42,10 +42,14 @@ export function App() {
   return (
     <div className="w-[420px]">
       {mode === "save" ? (
-        <PopupSaveView
-          onBack={() => setMode("quick")}
-          initialClip={pendingTrigger?.clip}
-        />
+        // Entering the save form reads as one step deeper; going back replays the
+        // quick panel's own staggered entrance
+        <div className="animate-in fade-in-0 slide-in-from-right-3 duration-200">
+          <PopupSaveView
+            onBack={() => setMode("quick")}
+            initialClip={pendingTrigger?.clip}
+          />
+        </div>
       ) : (
         <QuickPanel onFallbackToSaveView={() => setMode("save")} />
       )}

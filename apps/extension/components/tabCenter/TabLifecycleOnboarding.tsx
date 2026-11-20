@@ -138,7 +138,7 @@ export function TabLifecycleOnboarding({ open, onboarding, onOpenChange, onDone 
           <div className="flex flex-col items-center gap-3 py-6 text-center">
             <CheckCircle2
               data-testid="tab-onboarding-complete-icon"
-              className="h-10 w-10 text-emerald-500 transition-[opacity,scale] duration-180 ease-[cubic-bezier(0.23,1,0.32,1)] starting:opacity-0 motion-safe:starting:scale-95"
+              className="h-10 w-10 text-emerald-500 transition-[opacity,scale] duration-180 ease-out-strong starting:opacity-0 motion-safe:starting:scale-95"
             />
             <p className="text-sm font-medium">{t("tabCenter.onboarding.done")}</p>
           </div>

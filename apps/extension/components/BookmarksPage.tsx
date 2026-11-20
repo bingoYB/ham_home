@@ -965,7 +965,7 @@ export function BookmarksPage({ onViewChange }: BookmarksPageProps) {
         >
           {filteredBookmarks.length === 0 ? (
             <div className="flex flex-1 flex-col items-center justify-center p-8 text-muted-foreground">
-              <div className="flex flex-col items-center max-w-md text-center space-y-4">
+              <div className="flex flex-col items-center max-w-md text-center space-y-4 animate-rise">
                 <FolderOpen className="h-16 w-16 text-muted-foreground/30 mb-4" />
                 <p className="text-lg font-medium text-foreground">
                   {hasFilters

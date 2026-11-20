@@ -212,7 +212,7 @@ export function QuickPanel({ onFallbackToSaveView }: QuickPanelProps) {
           收口前的内容高度算，结果 viewport 比容器还高，直接把底栏顶出可视区。
           scrollbar-slim 保证滚动条是细条而不是系统默认样式 */}
       <div className="scrollbar-slim min-h-0 flex-1 overflow-y-auto overscroll-contain">
-        <div className="space-y-4 p-4">
+        <div className="space-y-4 p-4 motion-stagger">
           {/* Top: brand and settings */}
           <header className="flex items-center justify-between">
             <span className="text-sm font-semibold text-foreground">HamHome</span>
@@ -283,34 +283,37 @@ export function QuickPanel({ onFallbackToSaveView }: QuickPanelProps) {
             )}
           </section>
 
-          {/* Tabs: budget, tabs to tidy up, auto archived today */}
-          <PopupTabsCard
-            snapshot={snapshot}
-            recent={recentArchive.summary}
-            needsConsent={
-              lifecycle.pendingConsents.autoArchive || lifecycle.pendingConsents.autoMakeRoom
-            }
-            onboardingDone={!!lifecycle.state.onboardingCompletedAt}
-            triageOpen={triageOpen}
-            onToggleTriage={() => setTriageOpen((open) => !open)}
-            onViewArchive={() => openTab(getExtensionURL("app.html#tabs?view=archive"))}
-            onRestoreRecent={() => {
-              void recentArchive.restoreAll().then((count) =>
-                toast.success(t("bookmark:tabCenter.archive.restored", { count })),
-              );
-            }}
-            onConfirmPending={() => void tabActions.confirmPending()}
-            onOpenTabCenter={() => openTab(getExtensionURL("app.html#tabs"))}
-          />
-          {triageOpen && (
-            <PopupTriagePanel
-              tabs={triageTabs}
-              onReadLater={(tabId) => void tabActions.readLater([tabId])}
-              onBookmark={(tabId) => void tabActions.bookmark([tabId])}
-              onArchive={(tabId) => void tabActions.archive([tabId])}
-              onViewAll={() => openTab(getExtensionURL("app.html#tabs"))}
+          {/* Tabs: budget, tabs to tidy up, auto archived today. One wrapper so the
+              triage panel opens on its own animation, not as a late stagger step */}
+          <div className="space-y-4">
+            <PopupTabsCard
+              snapshot={snapshot}
+              recent={recentArchive.summary}
+              needsConsent={
+                lifecycle.pendingConsents.autoArchive || lifecycle.pendingConsents.autoMakeRoom
+              }
+              onboardingDone={!!lifecycle.state.onboardingCompletedAt}
+              triageOpen={triageOpen}
+              onToggleTriage={() => setTriageOpen((open) => !open)}
+              onViewArchive={() => openTab(getExtensionURL("app.html#tabs?view=archive"))}
+              onRestoreRecent={() => {
+                void recentArchive.restoreAll().then((count) =>
+                  toast.success(t("bookmark:tabCenter.archive.restored", { count })),
+                );
+              }}
+              onConfirmPending={() => void tabActions.confirmPending()}
+              onOpenTabCenter={() => openTab(getExtensionURL("app.html#tabs"))}
             />
-          )}
+            {triageOpen && (
+              <PopupTriagePanel
+                tabs={triageTabs}
+                onReadLater={(tabId) => void tabActions.readLater([tabId])}
+                onBookmark={(tabId) => void tabActions.bookmark([tabId])}
+                onArchive={(tabId) => void tabActions.archive([tabId])}
+                onViewAll={() => openTab(getExtensionURL("app.html#tabs"))}
+              />
+            )}
+          </div>
 
           {/* Recent saves / Read later */}
           <PopupRecentSection
@@ -402,7 +405,7 @@ function ActionTile({
       disabled={disabled}
       className={cn(
         "group flex items-center gap-2 rounded-xl border bg-card px-2 py-2 text-left",
-        "transition-all duration-150 hover:border-primary/40 hover:bg-muted hover:shadow-sm",
+        "transition-[background-color,border-color,box-shadow,scale] duration-150 ease-out-strong hover:border-primary/40 hover:bg-muted hover:shadow-sm",
         "active:scale-[0.97] active:shadow-none",
         "focus-visible:ring-2 focus-visible:ring-ring/50 focus-visible:outline-none",
         // 禁用时屏蔽指针事件，连带停掉 hover / active / group-hover 动效
@@ -412,7 +415,7 @@ function ActionTile({
       <span
         className={cn(
           "flex h-6 w-6 shrink-0 items-center justify-center rounded-md",
-          "transition-transform duration-150 group-hover:scale-110",
+          "transition-transform duration-200 ease-spring group-hover:scale-110",
           iconClassName,
         )}
       >
@@ -425,7 +428,7 @@ function ActionTile({
         </span>
         {hint && <Kbd>{hint}</Kbd>}
       </span>
-      <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground/60 transition-all duration-150 group-hover:translate-x-0.5 group-hover:text-primary" />
+      <ChevronRight className="h-3 w-3 shrink-0 text-muted-foreground/60 transition-[translate,color] duration-150 ease-out-strong group-hover:translate-x-0.5 group-hover:text-primary" />
     </button>
   );
 }
@@ -499,7 +502,7 @@ function LinkRow({ icon, label, description, onClick }: LinkRowProps) {
       onClick={onClick}
     >
       <RowLayout icon={icon} label={label} description={description}>
-        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60 transition-all duration-150 group-hover:translate-x-0.5 group-hover:text-primary" />
+        <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground/60 transition-[translate,color] duration-150 ease-out-strong group-hover:translate-x-0.5 group-hover:text-primary" />
       </RowLayout>
     </button>
   );

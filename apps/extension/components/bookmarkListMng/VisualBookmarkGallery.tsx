@@ -107,7 +107,7 @@ function VisualCard({
   return (
     <article
       ref={ref}
-      className={`group relative overflow-hidden rounded-2xl border bg-card transition-shadow hover:shadow-lg [content-visibility:auto] [contain-intrinsic-size:300px] ${
+      className={`group relative overflow-hidden rounded-2xl border bg-card transition-[box-shadow,translate] duration-200 ease-out-strong hover:shadow-lg motion-safe:hover:-translate-y-0.5 [content-visibility:auto] [contain-intrinsic-size:300px] ${
         selected ? "border-primary ring-2 ring-primary/20" : "border-border"
       }`}
     >
@@ -121,7 +121,7 @@ function VisualCard({
             src={url}
             alt={bookmark.title}
             loading="lazy"
-            className="h-full w-full object-cover object-top transition-transform duration-300 group-hover:scale-[1.02]"
+            className="h-full w-full object-cover object-top transition-transform duration-500 ease-out-strong group-hover:scale-[1.03]"
           />
         ) : (
           <span className="flex h-full items-center justify-center">

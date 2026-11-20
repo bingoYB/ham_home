@@ -28,7 +28,7 @@
   background: var(--dock);
   box-shadow: 0 2px 10px rgb(0 0 0 / 9%);
   transform: translateX(var(--inset));
-  transition: transform 140ms ease-out;
+  transition: transform 160ms var(--ease-out-strong, ease-out);
 }
 
 .hamhome-edge-trigger[data-position='right'] .hamhome-edge-dock {

@@ -75,7 +75,7 @@ function TreeRow({
         >
           <ChevronRight
             className={cn(
-              "h-3.5 w-3.5 transition-transform duration-150",
+              "h-3.5 w-3.5 transition-transform duration-150 ease-out-strong",
               expanded && "rotate-90",
             )}
           />
