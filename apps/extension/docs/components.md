@@ -863,6 +863,22 @@ Tab 分组规则列表组件，按规则名称、目标分组、颜色和折叠�
 
 书签面板相关组件，用于 Content UI 侧边书签浏览。
 
+### EdgeTrigger
+
+页内书签面板的边缘按钮。鼠标靠近设定的一侧时，带星芒的书签图标会随贴边的圆角短底座出现。浅色网页使用白色底座和品牌活力橙（`#FF5B24`）圆钮，深色网页使用炭灰底座和低亮度橙色圆钮。可点击区域为 44 × 64 px，支持键盘聚焦和减少动态效果。
+
+按钮显示时读取宿主网页的主题标记、入口附近的大面积背景和网页声明的 `color-scheme`，随网页切换明暗。缺少可用线索时使用系统偏好。书签面板本身仍使用插件设置中的主题。
+
+| Prop | Type | Required | Description |
+| --- | --- | --- | --- |
+| position | `"left" \| "right"` | ✓ | 按钮停靠的视口边缘 |
+| visible | `boolean` | ✓ | 显示按钮并允许交互 |
+| onClick | `() => void` | ✓ | 打开书签面板 |
+
+```tsx
+<EdgeTrigger position={position} visible={isTriggerVisible} onClick={openPanel} />
+```
+
 ### BookmarkPanel
 
 书签面板主容器组件，整合头部搜索筛选和分类树列表。

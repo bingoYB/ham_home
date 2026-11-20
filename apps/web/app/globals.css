@@ -11,7 +11,7 @@
   --font-display: 'DM Serif Display', Georgia, serif;
   --font-body: 'Noto Sans SC', system-ui, sans-serif;
 
-  --color-brand: #ff5b24;
+  --color-brand: var(--brand-orange);
   --color-brand-light: #ff8c5a;
   --color-brand-dark: #d94a1a;
   --color-brand-glow: #ff5b2433;

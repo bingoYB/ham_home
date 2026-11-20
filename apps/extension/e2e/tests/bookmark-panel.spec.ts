@@ -69,3 +69,47 @@ test("页内书签面板打开后才按需请求 favicon", async ({
   await page.keyboard.press("Escape");
   await expect(faviconImages).toHaveCount(0);
 });
+
+test("边缘按钮在同一网页内跟随站点主题和背景切换", async ({ context, e2eVariant }) => {
+  const page = await context.newPage();
+  await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
+  const url = "https://panel-theme.e2e.test/";
+  await page.route(url, route => route.fulfill({
+    contentType: "text/html",
+    body: `<!doctype html><meta name="color-scheme" content="light">
+      <style>body {margin:0} main {min-height:100vh; background:oklch(96% .01 60)}</style>
+      <main>Theme test</main>`,
+  }));
+  await page.goto(url);
+  await page.bringToFront();
+  const button = page.getByTitle(e2eVariant.text("打开书签面板", "Bookmark panel"));
+  await expect(button).toBeAttached();
+  await page.mouse.move(2, 120);
+  await expect(button).toBeVisible();
+
+  async function expectTheme(theme: "light" | "dark") {
+    await expect(button).toHaveAttribute("data-website-theme", theme);
+    await expect(button.locator(".hamhome-edge-dock")).toHaveCSS(
+      "background-color", theme === "light" ? "rgb(255, 253, 251)" : "rgb(34, 35, 36)",
+    );
+  }
+
+  await expectTheme("light");
+  await page.locator("main").evaluate(el => { el.style.backgroundColor = "oklch(20% .01 60)"; });
+  await expectTheme("dark");
+  await page.locator("main").evaluate(el => { el.style.backgroundColor = "transparent"; });
+  await expectTheme("light");
+  await page.evaluate(() => { document.documentElement.dataset.theme = "dark"; });
+  await expectTheme("dark");
+  await page.evaluate(() => {
+    delete document.documentElement.dataset.theme;
+    document.querySelector("meta")!.content = "light dark";
+  });
+  await page.emulateMedia({ colorScheme: "light", reducedMotion: "reduce" });
+  await expectTheme("light");
+  await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
+  await expectTheme("dark");
+
+  await button.click();
+  await expect(button).toBeHidden();
+});

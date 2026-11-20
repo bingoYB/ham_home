@@ -67,7 +67,7 @@ export function useEdgeTrigger({
       if (!hoverActive) return false;
 
       const windowWidth = window.innerWidth;
-      // 当触发器显示时，扩大判定区域，避免鼠标移到触发器上时消失（触发器宽度为 40px，预留 20px 缓冲）
+      // 触发器显示后保留缓冲区，避免指针移向按钮时意外收起。
       const effectiveZoneWidth = isTriggerVisible ? Math.max(triggerZoneWidth, 60) : triggerZoneWidth;
 
       if (position === 'left') {

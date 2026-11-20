@@ -4,6 +4,7 @@
 @custom-variant dark (&:is(.dark *));
 
 :root {
+  --brand-orange: #ff5b24;
   --background: oklch(0.9730 0.0133 286.1503);
   --foreground: oklch(0.2795 0.0368 260.0310);
   --card: oklch(1.0000 0 0);
